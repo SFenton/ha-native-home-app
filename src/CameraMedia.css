@@ -1,0 +1,31 @@
+.camera-media { min-width: 0; color: #fff; container-type: inline-size; }
+.camera-media-stage { position: relative; overflow: hidden; width: 100%; background: #000; border-radius: 22px; }
+.camera-media-stage video, .camera-media-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.camera-media-stage [hidden] { display: none; }
+.camera-media-viewer { box-sizing: border-box; width: 100%; max-width: 720px; margin-inline: auto; display: flex; flex-wrap: wrap; gap: 24px; padding: 0; }
+.camera-media-viewer > .camera-media-stage, .camera-media-viewer > .camera-media-controls { flex-basis: 100%; min-width: 0; }
+.camera-media-viewer .camera-media-stage { border-radius: 22px; }
+.camera-media-viewer video, .camera-media-viewer img { object-fit: contain; }
+.camera-media-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; text-align: center; background: #141416; font-size: 13px; overflow: auto; }
+.camera-media-placeholder > svg { flex-shrink: 0; width: 28px; height: 28px; }
+.camera-media-placeholder button { min-height: 44px; padding: 8px 16px; color: white; background: #333; border: 1px solid #777; border-radius: 12px; }
+.camera-media-stage:has(video[controls]) .camera-media-placeholder { pointer-events: none; padding-bottom: 48px; }
+.camera-media-stage:has(video[controls]) .camera-media-placeholder button { pointer-events: auto; }
+.camera-media-live { position: absolute; inset-block-start: 8px; inset-inline-start: 8px; padding: 3px 6px; border-radius: 5px; background: #000b; font-size: 11px; pointer-events: none; }
+.camera-media-controls { display: flex; flex-wrap: wrap; align-items: start; justify-content: center; gap: 12px; }
+.camera-media-controls .camera-media-control { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; min-width: 68px; min-height: 80px; padding: 0; color: #fff; border: 0; border-radius: 0; background: none; box-shadow: none; font-size: 13px; }
+.camera-media-control-circle { display: grid; place-items: center; width: max(44px, 3.5em); height: max(44px, 3.5em); font-size: 16px; border-radius: 50%; background: #ffffff29; }
+.camera-media-control-circle > svg { width: 24px; height: 24px; }
+.camera-media-control[aria-pressed=true] .camera-media-control-circle { color: #141416; background: #fff; }
+.camera-media-controls .camera-media-control:disabled { opacity: .5; cursor: not-allowed; }
+.camera-media-control:active:not(:disabled) .camera-media-control-circle { opacity: .8; }
+.camera-media-control:focus-visible { outline: 2px solid #74baff; outline-offset: 4px; }
+.camera-media-control-status, .camera-media-diagnostic { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.camera-media-control-status p { margin: 4px 0; }
+.camera-media-spinner { animation: camera-media-spin 1s linear infinite; }
+@container (min-width: 640px) {
+  .device-model.landscape:is(.device-ipad, .device-duo:not(.duo-closed)) .camera-media-viewer > .camera-media-stage { flex-basis: calc(50% - 12px); align-self: center; }
+  .device-model.landscape:is(.device-ipad, .device-duo:not(.duo-closed)) .camera-media-viewer > .camera-media-controls { flex-basis: calc(50% - 12px); align-content: center; flex-direction: column; align-items: center; }
+}
+@keyframes camera-media-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .camera-media-spinner { animation: none; } }

@@ -1,0 +1,10 @@
+export function isSafeUrl(value: string): boolean {
+  if (!value || /[\u0000-\u0020\\]/.test(value)) return false;
+  if (value.startsWith('/') && !value.startsWith('//')) return true;
+  try {
+    const url = new URL(value);
+    return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}

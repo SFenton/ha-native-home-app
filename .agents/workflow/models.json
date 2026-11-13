@@ -1,0 +1,18 @@
+{
+  "providerInstanceId": "acpRegistry_github_copilot",
+  "allowedModelFamily": "OpenAI",
+  "roles": {
+    "orchestrator": { "model": "gpt-6-astra", "options": { "reasoning_effort": "xhigh" } },
+    "researcher": { "model": "gpt-6-astra", "options": { "reasoning_effort": "xhigh" } },
+    "designer": { "model": "gpt-6-astra", "options": { "reasoning_effort": "xhigh" } },
+    "coder": { "model": "gpt-6.1-sol", "options": { "reasoning_effort": "high" } },
+    "verifier": { "model": "gpt-6.1-sol", "options": { "reasoning_effort": "high" } },
+    "reviewer": { "model": "gpt-6.1-sol", "options": { "reasoning_effort": "high" }, "independentFromAuthor": true },
+    "steward": { "model": "gpt-6.1-sol", "options": { "reasoning_effort": "high" } },
+    "menial": {
+      "model": "gpt-6.1-terra",
+      "options": { "reasoning_effort": "medium" },
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,54 @@
+.native-chores { position: relative; min-width: 0; color: var(--native-ink, #161619); font: inherit; }
+.native-chores .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.chore-section + .chore-section { margin-top: 24px; }
+.chore-section h3 { margin: 0 0 8px; font-size: 1.12em; }
+.chore-module { border-radius: 22px; background: var(--native-card, #fff); }
+.chore-row { position: relative; min-width: 0; overflow: clip; }
+.chore-row:first-child { border-radius: 22px 22px 0 0; }
+.chore-row:last-child { border-radius: 0 0 22px 22px; }
+.chore-row:only-child { border-radius: 22px; }
+.chore-row-front { position: relative; display: flex; align-items: center; background: linear-gradient(var(--native-card, #fff), var(--native-card, #fff)), var(--native-bg, #fff); touch-action: pan-y; }
+.chore-row + .chore-row .chore-row-front::before { content: ""; position: absolute; top: 0; left: 54px; right: 0; border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+.native-chores button, .native-chores input, .native-chores select, .native-chores textarea { font: inherit; }
+.native-chores button, .chore-menu summary { min-width: 44px; min-height: 44px; border: 0; cursor: pointer; }
+.native-chores :is(button,input,select,textarea,summary):focus-visible { outline: 3px solid var(--app-accent); outline-offset: -3px; }
+.native-chores :disabled { opacity: .5; cursor: not-allowed; }
+.chore-toggle { display: flex; align-items: center; justify-content: flex-start; flex: 1; min-width: 0; gap: 14px; padding: 14px 0 14px 16px; text-align: start; color: inherit; background: none; }
+.chore-check { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; box-sizing: border-box; flex: none; border: 1.5px solid color-mix(in srgb, currentColor 40%, transparent); border-radius: 50%; }
+.chore-copy { display: flex; flex-direction: column; min-width: 0; gap: 2px; overflow-wrap: anywhere; }
+.chore-copy small { font-size: .82em; opacity: .8; }
+.chore-due-warning { color: #b85900; }
+.chore-due-error { color: #c12924; }
+.appearance-dark .chore-due-warning { color: #ff9f0a; }
+.appearance-dark .chore-due-error { color: #ff6961; }
+.is-completed .chore-copy > span { text-decoration: line-through; opacity: .55; }
+.is-completed .chore-check { background: #248a3d; color: white; border-color: #248a3d; }
+.chore-accessory { flex: none; background: none; color: var(--app-accent); padding: 0 10px; }
+.chore-menu { position: static; flex: none; }
+.chore-menu summary { display: flex; align-items: center; justify-content: center; list-style: none; color: var(--app-accent); }
+.chore-menu summary::-webkit-details-marker { display: none; }
+.chore-menu[open] > div { position: fixed; z-index: 20; right: 16px; max-width: 230px; padding: 8px; border-radius: 16px; box-shadow: 0 5px 25px #0005; background: linear-gradient(var(--native-card, #fff), var(--native-card, #fff)), var(--native-bg, #fff); }
+.chore-menu button { display: block; width: 100%; text-align: start; background: none; color: inherit; }
+.chore-swipe-actions { position: absolute; display: flex; inset: 0; justify-content: flex-end; visibility: hidden; }
+.chore-swipe-actions[data-active="true"] { visibility: visible; }
+.chore-swipe-actions.leading { justify-content: flex-start; }
+.chore-swipe-actions button { width: 80px; padding: 8px; color: white; }
+.chore-swipe-actions.leading button { width: 100px; }
+.chore-complete-action { background: #248a3d; color: white; }
+.chore-edit-action { background: #007aff; color: white; }
+.chore-delete-action { background: #d32f2f; color: white; }
+.chore-add { display: flex; align-items: center; gap: 6px; margin: 18px 0 0 auto; padding: 10px 16px; border-radius: 24px; color: white; background: var(--app-accent); }
+.chore-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 40px 12px; }
+.chore-empty p { margin: 0; }
+.chore-simulation-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: .8em; margin-bottom: 12px; }
+.chore-simulation-status button { color: var(--app-accent); background: var(--native-card, #fff); border-radius: 12px; padding: 8px; }
+.chore-form-backdrop { position: absolute; inset: 56px 8px 12px; z-index: 40; background: #0005; display: flex; align-items: flex-start; padding: 0; }
+.chore-form { width: 100%; box-sizing: border-box; max-height: 100%; overflow: auto; padding: 16px; border-radius: 22px; background: linear-gradient(var(--native-card, #fff), var(--native-card, #fff)), var(--native-bg, #fff); box-shadow: 0 8px 25px #0004; }
+.chore-task-form { min-height: min(440px, 100%); }
+.chore-form header { display: flex; align-items: center; justify-content: space-between; }
+.chore-form header button { background: none; color: var(--app-accent); padding: 6px; }
+.chore-form label { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.chore-form :is(input,textarea,select) { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 10px; color: inherit; background: none; }
+.chore-form p { font-size: .8em; line-height: 1.4; }
+.chore-form > button { border-radius: 12px; padding: 8px 14px; margin-right: 8px; }
+@media (prefers-reduced-motion: reduce) { .native-chores * { scroll-behavior: auto; animation: none !important; transition: none !important; } }

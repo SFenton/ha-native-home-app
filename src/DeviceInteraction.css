@@ -1,0 +1,42 @@
+.native-node.editable-node,
+.native-node.editable-node * { user-select: none; -webkit-user-select: none; }
+.canvas-placement { position: absolute; z-index: 9; pointer-events: none; }
+.canvas-placement.vertical { left: 0; right: 0; height: calc(40% + 6px); }
+.canvas-placement.vertical.before { top: -6px; }
+.canvas-placement.vertical.after { bottom: -6px; }
+.canvas-placement.horizontal { top: 0; bottom: 0; width: calc(40% + 6px); }
+.canvas-placement.horizontal.before { left: -6px; }
+.canvas-placement.horizontal.after { right: -6px; }
+.canvas-placement::after { content: ''; position: absolute; border-radius: 4px; background: var(--teal); box-shadow: 0 0 0 2px #fff; opacity: 0; transition: opacity 100ms; }
+.canvas-placement.active::after { opacity: 1; }
+.canvas-placement.vertical::after { left: 0; right: 0; height: 3px; }
+.canvas-placement.horizontal::after { top: 0; bottom: 0; width: 3px; }
+.canvas-placement.before::after { top: 0; left: 0; }
+.canvas-placement.after::after { bottom: 0; right: 0; }
+.canvas-root-drop-cue { border-top: 3px solid var(--teal); color: var(--teal); margin-top: 12px; padding: 6px; text-align: center; font-size: 12px; }
+.native-node.canvas-drop-target { outline: none; }
+.device-stage.is-3d { touch-action: none; cursor: grab; user-select: none; }
+.device-stage.is-3d * { cursor: inherit; user-select: none; }
+.device-stage.orbiting { cursor: grabbing; }
+.device-stage.orbiting .device-model { transition: none; }
+.device-model { transform-origin: center; transition: transform 200ms ease, width 200ms ease, height 200ms ease; }
+.device-model[data-orientation="180"] .hardware-island { top: auto; bottom: 10px; }
+.device-model[data-orientation="180"] .hardware-notch { top: auto; bottom: -2px; transform: translateX(-50%) rotate(180deg); }
+.device-model[data-orientation="270"] .hardware-island,
+.device-model[data-orientation="270"] .hardware-notch { left: auto; right: 10px; transform: translateY(-50%) rotate(-90deg); }
+.device-model[data-orientation="180"] .device-button.power { right: auto; left: -4px; top: auto; bottom: 160px; }
+.device-model[data-orientation="180"] .device-button.volume { left: auto; right: -4px; top: auto; bottom: 160px; }
+.device-model.duo-folding { background: none; box-shadow: none; }
+.duo-fold-face { display: none; }
+.duo-folding .device-screen { opacity: 0; pointer-events: none; }
+.duo-folding .duo-fold-face { backface-visibility: visible; transition: transform 120ms linear; background: #17141b; box-shadow: 0 0 0 6px #928996, 0 18px 30px #30243c44; }
+.duo-folding .duo-fold-face { display: block; position: absolute; overflow: hidden; border: 4px solid #17141b; pointer-events: none; }
+.duo-folding .duo-fold-face img { display: block; position: absolute; }
+.duo-folding:not(.landscape) .duo-fold-face.leading { left: 10px; right: 10px; top: 10px; bottom: 50%; border-radius: 42px 42px 5px 5px; transform-origin: center bottom; transform: rotateX(var(--fold-angle)); }
+.duo-folding:not(.landscape) .duo-fold-face.trailing { left: 10px; right: 10px; top: 50%; bottom: 10px; border-radius: 5px 5px 42px 42px; transform-origin: center top; transform: rotateX(calc(-1 * var(--fold-angle))); }
+.duo-folding:not(.landscape) .duo-fold-face.trailing img { bottom: 0; }
+.duo-folding.landscape .duo-fold-face.leading { top: 10px; bottom: 10px; left: 10px; right: 50%; border-radius: 32px 5px 5px 32px; transform-origin: right center; transform: rotateY(calc(-1 * var(--fold-angle))); }
+.duo-folding.landscape .duo-fold-face.trailing { top: 10px; bottom: 10px; left: 50%; right: 10px; border-radius: 5px 32px 32px 5px; transform-origin: left center; transform: rotateY(var(--fold-angle)); }
+.duo-folding.landscape .duo-fold-face.trailing img { right: 0; }
+.device-dock { flex-wrap: wrap; justify-content: center; }
+.drag-footprint { width: 100%; height: 100%; } /* Keep dnd-kit's measured footprint independent of the readable label. */

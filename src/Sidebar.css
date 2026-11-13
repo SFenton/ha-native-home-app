@@ -1,0 +1,188 @@
+.sidebar .sidebar-help {
+  margin: 6px 18px 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.sidebar .sidebar-create-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 0;
+}
+.sidebar .sidebar-create-actions button {
+  flex: 1;
+  font-size: 11px;
+  min-height: 32px;
+  padding: 6px;
+}
+.sidebar .sidebar-tab-group {
+  margin: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sidebar .sidebar-tab-heading {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  background: var(--soft);
+}
+.sidebar .sidebar-tab-heading > button:first-child {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 7px 3px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.sidebar .sidebar-tab-heading > button:first-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar .sidebar-tab-heading svg { flex-shrink: 0; }
+.sidebar .sidebar-tab-pages { padding: 4px 0; }
+.sidebar .sidebar-surface { margin: 3px 12px; }
+.sidebar .sidebar-tab-pages .sidebar-surface { margin: 3px 4px; }
+.sidebar .sidebar-surface-row { display: flex; align-items: center; }
+.sidebar .sidebar-surface-row .page-row {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding: 8px;
+  gap: 7px;
+}
+.sidebar .sidebar-surface-row .page-row.active {
+  color: var(--accent);
+  background: var(--soft);
+  border-color: var(--line);
+}
+.sidebar .sidebar-surface-row .page-row > svg { flex-shrink: 0; }
+.sidebar .sidebar-page-note {
+  margin: 0 30px 6px;
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sidebar .tree-row { height: auto; min-height: 34px; flex-wrap: wrap; }
+.sidebar .tree-controls {
+  position: static;
+  flex-basis: 100%;
+  justify-content: flex-end;
+  background: transparent;
+  box-shadow: none;
+}
+.sidebar .tree-controls .icon-button { min-width: 26px; min-height: 26px; }
+.sidebar .tree-row > .icon-button { min-width: 28px; min-height: 28px; }
+.sidebar .inline-error { margin: 10px 12px; }
+.sidebar-context-menu {
+  position: fixed;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 5px;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 35px #25263326;
+}
+.sidebar-menu-title {
+  padding: 8px 9px;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  font-weight: 650;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.sidebar-context-menu > button {
+  justify-content: flex-start;
+  min-height: 34px;
+  text-align: start;
+  border-color: transparent;
+  font-size: 12px;
+}
+.sidebar-context-menu > button.sidebar-destructive { color: #a13e4e; }
+
+.sidebar [hidden] { display: none !important; }
+.component-library .palette-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px 28px;
+  align-items: center;
+  gap: 2px;
+}
+.component-library .palette-add { width: 100%; }
+.component-library .palette-add > div { min-width: 0; overflow-wrap: anywhere; }
+.component-library .palette-add > svg { display: none; }
+.component-library .palette-actions {
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 2px;
+  font-size: 10px;
+  border-color: transparent;
+  background: transparent;
+}
+.component-library .palette-drag {
+  position: static;
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 4px;
+}
+.component-library .library-search:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.component-library .library-search input:focus-visible { outline: none; }
+.sidebar .tree-expand { touch-action: auto; }
+
+@media (max-width: 1199px), (any-pointer: coarse) {
+  .sidebar :is(.icon-button, .drag-handle, .tree-expand),
+  .component-library :is(.palette-drag, .palette-actions) {
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+  }
+  .sidebar :is(.sidebar-tabs button, .sidebar-create-actions button, .sidebar-tab-heading > button:first-child, .page-row, .tree-label, .page-root, .variant-list button, .sidebar-footer > button, .outline-add, .delete-surface) {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .sidebar :is(.sidebar-surface-row, .tree-row, .sidebar-tab-heading) { gap: 4px; }
+  .sidebar .tree-row { padding-inline-end: 6px; }
+  .sidebar .tree-label span:first-of-type,
+  .sidebar .page-row > span:first-of-type,
+  .sidebar .sidebar-tab-heading > button:first-child span { white-space: normal; overflow-wrap: anywhere; }
+  .sidebar .tree-controls { display: none; }
+  .sidebar .tree-row > .icon-button { min-width: 44px; min-height: 44px; margin-inline-start: auto; }
+  .component-library .palette-item { grid-template-columns: minmax(0, 1fr) 52px 44px; gap: 4px; }
+  .component-library .palette-add { min-height: 52px; padding: 6px; gap: 8px; }
+  .component-library .palette-add strong { font-size: 14px; }
+  .component-library .palette-add small { display: block; font-size: 12px; }
+  .component-library .palette-add > span { width: 28px; height: 28px; }
+  .component-library .palette-actions { font-size: 11px; }
+  .component-library .library-search input { font-size: 16px; min-height: 36px; }
+  .component-library :is(.library-hint, .section-label) { font-size: 12px; line-height: 1.5; }
+  .sidebar :is(.sidebar-help, .sidebar-page-note, .inline-empty, .workspace-note) { font-size: 12px; }
+  .sidebar .sidebar-section-heading { font-size: 12px; letter-spacing: .5px; }
+  .sidebar .sidebar-project strong { font-size: 15px; }
+  .sidebar .sidebar-project small { display: block; font-size: 12px; }
+  .sidebar-context-menu > button { min-height: 44px; font-size: 14px; }
+  .sidebar-context-menu .sidebar-menu-title { font-size: 13px; }
+}
+
+@media (max-width: 700px), (max-height: 500px) {
+  .mobile-project-browser .sidebar { overflow-y: auto; }
+  .mobile-project-browser .sidebar-body { flex: 1 0 auto; overflow: visible; }
+  .mobile-project-browser .sidebar-footer { flex-shrink: 0; }
+  .mobile-project-browser .sidebar-top { padding: 12px 14px 0; }
+  .mobile-project-browser .sidebar-project { margin-bottom: 12px; }
+}

@@ -1,0 +1,31 @@
+name: Native Home Studio
+version: "0.1.0"
+slug: native_home_studio
+description: Design, preview, validate, and publish Native Home configurations.
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+stage: experimental
+init: true
+timeout: 30
+backup: cold
+ingress: true
+ingress_port: 4800
+panel_icon: mdi:cellphone-cog
+panel_title: Native Home Studio
+panel_admin: true
+homeassistant_api: true
+environment:
+  STUDIO_READ_ENDPOINTS_FILE: ""
+ports:
+  4800/tcp: null
+ports_description:
+  4800/tcp: Optional direct authoring port; configure auth_token before enabling.
+options:
+  auth_token: ""
+  enable_live_actions: false
+schema:
+  auth_token: password?
+  enable_live_actions: bool
