@@ -4,13 +4,14 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { once } from 'node:events';
 import { stringify } from 'yaml';
 import { z } from 'zod/v4';
-import { actionSchema, assertJsonBounds, DocumentValidationError, studioDocumentSchema, validateDocument } from '../src/shared/schema';
+import { actionSchema, assertJsonBounds, DocumentValidationError, MAX_DOCUMENT_BYTES, studioDocumentSchema, validateDocument } from '../src/shared/schema';
 import type { ServerConfig } from './config';
 import { HomeAssistantClient } from './ha';
 import { HttpError, StudioStore } from './store';
 import { readEndpointQuery } from './read-endpoints';
 
 const revision = z.number().int().positive();
+const documentRequestLimit = MAX_DOCUMENT_BYTES + 64 * 1024;
 const writeSchema = z.object({ document: z.unknown(), expectedRevision: revision }).strict();
 const publishSchema = z.object({ expectedRevision: revision }).strict();
 const feedbackSchema = z.object({
@@ -84,6 +85,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     }
     next();
   });
+  app.use(['/api/draft', '/api/validate'], express.json({ limit: documentRequestLimit, strict: true }));
   app.use(express.json({ limit: '1mb', strict: true }));
   app.post('/api/auth', (req, res) => {
     if (!config.authToken || typeof req.body?.token !== 'string' || !equalSecret(req.body.token, config.authToken)) { res.status(401).json({ error: 'Invalid authoring token' }); return; }
@@ -263,7 +265,10 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     if (error instanceof DocumentValidationError) { res.status(422).json({ error: error.message, errors: error.errors }); return; }
     if (error instanceof z.ZodError) { res.status(400).json({ error: 'Invalid request', errors: error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`) }); return; }
     if (error instanceof HttpError) { res.status(error.status).json({ error: error.message, ...(error.details && typeof error.details === 'object' ? error.details : {}) }); return; }
-    if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.too.large') { res.status(413).json({ error: 'Request body exceeds 1 MiB' }); return; }
+    if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.too.large') {
+      const limit = 'limit' in error && error.limit === documentRequestLimit ? '1 MiB plus 64 KiB of envelope space' : '1 MiB';
+      res.status(413).json({ error: `Request body exceeds ${limit}` }); return;
+    }
     if (error instanceof SyntaxError && 'body' in error) { res.status(400).json({ error: 'Malformed JSON request' }); return; }
     console.error('Studio request failed:', error instanceof Error ? error.name : 'UnknownError');
     res.status(500).json({ error: 'Internal server error; see server logs' });

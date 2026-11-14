@@ -43,6 +43,18 @@ async function fixture(overrides: Partial<ServerConfig> = {}) {
   return { directory, store, config, application, server, base, request };
 }
 
+function documentAtByteLength(size: number) {
+  const document = validateDocument(createSampleDocument());
+  const sample = Array<string>(1000).fill('');
+  document.dataSources.push({ id: 'large-sample', name: 'Large sample', kind: 'static', refreshSeconds: 60, sample });
+  const remaining = size - Buffer.byteLength(JSON.stringify(document));
+  const perItem = Math.floor(remaining / sample.length);
+  sample.fill('x'.repeat(perItem));
+  sample[0] += 'x'.repeat(remaining % sample.length);
+  expect(Buffer.byteLength(JSON.stringify(document))).toBe(size);
+  return document;
+}
+
 function houseConfig(cameraIds = ['camera.synthetic_entry', 'camera.synthetic_side']) {
   return {
     schema: 2, hash: 'a'.repeat(64),
@@ -619,6 +631,31 @@ describe('durable draft and immutable publishing API', () => {
     expect(reloaded.getDraft().document.name).toBe('Edited household');
     expect(reloaded.getDraft().revision).toBe(2);
   });
+  it('accepts a full-size document with its validate and save request envelopes', async () => {
+    const { request, store } = await fixture();
+    const document = documentAtByteLength(1024 * 1024);
+    expect(validateDocument(document)).toEqual(document);
+    const validation = await request('/api/validate', 'POST', { document });
+    expect(validation.status).toBe(200);
+    expect(await validation.json()).toEqual({ valid: true, errors: [] });
+    const saved = await request('/api/draft', 'PUT', { document, expectedRevision: 1 });
+    expect(saved.status).toBe(200);
+    expect(store.getDraft().document).toEqual(document);
+    expect((await request('/api/publish', 'POST', { expectedRevision: 2 })).status).toBe(200);
+    expect(store.getPublished().document).toEqual(document);
+  });
+  it('rejects a one-byte-oversized document without replacing the draft', async () => {
+    const { request, store } = await fixture();
+    const before = store.getDraft();
+    const document = documentAtByteLength(1024 * 1024 + 1);
+    const validation = await request('/api/validate', 'POST', { document });
+    expect(validation.status).toBe(200);
+    expect(await validation.json()).toEqual({ valid: false, errors: ['document: exceeds the 1 MiB serialized size limit'] });
+    const saved = await request('/api/draft', 'PUT', { document, expectedRevision: 1 });
+    expect(saved.status).toBe(422);
+    expect(store.getDraft()).toEqual(before);
+    expect((await request('/api/published')).status).toBe(404);
+  });
   it('publishes separately, preserves immutable snapshots, and exposes ETags', async () => {
     const { request, store, directory } = await fixture();
     const published = await (await request('/api/publish', 'POST', { expectedRevision: 1 })).json();
@@ -1025,7 +1062,12 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     expect((await request('/api/data/%2e%2e%2fsecret')).status).toBe(400);
     expect((await request('/api/data/https%3A%2F%2Fexample.com')).status).toBe(400);
     expect((await request('/api/proxy?url=http://169.254.169.254')).status).toBe(404);
-    expect((await request('/api/draft', 'PUT', { document: 'x'.repeat(1024 * 1024 + 1), expectedRevision: 1 })).status).toBe(413);
+    const oversized = await request('/api/draft', 'PUT', { document: 'x'.repeat(1024 * 1024 + 64 * 1024 + 1), expectedRevision: 1 });
+    expect(oversized.status).toBe(413);
+    expect(await oversized.json()).toEqual({ error: 'Request body exceeds 1 MiB plus 64 KiB of envelope space' });
+    const oversizedLogin = await request('/api/auth', 'POST', { token: 'x'.repeat(1024 * 1024 + 1) });
+    expect(oversizedLogin.status).toBe(413);
+    expect(await oversizedLogin.json()).toEqual({ error: 'Request body exceeds 1 MiB' });
     const document = createSampleDocument();
     document.dataSources[1].entityId = '../config';
     expect((await request('/api/draft', 'PUT', { document, expectedRevision: 1 })).status).toBe(422);

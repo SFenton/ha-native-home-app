@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test';
 const image = process.argv[2] ?? 'native-home-studio:check';
 const token = randomBytes(32).toString('hex');
 let container;
+let volume;
 let proxy;
 let browser;
 const docker = (...args) => execFileSync('docker', args, {
@@ -32,7 +33,9 @@ async function waitUntilReady(base) {
 }
 
 try {
+  volume = docker('volume', 'create');
   container = docker('run', '--detach', '--rm', '--publish', '127.0.0.1::4800',
+    '--mount', `type=volume,source=${volume},target=/data`,
     '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
   const bindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   let base = `http://127.0.0.1:${bindings['4800/tcp'][0].HostPort}`;
@@ -72,6 +75,20 @@ try {
   assert.equal(restored.revision, published.revision);
   assert.equal(restored.document.name, 'Container persistence check');
 
+  docker('stop', '--time', '10', container);
+  container = undefined;
+  container = docker('run', '--detach', '--rm', '--publish', '127.0.0.1::4800',
+    '--mount', `type=volume,source=${volume},target=/data`,
+    '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
+  const replacementBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
+  base = `http://127.0.0.1:${replacementBindings['4800/tcp'][0].HostPort}`;
+  await waitUntilReady(base);
+  const afterReplacement = await (await fetch(`${base}/api/published`, { headers })).json();
+  assert.deepEqual(afterReplacement, restored, 'Replacing the container must preserve the publication');
+  const draftAfterReplacement = await (await fetch(`${base}/api/draft`, { headers })).json();
+  assert.equal(draftAfterReplacement.revision, saved.revision);
+  assert.deepEqual(draftAfterReplacement.document, saved.document);
+
   const mount = '/api/hassio_ingress/studio-test/';
   const escapedRequests = [];
   proxy = http.createServer((request, response) => {
@@ -108,7 +125,7 @@ try {
   assert.equal(ingressDraft.document.pages[0].title, 'Ingress route check');
   assert.deepEqual(browserErrors, []);
   assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/')), []);
-  console.log('Production container: auth, assets, save/publish, restart persistence, and mounted-path browser routing passed.');
+  console.log('Production container: auth, assets, save/publish, restart/replacement persistence, and mounted-path browser routing passed.');
 } finally {
   await browser?.close();
   if (proxy) {
@@ -116,4 +133,5 @@ try {
     await new Promise(resolve => proxy.close(resolve));
   }
   if (container) docker('stop', '--time', '10', container);
+  if (volume) docker('volume', 'rm', volume);
 }

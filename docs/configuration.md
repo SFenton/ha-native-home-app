@@ -59,7 +59,10 @@ Unknown versions, fields, component types, and action types fail validation.
 IDs are bounded and component IDs are unique across the document. At most 50
 pages, 64 modals, 20 Live Activities, 100 data sources, 100 variables, and 2000
 components are supported. Component nesting is limited to eight levels; JSON
-recursion and the 1 MiB request body also have hard bounds. HTTP(S) and
+recursion and the 1 MiB serialized document also have hard bounds. Draft-save
+and validation request bodies allow an additional 64 KiB for the JSON envelope
+and whitespace; this does not increase the document limit. Other request bodies
+remain limited to 1 MiB. HTTP(S) and
 root-relative action URLs are accepted; credential-bearing, protocol-relative,
 script, file, and data URLs are rejected. Service targets are a single safe
 entity ID; target overrides in service data are rejected.

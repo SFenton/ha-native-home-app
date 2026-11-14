@@ -11,11 +11,16 @@ RUN npm run build
 FROM ${BUILD_FROM}
 ARG BUILD_ARCH
 ARG BUILD_VERSION=0.1.0
+ARG BUILD_REVISION=development
 LABEL io.hass.name="Native Home Studio" \
       io.hass.description="Server-driven Native Home configuration studio" \
       io.hass.arch="${BUILD_ARCH}" \
       io.hass.type="addon" \
-      io.hass.version="${BUILD_VERSION}"
+      io.hass.version="${BUILD_VERSION}" \
+      org.opencontainers.image.title="Native Home Studio" \
+      org.opencontainers.image.source="https://github.com/SFenton/ha-native-home-app" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.revision="${BUILD_REVISION}"
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=4800 DATA_DIR=/data/studio
 COPY package.json package-lock.json ./

@@ -1,8 +1,9 @@
 # Deploy Native Home Studio
 
-This repository contains buildable Home Assistant app packaging, not evidence
-that an app has been installed on your Home Assistant. The existing native-home
-integration and iOS app are not modified or replaced.
+This repository publishes Home Assistant app images and a separate `stable`
+distribution branch. A successful release is not evidence that the app has been
+installed on your Home Assistant. The existing native-home integration and
+iOS app are not modified or replaced.
 
 ## Local development
 
@@ -30,20 +31,36 @@ apps (formerly add-ons). This is not a custom integration installed under
 `custom_components`, and Home Assistant Container alone does not provide the
 Supervisor app store.
 
-1. Copy the complete repository checkout, excluding local dependencies, local
-   data, and secrets, into a dedicated local app directory such as
-   `/addons/native_home_studio` on the HA host. `config.yaml`, `Dockerfile`,
-   `package.json`, and source folders must all be in that directory.
-2. Reload the app store's local app list. Select **Native Home Studio**, install
-   it (the Supervisor builds locally), and start it.
+1. In **Settings > Apps > Install app**, open the top-right menu and select
+   **Repositories**. Add
+   `https://github.com/SFenton/ha-native-home-app#stable`.
+2. Reload the app store. Select **Native Home Studio**, install it, and start it.
+   Supervisor pulls the versioned image for your CPU; no local build is needed.
 3. Use **Open Web UI** / the Native Home Studio sidebar entry. Ingress provides
    authenticated HA access. The direct host port is disabled by default.
 
-This checkout is an **individual app build context**, not yet a published app
-store repository. Adding its URL to the store is not an installation path.
-For store distribution, a separate repository must contain `repository.yaml`
-at its root and this app's build context in a child folder. The supplied
-`repository.yaml` is metadata for that future distribution layout.
+The `#stable` suffix is required. Source development lives on `master`; the
+release pipeline creates `stable` with `repository.yaml` at the root and
+`native_home_studio/config.yaml` in a child folder. It advances this branch only
+after both architecture images pass their production smoke checks and the
+versioned multi-architecture image is anonymously readable. Before the first
+successful release, `stable` does not exist. The repository and GHCR package
+must be public; see [release setup](releasing.md).
+
+### Updates
+
+Home Assistant periodically refreshes the repository. To check immediately,
+refresh the app store, open Native Home Studio, and select **Update** when a
+new version appears. Back up the app before upgrading. App options and
+`/data/studio` persist across container replacement, so drafts and publications
+are retained. Automatic updates can be enabled in the app's settings; review
+the changelog first. Breaking releases must declare `breaking_versions` to
+prevent unattended upgrades across a migration boundary.
+
+Keep the exact repository URL, including `#stable`, unchanged: Supervisor uses
+it to derive the app's repository ID. Moving from a manually installed local
+app creates a different installation; back up and migrate its data deliberately
+rather than assuming the new installation shares the old app's `/data`.
 
 The package declares `amd64` and `aarch64`, uses a multi-architecture Node 22
 Alpine image, and stores app state in persistent `/data/studio`. `/data` is
@@ -52,6 +69,11 @@ container needs neither host networking nor privileged mode nor host filesystem
 access. It requests `homeassistant_api` for live state reads and opt-in service
 calls; the resulting Supervisor token is an administrator credential and stays
 server-side.
+
+For local app development instead, copy the source checkout without dependencies,
+data, or secrets into `/addons/native_home_studio`, remove `image` from that
+local copy of `config.yaml`, and reload the local app list. Supervisor then builds
+the root Dockerfile locally. Do not remove `image` from the released manifest.
 
 ### Options
 
