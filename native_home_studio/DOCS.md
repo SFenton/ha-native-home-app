@@ -45,7 +45,7 @@ release pipeline creates `stable` with `repository.yaml` at the root and
 after both architecture images pass their production smoke checks and the
 versioned multi-architecture image is anonymously readable. Before the first
 successful release, `stable` does not exist. The repository and GHCR package
-must be public; see [release setup](https://github.com/SFenton/ha-native-home-app/blob/c5ed50013bb8adebfc788a9b38b669fb5b8c4493/docs/releasing.md).
+must be public; see [release setup](https://github.com/SFenton/ha-native-home-app/blob/1d1e05bbcaac9397cafe220edf43d9d60f2ae436/docs/releasing.md).
 
 ### Updates
 
@@ -61,6 +61,25 @@ Keep the exact repository URL, including `#stable`, unchanged: Supervisor uses
 it to derive the app's repository ID. Moving from a manually installed local
 app creates a different installation; back up and migrate its data deliberately
 rather than assuming the new installation shares the old app's `/data`.
+
+### Native UIKit workspace
+
+Version 0.2.1 adds the separate **Native UIKit** schema-2 workspace under
+`native/api/`. Existing schema-1 drafts and publications remain unchanged.
+Native documents, immutable revisions, and content-addressed image assets are
+stored under `/data/studio/native-v2`, included in the app's persistent storage.
+
+When transferring a native workspace from a standalone Studio, back up both
+installations first. Transfer every referenced image through the native asset
+API, validate the document on the destination, and import its content using the
+destination workspace's document ID. Save with the destination's current
+`expectedRevision`, then publish that returned revision. Do not copy source
+publisher IDs, overwrite store files in a running app, or down-convert a
+schema-2 document into the legacy editor. Publishing here does not reconfigure
+or deploy a native client.
+
+See the [native composition contract](https://github.com/SFenton/ha-native-home-app/blob/master/docs/native-composition.md)
+for the protocol and current limitations.
 
 The package declares `amd64` and `aarch64`, uses a multi-architecture Node 22
 Alpine image, and stores app state in persistent `/data/studio`. `/data` is
@@ -139,7 +158,7 @@ actuation is added. Keep `ENABLE_LIVE_ACTIONS=false` for read-only preview.
 This endpoint has no unauthenticated sample-demo mode and never replaces an
 unavailable live bootstrap with samples. The eight-second, bounded snapshot
 preserves the integration envelope and returns only safe state fields for
-referenced entities; see [the API contract](https://github.com/SFenton/ha-native-home-app/blob/c5ed50013bb8adebfc788a9b38b669fb5b8c4493/docs/configuration.md#read-only-native-bootstrap)
+referenced entities; see [the API contract](https://github.com/SFenton/ha-native-home-app/blob/1d1e05bbcaac9397cafe220edf43d9d60f2ae436/docs/configuration.md#read-only-native-bootstrap)
 for limits and rejection rules. Credential-bearing layout data is rejected,
 not silently redacted. Provision credentials privately, restart the Studio
 process, and sign in through the existing authoring-token or verified admin
@@ -171,12 +190,12 @@ Camera loading stops when live data is off, the viewer is offscreen, or the tab
 is hidden. Sound is available only when the browser detects an HLS audio track;
 MJPEG is explicitly video-only.
 Stream failures are explicit and offer reconnection; Studio never labels a
-static image as live video. See the [media contract](https://github.com/SFenton/ha-native-home-app/blob/c5ed50013bb8adebfc788a9b38b669fb5b8c4493/docs/configuration.md#live-camera-media)
+static image as live video. See the [media contract](https://github.com/SFenton/ha-native-home-app/blob/1d1e05bbcaac9397cafe220edf43d9d60f2ae436/docs/configuration.md#live-camera-media)
 for limits and supported transport.
 
 ## Operations and limits
 
-The configuration protocol is documented in [configuration.md](https://github.com/SFenton/ha-native-home-app/blob/c5ed50013bb8adebfc788a9b38b669fb5b8c4493/docs/configuration.md).
+The configuration protocol is documented in [configuration.md](https://github.com/SFenton/ha-native-home-app/blob/1d1e05bbcaac9397cafe220edf43d9d60f2ae436/docs/configuration.md).
 `api/health` is authenticated in production; `haConnected` is a real probe result,
 not inferred from a configured credential. A published document is separate
 from the mutable draft and starts absent. Keep backups of `/data/studio` before

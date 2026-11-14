@@ -1,5 +1,5 @@
 name: Native Home Studio
-version: 0.1.0
+version: 0.2.1
 slug: native_home_studio
 image: ghcr.io/sfenton/native-home-studio
 arch:
