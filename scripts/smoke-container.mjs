@@ -67,6 +67,36 @@ try {
   });
   assert.equal(publishedResponse.status, 200);
   const published = await publishedResponse.json();
+
+  assert.equal((await fetch(`${base}/native/api/draft`)).status, 401, 'Native authoring must also require authentication');
+  const nativeDraft = await (await fetch(`${base}/native/api/draft`, { headers })).json();
+  assert.equal(nativeDraft.document.schemaVersion, '2.0');
+  nativeDraft.document.name = 'Native container persistence check';
+  const nativeValidation = await fetch(`${base}/native/api/validate`, {
+    method: 'POST', headers, body: JSON.stringify({ document: nativeDraft.document }),
+  });
+  assert.equal(nativeValidation.status, 200);
+  assert.equal((await nativeValidation.json()).valid, true);
+  const nativeSavedResponse = await fetch(`${base}/native/api/draft`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ document: nativeDraft.document, expectedRevision: nativeDraft.revision }),
+  });
+  assert.equal(nativeSavedResponse.status, 200);
+  const nativeSaved = await nativeSavedResponse.json();
+  const nativePublishedResponse = await fetch(`${base}/native/api/publish`, {
+    method: 'POST', headers, body: JSON.stringify({ expectedRevision: nativeSaved.revision }),
+  });
+  assert.equal(nativePublishedResponse.status, 200);
+  const nativePublished = await nativePublishedResponse.json();
+  assert.deepEqual(nativePublished.document, nativeDraft.document);
+  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const uploadedResponse = await fetch(`${base}/native/api/assets`, {
+    method: 'POST', headers: { ...headers, 'Content-Type': 'image/png' }, body: pixel,
+  });
+  assert.equal(uploadedResponse.status, 201);
+  const uploaded = await uploadedResponse.json();
+  assert.match(uploaded.source.path, /^\/api\/assets\/[a-f0-9]{64}\.png$/);
+
   docker('restart', container);
   const restartedBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${restartedBindings['4800/tcp'][0].HostPort}`;
@@ -88,6 +118,11 @@ try {
   const draftAfterReplacement = await (await fetch(`${base}/api/draft`, { headers })).json();
   assert.equal(draftAfterReplacement.revision, saved.revision);
   assert.deepEqual(draftAfterReplacement.document, saved.document);
+  const nativeAfterReplacement = await (await fetch(`${base}/native/api/published`, { headers })).json();
+  assert.deepEqual(nativeAfterReplacement, nativePublished, 'Native publication must survive container replacement without changing legacy state');
+  const nativeAssetAfterReplacement = await fetch(`${base}/native${uploaded.source.path}`, { headers });
+  assert.equal(nativeAssetAfterReplacement.status, 200);
+  assert.deepEqual(Buffer.from(await nativeAssetAfterReplacement.arrayBuffer()), pixel);
 
   const mount = '/api/hassio_ingress/studio-test/';
   const escapedRequests = [];
@@ -123,9 +158,15 @@ try {
   await tab.getByText(/Draft saved/).first().waitFor();
   const ingressDraft = await (await fetch(`${base}/api/draft`, { headers })).json();
   assert.equal(ingressDraft.document.pages[0].title, 'Ingress route check');
+  const mountedNative = await fetch(`http://127.0.0.1:${address.port}${mount}native/api/published`);
+  assert.equal(mountedNative.status, 200);
+  assert.deepEqual(await mountedNative.json(), nativePublished);
+  const mountedAsset = await fetch(`http://127.0.0.1:${address.port}${mount}native${uploaded.source.path}`);
+  assert.equal(mountedAsset.status, 200);
+  assert.deepEqual(Buffer.from(await mountedAsset.arrayBuffer()), pixel);
   assert.deepEqual(browserErrors, []);
-  assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/')), []);
-  console.log('Production container: auth, assets, save/publish, restart/replacement persistence, and mounted-path browser routing passed.');
+  assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/') || url?.startsWith('/native/')), []);
+  console.log('Production container: legacy/native auth, assets, save/publish, restart/replacement persistence, and mounted-path routing passed.');
 } finally {
   await browser?.close();
   if (proxy) {

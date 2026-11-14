@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createSampleDocument } from '../../src/shared/sample';
+import { compileCompositionDocument } from '../../src/shared/composition/compiler';
+import { createCompositionDocument, type CompositionDraft } from '../../src/shared/composition/workspace';
 import { parse as parseYaml } from 'yaml';
 
 test.beforeEach(async ({ request }) => {
@@ -105,6 +107,43 @@ test('edits persist across reload and publish the exact saved document', async (
   const published = await (await request.get('/api/published')).json();
   expect(published.revision).toBe(draft.revision);
   expect(published.document).toEqual(draft.document);
+});
+
+test('switching workspaces retains both local drafts and saves only the active workspace', async ({ page, request }) => {
+  const legacy = await (await request.get('/api/draft')).json();
+  const document = createCompositionDocument('synthetic-workspace-document');
+  let native: CompositionDraft = {
+    envelopeVersion: '2.0', publisherId: 'synthetic-workspace-publisher', revision: 1,
+    updatedAt: '2026-11-13T10:00:00Z', document,
+    capabilities: compileCompositionDocument(document).capabilities,
+    assetManifestSha256: 'a'.repeat(64),
+  };
+  await page.route('**/native/api/draft', async route => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON();
+      expect(body.expectedRevision).toBe(native.revision);
+      native = { ...native, document: body.document, revision: native.revision + 1 };
+    }
+    await route.fulfill({ json: native });
+  });
+  await page.goto('/');
+  await page.getByLabel('Page title', { exact: true }).fill('Unsaved schema-1 page');
+  await page.getByRole('button', { name: 'Native composition', exact: true }).click();
+  await page.getByLabel('Composition name', { exact: true }).fill('Unsaved schema-2 composition');
+  await page.getByRole('button', { name: '1.0 workspace', exact: true }).click();
+  await expect(page.getByLabel('Page title', { exact: true })).toHaveValue('Unsaved schema-1 page');
+  await page.getByRole('button', { name: 'Native composition', exact: true }).click();
+  await expect(page.getByLabel('Composition name', { exact: true })).toHaveValue('Unsaved schema-2 composition');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect.poll(() => native.document.name).toBe('Unsaved schema-2 composition');
+  await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+  expect(await (await request.get('/api/draft')).json()).toEqual(legacy);
+  await page.getByRole('button', { name: '1.0 workspace', exact: true }).click();
+  await expect(page.getByLabel('Page title', { exact: true })).toHaveValue('Unsaved schema-1 page');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect.poll(async () => (await (await request.get('/api/draft')).json()).document.pages[0].title)
+    .toBe('Unsaved schema-1 page');
+  expect(native.revision).toBe(2);
 });
 
 test('Edit retains the open modal, selected sheet tab and presenting page', async ({ page, request }) => {

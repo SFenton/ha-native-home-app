@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, closestCenter, pointerWithin, useSensor, useSensors, type CollisionDetection, type DragEndEvent, type DragStartEvent, type KeyboardCoordinateGetter } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { AlertCircle, ArrowLeft, ArrowUpRight, Check, CheckCircle2, ChevronRight, Cloud, Code2, Download, FileUp, Hand, History, Home, Layers, LoaderCircle, MousePointer2, PanelRight, Play, Plus, Redo2, Save, Send, Smartphone, Undo2, Upload, X } from 'lucide-react';
@@ -19,6 +19,7 @@ import Inspector from './Inspector';
 import DevicePreview, { initialPreview } from './DevicePreview';
 import { DataPanel, NavigationPanel, VariablesPanel } from './ProjectPanels';
 import { Dialog, EmptyState, Field, Icon, IconButton, SelectField, TextField } from './ui';
+const NativeCompositionWorkspace = lazy(() => import('./NativeCompositionWorkspace'));
 
 type DialogKind = 'source' | 'import' | 'native-import' | 'publish' | 'reset' | 'reload' | 'delete-surface' | 'report-issue' | 'request-feature' | undefined;
 type ActionLog = { id: string; time: string; message: string; tone: 'info' | 'error' | 'success' };
@@ -44,6 +45,14 @@ function downloadText(content: string, name: string, mime: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export default function App() {
+  const [native, setNative] = useState(false);
+  const [visitedNative, setVisitedNative] = useState(false);
+  return <>
+    <div hidden={native}><LegacyStudio active={!native} onNative={() => { setVisitedNative(true); setNative(true); }}/></div>
+    {visitedNative && <div hidden={!native}><Suspense fallback={<div className="loading-card" role="status">Loading native composition controls...</div>}><NativeCompositionWorkspace active={native} onLegacy={() => setNative(false)}/></Suspense></div>}
+  </>;
+}
+function LegacyStudio({ active, onNative }: { active: boolean; onNative: () => void }) {
   const studio = useStudio();
   const { document, apply, notify } = studio;
   const [target, setTarget] = useState<Target>({ kind: 'page', id: 'home' });
@@ -68,11 +77,11 @@ export default function App() {
   const [dragging, setDragging] = useState<string>();
   const variables = useMemo(() => ({ ...document?.variables, ...variableOverrides }), [document?.variables, variableOverrides]);
   const activeQuerySourceIds = useMemo(() => {
-    if (!document || editing || settings.threeD || view !== 'design' || dialog || target.kind === 'activity') return [];
+    if (!active || !document || editing || settings.threeD || view !== 'design' || dialog || target.kind === 'activity') return [];
     const surface = previewModal ? document.modals.find(modal => modal.id === previewModal)
       : document.pages.find(page => page.id === previewPage) ?? document.pages.find(page => page.id === document.navigation.initialPageId);
     return surface?.search?.mode === 'endpoint' ? [surface.search.sourceId] : [];
-  }, [document, editing, settings.threeD, view, dialog, target.kind, previewModal, previewPage]);
+  }, [active, document, editing, settings.threeD, view, dialog, target.kind, previewModal, previewPage]);
   const { liveEnabled, queryLiveEnabled, changeLive, enableQueryReads, dataResults, dataModes, dataErrors, fetchData } = usePreviewData(document, studio.savedDataSources, studio.serverMode, notify, variables, activeQuerySourceIds);
   const [nativeImport, setNativeImport] = useState<ReturnType<typeof importNativeHome>>();
   const variableKey = JSON.stringify(document?.variables ?? {});
@@ -199,6 +208,7 @@ export default function App() {
   }
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
+      if (!active) return;
       if (globalThis.document.querySelector('dialog[open]')) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void studio.save(); }
       if ((event.target as HTMLElement).closest('input,textarea,select,[contenteditable=true]')) return;
@@ -253,6 +263,7 @@ export default function App() {
   return <div className={`studio ${showInspector && view === 'design' ? 'with-inspector' : 'without-inspector'}`}>
     <header className="studio-header">
       <a className="brand" href="./" onClick={event => { if (studio.dirty) { event.preventDefault(); openDialog('reload'); } }}><span className="brand-symbol"><Home size={21}/></span><span>native home <b>STUDIO</b></span></a>
+      <button onClick={onNative}>Native composition</button>
       <div className="project-name">{document?.name ?? 'Your native experience'} <span className="badge">DRAFT</span></div>
       <span className={`save-status ${studio.dirty ? 'unsaved' : ''}`}><Cloud size={15}/>{studio.busy ? 'Saving changes…' : studio.dirty ? 'Unsaved changes' : document ? 'All changes saved' : 'Connecting'}</span>
       <IconButton label="Undo (Ctrl+Z)" disabled={!studio.canUndo || studio.busy} onClick={studio.undo}><Undo2 size={17}/></IconButton><IconButton label="Redo (Ctrl+Shift+Z)" disabled={!studio.canRedo || studio.busy} onClick={studio.redo}><Redo2 size={17}/></IconButton>

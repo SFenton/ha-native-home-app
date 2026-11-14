@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { createSampleDocument } from '../src/shared/sample';
 import { validateDocument } from '../src/shared/schema';
 import type { DraftEnvelope, PublishedEnvelope, StudioDocument } from '../src/shared/types';
+import { CompositionStore } from './composition-store';
 
 export class HttpError extends Error {
   constructor(public readonly status: number, message: string, public readonly details?: unknown) { super(message); }
@@ -38,7 +39,7 @@ async function readJson(file: string): Promise<unknown> {
   } finally { await handle.close(); }
 }
 
-async function atomicJson(file: string, value: unknown) {
+export async function atomicJson(file: string, value: unknown) {
   const temporary = `${file}.${randomUUID()}.tmp`;
   const handle = await open(temporary, 'wx', 0o600);
   try {
@@ -70,6 +71,7 @@ function publishedFromDisk(raw: unknown): PublishedEnvelope {
 }
 
 export class StudioStore {
+  native!: CompositionStore;
   private draft!: DraftEnvelope;
   private published?: PublishedEnvelope;
   private sequence: Promise<unknown> = Promise.resolve();
@@ -104,6 +106,7 @@ export class StudioStore {
         const snapshot = publishedFromDisk(await readJson(path.join(store.directory, 'revisions', `${store.published.revision}.json`)));
         if (JSON.stringify(snapshot) !== JSON.stringify(store.published)) throw new Error('Published pointer does not match its immutable revision snapshot');
       }
+      store.native = await CompositionStore.open(store.directory);
       return store;
     } catch (error) {
       await store.close();
@@ -169,6 +172,7 @@ export class StudioStore {
   }
   async close() {
     await this.sequence;
+    await this.native?.close();
     this.subscribers.clear();
     if (this.lock) {
       await this.lock.close();

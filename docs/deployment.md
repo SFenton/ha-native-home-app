@@ -62,6 +62,25 @@ it to derive the app's repository ID. Moving from a manually installed local
 app creates a different installation; back up and migrate its data deliberately
 rather than assuming the new installation shares the old app's `/data`.
 
+### Native UIKit workspace
+
+Version 0.2.0 adds the separate **Native UIKit** schema-2 workspace under
+`native/api/`. Existing schema-1 drafts and publications remain unchanged.
+Native documents, immutable revisions, and content-addressed image assets are
+stored under `/data/studio/native-v2`, included in the app's persistent storage.
+
+When transferring a native workspace from a standalone Studio, back up both
+installations first. Transfer every referenced image through the native asset
+API, validate the document on the destination, and import its content using the
+destination workspace's document ID. Save with the destination's current
+`expectedRevision`, then publish that returned revision. Do not copy source
+publisher IDs, overwrite store files in a running app, or down-convert a
+schema-2 document into the legacy editor. Publishing here does not reconfigure
+or deploy a native client.
+
+See the [native composition contract](https://github.com/SFenton/ha-native-home-app/blob/master/docs/native-composition.md)
+for the protocol and current limitations.
+
 The package declares `amd64` and `aarch64`, uses a multi-architecture Node 22
 Alpine image, and stores app state in persistent `/data/studio`. `/data` is
 provided by the Supervisor without an extra host configuration mount. The

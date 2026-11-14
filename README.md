@@ -95,6 +95,13 @@ clients, separately from later draft changes. The publication endpoint and
 revision event stream are a contract for a future native renderer; publishing
 here does not make the unchanged iOS app understand this format.
 
+The separate experimental **Native composition** workspace authors the strict
+[schema-2 native composition contract](docs/native-composition.md), with its own
+drafts, publications, and uploaded images. Schema-1 saved work is retained without
+automatic conversion. Its authenticated `/native/api/*` endpoints require a
+matching native client and providers; compiler acceptance does not certify
+native delivery or visual parity.
+
 Device frames and 3D/folding controls are browser previews, not iOS emulators.
 The device dock's **Device theme** selector overrides the preview with Light,
 Dark, System, or the document's App theme without editing that document. Main

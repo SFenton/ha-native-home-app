@@ -5,7 +5,10 @@ The native destination expansion requires more than the former 1,000-component
 limit; the modal bound also allows retaining older editable sheets during an
 upgrade. Existing byte, depth, reference, and per-container limits still apply.
 
-Native Home Studio authors **schema version `1.0`** documents. The exported
+The original Native Home Studio workspace authors **schema version `1.0`**
+documents. The separate **Native composition** workspace authors the strict
+[2.0 native contract](native-composition.md) without migrating or replacing
+1.0 saved work. The original workspace's exported
 TypeScript contract is `src/shared/types.ts`. `src/shared/schema.ts` is the strict
 Zod validator; `/api/schema` generates JSON Schema directly from it. Semantic
 checks (references, uniqueness, safe URLs, nesting, and component count) also run

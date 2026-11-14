@@ -9,6 +9,11 @@ import type { ServerConfig } from './config';
 import { HomeAssistantClient } from './ha';
 import { HttpError, StudioStore } from './store';
 import { readEndpointQuery } from './read-endpoints';
+import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON } from '../src/shared/composition/json';
+import { compositionDocumentSchema } from '../src/shared/composition/schema';
+import { MAX_COMPOSITION_ASSET_BYTES } from './composition-assets';
+import { formatCompositionIssue } from '../src/shared/composition/workspace';
 
 const revision = z.number().int().positive();
 const documentRequestLimit = MAX_DOCUMENT_BYTES + 64 * 1024;
@@ -57,6 +62,14 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     return Boolean((config.authToken && bearer && equalSecret(bearer, config.authToken)) ||
       (cookie && (sessions.get(cookie) ?? 0) > Date.now()) || validIngress(req, config));
   };
+  const publicationReader = (req: Request) => {
+    if (!['GET', 'HEAD'].includes(req.method) || Object.keys(req.query).length) return false;
+    const resource = req.baseUrl + req.path;
+    if (resource !== '/native/api/published' && !/^\/native\/api\/assets\/[a-f0-9]{64}\.(png|jpg)$/.test(resource)) return false;
+    const header = req.get('authorization');
+    if (!header?.startsWith('Bearer shr_')) return false;
+    return store.native.readers.permits(header.slice(7), store.native.getPublished(), resource);
+  };
   let stopping = false;
   app.disable('x-powered-by');
   app.set('trust proxy', false);
@@ -69,10 +82,11 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (!sameOrigin(req, config)) { res.status(403).json({ error: 'Cross-origin writes are not allowed' }); return; }
-      if (!req.is('application/json')) { res.status(415).json({ error: 'Writes require application/json' }); return; }
+      const nativeImage = req.method === 'POST' && req.path === '/native/api/assets' && (req.is('image/png') || req.is('image/jpeg'));
+      if (!req.is('application/json') && !nativeImage) { res.status(415).json({ error: 'Writes require application/json (native image uploads require image/png or image/jpeg)' }); return; }
       const now = Date.now();
       for (const [key, limit] of rateLimits) if (limit.until <= now) rateLimits.delete(key);
-      const login = req.path === '/api/auth';
+      const login = req.path === '/api/auth' || req.path === '/native/api/auth';
       const key = `${login ? 'login' : 'write'}:${normalizeAddress(req.socket.remoteAddress) ?? 'unknown'}`;
       let limit = rateLimits.get(key);
       if (!limit) {
@@ -85,9 +99,12 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     }
     next();
   });
+  app.use('/native/api/assets', express.raw({ type: ['image/png', 'image/jpeg'], limit: MAX_COMPOSITION_ASSET_BYTES }));
+  app.use('/native/api', express.raw({ type: 'application/json', limit: MAX_COMPOSITION_ENVELOPE_BYTES }));
   app.use(['/api/draft', '/api/validate'], express.json({ limit: documentRequestLimit, strict: true }));
   app.use(express.json({ limit: '1mb', strict: true }));
-  app.post('/api/auth', (req, res) => {
+  app.post(['/api/auth', '/native/api/auth'], (req, res) => {
+    if (Buffer.isBuffer(req.body)) req.body = parseCompositionJSON(req.body);
     if (!config.authToken || typeof req.body?.token !== 'string' || !equalSecret(req.body.token, config.authToken)) { res.status(401).json({ error: 'Invalid authoring token' }); return; }
     const id = randomBytes(32).toString('hex');
     const now = Date.now();
@@ -99,8 +116,8 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     res.json({ authenticated: true });
   });
   app.use((req, res, next) => {
-    if (authenticated(req) || (!config.production && !config.authToken && !config.ingress)) { next(); return; }
-    if (req.method === 'GET' && req.accepts('html') && !req.path.startsWith('/api/')) {
+    if (authenticated(req) || publicationReader(req) || (!config.production && !config.authToken && !config.ingress)) { next(); return; }
+    if (req.method === 'GET' && req.accepts('html') && !req.path.startsWith('/api/') && !req.path.startsWith('/native/api/')) {
       const nonce = randomBytes(16).toString('base64');
       res.set('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`);
       res.status(401).type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Native Home Studio - Sign in</title><style>body{font:16px system-ui;max-width:28rem;margin:15vh auto;padding:24px}input,button{box-sizing:border-box;font:inherit;padding:12px;width:100%;margin:8px 0}</style><h1>Native Home Studio</h1><p>Enter the authoring token configured by your administrator.</p><form><label for="token">Authoring token</label><input id="token" type="password" autocomplete="current-password" required><button>Sign in</button><p id="error" role="alert"></p></form><script nonce="${nonce}">document.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();try{const r=await fetch('./api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:document.querySelector('input').value})});if(!r.ok)throw Error('Sign-in failed');location.reload()}catch(e){document.querySelector('#error').textContent=e.message}})</script></html>`);
@@ -108,6 +125,65 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     }
     res.status(401).json({ error: 'Authentication required' });
   });
+  app.use('/native/api', (req, _res, next) => {
+    if (!authenticated(req) && !publicationReader(req)) throw new HttpError(401, 'Authentication required for native composition');
+    if (Buffer.isBuffer(req.body) && req.is('application/json')) req.body = parseCompositionJSON(req.body);
+    next();
+  });
+  app.get('/native/api/draft', (_req, res) => { res.json(store.native.getDraft()); });
+  app.post('/native/api/readers', async (req, res) => {
+    res.status(201).json(await store.native.readers.issue(req.body, store.native.getPublished()));
+  });
+  app.delete('/native/api/readers/:id', async (req, res) => {
+    z.strictObject({}).parse(req.body);
+    await store.native.readers.revoke(z.uuid().parse(req.params.id));
+    res.status(204).end();
+  });
+  app.put('/native/api/draft', async (req, res) => {
+    const body = writeSchema.parse(req.body);
+    res.json(await store.native.save(body.document, body.expectedRevision));
+  });
+  app.post('/native/api/validate', (req, res) => {
+    const body = z.strictObject({ document: z.unknown() }).parse(req.body);
+    const { capabilities } = compileCompositionDocument(body.document);
+    res.json({ valid: true, capabilities });
+  });
+  app.post('/native/api/publish', async (req, res) => {
+    res.json(await store.native.publish(publishSchema.parse(req.body).expectedRevision));
+  });
+  app.get('/native/api/published', (req, res) => {
+    const published = store.native.getPublished();
+    const etag = `"native-${published.publisherId}-${published.revision}"`;
+    res.set({ ETag: etag, 'Cache-Control': 'private, no-cache' });
+    if (req.get('if-none-match')?.split(',').some(value => value.trim().replace(/^W\//, '') === etag || value.trim() === '*')) {
+      res.status(304).end(); return;
+    }
+    res.json(published);
+  });
+  app.get('/native/api/schema', (_req, res) => {
+    res.json(z.toJSONSchema(compositionDocumentSchema, { target: 'draft-7' }));
+  });
+  app.get('/native/api/export', (req, res) => {
+    const { source } = z.strictObject({ source: z.enum(['draft', 'published']).default('draft') }).parse(req.query);
+    const envelope = source === 'draft' ? store.native.getDraft() : store.native.getPublished();
+    res.set('Content-Disposition', `attachment; filename="native-composition-${source}.json"`);
+    res.type('application/json').send(`${canonicalCompositionJSON(envelope.document)}\n`);
+  });
+  app.get('/native/api/assets', async (_req, res) => { res.json(await store.native.listAssets()); });
+  app.post('/native/api/assets', async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || (!req.is('image/png') && !req.is('image/jpeg'))) throw new HttpError(415, 'Upload raw image/png or image/jpeg bytes');
+    res.status(201).json(await store.native.upload(req.body, req.is('image/png') ? 'image/png' : 'image/jpeg'));
+  });
+  app.get('/native/api/assets/:name', async (req, res) => {
+    const { asset, bytes } = await store.native.readAsset(req.params.name);
+    const etag = `"${asset.sha256}"`;
+    res.set({ ETag: etag, 'Cache-Control': 'private, max-age=31536000, immutable' });
+    if (req.get('if-none-match')?.split(',').some(value => value.trim().replace(/^W\//, '') === etag || value.trim() === '*')) {
+      res.status(304).end(); return;
+    }
+    res.type(asset.mimeType).send(bytes);
+  });
+  app.use('/native/api', (_req, res) => { res.status(404).json({ error: 'Unknown native API endpoint' }); });
   app.get('/api/draft', (_req, res) => { res.json(store.getDraft()); });
   app.put('/api/draft', async (req, res) => {
     const body = writeSchema.parse(req.body);
@@ -262,11 +338,16 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   const errorHandler = (error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (res.destroyed) return;
     if (res.headersSent) { res.end(); return; }
+    if (error instanceof CompositionValidationError) {
+      res.status(422).json({ error: error.message, issues: error.issues, errors: error.issues.map(formatCompositionIssue) }); return;
+    }
     if (error instanceof DocumentValidationError) { res.status(422).json({ error: error.message, errors: error.errors }); return; }
     if (error instanceof z.ZodError) { res.status(400).json({ error: 'Invalid request', errors: error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`) }); return; }
     if (error instanceof HttpError) { res.status(error.status).json({ error: error.message, ...(error.details && typeof error.details === 'object' ? error.details : {}) }); return; }
     if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.too.large') {
-      const limit = 'limit' in error && error.limit === documentRequestLimit ? '1 MiB plus 64 KiB of envelope space' : '1 MiB';
+      const limit = 'limit' in error && error.limit === MAX_COMPOSITION_ASSET_BYTES ? '8 MiB'
+        : 'limit' in error && error.limit === MAX_COMPOSITION_ENVELOPE_BYTES ? '2 MiB plus 64 KiB of envelope space'
+        : 'limit' in error && error.limit === documentRequestLimit ? '1 MiB plus 64 KiB of envelope space' : '1 MiB';
       res.status(413).json({ error: `Request body exceeds ${limit}` }); return;
     }
     if (error instanceof SyntaxError && 'body' in error) { res.status(400).json({ error: 'Malformed JSON request' }); return; }
