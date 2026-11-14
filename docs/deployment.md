@@ -64,7 +64,7 @@ rather than assuming the new installation shares the old app's `/data`.
 
 ### Native UIKit workspace
 
-Version 0.2.0 adds the separate **Native UIKit** schema-2 workspace under
+Version 0.2.1 adds the separate **Native UIKit** schema-2 workspace under
 `native/api/`. Existing schema-1 drafts and publications remain unchanged.
 Native documents, immutable revisions, and content-addressed image assets are
 stored under `/data/studio/native-v2`, included in the app's persistent storage.

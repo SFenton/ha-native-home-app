@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- First published Native UIKit workspace release, including the schema-2
+  configuration and asset support described below.
+- Wait for explicit test-container removal before deleting its volume, avoiding
+  an asynchronous Docker cleanup race found on the arm64 release runner.
+
 ## 0.2.0
 
 - Add a separate experimental schema-2 Native composition workspace with

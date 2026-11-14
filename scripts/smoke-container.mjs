@@ -34,7 +34,7 @@ async function waitUntilReady(base) {
 
 try {
   volume = docker('volume', 'create');
-  container = docker('run', '--detach', '--rm', '--publish', '127.0.0.1::4800',
+  container = docker('run', '--detach', '--publish', '127.0.0.1::4800',
     '--mount', `type=volume,source=${volume},target=/data`,
     '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
   const bindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
@@ -106,8 +106,9 @@ try {
   assert.equal(restored.document.name, 'Container persistence check');
 
   docker('stop', '--time', '10', container);
+  docker('rm', container);
   container = undefined;
-  container = docker('run', '--detach', '--rm', '--publish', '127.0.0.1::4800',
+  container = docker('run', '--detach', '--publish', '127.0.0.1::4800',
     '--mount', `type=volume,source=${volume},target=/data`,
     '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
   const replacementBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
@@ -166,13 +167,16 @@ try {
   assert.deepEqual(Buffer.from(await mountedAsset.arrayBuffer()), pixel);
   assert.deepEqual(browserErrors, []);
   assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/') || url?.startsWith('/native/')), []);
-  console.log('Production container: legacy/native auth, assets, save/publish, restart/replacement persistence, and mounted-path routing passed.');
 } finally {
   await browser?.close();
   if (proxy) {
     proxy.closeAllConnections();
     await new Promise(resolve => proxy.close(resolve));
   }
-  if (container) docker('stop', '--time', '10', container);
+  if (container) {
+    docker('stop', '--time', '10', container);
+    docker('rm', container);
+  }
   if (volume) docker('volume', 'rm', volume);
 }
+console.log('Production container: legacy/native auth, assets, save/publish, restart/replacement persistence, mounted-path routing, and cleanup passed.');
