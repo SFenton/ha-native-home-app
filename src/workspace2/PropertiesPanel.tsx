@@ -1,3 +1,4 @@
+import { boundControlShows } from './editors/boundControl';
 import { useMemo, useState, type ReactNode } from 'react';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { Menu } from '@base-ui/react/menu';
@@ -44,10 +45,12 @@ function NodeBody({ path }: { path: EditorPath }) {
   const node = valueAt(document, path) as { id: string } | undefined;
   const overrides = useDeepRows(path);
   if (!node) return null;
+  // A bound control hides the fields its kind does not use: the compiler rejects them.
+  const hidden = (at: EditorPath) => notChildren(at) || !boundControlShows(document, path, at);
   return <>
-    <ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={notChildren} overrides={overrides} groups={['what', 'look', 'behaviour']}/>
+    <ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={hidden} overrides={overrides} groups={['what', 'look', 'behaviour']}/>
     <section className="w2-group"><button type="button" className="w2-disclosure-head w2-advanced-row" onClick={() => push?.push({
-      title: 'Advanced', body: <><IdRow id={node.id} path={[...path, 'id'].join('/')}/><ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={child => notChildren(child) || child.at(-1) === 'id'} overrides={overrides} groups={['advanced']}/></>,
+      title: 'Advanced', body: <><IdRow id={node.id} path={[...path, 'id'].join('/')}/><ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={child => hidden(child) || child.at(-1) === 'id'} overrides={overrides} groups={['advanced']}/></>,
     })}><span className="w2-row-label">Advanced</span><span className="w2-summary"/><ChevronRight size={16} aria-hidden/></button></section>
   </>;
 }

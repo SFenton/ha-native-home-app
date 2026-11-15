@@ -3,6 +3,10 @@ import { replaceAt, selectedVariant, valueAt, type EditorPath } from '../../comp
 import { bindEntity, boundEntity } from '../add/sources';
 import { EntityField, IconField } from '../pickers/PickerField';
 import { schemaAt, useRows, type RowOverride } from '../rows';
+import { boundControlKinds, withBoundControlKind } from './boundControl';
+import { SelectField } from '../../ui';
+import { valueWords } from '../labels';
+import type { BoundControlKind } from '../../shared/composition/bound-control';
 import { ActionRow } from './ActionEditor';
 import { RuleRow } from './RuleEditor';
 
@@ -31,6 +35,11 @@ export function useDeepRows(path: EditorPath): Record<string, RowOverride> {
     action, onAction: action, offAction: action, quickLinksAction: action, profileAction: action,
     visibleWhen: ({ path: at, label }) => <RuleRow label={label} path={at} itemName={itemName}/>,
     'icon.name': ({ path: at, value, label }) => <IconField label={label} symbol={String(value)} path={at.join('/')} onPick={symbol => onChange(replaceAt(document, at, symbol))}/>,
+    ...(node?.type === 'bound-control' ? {
+      // Changing the kind drops the fields the new kind does not use, so a Toggle never keeps a button's "When tapped".
+      'props.kind': ({ path: at, value, label }: { path: EditorPath; value: Json; label: string }) => <SelectField label={label} value={String(value)}
+        options={boundControlKinds.map(kind => ({ value: kind, label: valueWords(kind) }))} onChange={kind => onChange(withBoundControlKind(document, path, kind as BoundControlKind))}/>,
+    } : {}),
     'binding.sourceId': entity, 'props.sourceId': entity,
   };
 }

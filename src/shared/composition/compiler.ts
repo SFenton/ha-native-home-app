@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { boundControlActions, boundControlProps, kindDependentActions, kindDependentProps } from './bound-control';
 import { settingsDomain, settingsDestination, settingsItem, settingsFixedItems, type SettingsKind } from './settings';
 import { climateCapabilities, climateCapability, validateClimateControl, validateClimateInputs, type ClimateProps } from './climate';
 import { compositionChildren, compositionDocumentSchema, type CompositionAction, type CompositionDocument, type CompositionGroups,
@@ -424,11 +425,11 @@ export function compileCompositionDocument(input: unknown): { document: Composit
           require('bound-control');
           const props = item.props, kind = props.kind;
           if (props.surface !== undefined && kind !== 'toggle') add('invalid_combination', `${p}/props/surface`);
-          const allowed = ({ toggle: ['isOn'], stepper: ['value', 'range', 'format'], slider: ['value'], choice: ['options'], button: [] } as const)[kind] as readonly string[];
-          const actionKeys = ({ toggle: ['onAction', 'offAction'], stepper: ['action'], slider: ['action'], choice: [], button: ['action'] } as const)[kind] as readonly string[];
-          for (const key of ['isOn', 'value', 'range', 'format', 'options'] as const)
+          const allowed = boundControlProps[kind];
+          const actionKeys = boundControlActions[kind];
+          for (const key of kindDependentProps)
             if (props[key] !== undefined && !allowed.includes(key)) add('invalid_combination', `${p}/props/${key}`);
-          for (const key of ['onAction', 'offAction', 'action'] as const)
+          for (const key of kindDependentActions)
             if (item[key] !== undefined && !actionKeys.includes(key)) add('invalid_combination', `${p}/${key}`);
           for (const key of actionKeys) if (item[key as 'action'] === undefined) add('missing_required', `${p}/${key}`);
           for (const key of allowed) if (key !== 'format' && props[key as 'isOn'] === undefined) add('missing_required', `${p}/props/${key}`);

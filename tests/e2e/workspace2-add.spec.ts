@@ -301,3 +301,25 @@ test.describe('an iPad-width window with a touch pointer', () => {
     expect(sizes.filter(size => { const [w, h] = size.split(' ').at(-1)!.split('x').map(Number); return w < 44 || h < 44; })).toEqual([]);
   });
 });
+
+test('a Toggle offers turn on and turn off, never When tapped, and the draft stays saveable', async ({ page }) => {
+  await stubHouse(page);
+  await openWorkspace(page);
+  if (isPhone(page)) await page.locator('.w2-bottom-add').click(); else await page.locator('.w2-add-slot').last().click();
+  await page.getByTestId('add-picker').getByRole('button', { name: 'Entities' }).click();
+  await page.getByRole('option', { name: /Lamp 0/ }).first().click();
+  const panel = page.getByLabel('Properties');
+  await expect(panel.getByRole('heading', { name: /Lamp 0/ })).toBeVisible();
+  await expect(panel.getByRole('button', { name: /When turned on/ })).toBeVisible();
+  await expect(panel.getByRole('button', { name: /When tapped/ })).toHaveCount(0);
+  await expect(page.getByTestId('status-tag')).not.toHaveText('Not Saved');
+  // Changing the kind swaps the rows with it and keeps the draft free of clashes.
+  await panel.getByRole('combobox', { name: 'Kind' }).selectOption('button');
+  await expect(panel.getByRole('button', { name: /When turned on/ })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: /When tapped/ }).or(panel.getByRole('button', { name: 'Add When tapped' }))).toBeVisible();
+  // The kind change left no clash: the only problem is the action the Button still needs, and Checks says so.
+  await expect(page.getByTestId('status-tag')).toHaveText('Not Saved', { timeout: 8000 });
+  await page.getByTestId('status-tag').click();
+  await expect(page.getByText('Lamp 0: When tapped is needed.')).toBeVisible();
+  await expect(page.getByText('does not work with this kind')).toHaveCount(0);
+});

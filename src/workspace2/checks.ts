@@ -6,6 +6,7 @@ import { formatCompositionIssue } from '../shared/composition/workspace';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { buildOutline, collectLinks } from './outline';
 import { tabGroups } from './capacity';
+import { labelFor } from './labels';
 
 /** One row of the Checks popover: a sentence, where it is, and what choosing it selects. */
 export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey }
@@ -24,13 +25,18 @@ export function pointerPath(pointer: string): (string | number)[] {
  * The place a document path stands for, by name: the deepest node, page or sheet the path passes through, else the
  * part of the project it belongs to.
  */
-export function placeOf(document: CompositionDocument, path: readonly (string | number)[]): { place: string; select?: SelectionKey } {
+export function placeOf(document: CompositionDocument, path: readonly (string | number)[]): { place: string; select?: SelectionKey; field?: string } {
   const index = buildDocumentIndex(document);
   for (let length = path.length; length > 0; length--) {
     const key = index.keyAt(path.slice(0, length));
     const entry = key ? index.get(key) : undefined;
     if (!entry) continue;
-    if (entry.node) return { place: entry.node.title, select: entry.key };
+    if (entry.node) {
+      // The field the path ends in, by the label the properties show, when it is one of the node's own rows.
+      const rel = path.slice(entry.path.length);
+      const field = rel.length ? labelFor(entry.node.type, rel)?.label : undefined;
+      return { place: entry.node.title, select: entry.key, field };
+    }
     if (entry.kind === 'page' || entry.kind === 'modal') return { place: (document[entry.kind === 'page' ? 'pages' : 'modals'][entry.path[1] as number]).title, select: entry.key };
     if (entry.kind === 'tab') return { place: document.navigation.tabs[entry.path[2] as number]?.label ?? 'Tabs', select: entry.key };
   }
@@ -65,8 +71,14 @@ const problemWords: Record<CompositionIssue['code'], string> = {
 
 /** A compiler sentence with its pointer replaced by the place name (spec 5.8). */
 export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey } {
-  const { place, select } = placeOf(document, pointerPath(issue.pointer));
-  return { sentence: `${place}: ${problemWords[issue.code] ?? formatCompositionIssue(issue).replace(/^[^:]*:\s*/, '')}`, place, select };
+  const { place, select, field } = placeOf(document, pointerPath(issue.pointer));
+  // A problem in one row names the row, so the person knows which two settings clash and where to look.
+  const named: Partial<Record<CompositionIssue['code'], string>> = field ? {
+    invalid_combination: `${field} does not work with this kind. Remove it, or change the kind.`,
+    missing_required: `${field} is needed.`,
+    invalid_value: `${field} is not allowed.`,
+  } : {};
+  return { sentence: `${place}: ${named[issue.code] ?? problemWords[issue.code] ?? formatCompositionIssue(issue).replace(/^[^:]*:\s*/, '')}`, place, select };
 }
 
 /** Problems (they block publishing) and Suggestions (lints). */
