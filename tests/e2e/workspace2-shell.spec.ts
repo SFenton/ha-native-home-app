@@ -364,3 +364,9 @@ test('a tap in Use shows a readable note in words that stays for at least four s
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-use-note`);
   await expect(note).not.toContainText(text, { timeout: 3000 });
 });
+
+test('the narrow layout hides the Problems pill while there is nothing to report', async ({ page }) => {
+  test.skip(!isPhone(page), 'The narrow layout');
+  await openWorkspace(page);
+  await expect(page.getByTestId('checks-pill')).toBeHidden();
+});

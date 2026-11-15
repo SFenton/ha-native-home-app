@@ -249,3 +249,4 @@
 .w2-move-search { margin: 8px 12px; width: calc(100% - 24px); }
 .w2-move .w2-group-title { padding-inline: 12px; }
 .w2-move .w2-link-row { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding-block: 6px; }
+.w2-scope .w2-pill[hidden] { display: none; }
