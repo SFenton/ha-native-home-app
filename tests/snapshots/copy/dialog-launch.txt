@@ -1,0 +1,14 @@
+Custom launch text
+Ready announcement
+Loading title
+Unavailable title
+Unavailable message
+Try again in a moment.
+Retry button
+Why we ask
+Notifications
+Choose.
+Time Sensitive
+Review.
+Location
+Share.

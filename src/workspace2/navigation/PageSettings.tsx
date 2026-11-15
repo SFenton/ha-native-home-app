@@ -57,8 +57,8 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
   const presentation = kind === 'modal' ? surface.presentation : undefined;
   const setPresentation = (patch: Record<string, Json>) => set([...path, 'presentation'], { ...presentation, ...patch } as unknown as Json);
   const deep = useDeepRows(path);
-  const overrides: Record<string, RowOverride> = { ...deep, ...(kind === 'page' ? {
-    toolbar: ({ path: at }) => {
+  /** "Header buttons": the app's, or this surface's own. Pages and sheets both have them. */
+  const toolbar: RowOverride = ({ path: at }) => {
       const custom = surface.toolbar.type === 'replace';
       return <>
         <div className="w2-segment" role="group" aria-label="Header buttons" data-field-path={`${at.join('/')}/type`}>
@@ -68,8 +68,8 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
         </div>
         {custom && <ChromeGroups path={[...at, 'groups']}/>}
       </>;
-    },
-  } : {
+  };
+  const overrides: Record<string, RowOverride> = { ...deep, toolbar, ...(kind === 'page' ? {} : {
     'presentation.height': ({ path: at }) => {
       const full = surface.presentation.height.type === 'full';
       return <div className="w2-segment" role="group" aria-label="Height" data-field-path={`${at.join('/')}/type`}>

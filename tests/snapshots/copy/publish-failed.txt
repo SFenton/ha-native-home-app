@@ -1,0 +1,7 @@
+Publishing Failed
+Home Assistant refused the publication.
+Cancel
+Try Again
+
+[names]
+Close

@@ -1,0 +1,10 @@
+Header Buttons
+Used on every page
+Leading
+Menu
+Add Button
+Trailing
+Add Button
+
+[names]
+Close

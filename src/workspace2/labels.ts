@@ -126,6 +126,12 @@ export const labelMap: Readonly<Record<string, FieldLabel>> = {
   ...authored,
 };
 
+/** A stored choice (`two-column-fill`, `tile@1`, `caption1`) as words: sentence case, no version suffix. Authored `options` win over this. */
+export function valueWords(value: string): string {
+  const text = value.replace(/@\d+$/, '').replace(/([a-z])\d+$/, '$1').replace(/[-_.]+/g, ' ').trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** `key` split into words, sentence case, with "Id" as "ID". */
 export function mechanicalLabel(key: string): string {
   const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_.]+/g, ' ').trim().toLowerCase().split(/\s+/);

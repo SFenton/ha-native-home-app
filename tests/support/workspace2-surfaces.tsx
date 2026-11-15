@@ -7,6 +7,8 @@ import type { PropertiesTarget, Workspace2 } from '../../src/workspace2/useWorks
 
 /** What a test can say about the workspace a surface renders against. */
 export interface Stub {
+  /** More of the workspace than the defaults give: merged over them (`studio` is merged one level in). */
+  extra?: Record<string, unknown> & { studio?: Record<string, unknown> };
   publication?: Workspace2['publication'];
   publicationError?: string;
   activity?: Workspace2['activity'];
@@ -17,12 +19,16 @@ export interface Stub {
 /** A workspace with just what the properties surface and the Project dialogs read from it. */
 function workspace(document: CompositionDocument, target?: PropertiesTarget, stub: Stub = {}, apply: (next: CompositionDocument) => void = vi.fn()): Workspace2 {
   const publication = stub.publication;
+  const { studio: studioExtra, ...extra } = stub.extra ?? {};
   return {
     document, previewDocument: document, index: buildDocumentIndex(document), checks: runChecks(document), problemCount: 0, target,
-    studio: { apply, setError: vi.fn(), envelope: { publisherId: 'publisher-1', capabilities: ['shell@1'], assetManifestSha256: 'a'.repeat(64), revision: 3, ...stub.envelope }, dirty: false, busy: false, error: '', importHouse: vi.fn(async () => true) },
+    studio: { canUndo: false, canRedo: false, undo: vi.fn(), redo: vi.fn(), conflict: false, apply, setError: vi.fn(), envelope: { publisherId: 'publisher-1', capabilities: ['shell@1'], assetManifestSha256: 'a'.repeat(64), revision: 3, ...stub.envelope }, dirty: false, busy: false, error: '', importHouse: vi.fn(async () => true), ...studioExtra },
     activity: stub.activity ?? [], log: vi.fn(), publication, publicationError: stub.publicationError ?? '', liveRevision: publication?.current?.revision,
     refreshPublication: stub.refreshPublication ?? vi.fn(async () => publication), persist: vi.fn(async () => true),
     selectAnywhere: vi.fn(), select: vi.fn(), setSurface: vi.fn(), houseStates: { status: 'idle' },
+    surface: { kind: 'page', id: document.navigation.initialPageId }, mode: 'edit', setMode: vi.fn(), status: { text: 'Draft · Saved', tone: 'neutral' }, flash: '', failedSave: false, saveReason: '',
+    retrySave: vi.fn(), saveNow: vi.fn(), phase: 'idle', publishError: '', openPublish: vi.fn(), closePublish: vi.fn(), publish: vi.fn(async () => true), conflictDecided: false, decideLater: vi.fn(),
+    ...extra,
   } as unknown as Workspace2;
 }
 

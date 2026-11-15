@@ -1,0 +1,17 @@
+Home, Security, Climate and Camera
+Tabs
+Header Buttons
+Wallpaper
+Data
+Local State
+Links
+App Launch
+Live Activities
+Publish History
+Import…
+Export
+Edit as JSON…
+Activity
+About
+Help
+Home Assistant: not connected

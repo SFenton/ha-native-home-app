@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, ImageOff } from 'lucide-react';
 import { apiUrl, request } from '../api';
 import { createId as uid } from '../shared/ids';
 import { removeCompositionItem, reorderCompositionItem } from '../composition-editor';
@@ -125,7 +125,7 @@ export function WallpaperPanel() {
   };
   const thumb = (source: string, label: string) => <img src={apiUrl(`/native${source}`)} alt={label} width={72} height={72} className="w2-thumb"/>;
   return <div className="w2-wallpaper">
-    <div className="w2-wallpaper-now">{current ? thumb(current.source.path, 'Current wallpaper') : <div className="w2-thumb w2-thumb-none" role="img" aria-label="No image">No Image</div>}</div>
+    <div className="w2-wallpaper-now">{current ? thumb(current.source.path, 'Current wallpaper') : <div className="w2-thumb w2-thumb-none" role="img" aria-label="No image"><ImageOff size={24} aria-hidden/></div>}</div>
     <div className="w2-wallpaper-actions">
       <input ref={input} hidden type="file" accept="image/png,image/jpeg" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void upload(file); }}/>
       <button type="button" disabled={uploading} onClick={() => input.current?.click()}>Choose Image…</button>

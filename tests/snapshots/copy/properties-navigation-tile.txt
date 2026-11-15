@@ -1,0 +1,52 @@
+Room Thermostats
+Navigation tile · Climate › Advanced Controls
+Title
+Subtitle
+Fixed value
+Icon
+Thermometer
+Width
+Colour
+Neutral
+Lights
+Groceries
+Chore resident 1
+Chore resident 2
+Chore unassigned
+Chore home
+Selected
+Navigation path
+None
+Behaviour
+When tapped
+Opens Advanced Controls
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Room Thermostats
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Title from
+Add
+Alarm
+Add
+Room visibility
+Add
+Presentation
+Add
+
+[names]
+Add While the state is unknown
+Add Title from
+Add Alarm
+Add Room visibility
+Add Presentation

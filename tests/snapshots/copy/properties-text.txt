@@ -1,0 +1,34 @@
+Shelf Description
+Text · Shelf
+Title
+Value
+Fixed value
+Unavailable text
+Description unavailable
+Width
+Style
+Body
+Headline
+Caption
+Subheadline
+Footnote
+Section title
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Shelf Description
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

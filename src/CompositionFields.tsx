@@ -5,6 +5,7 @@ import { Field, NumberField, SelectField, TextField } from './ui';
 import { useState, type ReactElement } from 'react';
 import { CallServiceEditor, OperandEditor, PredicateBuilder } from './GrammarEditors';
 import { Disclosure } from './workspace2/Disclosure';
+import { sourceName } from './workspace2/dialogs/sources';
 
 /**
  * Opt-in behaviour for the workspace. Without it the form renders its plain default: generated labels, "Include"
@@ -41,13 +42,15 @@ function Group({ label, nested, children }: { label: string; nested?: boolean; c
   return <div className="w2-subform" role={label ? 'group' : undefined} aria-label={label || undefined}>{nested && label && <h4 className="w2-group-title">{label}</h4>}{children}</div>;
 }
 export const nameOf = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, letter => letter.toUpperCase());
-const relationship = (key: string, document: CompositionDocument) => {
-  if (key === 'pageId' || key === 'initialPageId') return document.pages.map(item => ({ value: item.id, label: `${item.title} (${item.id})` }));
-  if (key === 'modalId') return document.modals.map(item => ({ value: item.id, label: `${item.title} (${item.id})` }));
-  if (key === 'tabId' || key === 'initialTabId') return document.navigation.tabs.map(item => ({ value: item.id, label: `${item.label} (${item.id})` }));
-  if (key === 'sourceId') return document.dataSources.map(item => ({ value: item.id, label: `${item.id} (${item.kind})` }));
+/** The choices a reference field offers. With `plain` (the workspace's rows) they carry names only; the ids stay under Advanced and About. */
+const relationship = (key: string, document: CompositionDocument, plain = false) => {
+  const named = (title: string, id: string) => plain ? title : `${title} (${id})`;
+  if (key === 'pageId' || key === 'initialPageId') return document.pages.map(item => ({ value: item.id, label: named(item.title, item.id) }));
+  if (key === 'modalId') return document.modals.map(item => ({ value: item.id, label: named(item.title, item.id) }));
+  if (key === 'tabId' || key === 'initialTabId') return document.navigation.tabs.map(item => ({ value: item.id, label: named(item.label, item.id) }));
+  if (key === 'sourceId') return document.dataSources.map(item => ({ value: item.id, label: plain ? `${sourceName(item)} · ${item.id}` : `${item.id} (${item.kind})` }));
   if (key === 'assetId') return document.assets.map(item => ({ value: item.id, label: item.id }));
-  if (key === 'stateId') return (document.localState ?? []).map(item => ({ value: item.id, label: `${item.id} (${item.type})` }));
+  if (key === 'stateId') return (document.localState ?? []).map(item => ({ value: item.id, label: item.id }));
 };
 
 const fieldKey = (path: EditorPath) => path.at(-2) === 'subtitleSourceIds' ? 'sourceId' : String(path.at(-1) ?? '');
@@ -63,7 +66,7 @@ export function specialEditor(document: CompositionDocument, path: EditorPath, v
 
 /** The choices a reference field offers (pages, sheets, tabs, sources, assets, local states), or undefined for any other field. */
 export function relationOptions(document: CompositionDocument, path: EditorPath): { value: string; label: string }[] | undefined { return relationInfo(document, path).relations; }
-function relationInfo(document: CompositionDocument, path: EditorPath) {
+function relationInfo(document: CompositionDocument, path: EditorPath, plain = false) {
   const key = fieldKey(path);
   const container = path.at(-3) === 'tabs' ? valueAt(document, path.slice(0, -3)) : undefined;
   const localStateId = container && typeof container === 'object' && 'type' in container && container.type === 'local-tabs'
@@ -71,7 +74,7 @@ function relationInfo(document: CompositionDocument, path: EditorPath) {
     ? container.props.stateId : undefined;
   const tabField = document.localState?.find(field => field.id === localStateId);
   const tabOptions = key === 'id' && tabField?.type === 'choice' ? tabField.options : undefined;
-  return { tabOptions, relations: tabOptions?.map(option => ({ value: option.id, label: option.label })) ?? relationship(key, document) };
+  return { tabOptions, relations: tabOptions?.map(option => ({ value: option.id, label: option.label })) ?? relationship(key, document, plain) };
 }
 
 /** The closed contract supplies fields and variants; references remain explicit relationship selectors. */
@@ -95,10 +98,11 @@ export default function CompositionFields(props: Props) {
   if (object && key === 'value' && typeof object.type === 'string' && valueAt(document, path.slice(0, -2)) && (valueAt(document, path.slice(0, -2)) as Record<string, Json>).type === 'bound-control')
     return leaf(<OperandEditor label={label} value={object} document={document} onChange={set}/>);
   const variants = fieldVariants(schema);
-  const { relations, tabOptions } = relationInfo(document, path);
+  const { relations, tabOptions } = relationInfo(document, path, options?.rows);
   if (relations) {
     const nullable = key === 'initialTabId';
-    const selectOptions = [...(nullable ? [{ value: '', label: 'No selected tab' }] : [{ value: '', label: 'Select a destination' }]), ...relations];
+    const choose = options?.rows ? { pageId: 'Choose a page', initialPageId: 'Choose a page', modalId: 'Choose a sheet', tabId: 'Choose a tab', sourceId: 'Choose a source', assetId: 'Choose an image', stateId: 'Choose a state' }[key] : undefined;
+    const selectOptions = [...(nullable ? [{ value: '', label: 'No selected tab' }] : [{ value: '', label: choose ?? 'Select a destination' }]), ...relations];
     return leaf(<SelectField label={label} value={value === null ? '' : String(value)} options={selectOptions} onChange={next => {
       let updated = replaceAt(document, path, nullable && !next ? null : next);
       if (tabOptions) updated = replaceAt(updated, [...path.slice(0, -1), 'label'], tabOptions.find(option => option.id === next)?.label ?? '');

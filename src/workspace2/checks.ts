@@ -45,11 +45,28 @@ export function compilerIssues(document: CompositionDocument): CompositionIssue[
   catch (error) { if (error instanceof CompositionValidationError) return error.issues; throw error; }
 }
 
+/** What each compiler code means in the Studio's words. Edit as JSON keeps the compiler's own wording and its pointers. */
+const problemWords: Record<CompositionIssue['code'], string> = {
+  unsupported_schema: 'This document is not a version the app reads.',
+  unknown_field: 'This setting is not supported. Remove it.',
+  unknown_variant: 'This choice is not supported.',
+  missing_required: 'A required value is missing.',
+  invalid_value: 'This value is not allowed.',
+  duplicate_key: 'This key appears twice.',
+  limit_exceeded: 'There are more of these than the app allows.',
+  duplicate_id: 'Two items use the same ID.',
+  invalid_reference: 'This points to something that is not there.',
+  binding_type: 'The data does not match what this reads.',
+  invalid_combination: 'These settings do not work together.',
+  capability_manifest_mismatch: 'The capability list is out of date.',
+  unsupported_capability: 'The app does not support this yet.',
+  asset_integrity: 'An image is missing or has changed.',
+};
+
 /** A compiler sentence with its pointer replaced by the place name (spec 5.8). */
 export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey } {
   const { place, select } = placeOf(document, pointerPath(issue.pointer));
-  const text = formatCompositionIssue(issue).replace(/^[^:]*:\s*/, '');
-  return { sentence: `${place}: ${text}`, place, select };
+  return { sentence: `${place}: ${problemWords[issue.code] ?? formatCompositionIssue(issue).replace(/^[^:]*:\s*/, '')}`, place, select };
 }
 
 /** Problems (they block publishing) and Suggestions (lints). */

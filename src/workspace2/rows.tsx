@@ -5,7 +5,7 @@ import { useRows } from './rowsContext';
 import type { Json } from '../shared/types';
 import CompositionFields, { type FieldOptions } from '../CompositionFields';
 import { compositionEditorSchema, defaultField, fieldVariants, replaceAt, resolveField, selectedVariant, valueAt, type EditorPath, type SchemaField } from '../composition-editor';
-import { groupOrder, groupTitles, labelFor, mapPath, mechanicalLabel, type FieldGroup } from './labels';
+import { groupOrder, groupTitles, labelFor, mapPath, mechanicalLabel, valueWords, type FieldGroup } from './labels';
 
 export { RowsProvider, useRows, type RowsContext } from './rowsContext';
 export { Disclosure } from './Disclosure';
@@ -94,7 +94,7 @@ export function summarize(document: CompositionDocument, name: string, value: Js
     return count === 1 ? '1 condition' : `${count} conditions`;
   }
   if (Array.isArray(value)) return `${value.length}`;
-  if (value && typeof value === 'object') return String((value as Record<string, Json>).type ?? '');
+  if (value && typeof value === 'object') { const type = String((value as Record<string, Json>).type ?? ''); return variantWords[type] ?? valueWords(type); }
   return '';
 }
 
@@ -104,8 +104,8 @@ export function fieldOptions(owner: string, base: EditorPath, skip?: (path: Edit
   return {
     rows: true, fieldPath: true, skip,
     label: (path, key) => labelFor(owner, below(path))?.label ?? mechanicalLabel(key),
-    valueLabel: (path, value) => labelFor(owner, below(path))?.options?.[value],
-    variantLabel: (_path, name) => variantWords[name],
+    valueLabel: (path, value) => labelFor(owner, below(path))?.options?.[value] ?? valueWords(value),
+    variantLabel: (_path, name) => variantWords[name] ?? valueWords(name),
     addLabel: path => labelFor(owner, below(path))?.add,
   };
 }

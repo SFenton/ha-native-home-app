@@ -1,0 +1,27 @@
+Demo Camera
+Camera viewer · Demo Camera
+Title
+Entity
+camera.demo_entity_119
+Controls
+3
+Width
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Demo Camera
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

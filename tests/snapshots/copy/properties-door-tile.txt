@@ -1,0 +1,44 @@
+Demo Lock 1
+Door tile · Security › Doors
+Title
+Entity
+lock.demo_entity_406
+Name
+Text
+Loading text
+Unavailable text
+Hidden text
+Error text
+Opening text
+Closing text
+Open button label
+Close button label
+Reverse button label
+Width
+Kind
+Lock
+Garage
+By state
+5
+Red
+Green
+Blue
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Demo Lock 1
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

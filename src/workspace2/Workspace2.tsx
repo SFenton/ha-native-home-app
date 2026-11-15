@@ -29,7 +29,7 @@ const dialogOpen = () => Boolean(document.querySelector('[role=dialog][data-open
 const coverage = (snap: Snap | null) => snap === SNAP_PEEK ? 88 : snap === SNAP_FULL ? window.innerHeight : window.innerHeight * SNAP_HALF;
 
 /** Why the draft is not there: loading, not signed in, or could not load (spec 9). */
-function CanvasState({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
+export function CanvasState({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
   if (loading) return <div className="w2-state" role="status"><div className="w2-device-outline" aria-hidden/><p>Loading…</p></div>;
   const unauthorized = /authentication required|\(401\)|not signed in|unauthori[sz]ed/i.test(error);
   if (unauthorized) {

@@ -1,0 +1,5 @@
+Paste JSON
+Choose File…
+Import
+From Home Assistant
+Adds the rooms and chores pages this draft does not have yet.
