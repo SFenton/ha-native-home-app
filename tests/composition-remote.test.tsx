@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { compositionEditorSchema, fieldVariants, resolveField, valueAt, type EditorPath, type SchemaField } from '../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, resolveField, valueAt, type EditorPath, type SchemaField, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import type { CompositionDocument } from '../src/shared/composition/schema';
@@ -23,7 +23,7 @@ function fields(schema: SchemaField, path: EditorPath) {
 }
 
 function atomSchema() {
-  const nodes = compositionEditorSchema.definitions!.__schema0;
+  const nodes = nodeDefinition();
   return fieldVariants(nodes).find(variant => variant.properties?.type?.const === 'remote-control')!;
 }
 
@@ -37,7 +37,7 @@ it('matches the native all-atom fixture and exact capability closure without wid
 
 it('rejects binding remote atoms to an ordinary entity source', () => {
   const input = document();
-  input.dataSources = [{ id: 'source-demo', kind: 'ha-entity', entityId: { type: 'literal', value: 'media_player.demo' } }];
+  input.dataSources = [{ id: 'source-demo', kind: 'ha-entity', entityId: { type: 'literal', value: 'media_player.demo_unit' } }];
   try { compileCompositionDocument(input); throw Error('Expected rejection'); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;

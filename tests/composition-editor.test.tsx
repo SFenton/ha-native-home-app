@@ -69,7 +69,7 @@ describe('composition authoring model', () => {
     expect(() => removeCompositionItem(document, ['pages'], 1)).toThrow('/document/navigation/tabs/0/pageId');
     document.navigation.initialTabId = 'tab-detail'; document.navigation.initialPageId = 'detail';
     expect(() => removeCompositionItem(document, ['navigation', 'tabs'], 0)).toThrow('initialTabId');
-    document.dataSources.push({ id: 'source', kind: 'model', model: 'power-toggle@1', inputs: { entityId: { type: 'literal', value: 'switch.synthetic' } } });
+    document.dataSources.push({ id: 'source', kind: 'model', model: 'power-toggle@1', inputs: { entityId: { type: 'literal', value: 'switch.demo_item' } } });
     document.pages[0].components.push({
       id: 'action', title: 'Action', type: 'action-tile', icon: document.pages[0].icon, layout: { span: 1 },
       binding: { sourceId: 'source', projection: 'power-tile@1' },
@@ -87,7 +87,7 @@ describe('composition authoring model', () => {
     expect(Array.isArray(sourceSchema)).toBe(false);
     if (!sourceSchema || Array.isArray(sourceSchema)) throw new Error('Missing source schema');
     const model = fieldVariants(sourceSchema).find(variant => variant.properties?.kind?.const === 'model')!;
-    expect(changeFieldVariant(model, { id: 'existing-source', kind: 'ha-entity', entityId: { type: 'literal', value: 'switch.synthetic' } }, document, ''))
+    expect(changeFieldVariant(model, { id: 'existing-source', kind: 'ha-entity', entityId: { type: 'literal', value: 'switch.demo_item' } }, document, ''))
       .toMatchObject({ id: 'existing-source', kind: 'model' });
     const modalSchema = compositionEditorSchema.properties!.modals.items;
     if (!modalSchema || Array.isArray(modalSchema)) throw new Error('Missing modal schema');
@@ -169,9 +169,10 @@ describe('native composition structured controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add live activities item' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Cleaning' } });
     fireEvent.change(screen.getByLabelText('Glyph'), { target: { value: 'vacuum' } });
-    fireEvent.change(screen.getByLabelText('Job Id'), { target: { value: 'vacuum.demo' } });
+    fireEvent.change(screen.getByLabelText('Job Id'), { target: { value: 'vacuum.demo_unit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Routes' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add native extension delivery' }));
-    expect(screen.getByText('stub@1')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Import legacy aliases' })).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Publish native' }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(false);
   });
@@ -362,5 +363,53 @@ describe('native composition persistence controls', () => {
     await act(async () => { expect(await result.current.save(true)).toBe(false); });
     expect(request).toHaveBeenCalledTimes(2);
     expect(result.current.error).toContain('/document/pages');
+  });
+});
+
+describe('Publish to Home Assistant', () => {
+  const entry = (revision: number, publishedBy: string | null = 'supervisor-user-id') => ({
+    revision, publishedAt: '2026-11-14T12:00:00+00:00', publishedBy, envelopeSha256: 'b'.repeat(64), capabilities: [],
+  });
+  it('publishes the saved draft, shows the revision, lists history and rolls back after confirmation', async () => {
+    const summary = (current: number, history: number[]) => ({ epoch: 'e', current: entry(current), history: history.map(revision => entry(revision, null)), storedAssets: 0 });
+    let published = false;
+    vi.mocked(request).mockImplementation(async (path, init) => {
+      if (path === '/native/api/ha/publish') { published = true; return { epoch: 'e', revision: 2, envelopeSha256: 'b'.repeat(64), uploadedAssets: 1, skippedAssets: 2 }; }
+      if (path === '/native/api/ha/rollback') { expect(JSON.parse(String(init?.body))).toEqual({ revision: 1 }); published = false; return { epoch: 'e', revision: 3, envelopeSha256: 'b'.repeat(64) }; }
+      if (path === '/native/api/ha/publication') return published ? summary(2, [1]) : summary(3, [2, 1]);
+      return envelope();
+    });
+    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
+    await screen.findByDisplayValue('Native composition');
+    fireEvent.click(screen.getByRole('button', { name: 'Publish to Home Assistant' }));
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/ha/publish', expect.objectContaining({ method: 'POST', body: JSON.stringify({ expectedRevision: 1 }) })));
+    expect((await screen.findByRole('status')).textContent).toContain('Published to Home Assistant as revision 2');
+    fireEvent.click(screen.getByRole('button', { name: 'Home Assistant' }));
+    expect(await screen.findByText('1 image uploaded, 2 already stored', { exact: false })).toBeTruthy();
+    const rows = await screen.findAllByRole('row');
+    expect(rows.map(row => within(row).queryByRole('rowheader')?.textContent)).toEqual([undefined, 'r2current', 'r1']);
+    expect(within(rows[2]).getByText('unknown')).toBeTruthy();
+    expect(within(rows[1]).queryByRole('button')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll back to revision 1' }));
+    expect(request).not.toHaveBeenCalledWith('/native/api/ha/rollback', expect.anything());
+    fireEvent.click(await screen.findByRole('button', { name: 'Roll back' }));
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/ha/rollback', expect.objectContaining({ method: 'POST' })));
+    expect((await screen.findByRole('status')).textContent).toContain('Home Assistant now serves revision 3');
+  });
+
+  it('shows Home Assistant errors and keeps local edits', async () => {
+    vi.mocked(request).mockImplementation(async path => {
+      if (path === '/native/api/ha/publish') throw new ApiError('Home Assistant refused the request: publishing needs an administrator.', 502);
+      if (path === '/native/api/ha/publication') throw new ApiError('Home Assistant is not configured', 503);
+      return envelope();
+    });
+    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
+    await screen.findByDisplayValue('Native composition');
+    fireEvent.change(screen.getByDisplayValue('Native composition'), { target: { value: 'Edited' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish to Home Assistant' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('needs an administrator');
+    expect(screen.getByText('Unsaved local changes')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Home Assistant' }));
+    await waitFor(() => expect(screen.getAllByRole('alert').map(item => item.textContent).join()).toContain('not configured'));
   });
 });

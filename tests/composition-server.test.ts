@@ -5,33 +5,23 @@ import { deflateSync } from 'node:zlib';
 import { mkdtemp, readFile, readdir, rm, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../server/app';
 import type { ServerConfig } from '../server/config';
 import { StudioStore } from '../server/store';
 import { compositionAssetManifestHash, validateCompositionPublication } from '../server/composition';
-import { readerRequest } from '../server/publication-readers';
 import { canonicalCompositionJSON, MAX_COMPOSITION_ENVELOPE_BYTES } from '../src/shared/composition/json';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { CompositionDraft, UploadedCompositionAsset } from '../src/shared/composition/workspace';
+import { fakeHomeAssistant, type FakeHaOptions } from './fake-ha-publication';
+import { HomeAssistantClient } from '../server/ha';
+import corpusRemote from '../contract/corpus/accept/device-media-remote-config.json';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
 const token = 'synthetic-composition-token';
 const auth = { Authorization: `Bearer ${token}` };
 
-it('keeps canonical local HA origins but never issues remote-HTTP or author-scope reader grants', () => {
-  const request = { haServer: 'https://ha.example.test', haUserID: 'demo-user',
-    publisherURL: 'https://publisher.example.test/native', expiresAt: Math.floor(Date.now() / 1000) + 3600 };
-  for (const haServer of ['http://homeassistant.local:8123', 'http://127.0.0.1:8123', 'http://[::1]:8123', 'http://[::ffff:7f00:1]:8123']) {
-    expect(readerRequest.parse({ ...request, haServer }).haServer).toBe(haServer);
-  }
-  for (const update of [{ haServer: 'http://remote.example.test' }, { haServer: 'https://ha.example.test/path' },
-    { publisherURL: 'http://publisher.example.test/native' }, { publisherURL: 'https://publisher.example.test:0/native' },
-    { publisherURL: 'https://publisher.example.test/native/%00' }, { scope: 'author' }]) {
-    expect(() => readerRequest.parse({ ...request, ...update })).toThrow();
-  }
-});
 // Generated from the synthetic one-pixel PNG, with no production/reference media.
 const jpeg = Buffer.from('/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAAQABAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAf/aAAwDAQACEQMRAD8A+I6KKK/bD8jP/9k=', 'base64');
 
@@ -91,52 +81,17 @@ function withWallpaper(document: CompositionDocument, asset: UploadedComposition
 }
 
 describe('separate authenticated native composition pipeline', () => {
-  it('issues durable reader-only grants scoped to published identity and published assets, with revocation', async () => {
-    const f = await fixture(), first = await f.draft();
-    const asset: UploadedCompositionAsset = await (await f.upload()).json();
-    const saved: CompositionDraft = await (await f.request('/native/api/draft', 'PUT', {
-      expectedRevision: first.revision, document: withWallpaper(first.document, asset),
-    })).json();
-    await f.request('/native/api/publish', 'POST', { expectedRevision: saved.revision });
-    const response = await f.request('/native/api/readers', 'POST', {
-      haServer: 'https://ha.example.test', haUserID: 'synthetic-user',
-      publisherURL: 'https://publisher.example.test/native', expiresAt: Math.floor(Date.now() / 1000) + 3600,
-    });
-    expect(response.status).toBe(201);
-    const enrollment = await response.json();
-    expect(enrollment.publisherID).toBe(first.publisherId);
-    const reader = { Authorization: `Bearer ${enrollment.credential}` };
-    const get = await f.request('/native/api/published', 'GET', undefined, reader);
-    expect(get.status).toBe(200);
-    expect((await f.request('/native/api/published', 'HEAD', undefined, reader)).status).toBe(200);
-    expect((await f.request('/native/api/published', 'GET', undefined,
-      { ...reader, 'If-None-Match': get.headers.get('etag')! })).status).toBe(304);
-    expect((await f.request(`/native${asset.source.path}`, 'GET', undefined, reader)).status).toBe(200);
-    const unpublished: UploadedCompositionAsset = await (await f.upload(jpeg, 'image/jpeg')).json();
-    for (const endpoint of ['/native/api/draft', '/native/api/assets', '/native/api/export', '/native/api/schema',
-      '/api/native-home', '/api/actions', '/api/events', '/native/api/published?extra=1', `/native${unpublished.source.path}`])
-      expect((await f.request(endpoint, 'GET', undefined, reader)).status).toBe(401);
-    for (const endpoint of ['/native/api/publish', '/native/api/readers', '/api/actions', '/native/api/auth'])
-      expect((await f.request(endpoint, 'POST', {}, reader)).status).toBe(401);
-    const disk = await readFile(path.join(f.directory, 'native-v2/publication-readers.json'), 'utf8');
-    expect(disk).not.toContain(enrollment.credential);
-    const { PublicationReaders } = await import('../server/publication-readers');
-    const reopened = await PublicationReaders.open(path.join(f.directory, 'native-v2'));
-    expect(reopened.permits(enrollment.credential, f.store.native.getPublished(), '/native/api/published')).toBe(true);
-    expect(reopened.permits(enrollment.credential, { ...f.store.native.getPublished(), publisherId: 'other' }, '/native/api/published')).toBe(false);
-    expect(reopened.permits(enrollment.credential, f.store.native.getPublished(), '/native/api/published', (enrollment.expiresAt + 1) * 1000)).toBe(false);
-    expect((await f.request(`/native/api/readers/${enrollment.grantID}`, 'DELETE', {}, reader)).status).toBe(401);
-    expect((await f.request(`/native/api/readers/${enrollment.grantID}`, 'DELETE', {})).status).toBe(204);
+  it('no longer issues reader grants or accepts them as authorization', async () => {
+    const f = await fixture();
+    for (const endpoint of ['/native/api/readers']) expect((await f.request(endpoint, 'POST', {})).status).toBe(404);
+    const reader = { Authorization: `Bearer shr_${'0'.repeat(64)}` };
     expect((await f.request('/native/api/published', 'GET', undefined, reader)).status).toBe(401);
-    expect((await f.request('/native/api/draft')).status).toBe(200);
+    expect((await f.request('/native/api/draft', 'GET', undefined, reader)).status).toBe(401);
   });
 
-  it('retains schema-1 work, durable identities, exact publication closure and immutable revisions across restart', async () => {
+  it('retains schema-1 draft bytes, durable identities, exact publication closure and immutable revisions across restart', async () => {
     const f = await fixture();
-    const legacy = f.store.getDraft();
-    await f.store.publish(legacy.revision);
     const legacyDraftBytes = await readFile(path.join(f.directory, 'draft.json'));
-    const legacyPublicationBytes = await readFile(path.join(f.directory, 'published.json'));
     const first = await f.draft();
     expect(first.document.schemaVersion).toBe('2.0');
     expect((await f.request('/native/api/published')).status).toBe(404);
@@ -163,9 +118,7 @@ describe('separate authenticated native composition pipeline', () => {
     cleanup.push(() => reopened.close());
     expect(reopened.native.getDraft()).toEqual(saved);
     expect(reopened.native.getPublished()).toEqual(published);
-    expect(reopened.getDraft()).toEqual(legacy);
     expect(await readFile(path.join(f.directory, 'draft.json'))).toEqual(legacyDraftBytes);
-    expect(await readFile(path.join(f.directory, 'published.json'))).toEqual(legacyPublicationBytes);
   });
 
   it('preserves last publication and draft on invalid content, stale writes and identity changes', async () => {
@@ -345,5 +298,216 @@ describe('separate authenticated native composition pipeline', () => {
     await unlink(path.join(f.directory, 'native-v2/state.json'));
     await expect(StudioStore.open(f.directory)).rejects.toThrow('existing data was not replaced');
     expect(await readFile(path.join(f.directory, 'native-v2/revisions/1.json'))).toEqual(snapshot);
+  });
+});
+
+describe('Publish to Home Assistant', () => {
+  const haToken = 'synthetic-ha-token-that-must-never-leave-the-server';
+  async function home(options: Partial<FakeHaOptions> = {}) {
+    const fake = await fakeHomeAssistant({ token: haToken, ...options });
+    cleanup.push(() => fake.close());
+    const f = await fixture(true, { haUrl: fake.url, haToken });
+    const withAsset = async (name = 'Studio') => {
+      const first = await f.draft();
+      const asset: UploadedCompositionAsset = await (await f.upload()).json();
+      const saved: CompositionDraft = await (await f.request('/native/api/draft', 'PUT', {
+        expectedRevision: first.revision, document: { ...withWallpaper(first.document, asset), name },
+      })).json();
+      return { asset, saved };
+    };
+    const publish = (expectedRevision: number) => f.request('/native/api/ha/publish', 'POST', { expectedRevision });
+    return { fake, f, withAsset, publish };
+  }
+
+  describe('remote scripts', () => {
+    const script = (service: string) => ({ type: 'command', command: { type: 'service', call: { domain: 'script', service, data: {} }, optimistic: [] } });
+    async function withScriptRemote(options: Partial<FakeHaOptions>, service: string) {
+      const { fake, f, publish } = await home(options);
+      const draft = await f.draft();
+      const remote = (corpusRemote.document.dataSources as { inputs: { power: { action: unknown } } }[])[0];
+      const source = structuredClone(remote); source.inputs.power.action = script(service);
+      const saved: CompositionDraft = await (await f.request('/native/api/draft', 'PUT', {
+        expectedRevision: draft.revision, document: { ...draft.document, dataSources: [...draft.document.dataSources, source] },
+      })).json();
+      return { fake, f, publish, saved };
+    }
+
+    it('publishes any script name without reading the house document', async () => {
+      const { fake, ...ok } = await withScriptRemote({}, 'any_script_at_all');
+      expect((await ok.publish(ok.saved.revision)).status).toBe(200);
+      expect(fake.log).toEqual(['ws get', 'ws publish']);
+    });
+  });
+
+  it('uploads only the images Home Assistant lacks, immediately before the publish, and returns the revision', async () => {
+    const { fake, f, withAsset, publish } = await home();
+    const { asset, saved } = await withAsset();
+    const response = await publish(saved.revision);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      epoch: 'epoch-1', revision: 1, envelopeSha256: expect.stringMatching(/^[a-f0-9]{64}$/), uploadedAssets: 1, skippedAssets: 0,
+    });
+    expect(fake.log).toEqual(['ws get', `POST ${asset.sha256}`, 'ws publish']);
+    expect(fake.assets.get(asset.sha256)).toMatchObject({ contentType: 'image/png', size: asset.byteLength });
+    const sent = fake.messages.find(message => message.type === 'fenton_home/ui_publication/publish')!.envelope;
+    expect(sent).toEqual(JSON.parse(JSON.stringify(f.store.native.getPublished())));
+    expect(validateCompositionPublication(sent).document.assets.map(item => item.sha256)).toEqual([asset.sha256]);
+
+    fake.log.length = 0;
+    const again = await publish(saved.revision);
+    expect(await again.json()).toMatchObject({ revision: 2, uploadedAssets: 0, skippedAssets: 1 });
+    expect(fake.log).toEqual(['ws get', 'ws publish']);
+  });
+
+  it('skips images already stored and uploads nothing for a document without images', async () => {
+    const plain = await home();
+    const first = await plain.f.draft();
+    expect((await plain.publish(first.revision)).status).toBe(200);
+    expect(plain.fake.log).toEqual(['ws get', 'ws publish']);
+
+    const stored = await home();
+    const asset: UploadedCompositionAsset = await (await stored.f.upload()).json();
+    stored.fake.assets.set(asset.sha256, { contentType: 'image/png', size: asset.byteLength, body: Buffer.alloc(0) });
+    const draft = await stored.f.draft();
+    const saved: CompositionDraft = await (await stored.f.request('/native/api/draft', 'PUT', {
+      expectedRevision: draft.revision, document: withWallpaper(draft.document, asset),
+    })).json();
+    expect(await (await stored.publish(saved.revision)).json()).toMatchObject({ uploadedAssets: 0, skippedAssets: 1 });
+    expect(stored.fake.log).toEqual(['ws get', 'ws publish']);
+  });
+
+  it('lists history without envelopes and rolls back to a history revision', async () => {
+    const { fake, f, withAsset, publish } = await home();
+    const { saved } = await withAsset('First');
+    await publish(saved.revision);
+    const renamed: CompositionDraft = await (await f.request('/native/api/draft', 'PUT', {
+      expectedRevision: saved.revision, document: { ...saved.document, name: 'Second' },
+    })).json();
+    await publish(renamed.revision);
+
+    const summary = await (await f.request('/native/api/ha/publication')).json();
+    expect(summary).toMatchObject({ epoch: 'epoch-1', current: { revision: 2, publishedBy: 'supervisor-user' }, history: [{ revision: 1 }], storedAssets: 1 });
+    expect(JSON.stringify(summary)).not.toContain('envelope"');
+    expect(summary.current).not.toHaveProperty('envelope');
+    expect(summary.history[0]).not.toHaveProperty('envelope');
+
+    const rolled = await f.request('/native/api/ha/rollback', 'POST', { revision: 1 });
+    expect(rolled.status).toBe(200);
+    expect(await rolled.json()).toMatchObject({ epoch: 'epoch-1', revision: 3 });
+    expect(fake.state.current?.revision).toBe(3);
+    const missing = await f.request('/native/api/ha/rollback', 'POST', { revision: 99 });
+    expect(missing.status).toBe(404);
+    expect((await missing.json()).error).toContain('no longer in the Home Assistant history');
+    expect((await f.request('/native/api/ha/rollback', 'POST', { revision: 0 })).status).toBe(400);
+    expect((await f.request('/native/api/ha/rollback', 'POST', { revision: 1, extra: true })).status).toBe(400);
+  });
+
+  it.each([
+    ['too_large', 422, 'larger than Home Assistant accepts'], ['not_json', 422, 'not plain JSON'], ['too_deep', 422, 'nested too deeply'],
+    ['bad_capabilities', 422, 'capability list'], ['bad_asset_manifest_hash', 422, 'asset manifest hash'],
+    ['bad_document_hash', 422, 'document hash'], ['bad_document', 422, 'document is malformed'],
+    ['bad_assets', 422, 'asset list'], ['missing_asset', 409, 'does not hold every image'],
+  ])('maps the publish rejection %s to a clear Studio message', async (reason, status, text) => {
+    const { f, publish } = await home({ publishReason: reason });
+    const draft = await f.draft();
+    const response = await publish(draft.revision);
+    expect(response.status).toBe(status);
+    expect((await response.json()).error).toContain(text);
+  });
+
+  it('never forwards unrecognised Home Assistant error text', async () => {
+    const { f, publish } = await home({ publishReason: 'extra keys not allowed @ data[\'secret_field\'] synthetic-leak' });
+    const response = await publish((await f.draft()).revision);
+    const body = JSON.stringify(await response.json());
+    expect(response.status).toBe(502);
+    expect(body).toContain('rejected the publish request');
+    expect(body).not.toContain('synthetic-leak');
+  });
+
+  it.each([
+    [{ unknownCommand: true }, 'Install fenton_home 1.4.0'],
+    [{ denyCommands: true }, 'needs an administrator'],
+  ] as const)('explains an unusable integration: %j', async (options, text) => {
+    const { f, publish } = await home(options);
+    const response = await publish((await f.draft()).revision);
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toContain(text);
+    expect((await (await f.request('/native/api/ha/publication')).json()).error).toContain(text);
+  });
+
+  it.each([
+    [{ status: 400, error: 'hash_mismatch' }, 422, 'different image bytes'], [{ status: 413, error: 'too_large' }, 413, '15 MiB'],
+    [{ status: 415, error: 'unsupported_type' }, 415, 'JPEG, PNG, HEIC and WebP'], [{ status: 507, error: 'store_full' }, 507, 'no room'],
+    [{ status: 401 }, 502, 'needs an administrator'], [{ status: 404 }, 502, 'Install fenton_home'], [{ status: 500 }, 502, 'HTTP 500'],
+  ])('maps the asset upload failure %j and does not publish', async (uploadFailure, status, text) => {
+    const { fake, f, withAsset, publish } = await home({ uploadFailure });
+    const { saved } = await withAsset();
+    const response = await publish(saved.revision);
+    expect(response.status).toBe(status);
+    expect((await response.json()).error).toContain(text);
+    expect(fake.log.at(-1)).toMatch(/^POST /);
+    expect(fake.state.current).toBeNull();
+    void f;
+  });
+
+  it('reports an unconfigured Home Assistant and a stale draft revision', async () => {
+    const f = await fixture();
+    const draft = await f.draft();
+    expect((await f.request('/native/api/ha/publish', 'POST', { expectedRevision: draft.revision })).status).toBe(503);
+    expect((await f.request('/native/api/ha/publication')).status).toBe(503);
+    expect((await f.request('/native/api/ha/rollback', 'POST', { revision: 1 })).status).toBe(503);
+    const { f: live, publish } = await home();
+    expect((await publish((await live.draft()).revision + 5)).status).toBe(409);
+    expect((await live.request('/native/api/ha/publish', 'POST', {})).status).toBe(400);
+  });
+
+  it('answers the style editor reads: unconfigured is 503, a malformed query 400, and no sign-in 401', async () => {
+    const f = await fixture();
+    for (const endpoint of ['/native/api/ha/entities', '/native/api/ha/entity-states?entityId=lock.fixture_front', '/native/api/ha/exists?id=script.fixture_known'])
+      expect((await f.request(endpoint)).status).toBe(503);
+    expect((await f.request('/native/api/ha/entities?domain=Bad%20Domain')).status).toBe(400);
+    expect((await f.request('/native/api/ha/entity-states')).status).toBe(400);
+    expect((await f.request('/native/api/ha/exists?id=light.fixture')).status).toBe(400);
+    expect((await f.request('/native/api/ha/entities', 'GET', undefined, {})).status).toBe(401);
+  });
+
+  it('requires Studio authentication', async () => {
+    const { fake, f } = await home();
+    for (const [endpoint, method, body] of [['/native/api/ha/publication', 'GET'], ['/native/api/ha/publish', 'POST', { expectedRevision: 1 }],
+      ['/native/api/ha/rollback', 'POST', { revision: 1 }]] as const)
+      expect((await f.request(endpoint, method, body, {})).status).toBe(401);
+    expect(fake.log).toEqual([]);
+  });
+
+  it('never returns or logs the Home Assistant token, and sends it only to Home Assistant', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map(name => vi.spyOn(console, name).mockImplementation(() => undefined));
+    try {
+      const { fake, f, withAsset, publish } = await home();
+      const { saved } = await withAsset();
+      const bodies = [await (await publish(saved.revision)).text(), await (await f.request('/native/api/ha/publication')).text(),
+        await (await f.request('/native/api/ha/rollback', 'POST', { revision: 9 })).text()];
+      const failing = await home({ publishReason: haToken, uploadFailure: { status: 500, error: haToken } });
+      bodies.push(await (await failing.publish((await failing.f.draft()).revision)).text());
+      for (const body of bodies) expect(body).not.toContain(haToken);
+      expect(JSON.stringify(spies.map(spy => spy.mock.calls))).not.toContain(haToken);
+      const posts = fake.authorizations.filter(header => header !== undefined);
+      expect(posts.length).toBeGreaterThan(0);
+      expect(posts.every(header => header === `Bearer ${haToken}`)).toBe(true);
+      expect(fake.messages.filter(message => message.type === 'auth').every(message => message.access_token === haToken)).toBe(true);
+    } finally { for (const spy of spies) spy.mockRestore(); }
+  });
+
+  it('as an add-on, talks to the Supervisor proxy with the Supervisor token', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('WebSocket', class { constructor(url: string) { urls.push(url); throw new Error('stub'); } });
+    try {
+      const client = new HomeAssistantClient({
+        production: false, port: 0, host: '127.0.0.1', dataDir: '.', enableLiveActions: false, supervisorToken: 'synthetic-supervisor-token',
+      });
+      expect(client.publication.configured).toBe(true);
+      await expect(client.publication.get()).rejects.toMatchObject({ status: 502 });
+      expect(urls).toEqual(['ws://supervisor/core/websocket']);
+      client.close();
+    } finally { vi.unstubAllGlobals(); }
   });
 });

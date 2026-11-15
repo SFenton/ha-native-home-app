@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { componentLocations, compositionEditorSchema, fieldVariants, resolveField } from '../src/composition-editor';
+import { componentLocations, compositionEditorSchema, fieldVariants, resolveField, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { climatePropsSchema } from '../src/shared/composition/climate';
 import fixture from './fixtures/home-domains.json';
@@ -53,7 +53,7 @@ describe('Home domain production recipes', () => {
   });
 
   it('exposes new prediction and metadata fields through the generated inspector and keeps them closed', () => {
-    const nodeSchema = compositionEditorSchema.definitions?.__schema0;
+    const nodeSchema = nodeDefinition();
     const node = fieldVariants(nodeSchema!).find(variant => variant.properties?.type?.const === 'climate-control');
     const props = fieldVariants(resolveField(node!.properties!.props)!);
     const explicit = props.find(variant => variant.properties?.kind?.const === 'explicit-switch');

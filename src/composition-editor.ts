@@ -11,7 +11,7 @@ export type SchemaField = {
   properties?: Record<string, SchemaField>; items?: SchemaField | SchemaField[];
   additionalProperties?: SchemaField | boolean; propertyNames?: SchemaField; pattern?: string;
   required?: string[];
-  oneOf?: SchemaField[]; anyOf?: SchemaField[]; definitions?: Record<string, SchemaField>;
+  oneOf?: SchemaField[]; anyOf?: SchemaField[]; allOf?: SchemaField[]; definitions?: Record<string, SchemaField>;
   minimum?: number; maximum?: number; minItems?: number; maxItems?: number; maxLength?: number;
 };
 const schemaField: z.ZodType<SchemaField> = z.lazy(() => z.object({
@@ -23,14 +23,23 @@ const schemaField: z.ZodType<SchemaField> = z.lazy(() => z.object({
   propertyNames: schemaField.optional(), pattern: z.string().optional(),
   required: z.array(z.string()).optional(),
   items: z.union([schemaField, z.array(schemaField), z.boolean().transform(() => ({}))]).optional(),
-  oneOf: z.array(schemaField).optional(), anyOf: z.array(schemaField).optional(),
+  oneOf: z.array(schemaField).optional(), anyOf: z.array(schemaField).optional(), allOf: z.array(schemaField).optional(),
   definitions: z.record(z.string(), schemaField).optional(),
   minimum: z.number().optional(), maximum: z.number().optional(), minItems: z.number().optional(),
   maxItems: z.number().optional(), maxLength: z.number().optional(),
 }));
 export const compositionEditorSchema = schemaField.parse(z.toJSONSchema(compositionDocumentSchema, { target: 'draft-7' }));
+/** The generated definition of a composition node (the recursive union every container's children share). */
+export function nodeDefinition(): SchemaField {
+  const found = Object.values(compositionEditorSchema.definitions ?? {}).find(definition =>
+    (definition.anyOf ?? definition.oneOf)?.some(variant => variant.properties?.type?.const === 'tile-grid'));
+  if (!found) throw new Error('The node definition is missing from the generated schema');
+  return found;
+}
 export type EditorPath = (string | number)[];
 export function resolveField(schema: SchemaField): SchemaField {
+  // A schema carrying only a reference and a check is emitted as a single-member allOf.
+  if (schema.allOf?.length === 1 && !schema.$ref) return resolveField(schema.allOf[0]);
   if (!schema.$ref) return schema;
   const definition = compositionEditorSchema.definitions?.[schema.$ref.split('/').at(-1)!];
   if (!definition) throw new Error('Unsupported composition schema reference');
@@ -55,6 +64,9 @@ export function selectedVariant(schema: SchemaField, value: Json): SchemaField {
 export function defaultField(schema: SchemaField, document: CompositionDocument, key = ''): Json {
   schema = resolveField(schema);
   if (schema.const !== undefined) return schema.const;
+  const tag = schema.properties?.type?.const;
+  if (tag === 'call-service') return { type: 'call-service', domain: 'light', service: 'turn_on' };
+  if (tag === 'state' && schema.properties?.in) return { type: 'state', sourceId: document.dataSources.find(source => source.kind === 'ha-entity')?.id ?? '', path: ['state'], in: ['on'] };
   if (schema.oneOf || schema.anyOf) return defaultField(fieldVariants(schema)[0], document, key);
   if (schema.enum) return schema.enum[0];
   if (schema.type === 'object') {

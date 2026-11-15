@@ -6,7 +6,7 @@ import { createCompositionDocument } from './workspace';
 /** An explicit recipe, not renderer defaults. No credentials, real house IDs or service execution. */
 export function securityExample(): CompositionDocument {
   const document = createCompositionDocument('demo-security');
-  const icon = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'reject' as const });
+  const icon = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'fallback' as const });
   const fill = (red: number, green: number, blue: number) => ({ type: 'solid-rgb' as const, red, green, blue });
   const appearance = (text: string, name: string, color = fill(84, 110, 122)) => ({ text, icon: icon(name), fill: color });
   const panel: Extract<CompositionNode, { type: 'alarm-panel' }> = {
@@ -38,9 +38,9 @@ export function securityExample(): CompositionDocument {
   const root = document.pages[0];
   root.title = 'Security controls';
   document.dataSources = [
-    { id: 'demo-alarm', kind: 'model', model: 'alarm-mode@1', inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo' } } },
-    { id: 'demo-lock', kind: 'model', model: 'security-door@1', inputs: { kind: 'lock', entityId: { type: 'literal', value: 'lock.demo' } } },
-    { id: 'demo-garage', kind: 'model', model: 'security-door@1', inputs: { kind: 'garage', entityId: { type: 'literal', value: 'cover.demo' } } },
+    { id: 'demo-alarm', kind: 'model', model: 'alarm-mode@1', inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo_unit' } } },
+    { id: 'demo-lock', kind: 'model', model: 'security-door@1', inputs: { kind: 'lock', entityId: { type: 'literal', value: 'lock.demo_unit' } } },
+    { id: 'demo-garage', kind: 'model', model: 'security-door@1', inputs: { kind: 'garage', entityId: { type: 'literal', value: 'cover.demo_unit' } } },
   ];
   const door = (kind: 'lock' | 'garage'): Extract<CompositionNode, { type: 'door-tile' }> => ({
     id: `demo-${kind}-control`, title: kind === 'lock' ? 'Entry' : 'Garage', type: 'door-tile', layout: { span: 1 },

@@ -89,7 +89,7 @@ test('native weather, alarm, subpage chrome and device themes stay data driven',
   expect((await (await request.get('/api/draft')).json()).document).toEqual(document);
 });
 
-test('edits persist across reload and publish the exact saved document', async ({ page, request }) => {
+test('edits persist across reload', async ({ page, request }) => {
   await page.goto('/');
   await page.getByLabel('Page title', { exact: true }).fill('Arrival Hub');
   await page.getByRole('button', { name: /^Save/ }).click();
@@ -97,16 +97,7 @@ test('edits persist across reload and publish the exact saved document', async (
     .toBe('Arrival Hub');
   await page.reload();
   await expect(page.getByLabel('Page title', { exact: true })).toHaveValue('Arrival Hub');
-  const draft = await (await request.get('/api/draft')).json();
-  await page.getByRole('button', { name: /^Publish/ }).click();
-  await page.getByRole('button', { name: 'Publish configuration', exact: true }).click();
-  await expect.poll(async () => {
-    const response = await request.get('/api/published');
-    return response.ok() ? (await response.json()).revision : null;
-  }).toBe(draft.revision);
-  const published = await (await request.get('/api/published')).json();
-  expect(published.revision).toBe(draft.revision);
-  expect(published.document).toEqual(draft.document);
+  expect((await (await request.get('/api/published')).json()).error).toBe('Unknown API endpoint');
 });
 
 test('switching workspaces retains both local drafts and saves only the active workspace', async ({ page, request }) => {
@@ -700,7 +691,7 @@ test('native camera viewers expose configured controls and stop private reads wh
   document.pages[0].toolbar = [];
   document.pages[0].components = [{
     id: 'test-camera', type: 'camera-button', title: 'Test camera',
-    props: { entityId: 'camera.synthetic', presentation: 'camera-card' },
+    props: { entityId: 'camera.demo_item', presentation: 'camera-card' },
     action: { type: 'modal', modalId: 'test-camera-viewer' },
   }];
   document.navigation.tabs = [document.navigation.tabs[0]];
@@ -711,7 +702,7 @@ test('native camera viewers expose configured controls and stop private reads wh
     layout: { columns: 1, gap: 16 }, toolbar: [],
     components: [{
       id: 'test-camera-feed', type: 'camera-feed', title: 'Test camera',
-      props: { entityId: 'camera.synthetic', viewer: true, controls: ['snapshot', 'sound', 'record'] },
+      props: { entityId: 'camera.demo_item', viewer: true, controls: ['snapshot', 'sound', 'record'] },
     }],
   }];
   expect((await request.put('/api/draft', { data: { document, expectedRevision: before.revision } })).ok()).toBeTruthy();

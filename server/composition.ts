@@ -35,6 +35,7 @@ export function validateCompositionPublication(input: unknown): CompositionPubli
   return publication;
 }
 
+/** The Studio's counterpart of the app's `ServerUICompositionPublication.decode(_:)`. */
 export function decodeCompositionPublication(bytes: Uint8Array): CompositionPublication {
   return validateCompositionPublication(parseCompositionJSON(bytes));
 }

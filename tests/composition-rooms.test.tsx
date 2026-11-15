@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { componentLocations, compositionEditorSchema, fieldVariants, moveCompositionNode, resolveField, valueAt, type EditorPath, type SchemaField } from '../src/composition-editor';
+import { componentLocations, compositionEditorSchema, fieldVariants, moveCompositionNode, resolveField, valueAt, type EditorPath, type SchemaField, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CompositionDocument, CompositionNode } from '../src/shared/composition/schema';
 import { createCompositionDocument } from '../src/shared/composition/workspace';
@@ -135,7 +135,7 @@ it('authors navigation ranking, visit intent, counter and live visibility with g
 
 it('authors room section arrangement and moves retained nodes between section parents', () => {
   const document = fixture();
-  const nodes = compositionEditorSchema.definitions!.__schema0;
+  const nodes = nodeDefinition();
   const section = fieldVariants(nodes).find(variant => variant.properties?.type?.const === 'room-section')!;
   const current = form(document, section.properties!.props, ['pages', 0, 'components', 0, 'props']);
   fireEvent.change(screen.getByLabelText('Arrangement'), { target: { value: 'two-column-fill' } });

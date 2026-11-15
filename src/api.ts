@@ -1,4 +1,4 @@
-import type { DraftEnvelope, PublishedEnvelope, StudioDocument } from './shared/types';
+import type { DraftEnvelope, StudioDocument } from './shared/types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -23,4 +23,3 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const loadDraft = () => request<DraftEnvelope>('/api/draft');
 export const saveDraft = (document: StudioDocument, expectedRevision: number) => request<DraftEnvelope>('/api/draft', { method: 'PUT', body: JSON.stringify({ document, expectedRevision }) });
 export const validateDocument = (document: unknown) => request<{ valid: boolean; errors: string[] }>('/api/validate', { method: 'POST', body: JSON.stringify({ document }) });
-export const publishDraft = (expectedRevision: number) => request<PublishedEnvelope>('/api/publish', { method: 'POST', body: JSON.stringify({ expectedRevision }) });

@@ -1,11 +1,12 @@
 import { z } from 'zod/v4';
 import { identifierSchema } from '../schema';
 import type { CompositionIssue } from './json';
+import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;
 const text = (max: number, blank = false) => z.string().max(max).refine(value => blank || Boolean(value.trim()));
 const entity = text(160), title = text(240), id = identifierSchema;
-const symbol = object({ type: z.literal('sf-symbol'), name: text(80), rendering: z.literal('canonical'), unavailable: z.literal('reject') });
+const symbol = object({ type: z.literal('sf-symbol'), name: text(80), rendering: z.literal('canonical'), unavailable: symbolUnavailable });
 export const deviceModels = ['air-purifier@1', 'bathroom-fan@1', 'grill@1', 'humidifier@1'] as const;
 export const deviceDomains: Record<typeof deviceModels[number], Record<string, string>> = {
   'air-purifier@1': { pm25EntityId: 'sensor', aqiEntityId: 'sensor', autoModeEntityId: 'select', fanEntityId: 'fan', modeEntityId: 'select' },

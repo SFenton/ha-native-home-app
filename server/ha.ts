@@ -6,6 +6,8 @@ import { CameraTransport, nativeCameraIds } from './camera';
 import { nativeHomeAbortError, readNativeHouseConfig, readNativeSnapshot, type NativeHomeSnapshot } from './native-home';
 import { HttpError } from './store';
 import { ReadEndpointRegistry } from './read-endpoints';
+import { HaPublicationClient, command } from './ha-publication';
+import { entityExists, entityStates, listEntities, type HaReads } from './ha-entities';
 
 export class HomeAssistantClient {
   private readonly base?: string;
@@ -15,11 +17,14 @@ export class HomeAssistantClient {
   private connected = false;
   readonly cameras: CameraTransport;
   readonly readEndpoints: ReadEndpointRegistry;
+  /** Publishes to the `fenton_home` integration with this client's credentials; the token never leaves the server. */
+  readonly publication: HaPublicationClient;
   constructor(private readonly config: ServerConfig) {
     const direct = Boolean(config.haUrl && config.haToken);
     this.base = direct ? config.haUrl : (config.supervisorToken ? 'http://supervisor/core' : undefined);
     this.token = direct ? config.haToken : config.supervisorToken;
     this.websocketUrl = direct ? new URL('/api/websocket', config.haUrl).href.replace(/^http/, 'ws') : (config.supervisorToken ? 'ws://supervisor/core/websocket' : undefined);
+    this.publication = new HaPublicationClient({ base: this.base, token: this.token, websocketUrl: this.websocketUrl });
     this.readEndpoints = new ReadEndpointRegistry({
       base: this.base, token: this.token, endpoints: config.readEndpoints,
       credentials: [config.haToken ?? '', config.supervisorToken ?? '', config.authToken ?? ''],
@@ -33,6 +38,35 @@ export class HomeAssistantClient {
       },
     });
   }
+  /** The house configuration the `fenton_home` integration serves, read over this client's own connection. */
+  async houseConfig(signal = AbortSignal.timeout(15000)): Promise<Record<string, unknown>> {
+    if (!this.websocketUrl || !this.token) throw new HttpError(503, 'Home Assistant is not configured');
+    return (await readNativeHouseConfig(this.websocketUrl, this.token, signal)).config;
+  }
+  /** The read-only reads the style editor needs, over this client's credentials. A 404 reads as `undefined`. */
+  private reads(signal: AbortSignal): HaReads {
+    return {
+      get: async path => {
+        try { return await this.request(path, 'GET', undefined, signal, 4 * 1024 * 1024); }
+        catch (error) {
+          if (error instanceof HttpError && error.message.endsWith('HTTP 404')) { this.connected = true; return undefined; }
+          throw error;
+        }
+      },
+      translations: async domain => {
+        const result = await command({ base: this.base, token: this.token, websocketUrl: this.websocketUrl }, 'translations',
+          { language: 'en', category: 'entity_component', integration: [domain] }, signal, 'frontend/get_translations');
+        const resources = typeof result === 'object' && result !== null ? (result as { resources?: unknown }).resources : undefined;
+        return typeof resources === 'object' && resources !== null ? resources as Record<string, string> : {};
+      },
+    };
+  }
+  /** Read-only entity lookups for the style editor. Nothing is written to Home Assistant. */
+  readonly entities = {
+    list: (domain?: string, signal = AbortSignal.timeout(15000)) => listEntities(this.reads(signal), domain),
+    states: (entityId: string, signal = AbortSignal.timeout(20000)) => entityStates(this.reads(signal), entityId),
+    exists: (id: string, signal = AbortSignal.timeout(8000)) => entityExists(this.reads(signal), id),
+  };
   get configured() { return Boolean(this.base && this.token); }
   get haConnected() { return this.connected; }
   private async request(endpoint: string, method: 'GET' | 'POST' = 'GET', body?: unknown, signal = AbortSignal.timeout(8000), maxBytes = 1024 * 1024): Promise<unknown> {
@@ -100,7 +134,7 @@ export class HomeAssistantClient {
       throw error;
     } finally { clearTimeout(timer); }
   }
-  close() { this.shutdown.abort(); this.cameras.close(); this.readEndpoints.close(); }
+  close() { this.shutdown.abort(); this.cameras.close(); this.readEndpoints.close(); this.publication.close(); }
   async wallpaper(): Promise<{ image: Buffer; type: string }> {
     if (!this.configured) throw new HttpError(503, 'Home Assistant is not configured');
     let response: Response;

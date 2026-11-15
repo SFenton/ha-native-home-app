@@ -3,6 +3,7 @@ import type { Json } from './shared/types';
 import { changeFieldVariant, defaultField, fieldVariants, removeCompositionItem, reorderCompositionItem, replaceAt, resolveField, selectedVariant, valueAt, variantName, type EditorPath, type SchemaField } from './composition-editor';
 import { Field, NumberField, SelectField, TextField } from './ui';
 import { useState } from 'react';
+import { CallServiceEditor, OperandEditor, PredicateBuilder } from './GrammarEditors';
 
 type Props = {
   schema: SchemaField; value: Json; path: EditorPath; label: string; document: CompositionDocument;
@@ -26,6 +27,17 @@ export default function CompositionFields(props: Props) {
   const run = (operation: () => CompositionDocument) => {
     try { onChange(operation()); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   };
+  const object = value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : undefined;
+  if (object?.type === 'call-service') {
+    const control = path.some((_, depth) => {
+      const owner = valueAt(document, path.slice(0, depth)) as Record<string, Json> | undefined;
+      return owner?.type === 'bound-control' && (owner.props as Record<string, Json>).kind !== 'button';
+    });
+    return <CallServiceEditor label={label} value={object} document={document} allowControl={control} onChange={set}/>;
+  }
+  if (object && ['visibleWhen', 'selectedWhen', 'isOn'].includes(key) && typeof object.type === 'string') return <PredicateBuilder label={label} value={object} document={document} onChange={set}/>;
+  if (object && key === 'value' && typeof object.type === 'string' && valueAt(document, path.slice(0, -2)) && (valueAt(document, path.slice(0, -2)) as Record<string, Json>).type === 'bound-control')
+    return <OperandEditor label={label} value={object} document={document} onChange={set}/>;
   const variants = fieldVariants(schema);
   const container = path.at(-3) === 'tabs' ? valueAt(document, path.slice(0, -3)) : undefined;
   const localStateId = container && typeof container === 'object' && 'type' in container && container.type === 'local-tabs'

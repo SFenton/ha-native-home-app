@@ -20,6 +20,11 @@ export function reject(code: CompositionIssue['code'], at: string, capability?: 
   throw new CompositionValidationError([{ code, pointer: at, ...(capability ? { capability } : {}) }]);
 }
 const reserved = new Set(['__proto__', 'prototype', 'constructor']);
+/**
+ * Object keys are compared as the app compares them: Swift `String` equality is canonical equivalence, so two keys that
+ * normalise to the same NFC form are one key. Lone surrogates have no normal form and are rejected by `unicode` first.
+ */
+const keyForm = (key: string) => key.normalize('NFC');
 function unicode(value: string, path: string) {
   for (let index = 0; index < value.length; index++) {
     const unit = value.charCodeAt(index);
@@ -44,8 +49,13 @@ export function assertCompositionBounds(input: unknown): void {
     const entries = Object.entries(value);
     if (entries.length > 1000 || (Array.isArray(value) && entries.length !== value.length)) reject('limit_exceeded', path);
     ancestors.add(value);
+    const forms = new Set<string>();
     for (const [key, nested] of entries) {
       unicode(key, path);
+      if (!Array.isArray(value)) {
+        if (forms.has(keyForm(key))) reject('duplicate_key', pointer(path, key));
+        forms.add(keyForm(key));
+      }
       if (reserved.has(key)) reject('invalid_value', pointer(path, key));
       walk(nested, pointer(path, key), depth + 1);
     }
@@ -103,8 +113,8 @@ export function parseCompositionJSON(bytes: Uint8Array): unknown {
         if (char === '{') {
           if (text[index] !== '"') reject('invalid_value', path);
           key = string(path);
-          if (keys.has(key)) reject('duplicate_key', pointer(path, key));
-          keys.add(key);
+          if (keys.has(keyForm(key))) reject('duplicate_key', pointer(path, key));
+          keys.add(keyForm(key));
           whitespace();
           if (text[index++] !== ':') reject('invalid_value', path);
         }

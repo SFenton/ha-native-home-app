@@ -11,7 +11,7 @@
          "props":{"header":"Checklist","footer":"","style":"module-list","density":"thin","hasGlyphs":true,"spacing":{"type":"token","name":"m"},"presentationProviderId":"live-section"},
          "children":[
            {"id":"section-settings-link","title":"Preferences","type":"settings-link","layout":{"span":1},
-            "icon":{"type":"sf-symbol","name":"gearshape","rendering":"canonical","unavailable":"reject"},
+            "icon":{"type":"sf-symbol","name":"gearshape","rendering":"canonical","unavailable":"fallback"},
             "props":{"subtitle":"","showsChevron":false},
             "action":{"type":"present","modalId":"modal-swatch","arguments":{},"ifPresented":"reject"}}
          ]},
@@ -35,9 +35,9 @@
     {
       "id":"form-actions","title":"Form Actions","type":"pinned-actions","layout":{"span":1},
       "props":{"style":"form","searchPrompt":"Search","items":[
-        {"id":"form-save","title":"Save","icon":{"type":"sf-symbol","name":"checkmark","rendering":"canonical","unavailable":"reject"},"prominent":true,"showsTitle":true,"stateProviderId":"save-state",
+        {"id":"form-save","title":"Save","icon":{"type":"sf-symbol","name":"checkmark","rendering":"canonical","unavailable":"fallback"},"prominent":true,"showsTitle":true,"stateProviderId":"save-state",
          "action":{"type":"set-local","stateId":"summary-panel","value":{"type":"string","value":"profile"}}},
-        {"id":"form-cancel","title":"Cancel","icon":{"type":"sf-symbol","name":"xmark","rendering":"canonical","unavailable":"reject"},"prominent":false,"showsTitle":true,"action":{"type":"back"}}
+        {"id":"form-cancel","title":"Cancel","icon":{"type":"sf-symbol","name":"xmark","rendering":"canonical","unavailable":"fallback"},"prominent":false,"showsTitle":true,"action":{"type":"back"}}
       ]}
     }
   ]

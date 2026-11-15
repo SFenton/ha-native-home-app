@@ -37,10 +37,10 @@ function liveFixture() {
   tile.props.alarm = {
     sourceId: 'source-panel', projection: 'alarm-navigation@1',
     states: [{ state: 'disarmed', appearance: {
-      icon: { type: 'sf-symbol', name: 'shield.slash', rendering: 'canonical', unavailable: 'reject' },
+      icon: { type: 'sf-symbol', name: 'shield.slash', rendering: 'canonical', unavailable: 'fallback' },
       fill: { type: 'solid-rgb', red: 67, green: 160, blue: 71 }, text: 'At rest',
     } }],
-    fallback: { icon: { type: 'sf-symbol', name: 'shield', rendering: 'canonical', unavailable: 'reject' },
+    fallback: { icon: { type: 'sf-symbol', name: 'shield', rendering: 'canonical', unavailable: 'fallback' },
       fill: { type: 'solid-rgb', red: 84, green: 110, blue: 122 }, text: 'Panel' },
     loadingText: 'Reading panel', unavailableText: 'Panel unavailable', errorText: 'No response', hiddenText: 'Private',
   };
@@ -48,11 +48,24 @@ function liveFixture() {
   return { publication, tile, text };
 }
 describe('configured live adapters', () => {
+  it('negotiates supporting text styles without changing the original text contract', () => {
+    for (const style of ['subheadline', 'footnote', 'section-title'] as const) {
+      const publication = fixture(), text = publication.document.pages[2].components[0];
+      if (text.type !== 'text') throw Error('Fixture shape changed');
+      text.props.style = style;
+      issue(() => validateCompositionPublication(publication), 'capability_manifest_mismatch');
+      publication.capabilities = compileCompositionDocument(publication.document).capabilities;
+      expect(publication.capabilities).toContain(style === 'section-title' ? 'sh.section-title@1' : 'sh.supporting-text-styles@1');
+      expect(validateCompositionPublication(publication).document).toEqual(publication.document);
+    }
+    expect(compileCompositionDocument(fixture().document).capabilities).toEqual(firstSliceCapabilities);
+  });
+
   it('authors todo count sources with exact capability and strict list targets', () => {
     const publication = fixture();
     publication.document.dataSources.push({
       id: 'source-chores', kind: 'model', model: 'todo-counts@1',
-      inputs: { lists: [{ entityId: { type: 'literal', value: 'todo.demo' }, overdue: true }] },
+      inputs: { lists: [{ entityId: { type: 'literal', value: 'todo.demo_unit' }, overdue: true }] },
       labels: { openSuffix: 'open', overdueSuffix: 'late', separator: ' / ', zeroText: 'All clear',
         loadingText: 'Loading', unavailableText: 'Unavailable' },
     });
@@ -70,7 +83,7 @@ describe('configured live adapters', () => {
     source.inputs.lists.push(structuredClone(source.inputs.lists[0]));
     issue(() => compileCompositionDocument(publication.document), 'invalid_combination', '/document/dataSources/2/inputs/lists/1/entityId/value');
     source.inputs.lists.pop();
-    source.inputs.lists[0].entityId.value = 'sensor.demo';
+    source.inputs.lists[0].entityId.value = 'sensor.demo_unit';
     issue(() => compileCompositionDocument(publication.document), 'invalid_combination', '/document/dataSources/2/inputs/lists/0/entityId/value');
   });
   it('authors a strictly configured sprinkler state source with exact capability and typed reads', () => {
@@ -175,7 +188,7 @@ describe('configured live adapters', () => {
   });
   it('negotiates delivered activity presentation without granting engine actions', () => {
     const activity = {
-      id: 'activity-demo', jobId: 'fan.demo', type: 'activity-presentation@1', title: 'Cleaning', glyph: 'fan', tint: 'air',
+      id: 'activity-demo', jobId: 'fan.demo_unit', type: 'activity-presentation@1', title: 'Cleaning', glyph: 'fan', tint: 'air',
       source: 'activity-engine@1', privacy: 'system-sensitive@1', updates: 'engine@1', intents: 'engine-safe@1',
     };
     expect(activityPresentationSchema.safeParse(activity).success).toBe(true);
@@ -258,7 +271,7 @@ describe('settings links', () => {
     const publication = fixture();
     publication.document.pages[2].components[0] = {
       id: 'settings-demo', type: 'settings-link', title: 'Sample setting', layout: { span: 1 },
-      icon: { type: 'sf-symbol', name: 'gearshape', rendering: 'canonical', unavailable: 'reject' },
+      icon: { type: 'sf-symbol', name: 'gearshape', rendering: 'canonical', unavailable: 'fallback' },
       props: { subtitle: 'Open details', hint: 'Opens details', showsChevron: true },
       action: { type: 'push', pageId: 'page-echo', arguments: {}, origin: 'sender', duplicate: 'reuse-nearest' },
     };
@@ -473,5 +486,21 @@ describe('bounded inert JSON', () => {
     input[99].push(0);
     issue(() => assertCompositionBounds(input), 'limit_exceeded');
     issue(() => parseCompositionJSON(Buffer.from(JSON.stringify(input))), 'limit_exceeded');
+  });
+});
+
+describe('canonically equivalent object keys', () => {
+  const composed = '"caf\\u00e9"', decomposed = '"cafe\\u0301"';
+  it('rejects a key repeated in another Unicode normal form while parsing', () => {
+    issue(() => parseCompositionJSON(Buffer.from(`{"a":{${composed}:1,${decomposed}:2}}`)), 'duplicate_key', '/a/cafe\u0301');
+    issue(() => parseCompositionJSON(Buffer.from(`{${decomposed}:1,${composed}:2}`)), 'duplicate_key', '/caf\u00e9');
+    issue(() => parseCompositionJSON(Buffer.from('{"\\uac01":1,"\\u1100\\u1161\\u11a8":2}')), 'duplicate_key', '/\u1100\u1161\u11a8');
+    expect(parseCompositionJSON(Buffer.from('{"caf\\u00e9":1,"cafe":2}'))).toEqual({ 'caf\u00e9': 1, cafe: 2 });
+  });
+  it('rejects equivalent keys already parsed into one object, before canonicalization', () => {
+    const value = JSON.parse(`{"a":{${composed}:1,${decomposed}:2}}`);
+    issue(() => assertCompositionBounds(value), 'duplicate_key', '/a/cafe\u0301');
+    expect(() => canonicalCompositionJSON(value)).toThrow(CompositionValidationError);
+    expect(() => assertCompositionBounds({ list: [{ 'caf\u00e9': 1 }, { 'caf\u00e9': 2 }] })).not.toThrow();
   });
 });
