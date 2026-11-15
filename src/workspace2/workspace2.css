@@ -165,6 +165,7 @@
 .w2-scope .w2-segment button { min-height: 32px; flex: 1; }
 .w2-scope .w2-segment button[aria-pressed=true] { background: var(--w2-selected); border-color: var(--w2-primary); font-weight: 600; }
 .w2-scope .w2-remove { align-self: flex-end; margin: 0 0 6px; font-size: 12px; min-height: 28px; border-color: transparent; color: var(--w2-err-text); }
+@media (pointer: coarse) { .w2-scope .w2-remove { min-height: 44px; min-width: 44px; } }
 .w2-caption { margin: 2px 0 8px; font-size: 12px; color: var(--w2-muted); }
 .w2-id-row code { flex: 1; }
 .w2-link-row, .w2-list-row, .w2-page-row, .w2-check-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; justify-content: flex-start; border: 0 !important; padding: 8px 12px; min-height: 48px; }
@@ -246,7 +247,7 @@
 .w2-chip-static { display: inline-flex; padding: 2px 8px; border-radius: 10px; background: var(--w2-selected); font-size: 12px; }
 
 /* Move To…: a search field over the places, grouped by page or sheet */
-.w2-move-search { margin: 8px 12px; width: calc(100% - 24px); }
+.w2-scope .w2-move input.w2-move-search[type=search] { display: block; margin: 8px 12px; width: calc(100% - 24px); box-sizing: border-box; }
 .w2-move .w2-group-title { padding-inline: 12px; }
 .w2-move .w2-link-row { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding-block: 6px; }
 .w2-scope .w2-pill[hidden] { display: none; }

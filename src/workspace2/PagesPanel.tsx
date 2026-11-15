@@ -8,7 +8,7 @@ import { Tag } from './kit';
 import ThisPage from './ThisPage';
 import type { Workspace2 } from './useWorkspace2';
 import { createPage, createSheet, createTab, deleteSurfaceDialog, renameSurfaceDialog } from './navigation/controller';
-import { duplicateSurface } from './navigation/edit';
+import { duplicateSurface, tabRoom } from './navigation/edit';
 
 /** What the Pages overlay does to the rest of the workspace. Everything here is optional so the panel can be drawn on its own. */
 export interface PagesActions {
@@ -28,12 +28,13 @@ export interface PagesActions {
 interface PagesView { id: string; title: string; render: (query: string) => ReactNode }
 
 /** The overlay's footer: "Page", "Sheet" and "Tab", each with a plus, each opening the one creation dialog (spec 5.6). */
-export function PagesFooter({ onDismiss }: { onDismiss?: () => void }) {
+export function PagesFooter({ onDismiss, tabReason }: { onDismiss?: () => void; /** Why no tab can be added, when the bar is full; it shows beside the disabled Tab button. */ tabReason?: string }) {
   const open = (start: () => Promise<string | undefined>) => () => { onDismiss?.(); void start(); };
   return <footer className="w2-pages-foot" aria-label="Add">
     <button type="button" onClick={open(() => createPage())}><Plus size={14} aria-hidden/>Page</button>
     <button type="button" onClick={open(() => createSheet())}><Plus size={14} aria-hidden/>Sheet</button>
-    <button type="button" onClick={open(() => createTab())}><Plus size={14} aria-hidden/>Tab</button>
+    <button type="button" disabled={Boolean(tabReason)} aria-describedby={tabReason ? 'w2-pages-tab-reason' : undefined} onClick={open(() => createTab())}><Plus size={14} aria-hidden/>Tab</button>
+    {tabReason && <p id="w2-pages-tab-reason" className="w2-caption w2-pages-foot-reason">{tabReason}</p>}
   </footer>;
 }
 
@@ -100,6 +101,6 @@ export default function PagesPanel({ document, current, onPick, actions = {}, ws
       {views.map(item => <button key={item.id} type="button" role="radio" aria-checked={item.id === view.id} onClick={() => setViewId(item.id)}>{item.title}</button>)}
     </div>}
     <div className="w2-pages-scroll">{view.render(query)}</div>
-    <PagesFooter onDismiss={actions.onDismiss}/>
+    <PagesFooter onDismiss={actions.onDismiss} tabReason={tabRoom(document).reason}/>
   </div>;
 }

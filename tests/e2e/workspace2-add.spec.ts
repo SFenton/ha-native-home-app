@@ -359,6 +359,36 @@ test('under a coarse pointer the Not Saved tag, the Tabs heading and a target ch
   expect(remove!.height).toBeGreaterThanOrEqual(43.5);
 });
 
+test('Move To… tells apart places that share a title by their page and containers', async ({ page }) => {
+  await openWorkspace(page);
+  const panel = await selectTile(page, 'Weather');
+  if (isPhone(page)) await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
+  await panel.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('menuitem', { name: 'Move To…' }).click();
+  const rows = await page.locator('.w2-move .w2-link-row').evaluateAll(list => list.map(row => ({ title: row.querySelector('span')?.textContent ?? '', via: row.querySelector('.w2-page-via')?.textContent ?? '' })));
+  const titles = new Map<string, string[]>();
+  for (const row of rows) titles.set(row.title, [...(titles.get(row.title) ?? []), row.via]);
+  const shared = [...titles].filter(([, vias]) => vias.length > 1);
+  expect(shared.length).toBeGreaterThan(0);
+  for (const [title, vias] of shared) { expect(vias.every(Boolean), title).toBe(true); expect(new Set(vias).size, title).toBe(vias.length); }
+});
+
+test('under a coarse pointer the Remove beside Shown as and On when is 44 px tall', async ({ page }) => {
+  test.skip(!isPhone(page), 'The measure is the touch family');
+  await stubHouse(page);
+  await openWorkspace(page);
+  await page.locator('.w2-bottom-add').click();
+  await page.getByTestId('add-picker').getByRole('button', { name: 'Entities' }).click();
+  await page.getByRole('option', { name: /Lamp 0/ }).first().click();
+  const panel = page.getByLabel('Properties');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
+  const removes = panel.locator('.w2-remove');
+  expect(await removes.count()).toBeGreaterThan(0);
+  for (const box of await removes.evaluateAll(list => list.map(item => { const r = item.getBoundingClientRect(); return { label: item.getAttribute('aria-label'), h: r.height, w: r.width }; }))) {
+    expect(box.h, `${box.label} ${box.w}x${box.h}`).toBeGreaterThanOrEqual(43.5);
+  }
+});
+
 test('under a coarse pointer the Not Saved tag is 44 px', async ({ page }) => {
   test.skip(!isPhone(page), 'The measure is the touch family');
   await openWorkspace(page);
@@ -384,6 +414,10 @@ test('Move To… groups the places by page, searches them and moves the tile', a
   const found = await page.locator('.w2-move .w2-link-row').count();
   expect(found).toBeGreaterThan(0);
   expect(found).toBeLessThan(all);
+  // The search box sits inside its sheet, with its margin on both sides.
+  const box = (await search.boundingBox())!, host = (await page.locator('.w2-move').boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(host.x);
+  expect(box.x + box.width).toBeLessThanOrEqual(host.x + host.width);
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-move-to`);
   await page.locator('.w2-move .w2-link-row').first().click();
   await expect(page.locator('.w2-move')).toHaveCount(0);

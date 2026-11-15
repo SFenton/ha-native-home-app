@@ -85,11 +85,12 @@ test('the sixth tab cannot be added and the bar says why', async ({ page }) => {
   }
   const pages = await openPages(page);
   await expect(pages.getByRole('heading', { name: 'Tabs · 5 of 5' })).toBeVisible();
-  await pages.getByRole('button', { name: 'Tab', exact: true }).click();
-  await expect(dialog(page).getByText('The tab bar holds 5.')).toBeVisible();
-  await expect(dialog(page).getByRole('button', { name: 'Create' })).toBeDisabled();
+  // At the cap the Tab button is disabled and the reason sits beside it before anyone taps.
+  await expect(pages.getByRole('button', { name: 'Tab', exact: true })).toBeDisabled();
+  await expect(pages.getByLabel('Add').getByText('The tab bar holds 5.')).toBeVisible();
+  await expect(pages.getByRole('button', { name: 'Tab', exact: true })).toHaveAccessibleDescription('The tab bar holds 5.');
   await snap(page, `${tag(page)}-tab-cap-dialog`);
-  await dialog(page).getByRole('button', { name: 'Cancel' }).click();
+  await closePages(page);
   // The Tabs panel, from the "Tabs" header.
   const again = await openPages(page);
   await again.getByRole('button', { name: 'Tabs · 5 of 5' }).click();

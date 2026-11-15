@@ -14,7 +14,7 @@ import { useDeepRows } from './editors/overrides';
 import { after } from './add/insert';
 import IdRow from './IdRow';
 import SurfaceSettings from './navigation/PageSettings';
-import { deleteNode, duplicateNode, filterMoveTargets, groupMoveTargets, moveNodeBy, moveNodeTo, moveTargets } from './nodeActions';
+import { deleteNode, duplicateNode, filterMoveTargets, groupMoveTargets, moveNodeBy, moveNodeTo, moveTargets, type MoveTarget } from './nodeActions';
 import { typeName } from './util';
 import type { Workspace2 } from './useWorkspace2';
 
@@ -34,6 +34,9 @@ function MoveToPage({ id, onDone }: { id: string; onDone: (moved: CompositionDoc
   const [query, setQuery] = useState('');
   const targets = useMemo(() => moveTargets(document, id), [document, id]);
   const groups = groupMoveTargets(filterMoveTargets(targets, query));
+  // A title two places share (two "Cameras") carries the page or sheet and the containers it sits in, so no two rows read alike.
+  const shared = useMemo(() => { const count = new Map<string, number>(); for (const target of targets) count.set(target.label, (count.get(target.label) ?? 0) + 1); return count; }, [targets]);
+  const where = (target: MoveTarget) => (shared.get(target.label) ?? 0) > 1 ? [target.where, ...target.trail].filter(Boolean).join(' › ') : target.trail.join(' › ');
   return <div className="w2-move">
     <input type="search" className="w2-move-search" aria-label="Search places" placeholder="Search" value={query} onChange={event => setQuery(event.target.value)}/>
     {groups.length === 0 && <p className="w2-empty">No places match.</p>}
@@ -41,7 +44,7 @@ function MoveToPage({ id, onDone }: { id: string; onDone: (moved: CompositionDoc
       <h3 className="w2-group-title">{group}</h3>
       <ul className="w2-move-list">{list.map(target => <li key={`${target.parent.kind}:${target.parent.id}:${target.parent.tabId ?? ''}`}>
         <button type="button" className="w2-link-row" onClick={() => { try { onDone(moveNodeTo(document, id, target.parent)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } }}>
-          <span>{target.label}</span>{target.trail.length > 0 && <span className="w2-page-via">In {target.trail.join(' › ')}</span>}</button></li>)}</ul>
+          <span>{target.label}</span>{where(target) && <span className="w2-page-via">In {where(target)}</span>}</button></li>)}</ul>
     </section>)}
   </div>;
 }
