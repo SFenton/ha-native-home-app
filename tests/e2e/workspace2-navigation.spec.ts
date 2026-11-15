@@ -8,6 +8,7 @@ const tag = (page: Page) => isPhone(page) ? 'phone' : 'desktop';
 const pagesButton = (page: Page) => page.getByRole('button', { name: 'Pages', exact: true }).first();
 const openPages = async (page: Page) => { await pagesButton(page).click(); await expect(page.locator('.w2-pages')).toBeVisible(); return page.locator('.w2-pages'); };
 const dialog = (page: Page) => page.getByRole('dialog');
+const closePages = async (page: Page) => { await page.keyboard.press('Escape'); await expect(page.locator('.w2-pages')).toHaveCount(0); };
 
 /** Adds a page from the Pages overlay's footer, linked from the page being edited unless `from` says otherwise. */
 async function addPage(page: Page, name: string, from?: string) {
@@ -42,8 +43,9 @@ test('the Pages overlay shows Page, Sheet and Tab at the bottom, wide and narrow
   const pages = await openPages(page);
   const foot = pages.locator('.w2-pages-foot');
   for (const name of ['Page', 'Sheet', 'Tab']) await expect(foot.getByRole('button', { name, exact: true })).toBeVisible();
-  const box = await foot.boundingBox(), view = page.viewportSize()!;
-  expect(box && box.y + box.height <= view.height + 1, `the footer sits inside the viewport: ${JSON.stringify(box)}`).toBeTruthy();
+  // A narrow sheet slides in, so wait for it to settle before asking where the footer is.
+  const view = page.viewportSize()!;
+  await expect.poll(async () => { const box = await foot.boundingBox(); return box ? box.y + box.height <= view.height + 1 : false; }, { message: 'the footer sits inside the viewport' }).toBe(true);
   await expect(pages.getByRole('heading', { name: 'Tabs · 3 of 5' })).toBeVisible();
   await snap(page, `${tag(page)}-pages-footer`);
 });
@@ -58,11 +60,11 @@ test('New Page makes the page and its tile in one undo step and lists it under i
   const pages = await openPages(page);
   const parent = pages.locator('li', { has: page.getByRole('button', { name: /^Home/ }) }).first();
   await expect(parent.locator('ul').getByRole('button', { name: /^Garage/ })).toBeVisible();
-  await page.keyboard.press('Escape');
-  if (await page.locator('.w2-pages').count()) await page.getByRole('button', { name: 'Done' }).click();
+  await closePages(page);
   await page.getByRole('button', { name: 'Undo' }).click();
   const after = await openPages(page);
   await expect(after.getByRole('button', { name: /^Garage/ })).toHaveCount(0);
+  await closePages(page);
   await expect(pagesButton(page)).toContainText('Home');
 });
 
@@ -112,7 +114,8 @@ test('Page settings: the split switch turns two panes on at iPad sideways and of
   await expect(panel.getByText('Used when the window is wide enough for two.')).toBeVisible();
   await expect(panel.getByLabel('Empty side text')).toBeVisible();
   await snap(page, `${tag(page)}-page-settings-split`);
-  await panel.getByRole('button', { name: 'Advanced' }).click();
+  // On a phone the sheet opens at half height, so the Advanced row can sit below the screen: activate it without scrolling the page.
+  await panel.getByRole('button', { name: 'Advanced' }).dispatchEvent('click');
   await expect(panel.getByText('Start with one pane')).toBeVisible();
   await expect(panel.getByText('Start a new column set here')).toBeVisible();
   // iPad sideways: two panes and the read-out says on.
@@ -173,8 +176,8 @@ test('a lint row goes to its place', async ({ page }) => {
   const box = await addPage(page, 'Island', 'Nothing yet');
   await box.getByRole('button', { name: 'Create' }).click();
   await expect(pagesButton(page)).toContainText('Island');
-  await pagesButton(page).click();
-  await page.getByRole('button', { name: 'Home' }).first().click().catch(() => {});
+  const pages = await openPages(page);
+  await pages.getByRole('button', { name: /^Home/ }).first().click();
   await expect(pagesButton(page)).toContainText('Home');
   if (isPhone(page)) { await page.getByRole('button', { name: 'Project' }).click(); await page.getByRole('button', { name: 'Checks', exact: true }).click(); }
   else await page.getByTestId('checks-pill').click();
