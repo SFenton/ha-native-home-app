@@ -1,8 +1,9 @@
 import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 /** Where the evidence screenshots go; override with STUDIO_EVIDENCE_DIR. */
-const evidence = process.env.STUDIO_EVIDENCE_DIR ?? '/Users/stephenfenton/.t3/worktrees/native-home/t3-b48b8cc0/build/evidence/studio-ux-render';
+const evidence = process.env.STUDIO_EVIDENCE_DIR ?? join(process.cwd(), 'test-results', 'preview2-evidence');
 test.use({ viewport: { width: 1100, height: 940 }, deviceScaleFactor: 2 });
 
 const story = (query: string) => `/?preview2=1&${query}`;
