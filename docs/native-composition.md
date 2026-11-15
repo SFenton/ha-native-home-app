@@ -627,14 +627,21 @@ A tile applies a style by id:
   `state-styles.ts` and in `contract/corpus/state-styles/built-in.json`. The app decodes that file and tests it equal to its own
   `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Regenerate with `scripts/generate-state-style-corpus.ts`.
 
-**Authoring** (the Styles section, `src/StateStyles.tsx`). The library lists the built-ins read-only; Duplicate makes a saved
-style, Rename and Delete apply to saved styles, and Delete is blocked while a tile uses the style ("Used by N tiles"; editing a
-used style warns how many tiles change). The state-map editor offers the arc spinner only for a state with no action ("No arc while
-this state has an action") and names the iOS 17 fallbacks beside Breathe (Pulse) and Wiggle (Bounce). A tile's per-state overrides
-are one layer each, with reset, and Save as New Style folds them into a saved style. The picker lists live entities and fills a
-state map from Home Assistant's own states and translated names; states seen only in history are listed as unclassified, and the
-map always ends in a fallback. The preview (`state-style-preview.ts`) resolves a state the way the app does and draws it at iPhone,
-Duo and iPad widths, with the 0.2 s disc and arc cross-fade and the VoiceOver value ("dimmed" while the arc shows).
+**Authoring.** The 1.0 Styles section is gone with the 1.0 workspace, and the 2.0 editor for state styles has not landed. What
+exists now: the contract and the corpus above (a style library, per-state rules, per-tile overrides), validation, and the 2.0
+preview, which resolves a state the way the app does (`ruleFor`, `unknownRuleFor`) and draws a state tile. A state tile's style
+and overrides are therefore edited only as raw rows under Advanced. Not ported to 2.0 yet:
+
+1. The style library editor: built-ins listed read-only, Duplicate, Rename, Delete (blocked while a tile uses the style), the
+   ordered state-map rules (class, icon, text, indicator and colour menus, "Colour follows the class", the arc only for a state
+   with no action, the iOS 17 fallbacks), Save as New Style, the "used by" line, and the request-phase settings with a warning
+   when a script or timer does not exist.
+2. An entity picker that fills a state map from live states and translated names, flagging states seen only in history. Its
+   server routes stay (below); nothing in 2.0 calls them.
+3. The side-by-side style preview at iPhone, Duo and iPad tile widths, with the arc in the disc's place and the dimmed
+   VoiceOver value.
+4. The per-tile override editor (icon, text, indicator and colour layers, each with reset).
+5. An Add picker entry that creates a state tile with the built-in style its device class suggests.
 
 The picker reads Home Assistant through three read-only endpoints (`GET /native/api/ha/entities?domain=`,
 `/native/api/ha/entity-states?entityId=`, `/native/api/ha/exists?id=`) in `server/ha-entities.ts`: the entity list, a domain's states
