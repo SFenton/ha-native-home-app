@@ -293,14 +293,21 @@ Conflicts retain local edits, offer confirmed reload/discard, or explicit
 keep-local replacement against a newly read revision. Undo/redo, failed import
 and delayed save responses retain local work.
 
-This slice supports up to five native tabs, grouped chrome, column pages,
-canonical fitted/full-height local-stack sheets, text/grids/navigation/power tiles, typed HA-entity,
+This slice supports up to five native tabs, grouped chrome, column pages
+(`navigation-columns`, with `onDemand` and `standalone`), canonical fitted or
+full-height local-stack sheets, sheets that open beside their list when there is
+room (`adaptive`), full-screen sheets (which cannot also be adaptive), routes
+with aliases, keywords, Siri suggestions and viewer rules,
+text/grids/navigation/power tiles, typed HA-entity,
 power/alarm/lock/garage/camera models, inventory and todo summaries, configured vacuum controls,
 and same-publisher PNG/JPEG backdrops. Power toggles are
-limited to `switch` and `input_boolean`. Content-image assets/nodes, forms/local
-variables, route arguments, extended tabs, arbitrary styling/fonts, other service
-models, external asset URLs and full-screen modals are
-not supported. It adds no product-specific feature dispatcher.
+limited to `switch` and `input_boolean`. Content-image assets/nodes, forms,
+arbitrary styling/fonts, other service
+models and external asset URLs are
+not supported. Navigation that is not supported yet: route arguments, assigning a
+page to a pane (`content-panes`), per-section Duo sides (`section-sides`), more
+than five tabs or flyout items (`sh.extended-tabs@1`) and a custom back target.
+It adds no product-specific feature dispatcher.
 
 ## Publishing to Home Assistant
 

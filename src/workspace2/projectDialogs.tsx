@@ -5,10 +5,10 @@ import { CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES } from '../s
 import { formatCompositionIssue } from '../shared/composition/workspace';
 import type { Json } from '../shared/types';
 import CompositionFields from '../CompositionFields';
-import RoutesEditor from '../RoutesEditor';
 import { Field, TextField } from '../ui';
 import { fieldOptions, RowsProvider, schemaAt, useRows } from './rows';
 import { Modal, Tag } from './kit';
+import { LinksList } from './navigation/Links';
 import { copyText } from './util';
 import { toastManager } from './toasts';
 import type { Workspace2 } from './useWorkspace2';
@@ -44,12 +44,10 @@ function LocalState() {
 }
 
 function Links() {
-  const { document, onChange } = useRows();
+  const { document } = useRows();
   return <>
-    <RoutesEditor document={document} onChange={onChange}/>
-    {document.extensions && <PartForm path={['extensions', 'routes']} label="Links"/>}
+    <LinksList/>
     {document.extensions?.linkPrefixes && <PartForm path={['extensions', 'linkPrefixes']} label="Link prefixes"/>}
-    {document.extensions?.routes.length === 0 && <p className="w2-empty">No links. Add one from a page’s settings.</p>}
   </>;
 }
 

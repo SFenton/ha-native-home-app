@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import { apiUrl, request } from '../api';
 import { uid } from '../editor';
-import { defaultField, removeCompositionItem, reorderCompositionItem, replaceAt } from '../composition-editor';
+import { removeCompositionItem, reorderCompositionItem } from '../composition-editor';
 import type { Json } from '../shared/types';
 import type { UploadedCompositionAsset } from '../shared/composition/workspace';
 import CompositionFields from '../CompositionFields';
@@ -11,6 +11,8 @@ import { fillTabGroups, groupWithRoom, tabGroups, type TabGroup } from './capaci
 import { Disclosure, fieldOptions, ObjectRows, schemaAt, useRows } from './rows';
 import { PushStack, Tag, usePush } from './kit';
 import { toastManager } from './toasts';
+import { createPage, createTab } from './navigation/controller';
+import { setTabPage } from './navigation/edit';
 
 /** The Tabs panel (spec 5.2): a reorderable list in groups from the capacity table, each row pushing its fields. */
 export function TabsPanel({ selectedTab, groups = tabGroups }: { selectedTab?: string; groups?: readonly TabGroup[] }) {
@@ -20,11 +22,7 @@ export function TabsPanel({ selectedTab, groups = tabGroups }: { selectedTab?: s
   const filled = fillTabGroups(tabs, groups), room = groupWithRoom(tabs, groups);
   const full = !room;
   const move = (index: number, offset: number) => { try { onChange(reorderCompositionItem(document, ['navigation', 'tabs'], index, offset)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
-  const add = () => {
-    const itemSchema = schemaAt(document, ['navigation', 'tabs', 0]);
-    const tab = defaultField(itemSchema, document) as Record<string, Json>;
-    onChange(replaceAt(document, ['navigation', 'tabs'], [...tabs, { ...tab, id: uid('tab'), label: 'New Tab' }]));
-  };
+  const add = () => { void createTab(); };
   const open = (index: number) => push?.push({ title: tabs[index].label, body: <TabFields index={index}/> });
   useEffect(() => { const at = tabs.findIndex(tab => tab.id === selectedTab); if (at >= 0) open(at); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   let at = 0;
@@ -38,7 +36,7 @@ export function TabsPanel({ selectedTab, groups = tabGroups }: { selectedTab?: s
             <button type="button" className="w2-tab-open" onClick={() => open(index)} aria-label={`${tab.label}, ${document.pages.find(page => page.id === tab.pageId)?.title ?? ''}`}>
               <Icon name={tab.icon.name} size={18}/>
               <span className="w2-page-text"><span className="w2-page-title">{tab.label}</span><span className="w2-page-via">{document.pages.find(page => page.id === tab.pageId)?.title ?? tab.pageId}</span></span>
-              {document.navigation.initialTabId === tab.id && <Tag>Opens First</Tag>}<ChevronRight size={16} aria-hidden/>
+              {document.navigation.initialTabId === tab.id && <Tag>Opens First</Tag>}{'visibleWhen' in tab && tab.visibleWhen && <Tag>Rule</Tag>}<ChevronRight size={16} aria-hidden/>
             </button>
             <button type="button" className="w2-icon-button" aria-label={`Move ${tab.label} up`} disabled={index === 0} onClick={() => move(index, -1)}><ArrowUp size={16} aria-hidden/></button>
             <button type="button" className="w2-icon-button" aria-label={`Move ${tab.label} down`} disabled={index === tabs.length - 1} onClick={() => move(index, 1)}><ArrowDown size={16} aria-hidden/></button>
@@ -47,10 +45,26 @@ export function TabsPanel({ selectedTab, groups = tabGroups }: { selectedTab?: s
       </ul>
     </section>)}
     <div className="w2-tabs-add">
-      <button type="button" disabled={full} onClick={add}>Add Tab</button>
-      {full && <p className="w2-caption">{groups.at(-1)?.full ?? 'The tab bar holds 5.'}</p>}
+      <button type="button" disabled={full} aria-describedby={full ? 'w2-tabs-full' : undefined} onClick={add}>Add Tab</button>
+      {full && <p id="w2-tabs-full" className="w2-caption">{groups.at(-1)?.full ?? 'The tab bar holds 5.'}</p>}
     </div>
     <p className="w2-caption">iPad shows these in its sidebar.</p>
+  </div>;
+}
+
+/** The tab's Page row: every page, then "New Page…", which makes a page and points the tab at it in one undo step. */
+function TabPage({ index }: { index: number }) {
+  const { document, onChange } = useRows();
+  const tab = document.navigation.tabs[index];
+  return <div className="w2-row" data-field-path={`navigation/tabs/${index}/pageId`}>
+    <label className="field"><span>Page</span>
+      <select value={tab.pageId} onChange={event => {
+        if (event.target.value === '__new') { void createPage({ hideLink: true, switchTo: false, connect: (made, id) => setTabPage(made, index, id) }); return; }
+        onChange(setTabPage(document, index, event.target.value));
+      }}>
+        {document.pages.map(page => <option key={page.id} value={page.id}>{page.title}</option>)}
+        <option value="__new">New Page…</option>
+      </select></label>
   </div>;
 }
 
@@ -63,7 +77,7 @@ function TabFields({ index }: { index: number }) {
   const first = document.navigation.initialTabId === tab.id;
   const setFirst = (on: boolean) => onChange({ ...document, navigation: { ...document.navigation, initialTabId: on ? tab.id : null, initialPageId: on ? tab.pageId : document.navigation.initialPageId } });
   return <>
-    <ObjectRows path={['navigation', 'tabs', index]} owner="tab" extra={{ look: <div className="w2-row" data-field-path={`navigation/tabs/${index}/opensFirst`}>
+    <ObjectRows path={['navigation', 'tabs', index]} owner="tab" skip={at => at.at(-1) === 'pageId'} extra={{ what: <TabPage index={index}/>, look: <div className="w2-row" data-field-path={`navigation/tabs/${index}/opensFirst`}>
       <label className="w2-switch-row"><span className="w2-row-label">Opens first</span><input type="checkbox" role="switch" checked={first} onChange={event => setFirst(event.target.checked)}/></label>
     </div> }}/>
     <div className="w2-row"><button type="button" className="w2-danger" onClick={() => {

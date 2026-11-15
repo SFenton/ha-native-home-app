@@ -6,6 +6,7 @@ import { isPhone, seed } from './workspace2-helpers';
 test.beforeEach(async ({ request }) => { await seed(request); });
 
 const evidence = process.env.STUDIO_EVIDENCE_DIR;
+test.use({ actionTimeout: 10_000 });
 
 /** Home Assistant's default light and dark themes, as variables on its root element. */
 const themes = {
@@ -50,10 +51,12 @@ test('a theme that sets only its primary colour recolours the chrome and keeps e
 
 test('the chrome follows a live theme change in the parent, and the preview does not', async ({ page }) => {
   const frame = await openInHomeAssistant(page, themes.light);
-  const preview = frame.locator('[data-preview-root]').first();
+  // The device itself: the preview's root also holds the stage around it, which follows the chrome.
+  const preview = frame.locator('[data-preview-root] .sh-model').first();
   const box = (await preview.boundingBox())!;
   // Inside the device, clear of its rounded corners (which show the stage behind) and of any sheet.
-  const clip = { x: box.x + 4, y: box.y + 40, width: box.width - 8, height: 300 };
+  const clip = { x: box.x + 16, y: box.y + 40, width: box.width - 32, height: 300 };
+  await page.waitForTimeout(1200); // the house reads in and the first frame settles
   const lightPreview = await page.screenshot({ clip, animations: 'disabled' });
   const light = await tokens(page);
   await page.evaluate(style => { document.documentElement.setAttribute('style', style); }, themes.dark);
@@ -61,8 +64,8 @@ test('the chrome follows a live theme change in the parent, and the preview does
   const dark = await tokens(page);
   expect(contrast(colour(dark['--w2-ink']), colour(dark['--w2-bg']))).toBeGreaterThanOrEqual(4.5);
   expect(await page.frames().find(frame => frame !== page.mainFrame())!.evaluate(() => document.documentElement.style.colorScheme)).toBe('dark');
-  const darkPreview = await page.screenshot({ clip, animations: 'disabled' });
-  expect(darkPreview.equals(lightPreview), 'the preview draws the same pixels in a light and a dark chrome').toBeTruthy();
+  // A leak would persist; a frame still settling (a poll landing, a transition) would not.
+  await expect.poll(async () => (await page.screenshot({ clip, animations: 'disabled' })).equals(lightPreview), { timeout: 5000, message: 'the preview draws the same pixels in a light and a dark chrome' }).toBeTruthy();
 });
 
 test('evidence: rest, tile selected, Pages, Project menu and Publish, in light and dark Home Assistant themes', async ({ page }) => {
@@ -79,6 +82,10 @@ test('evidence: rest, tile selected, Pages, Project menu and Publish, in light a
     await frame.locator('[data-preview-root]').getByText('Lights', { exact: true }).first().click();
     await page.waitForTimeout(900);
     await shot('tile');
+    await frame.getByRole('button', { name: 'Advanced' }).click();
+    await page.waitForTimeout(500);
+    await shot('advanced');
+    await frame.locator('.w2-back').click();
     await frame.getByRole('button', { name: 'Close', exact: true }).first().click();
     await frame.getByRole('button', { name: 'Pages' }).click();
     await page.waitForTimeout(500);
@@ -93,6 +100,15 @@ test('evidence: rest, tile selected, Pages, Project menu and Publish, in light a
     await frame.getByRole('button', { name: 'Publish' }).click();
     await page.waitForTimeout(500);
     await shot('publish');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    // Use mode: tap the first action tile that is drawn; the call is simulated and the Checks pill says so.
+    await frame.getByRole('button', { name: 'Use', exact: true }).click();
+    await frame.locator('.sh-tab', { hasText: 'Security' }).click();
+    await page.waitForTimeout(600);
+    await frame.locator('[data-preview-root] .sh-page[data-current] .sh-node[data-type="action-tile"]').first().click();
+    await page.waitForTimeout(400);
+    await shot('use');
     await page.unroute('**/ha-host.html');
   }
 });

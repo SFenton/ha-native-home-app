@@ -73,7 +73,19 @@ export function runChecks(document: CompositionDocument): Checks {
       suggestions.push({ id: `adaptive-${modal.id}`, sentence: `${modal.title} opens beside a list, but its page does not.`, place: modal.title, select: `modal:${modal.id}` });
   }
   const bar = tabGroups[0].capacity ?? 5;
-  if (document.navigation.tabs.length > bar) suggestions.push({ id: 'tab-bar', sentence: `The tab bar holds ${bar}.`, place: 'Tabs' });
+  if (document.navigation.tabs.length > bar) suggestions.push({ id: 'tab-bar', sentence: tabGroups[0].full ?? `The tab bar holds ${bar}.`, place: 'Tabs', select: `tab:${document.navigation.tabs[bar].id}` });
+  const owners = new Map<string, string>(), clashes = new Set<string>();
+  for (const route of document.extensions?.routes ?? []) {
+    for (const path of new Set([route.path, ...(route.aliases ?? [])])) {
+      const first = owners.get(path);
+      if (first === undefined) owners.set(path, route.id);
+      else if (first !== route.id && !clashes.has(path)) {
+        clashes.add(path);
+        const page = document.pages.find(item => item.id === route.pageId);
+        suggestions.push({ id: `link-clash-${path}`, sentence: `Two links use the path ${path}.`, place: page?.title ?? 'Links', select: page ? `page:${page.id}` : undefined });
+      }
+    }
+  }
   for (const warning of compositionWarnings(document)) {
     const { place, select } = placeOf(document, pointerPath(warning.pointer));
     suggestions.push({ id: `warning-${warning.pointer}`, sentence: `${place}: ${warning.message}`, place, select });

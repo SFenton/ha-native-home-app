@@ -56,14 +56,16 @@ export interface PageViewProps {
   /** Classes for the push and pop motion (`sh-in-push`, `sh-out-pop`, ...). */
   motion?: string;
   current: boolean;
+  /** The detail pane of a split: no back button and no menu. */
+  detail?: boolean;
 }
 /** One page of the stack: its header over its scroller. The selection key of the page itself rides on this element. */
-export function PageView({ document, page, root, onBack, scrollToTop, motion = '', current }: PageViewProps) {
+export function PageView({ document, page, root, onBack, scrollToTop, motion = '', current, detail }: PageViewProps) {
   const groups: CompositionGroups = page.toolbar.type === 'replace' ? page.toolbar.groups : document.navigation.chrome.groups;
   const title = useSourceText(page.titleSourceId, page.title);
   return <div className={`sh-page ${motion}`.trim()} data-sel={`page:${page.id}`} data-page={page.id} data-current={current ? '' : undefined}
     aria-hidden={current ? undefined : true} inert={!current || undefined}>
     <PageBody surface={page} largeTitle scrollToTop={root ? scrollToTop : 0}/>
-    <HeaderBar groups={groups} root={root} onBack={onBack} title={title.state === 'ready' && title.text ? title.text : page.title}/>
+    <HeaderBar groups={groups} root={root} onBack={onBack} detail={detail} title={title.state === 'ready' && title.text ? title.text : page.title}/>
   </div>;
 }
