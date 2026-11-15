@@ -117,13 +117,21 @@ export function changeFieldVariant(schema: SchemaField, previous: Json, document
 export function valueAt(root: unknown, path: EditorPath): unknown {
   return path.reduce<unknown>((value, key) => value !== null && typeof value === 'object' ? Reflect.get(value, key) : undefined, root);
 }
+/**
+ * Returns `root` with `value` placed at `path`. Only the objects and arrays along the path are copied; every other
+ * subtree is shared with `root`, so an untouched node keeps its identity and a memoised view can skip it. `value` is
+ * adopted as is (not cloned), so documents are treated as immutable: change one only through this function.
+ */
 export function replaceAt<T>(root: T, path: EditorPath, value: unknown): T {
   if (!path.length) throw new Error('Cannot replace the workspace identity');
-  const next = structuredClone(root);
-  const owner = valueAt(next, path.slice(0, -1));
-  if (!owner || typeof owner !== 'object') throw new Error('The selected composition property no longer exists');
-  Reflect.set(owner, path.at(-1)!, structuredClone(value));
-  return next;
+  const rebuild = (current: unknown, depth: number): unknown => {
+    if (!current || typeof current !== 'object') throw new Error('The selected composition property no longer exists');
+    const key = path[depth];
+    const copy: unknown = Array.isArray(current) ? [...current] : { ...current };
+    Reflect.set(copy as object, key, depth === path.length - 1 ? value : rebuild(Reflect.get(current, key), depth + 1));
+    return copy;
+  };
+  return rebuild(root, 0) as T;
 }
 export function compositionErrors(document: unknown): string[] {
   try { compileCompositionDocument(document); return []; }
@@ -164,14 +172,29 @@ export function reorderCompositionItem(document: CompositionDocument, path: Edit
   return replaceAt(document, path, next);
 }
 export type ComponentLocation = { node: CompositionNode; path: EditorPath; parent: string };
+/** One list of child nodes a container holds: where it lives under the container and the `parent` label its nodes carry. */
+export type ChildSlot = { path: EditorPath; parent: string; nodes: CompositionNode[] };
+/**
+ * Every child list of a container, covering the same children as `compositionChildren` (grids, sections, rails, room
+ * sections, paged rows, pinned actions and each local tab), with the path of each list relative to the node.
+ */
+export function childSlots(node: CompositionNode): ChildSlot[] {
+  switch (node.type) {
+    case 'tile-grid': case 'section': case 'status-rail': case 'room-section': case 'paged-row':
+      return [{ path: ['children'], parent: node.id, nodes: node.children }];
+    case 'pinned-actions':
+      return node.children ? [{ path: ['children'], parent: node.id, nodes: node.children }] : [];
+    case 'local-tabs':
+      return node.tabs.map((tab, index) => ({ path: ['tabs', index, 'children'], parent: `${node.id}:${tab.id}`, nodes: tab.children }));
+    default: return [];
+  }
+}
 export function componentLocations(document: CompositionDocument): ComponentLocation[] {
   const result: ComponentLocation[] = [];
   const visit = (nodes: CompositionNode[], path: EditorPath, parent: string) => nodes.forEach((node, index) => {
     const at = [...path, index];
     result.push({ node, path: at, parent });
-    if (node.type === 'tile-grid' || node.type === 'section' || node.type === 'status-rail' || node.type === 'room-section') visit(node.children, [...at, 'children'], node.id);
-    if (node.type === 'local-tabs') node.tabs.forEach((tab, tabIndex) =>
-      visit(tab.children, [...at, 'tabs', tabIndex, 'children'], `${node.id}:${tab.id}`));
+    for (const slot of childSlots(node)) visit(slot.nodes, [...at, ...slot.path], slot.parent);
   });
   for (const kind of ['pages', 'modals'] as const) document[kind].forEach((surface, index) => visit(surface.components, [kind, index, 'components'], surface.id));
   return result;
