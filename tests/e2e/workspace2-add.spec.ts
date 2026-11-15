@@ -48,6 +48,10 @@ test('add a button, set it to call a service on an entity, without typing an id'
   await step(() => page.getByRole('option', { name: /Lamp 0/ }).first().click());
   await expect(editor.locator('[data-target="light.demo_0"]')).toBeVisible();
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-action-editor`);
+  // The custom-field row names its input "Field name" once and its button "Add Field" once; the row label is not the button's twin.
+  await expect(editor.getByText('Add Field', { exact: true })).toHaveCount(1);
+  await expect(editor.getByRole('button', { name: 'Add Field' })).toHaveCount(1);
+  await expect(editor.getByText('Field name', { exact: true })).toHaveCount(1);
   await step(() => page.getByRole('button', { name: 'Done', exact: true }).click());
   await expect(panel.getByRole('button', { name: /When tapped/ })).toContainText('light.turn_on');
   console.log(`STEPS ${isPhone(page) ? 'phone' : 'desktop'}: ${steps}`);

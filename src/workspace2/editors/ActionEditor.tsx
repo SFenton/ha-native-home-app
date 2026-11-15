@@ -128,8 +128,8 @@ function CallBody({ draft, path }: { draft: Draft; path: EditorPath }) {
     </div></div>
     {known.map(([key, field]) => <DataRow key={key} draft={draft} path={[...path, 'data', 'fields']} name={key} spec={field} operand={fields[key]} onRemove={() => set(withDataField(call, key, undefined))}/>)}
     {extra.map(key => <DataRow key={key} draft={draft} path={[...path, 'data', 'fields']} name={key} operand={fields[key]} onRemove={() => set(withDataField(call, key, undefined))}/>)}
-    <div className="w2-field-row"><span className="w2-field-label"><span>Add Field</span></span>
-      <div className="w2-field-control"><input aria-label="Field name" placeholder="Field name" value={custom} onChange={event => setCustom(event.target.value.trim())} onKeyDown={event => { if (event.key === 'Enter') { add(); } }}/></div>
+    <div className="w2-field-row"><span className="w2-field-label"><span>Field name</span></span>
+      <div className="w2-field-control"><input aria-label="Field name" value={custom} onChange={event => setCustom(event.target.value.trim())} onKeyDown={event => { if (event.key === 'Enter') { add(); } }}/></div>
       <button type="button" disabled={!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(custom) || custom in fields} onClick={add}>Add Field</button></div>
     <Switch label="Ask first" checked={Boolean(ask)} onChange={on => setAsk(on ? {} : undefined)}/>
     {ask && <>
