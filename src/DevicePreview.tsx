@@ -16,7 +16,7 @@ import type { Action, Component, Json, LiveActivity, Page, Primitive, StudioDocu
 import { containers, findComponent, getComponents, getPage, readPath, variantLabels, variants, type Target, type Variant } from './editor';
 import { EmptyState, Icon, IconButton } from './ui';
 import { apiUrl } from './api';
-import { usePreviewPointer } from './preview-pointer';
+import { DeviceFrame, fitZoom, useAutoFit } from './preview2/DeviceFrame';
 import { owningTabIds } from './shared/navigation';
 import { choreLinkPresentation, choreUserId } from './shared/native-chores';
 import { ChoresSimulationProvider, NativeChores, useChoreStates } from './NativeChores';
@@ -607,62 +607,46 @@ export default function DevicePreview(props: DeviceProps) {
   </div>;
   };
   const frameRef = useRef<HTMLDivElement>(null);
-  usePreviewPointer(frameRef, !editing && !settings.threeD);
   const fitDevice = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
-    const scale = Math.min((canvas.clientWidth - 80) / width, (canvas.clientHeight - (target.kind === 'activity' ? 290 : 240)) / height);
-    const zoom = Math.min(120, Math.max(25, Math.floor(scale * 100)));
-    if (zoom !== settings.zoom || !settings.autoFit) onSettings({ ...settings, zoom, autoFit: true });
+    const zoom = canvas ? fitZoom(canvas, width, height, 80, target.kind === 'activity' ? 290 : 240) : undefined;
+    if (zoom !== undefined && (zoom !== settings.zoom || !settings.autoFit)) onSettings({ ...settings, zoom, autoFit: true });
   }, [width, height, target.kind, settings, onSettings]);
-  useEffect(() => {
-    if (!settings.autoFit) return;
-    fitDevice();
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', fitDevice);
-      return () => window.removeEventListener('resize', fitDevice);
-    }
-    const observer = new ResizeObserver(fitDevice);
-    if (canvasRef.current) observer.observe(canvasRef.current);
-    return () => observer.disconnect();
-  }, [settings.autoFit, fitDevice]);
+  useAutoFit(canvasRef, settings.autoFit, fitDevice);
   const choresIdentityKey = JSON.stringify([document.id, ...document.dataSources.filter(source => (source.kind === 'native-home' && source.endpoint === 'house-profile') || source.id === 'native-profile').map(source => record(source.sample).id)]);
   return <ChoresSimulationProvider identityKey={choresIdentityKey}><section className={`canvas-workspace ${isOver ? 'drop-over' : ''}`} ref={setCanvasRef} aria-label="Device canvas">
     <div className="canvas-stage">
       {target.kind === 'activity' && <div className="activity-variant-switch" aria-label="Activity variant">{variants.map(variant => <button key={variant} className={target.variant === variant ? 'active' : ''} onClick={() => onTarget({ ...target, variant })}>{variantLabels[variant]}</button>)}</div>}
       {target.kind === 'activity' && target.variant !== 'lockScreen' && ['notch', 'ipad'].includes(settings.device) && <p className="canvas-tip">This device has no Dynamic Island.</p>}
-      <div className={`device-stage ${settings.threeD ? 'is-3d' : ''} ${orbiting ? 'orbiting' : ''}`} style={{ width: width * zoom + 40, height: height * zoom + 36, perspective: 1300 }}
-        tabIndex={settings.threeD ? 0 : undefined} role={settings.threeD ? 'group' : undefined} aria-label={settings.threeD ? '3D device. Drag to rotate, or use arrow keys.' : undefined}
-        onPointerDownCapture={event => {
+      <DeviceFrame width={width} height={height} zoom={zoom} pan={!editing && !settings.threeD} perspective={1300} transform={settings.threeD ? `rotateX(${settings.pitch}deg) rotateY(${settings.yaw}deg)` : ''} frameRef={frameRef}
+        stageClassName={`${settings.threeD ? 'is-3d' : ''} ${orbiting ? 'orbiting' : ''}`}
+        stageProps={{ tabIndex: settings.threeD ? 0 : undefined, role: settings.threeD ? 'group' : undefined, 'aria-label': settings.threeD ? '3D device. Drag to rotate, or use arrow keys.' : undefined, onPointerDownCapture: event => {
           if (!settings.threeD || event.button !== 0 || !event.isPrimary) return;
           event.preventDefault(); event.stopPropagation(); event.currentTarget.focus({ preventScroll: true });
           event.currentTarget.setPointerCapture(event.pointerId);
           orbit.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, yaw: settings.yaw, pitch: settings.pitch };
           setOrbiting(true);
-        }}
-        onPointerMove={event => {
+        }, onPointerMove: event => {
           const start = orbit.current;
           if (!start || start.pointerId !== event.pointerId) return;
           event.preventDefault(); event.stopPropagation();
           const yaw = ((start.yaw + (event.clientX - start.x) * .45 + 180) % 360 + 360) % 360 - 180;
           const pitch = Math.max(-85, Math.min(85, start.pitch - (event.clientY - start.y) * .45));
           onSettings({ ...settings, yaw: Math.round(yaw), pitch: Math.round(pitch) });
-        }}
-        onPointerUp={event => { if (orbit.current?.pointerId === event.pointerId) { orbit.current = undefined; setOrbiting(false); event.currentTarget.releasePointerCapture(event.pointerId); } }}
-        onPointerCancel={() => { orbit.current = undefined; setOrbiting(false); }}
-        onLostPointerCapture={() => { orbit.current = undefined; setOrbiting(false); }}
-        onKeyDown={event => {
+        }, onPointerUp: event => { if (orbit.current?.pointerId === event.pointerId) { orbit.current = undefined; setOrbiting(false); event.currentTarget.releasePointerCapture(event.pointerId); } }, onPointerCancel: () => { orbit.current = undefined; setOrbiting(false); }, onLostPointerCapture: () => { orbit.current = undefined; setOrbiting(false); }, onKeyDown: event => {
           if (!settings.threeD || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
           event.preventDefault();
           onSettings({ ...settings, yaw: Math.max(-180, Math.min(180, settings.yaw + (event.key === 'ArrowLeft' ? -5 : event.key === 'ArrowRight' ? 5 : 0))), pitch: Math.max(-85, Math.min(85, settings.pitch + (event.key === 'ArrowUp' ? 5 : event.key === 'ArrowDown' ? -5 : 0))) });
-        }}>
-        <div ref={frameRef} data-pan={!editing && !settings.threeD ? '' : undefined} className={`device-model device-${settings.device} posture-${posture} ${folding && foldedFrame ? 'duo-folding' : ''} ${closedDuo ? 'duo-closed' : ''} ${settings.landscape ? 'landscape' : ''}`} data-posture={posture} data-orientation={rotation} data-layout={duo && (settings.landscape || closedDuo) ? 'side-controls' : 'bottom-controls'} style={{ width, height, left: (width * zoom + 40 - width) / 2, top: (height * zoom + 36 - height) / 2, transform: `scale(${zoom}) ${settings.threeD ? `rotateX(${settings.pitch}deg) rotateY(${settings.yaw}deg)` : ''}`, '--fold-angle': `${(180 - settings.fold) / 2}deg` } as CSSProperties}>
+        } }}
+        modelClassName={`device-${settings.device} posture-${posture} ${folding && foldedFrame ? 'duo-folding' : ''} ${closedDuo ? 'duo-closed' : ''} ${settings.landscape ? 'landscape' : ''}`}
+        modelProps={{ 'data-posture': posture, 'data-orientation': String(rotation), 'data-layout': duo && (settings.landscape || closedDuo) ? 'side-controls' : 'bottom-controls' }}
+        modelStyle={{ '--fold-angle': `${(180 - settings.fold) / 2}deg` } as CSSProperties}>
         <div className="device-button power"/><div className="device-button volume"/>
         <div className="device-screen">{renderScreen()}</div>
         {folding && foldedFrame && (['leading', 'trailing'] as const).map(side => <div key={side} className={`duo-fold-face ${side}`} aria-hidden="true">
           <img alt="" src={foldedFrame} style={{ width: screenWidth, height: screenHeight, maxWidth: 'none' }}/>
         </div>)}
-      </div></div>
+      </DeviceFrame>
       {settings.threeD && <p className="canvas-tip">Drag to rotate. Switch to Flat to edit.</p>}
       {folding && !foldedFrame && <p className="canvas-tip" role="status">{frame?.key === frameKey && frame.error ? 'Showing the flat view.' : 'Capturing…'}</p>}
       
