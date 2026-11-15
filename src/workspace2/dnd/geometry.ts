@@ -31,7 +31,7 @@ export function containerHosts(root: ParentNode): { host: HTMLElement; owner: Se
 /** The drawn children of a container, by the id of the node each draws. */
 function childrenOf(host: HTMLElement): { element: HTMLElement; id: string; box: Box }[] {
   return [...host.children].flatMap(child => {
-    const key = child instanceof HTMLElement ? child.getAttribute('data-sel') : null;
+    const key = typeof (child as HTMLElement).getAttribute === 'function' ? (child as HTMLElement).getAttribute('data-sel') : null;
     return key?.startsWith('node:') ? [{ element: child as HTMLElement, id: key.slice(5), box: boxOf(child) }] : [];
   });
 }

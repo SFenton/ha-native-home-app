@@ -104,7 +104,7 @@ test('a touch long press picks a tile up and moves it', async ({ page }) => {
   const before = await order(page);
   const from = await centre(previewTile(page, 'Weather')), to = await centre(previewTile(page, 'Demo Guests 2'));
   const cdp = await page.context().newCDPSession(page);
-  const touch = (type: string, x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
   await touch('touchStart', from.x, from.y);
   await page.waitForTimeout(400);
   for (let step = 1; step <= 8; step += 1) await touch('touchMove', from.x + (to.x - from.x) * step / 8, from.y + (to.y + 8 - from.y) * step / 8);
@@ -219,4 +219,35 @@ test('under a coarse pointer no Studio control is under 44 px', async ({ page })
   await page.getByLabel('Properties').getByRole('button', { name: /Visible when/ }).click();
   await expect(page.getByTestId('rule-editor')).toBeVisible();
   expect(await small()).toEqual([]);
+});
+
+test('the entity list stays smooth with 5,000 entities: frame times while scrolling and while typing', async ({ page }) => {
+  await stubHouse(page, 5000);
+  await openWorkspace(page);
+  if (isPhone(page)) await page.locator('.w2-bottom-add').click(); else await page.locator('.w2-add-slot').last().click();
+  await page.getByTestId('add-picker').getByRole('button', { name: 'Entities' }).click();
+  const list = page.getByRole('listbox', { name: /entities/i }).first();
+  await expect(list).toBeVisible();
+  await expect(list).toHaveAttribute('data-total', '5000');
+  expect(await list.getByRole('option').count()).toBeLessThan(80);
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-entity-list-5000`);
+  const frames = await page.evaluate(async () => {
+    const box = document.querySelector<HTMLElement>('.w2-vlist')!;
+    const times: number[] = [];
+    let last = performance.now();
+    await new Promise<void>(resolve => {
+      let count = 0;
+      const tick = (now: number) => { times.push(now - last); last = now; box.scrollTop += 600; count += 1; if (count < 90) requestAnimationFrame(tick); else resolve(); };
+      requestAnimationFrame(tick);
+    });
+    return times.slice(2).sort((a, b) => a - b);
+  });
+  const median = frames[Math.floor(frames.length / 2)], p95 = frames[Math.floor(frames.length * 0.95)];
+  console.log(`FRAMES ${isPhone(page) ? 'phone' : 'desktop'} median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, max ${frames.at(-1)!.toFixed(1)} ms`);
+  expect(p95).toBeLessThan(50);
+  expect(await list.getByRole('option').count()).toBeLessThan(80);
+  const typed = Date.now();
+  await page.getByRole('searchbox', { name: /Search/ }).first().fill('lamp 42');
+  await expect(list.getByRole('option').first()).toContainText(/42/);
+  console.log(`FILTER ${isPhone(page) ? 'phone' : 'desktop'} ${Date.now() - typed} ms`);
 });
