@@ -9,6 +9,17 @@ import { compilerIssues, followCheck, pointerPath, runChecks, sentenceFor } from
 import { targetOf } from '../src/workspace2/checkWords';
 import { dialogTitles } from '../src/workspace2/projectDialogs';
 
+/** The first node that sits inside another node with a title, its path, kind and the holder's title. */
+function findNested(document: CompositionDocument): { path: (string | number)[]; type: string; holder: string } {
+  const index = buildDocumentIndex(document);
+  for (const key of index.keys) {
+    const entry = index.get(key);
+    const holder = entry?.node && entry.parent ? index.get(entry.parent)?.node : undefined;
+    if (entry?.node && holder?.title && entry.node.title) return { path: [...entry.path], type: entry.node.type.replace(/-/g, ' '), holder: holder.title };
+  }
+  throw new Error('The fixture has no nested node.');
+}
+
 /** Every row of Checks must say what it is about (by name), which field (by its label), what to change, and go somewhere. */
 const corpus = path.resolve(__dirname, '../contract/corpus/reject');
 const home = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')).document as CompositionDocument;
@@ -87,6 +98,32 @@ describe('every compiler error names its target, its field and what to change, a
 
   it('keeps the old wording for a field the person can see on the tile', () => {
     expect(sentenceFor(home, { code: 'missing_required', pointer: '/document/pages/0/components/0/title' }).sentence).toMatch(/: Title is needed\. Add it\.$/);
+  });
+
+  it('says an emptied title is empty, by the item\'s place, never "not allowed"', () => {
+    const titleOf = (path: (string | number)[]) => runChecks(replaceAt(home, [...path, 'title'], '')).problems.map(row => row.sentence);
+    // An unnamed node is placed by the page that holds it, or by the nearest titled node around it.
+    expect(titleOf(['pages', 0, 'components', 0])).toEqual([`Untitled status rail in ${home.pages[0].title}: Title is empty. Add a title.`]);
+    const nested = findNested(home);
+    expect(titleOf(nested.path)).toEqual([`Untitled ${nested.type} in ${nested.holder}: Title is empty. Add a title.`]);
+    expect(titleOf(nested.path)[0]).not.toMatch(/not allowed/);
+    // A whitespace-only title is empty too.
+    expect(runChecks(replaceAt(home, ['pages', 0, 'components', 0, 'title'], '   ')).problems[0].sentence).toMatch(/: Title is empty\. Add a title\.$/);
+    // Pages and sheets: "Untitled page" and where it sits.
+    expect(titleOf(['pages', 0])).toEqual(['Untitled page in the Home tab: Title is empty. Add a title.']);
+    expect(titleOf(['pages', 1])[0]).toBe(`Untitled page after ${home.pages[0].title}: Title is empty. Add a title.`);
+    expect(titleOf(['modals', 1])).toEqual([`Untitled sheet after ${home.modals[0].title}: Title is empty. Add a title.`]);
+    expect(titleOf(['modals', 0])).toEqual(['Untitled sheet, the first sheet: Title is empty. Add a title.']);
+  });
+
+  it('gives every row that names a field the path to focus, and nothing for a row that names none', () => {
+    const rows = runChecks(replaceAt(home, ['pages', 0, 'components', 0, 'title'], '')).problems;
+    expect(rows[0].fieldPath).toBe('pages/0/components/0/title');
+    const calls: string[] = [];
+    followCheck(rows[0], { select: key => calls.push(`select ${key}`), panel: () => undefined, dialog: () => undefined, focus: path => calls.push(`focus ${path}`) });
+    expect(calls).toEqual([expect.stringMatching(/^select node:/), 'focus pages/0/components/0/title']);
+    expect(runChecks(home).problems).toEqual([]);
+    expect(sentenceFor(home, { code: 'invalid_value', pointer: '/document/pages/0/components/0' }).fieldPath).toBeUndefined();
   });
 
   it('goes to the item, panel or dialog a row names', () => {

@@ -6,6 +6,7 @@ import { useStudioTheme } from './useStudioTheme';
 import { useWorkspace2, type PanelKind } from './useWorkspace2';
 import { ModeSegment, ChecksPill } from './TopBar';
 import { followCheck, type CheckRow } from './checks';
+import { focusField } from './focusField';
 import AddHost, { useAdd } from './add/AddHost';
 import DragLayer from './dnd/DragLayer';
 import { SHEET_SNAP_EVENT } from './editors/EditorRow';
@@ -79,7 +80,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const close = useCallback(() => { ws.select(undefined); ws.setPanel(undefined); }, [ws]);
   // Choosing a Checks row goes to what it names: the item in the preview, or the Project panel or dialog that holds it.
   const goTo = useCallback((row: CheckRow) => followCheck(row, {
-    select: key => ws.selectAnywhere(key), panel: openPanel, dialog: key => { setProjectOpen(false); setDialog(key); },
+    select: key => ws.selectAnywhere(key), panel: openPanel, dialog: key => { setProjectOpen(false); setDialog(key); }, focus: focusField,
   }), [ws, openPanel]);
   const openProjectDialog = useCallback((key: string) => { if (narrow) setProjectOpen(true); else setDialog(key as DialogKey); }, [narrow]);
   const bottomInset = narrow && target ? coverage(snap) : 0;

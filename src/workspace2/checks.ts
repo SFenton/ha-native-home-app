@@ -11,7 +11,8 @@ import { tabGroups } from './capacity';
 import { labelFor } from './labels';
 
 /** One row of the Checks popover: a sentence, where it is, and what choosing it selects. */
-export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey; /** Where choosing the row goes; every problem has one. */ go?: Destination }
+export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey; /** Where choosing the row goes; every problem has one. */ go?: Destination;
+  /** The `data-field-path` of the field the row names, when it names one: choosing the row focuses it. */ fieldPath?: string }
 export interface Checks { problems: CheckRow[]; suggestions: CheckRow[] }
 
 const unescape = (part: string) => part.replace(/~1/g, '/').replace(/~0/g, '~');
@@ -27,19 +28,20 @@ export function pointerPath(pointer: string): (string | number)[] {
  * The place a document path stands for, by name: the deepest node, page, sheet or tab the path passes through, else the part of
  * the project it belongs to, with where choosing it goes.
  */
-export function placeOf(document: CompositionDocument, path: readonly (string | number)[]): { place: string; select?: SelectionKey; field?: string; go: Destination } {
-  const { place, select, field, go } = targetOf(document, path);
-  return { place, select, field, go };
+export function placeOf(document: CompositionDocument, path: readonly (string | number)[]): { place: string; select?: SelectionKey; field?: string; go: Destination; fieldPath?: string } {
+  const { place, select, field, go, fieldPath } = targetOf(document, path);
+  return { place, select, field, go, fieldPath: fieldPath?.join('/') };
 }
 
 /** What choosing a row does in the workspace: select an item, open a Project panel, or open a Project dialog. */
-export interface CheckHandlers { select: (key: SelectionKey) => void; panel: (panel: PanelKind) => void; dialog: (dialog: DialogKey) => void }
+export interface CheckHandlers { select: (key: SelectionKey) => void; panel: (panel: PanelKind) => void; dialog: (dialog: DialogKey) => void; /** Focuses the field at a `data-field-path` once the surface that holds it has opened. */ focus?: (fieldPath: string) => void }
 
-/** Takes the person to what a row names (selecting a row goes there). */
+/** Takes the person to what a row names (selecting a row goes there), and to the field it names. */
 export function followCheck(row: CheckRow, to: CheckHandlers): void {
   const go = row.go ?? (row.select ? { select: row.select } : undefined);
   if (!go) return;
   if ('select' in go) to.select(go.select); else if ('panel' in go) to.panel(go.panel); else to.dialog(go.dialog);
+  if (row.fieldPath) to.focus?.(row.fieldPath);
 }
 
 /** The compiler's issues for a document, or none when it compiles. */
@@ -52,10 +54,10 @@ export function compilerIssues(document: CompositionDocument): CompositionIssue[
  * A compiler issue in the Studio's words (spec 5.8): the thing it concerns by name, the field by its label, a plain sentence
  * saying what to change, and where choosing the row goes. The pointer never shows.
  */
-export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey; go: Destination } {
+export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey; go: Destination; fieldPath?: string } {
   const path = pointerPath(issue.pointer);
   const target = targetOf(document, path);
-  return { sentence: `${target.place}: ${wordsFor(document, issue, target, path)}`, place: target.place, select: target.select, go: target.go };
+  return { sentence: `${target.place}: ${wordsFor(document, issue, target, path)}`, place: target.place, select: target.select, go: target.go, fieldPath: target.fieldPath?.join('/') };
 }
 
 /** Problems (they block publishing) and Suggestions (lints). */
@@ -93,8 +95,8 @@ export function runChecks(document: CompositionDocument): Checks {
     }
   }
   for (const warning of compositionWarnings(document)) {
-    const { place, select, go } = placeOf(document, pointerPath(warning.pointer));
-    suggestions.push({ id: `warning-${warning.pointer}`, sentence: `${place}: ${warning.message}`, place, select, go });
+    const { place, select, go, fieldPath } = placeOf(document, pointerPath(warning.pointer));
+    suggestions.push({ id: `warning-${warning.pointer}`, sentence: `${place}: ${warning.message}`, place, select, go, fieldPath });
   }
   return { problems, suggestions };
 }

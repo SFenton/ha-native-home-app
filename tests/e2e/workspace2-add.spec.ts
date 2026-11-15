@@ -286,6 +286,28 @@ test.describe('every menu row is 44 px under a coarse pointer', () => {
   });
 });
 
+test('an emptied title reads as empty, and tapping its Checks row selects the tile and focuses its Title', async ({ page }) => {
+  await openWorkspace(page);
+  const panel = await selectTile(page, 'Weather');
+  const title = panel.getByLabel('Title', { exact: true });
+  await title.fill('');
+  await title.blur();
+  await expect(page.getByTestId('status-tag')).toHaveText('Not Saved', { timeout: 8000 });
+  await panel.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByLabel('Properties')).toHaveCount(0);
+  await page.getByTestId('status-tag').click();
+  const row = page.getByRole('button', { name: /^Untitled .+ in Home: Title is empty\. Add a title\.$/ });
+  await expect(row).toBeVisible();
+  await expect(page.getByText('is not allowed')).toHaveCount(0);
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-checks-empty-title`);
+  await row.click();
+  const opened = page.getByLabel('Properties');
+  await expect(opened).toBeVisible();
+  await expect(opened.getByLabel('Title', { exact: true })).toBeFocused();
+  await expect(opened.getByLabel('Title', { exact: true })).toBeInViewport();
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-checks-empty-title-focused`);
+});
+
 test('the entity list stays smooth with 5,000 entities: frame times while scrolling and while typing', async ({ page }) => {
   await stubHouse(page, 5000);
   await openWorkspace(page);

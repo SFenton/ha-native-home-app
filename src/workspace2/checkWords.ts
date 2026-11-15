@@ -3,6 +3,7 @@ import type { CompositionIssue } from '../shared/composition/json';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { valueAt } from '../composition-editor';
 import { labelFor, mechanicalLabel, valueWords } from './labels';
+import { typeName } from './util';
 import { sourceName } from './dialogs/sources';
 import { modelDomains } from './add/sources';
 import { domainName } from './pickers/entities';
@@ -14,7 +15,11 @@ export type Destination = { select: SelectionKey } | { panel: PanelKind } | { di
 type Path = readonly (string | number)[];
 
 /** What an issue concerns: the thing by name, the field by its label (when the path names one), and where to go. */
-export interface Target { place: string; go: Destination; select?: SelectionKey; field?: string; rel: Path; owner?: 'node' | 'other' }
+export interface Target {
+  place: string; go: Destination; select?: SelectionKey; field?: string; rel: Path; owner?: 'node' | 'other';
+  /** The document path of the field the issue names, so choosing the row can focus it. */
+  fieldPath?: Path;
+}
 
 const entityId = /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/;
 const quoted = (value: unknown) => typeof value === 'string' && value && value.length <= 40 ? ` “${value}”` : '';
@@ -67,6 +72,34 @@ function projectPart(document: CompositionDocument, path: Path): { place: string
   }
 }
 
+const blank = (value: unknown) => value === undefined || (typeof value === 'string' && value.trim() === '');
+
+/** A node's name for a sentence: its title, or, when it has none, "Untitled action tile in <Section>" by where it sits. */
+function nodePlace(document: CompositionDocument, key: SelectionKey, node: { type: string; title?: string }): string {
+  const title = node.title?.trim();
+  if (title) return title;
+  const index = buildDocumentIndex(document);
+  const holder = index.ancestors(key).reverse().map(at => {
+    const entry = index.get(at);
+    if (entry?.node) return entry.node.title?.trim();
+    if (entry?.kind === 'page' || entry?.kind === 'modal') return document[entry.kind === 'page' ? 'pages' : 'modals'][entry.path[1] as number]?.title?.trim();
+    return undefined;
+  }).find(Boolean);
+  return `Untitled ${typeName(node.type).toLowerCase()}${holder ? ` in ${holder}` : ''}`;
+}
+
+/** A page or sheet's name for a sentence: its title, or "Untitled page" with where it sits (the tab that opens it, else the one before it). */
+function surfacePlace(document: CompositionDocument, kind: 'page' | 'modal', at: number): string {
+  const surface = document[kind === 'page' ? 'pages' : 'modals'][at];
+  const title = surface?.title?.trim();
+  if (title) return title;
+  const word = kind === 'page' ? 'page' : 'sheet';
+  const tab = kind === 'page' ? document.navigation.tabs.find(item => item.pageId === surface?.id) : undefined;
+  if (tab) return `Untitled ${word} in the ${tab.label} tab`;
+  const before = document[kind === 'page' ? 'pages' : 'modals'][at - 1];
+  return before ? `Untitled ${word} after ${before.title?.trim() || `Untitled ${word}`}` : `Untitled ${word}, the first ${word}`;
+}
+
 /** The thing a document path stands for, by name: the deepest node, page, sheet or tab it passes through, else the part of the project. */
 export function targetOf(document: CompositionDocument, path: Path): Target {
   const index = buildDocumentIndex(document);
@@ -75,16 +108,20 @@ export function targetOf(document: CompositionDocument, path: Path): Target {
     const entry = key ? index.get(key) : undefined;
     if (!entry) continue;
     const rel = path.slice(entry.path.length);
-    if (entry.node) return { place: entry.node.title || valueWords(entry.node.type), select: entry.key, go: { select: entry.key }, rel, field: fieldName(entry.node.type, rel), owner: 'node' };
+    if (entry.node) { const field = fieldName(entry.node.type, rel); return { place: nodePlace(document, entry.key, entry.node), select: entry.key, go: { select: entry.key }, rel, field, owner: 'node', fieldPath: field ? path : undefined }; }
     if (entry.kind === 'page' || entry.kind === 'modal') {
-      const surface = document[entry.kind === 'page' ? 'pages' : 'modals'][entry.path[1] as number];
-      return { place: surface.title || (entry.kind === 'page' ? 'Page' : 'Sheet'), select: entry.key, go: { select: entry.key }, rel, field: fieldName(entry.kind === 'page' ? 'page' : 'sheet', rel), owner: 'other' };
+      const field = fieldName(entry.kind === 'page' ? 'page' : 'sheet', rel);
+      return { place: surfacePlace(document, entry.kind, entry.path[1] as number), select: entry.key, go: { select: entry.key }, rel, field, owner: 'other', fieldPath: field ? path : undefined };
     }
-    if (entry.kind === 'tab') return { place: `Tab ${document.navigation.tabs[entry.path[2] as number]?.label ?? ''}`.trim(), select: entry.key, go: { select: entry.key }, rel, field: fieldName('tab', rel), owner: 'other' };
+    if (entry.kind === 'tab') { const field = fieldName('tab', rel); return { place: `Tab ${document.navigation.tabs[entry.path[2] as number]?.label ?? ''}`.trim(), select: entry.key, go: { select: entry.key }, rel, field, owner: 'other', fieldPath: field ? path : undefined }; }
   }
   const part = projectPart(document, path);
-  return { place: part.place, go: part.go, rel: part.rel, field: fieldName('project', part.rel), owner: 'other' };
+  const field = fieldName('project', part.rel);
+  return { place: part.place, go: part.go, rel: part.rel, field, owner: 'other', fieldPath: field ? path : undefined };
 }
+
+/** An emptied or missing text field: "Title is empty. Add a title." */
+const emptyWords = (field: string) => `${field} is empty. Add ${/^[aeiou]/i.test(field) ? 'an' : 'a'} ${field.charAt(0).toLowerCase()}${field.slice(1)}.`;
 
 const tooMany = (value: unknown) => Array.isArray(value) ? (value.length ? 'has more items than the app allows. Remove some.' : 'is empty. Add at least one.')
   : typeof value === 'string' ? 'is too long. Shorten it.' : typeof value === 'number' ? 'is outside the range the app allows. Change the number.' : 'is nested too deeply. Simplify it.';
@@ -101,8 +138,8 @@ export function wordsFor(document: CompositionDocument, issue: CompositionIssue,
     case 'unsupported_schema': return 'This project is saved in a version the app does not read. Open Edit as JSON and set the current version.';
     case 'unknown_field': return `${f ?? 'A setting'} is not one the app knows. Remove it.`;
     case 'unknown_variant': return `${f ?? 'A choice'}${quoted(value)} is not one the app supports. Pick one of the listed choices.`;
-    case 'missing_required': return `${f ?? 'A required value'} is needed. Add it.`;
-    case 'invalid_value': return `${f ?? 'A value'}${quoted(value)} is not allowed. Change it to a value the app accepts.`;
+    case 'missing_required': return blank(value) && f ? emptyWords(f) : `${f ?? 'A required value'} is needed. Add it.`;
+    case 'invalid_value': return blank(value) && f ? emptyWords(f) : `${f ?? 'A value'}${quoted(value)} is not allowed. Change it to a value the app accepts.`;
     case 'duplicate_key': return `${f ?? 'A setting'} appears twice. Delete one of them in Edit as JSON.`;
     case 'limit_exceeded': return `${f ?? 'A list'} ${tooMany(value)}`;
     case 'duplicate_id': return `${f ?? 'An ID'}${quoted(value)} is used twice. Give one of them a different name.`;
