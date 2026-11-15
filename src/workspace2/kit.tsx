@@ -6,7 +6,10 @@ import { ChevronLeft, X } from 'lucide-react';
 
 /** Home Assistant's adaptive dialog rule (spec section 2). */
 export const NARROW_QUERY = '(max-width: 870px), (max-height: 500px)';
+/** Environments without `matchMedia` (a server render, a bare test DOM) are wide and never change. */
+const hasMedia = () => typeof matchMedia === 'function';
 const subscribe = (query: string) => (notify: () => void) => {
+  if (!hasMedia()) return () => {};
   const media = matchMedia(query);
   media.addEventListener('change', notify);
   return () => media.removeEventListener('change', notify);
@@ -14,7 +17,7 @@ const subscribe = (query: string) => (notify: () => void) => {
 const narrowSubscribe = subscribe(NARROW_QUERY);
 /** Whether the viewport is narrow. */
 export function useNarrow(): boolean {
-  return useSyncExternalStore(narrowSubscribe, () => matchMedia(NARROW_QUERY).matches, () => false);
+  return useSyncExternalStore(narrowSubscribe, () => hasMedia() && matchMedia(NARROW_QUERY).matches, () => false);
 }
 
 /** A status pill: words always, colour as a second cue. */
