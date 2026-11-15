@@ -33,14 +33,14 @@ const advanced = (label: string, more: Omit<FieldLabel, 'label' | 'group'> = {})
 const unknownPolicy = { show: 'Show', hide: 'Hide', keep: 'Keep last' };
 
 /** Entries by `<owner type>.<path>` or `*.<path>` / `*.<last key>`. */
-export const labelMap: Readonly<Record<string, FieldLabel>> = {
+const authored: Record<string, FieldLabel> = {
   '*.title': entry('Title', { order: 1 }), '*.label': entry('Label', { order: 1 }), '*.menuLabel': entry('Menu label', { order: 2 }),
   '*.subtitle': entry('Subtitle', { order: 2 }), '*.detail': entry('Subtitle', { order: 2 }),
   '*.icon': entry('Icon', { order: 3 }),
   '*.binding.sourceId': entry('Entity', { order: 4 }), '*.props.sourceId': entry('Entity', { order: 4 }), '*.entityId': entry('Entity', { order: 4 }),
   '*.layout.span': entry('Width', { group: 'look', order: 1 }),
   '*.props.family': entry('Colour', { group: 'look', order: 2, options: { neutral: 'Neutral', lights: 'Lights', occupancy: 'Occupancy' } }),
-  '*.action': behaviour('When tapped', 1), '*.visibleWhen': behaviour('Visible when', 2),
+  '*.action': behaviour('When tapped', 1), '*.onAction': behaviour('When turned on', 1), '*.offAction': behaviour('When turned off', 2), '*.visibleWhen': behaviour('Visible when', 2),
   '*.whenUnknown': advanced('While the state is unknown', { options: unknownPolicy }),
   '*.titleSourceId': entry('Title from', { order: 5 }),
   'page.navigation.type': entry('Open pages beside this one', { group: 'look', order: 1, options: { stack: 'Off', 'navigation-columns': 'On' } }),
@@ -76,6 +76,45 @@ export const labelMap: Readonly<Record<string, FieldLabel>> = {
   'project.extensions.cameras': entry('Camera notifications', { add: 'Add Camera' }),
   'chrome.groups': entry('Header Buttons', { add: 'Add Button' }), 'chrome.groups.items': entry('Buttons', { add: 'Add Button' }),
   'tab.tabs': entry('Tabs', { add: 'Add Tab' }),
+};
+
+/**
+ * Words for the fields that recur across node types, found by their last key. Each is `[label, group]`; a field with no group is
+ * in the "what it shows" group. Technical ids and per-state tables sit under Advanced.
+ */
+const byKey: Record<string, readonly [string, FieldGroup?]> = {
+  accessory: ['Accessory', 'look'], actionOrder: ['Action order', 'advanced'], activeStates: ['Active states', 'advanced'], alarmSourceId: ['Alarm', 'advanced'],
+  announcement: ['Announce changes', 'look'], aqiSourceId: ['Air quality', 'advanced'], arrangement: ['Arrangement', 'look'], automatic: ['Switch tabs by rule', 'advanced'],
+  awaySourceIds: ['Away sources', 'advanced'], bedroomLinks: ['Links', 'behaviour'], blue: ['Blue', 'look'], bodyHint: ['Hint', 'look'], bottom: ['Bottom', 'advanced'],
+  cancel: ['Cancel button'], climateActionTone: ['Tint by mode', 'look'], closeLabel: ['Close button label'], colorSourceId: ['Colour source', 'advanced'], compactHours: ['Hours, compact', 'look'],
+  confirmLabel: ['Confirm button label'], control: ['Control'], controls: ['Controls'], density: ['Density', 'look'], destination: ['Opens', 'behaviour'], detailEntityId: ['Detail entity', 'advanced'],
+  disabledStates: ['Disabled states', 'advanced'], dismissLabel: ['Dismiss button label'], domain: ['Domain', 'advanced'], empty: ['Empty message'], emptyText: ['Empty text'],
+  enableLabel: ['Enable button label'], equalRowHeights: ['Equal row heights', 'look'], error: ['Error text'], errorText: ['Error text'], failed: ['Failed text'], fallbackName: ['Name when signed out'],
+  fields: ['Fields'], fill: ['Fill', 'look'], fold: ['Fold', 'look'], footer: ['Footer'], footnote: ['Footnote'], format: ['Format'], green: ['Green', 'look'], hasGlyphs: ['Show icons', 'look'],
+  header: ['Header'], hiddenText: ['Hidden text'], hidesContactSubtitle: ['Hide contact subtitle', 'look'], highTarget: ['High target', 'advanced'], highlights: ['Highlights', 'look'],
+  hint: ['Hint'], homeAwaySourceId: ['Home or away', 'advanced'], info: ['Info text'], initialMinutes: ['Starting minutes', 'advanced'], initialMode: ['Starts with', 'look'],
+  invalidTarget: ['Invalid target text'], isOn: ['On when', 'behaviour'], item: ['Item'], items: ['Items'], kind: ['Kind', 'look'], layout: ['Layout', 'look'], leadJoinsAtRegularWidth: ['Lead joins when wide', 'advanced'],
+  leading: ['Leading', 'advanced'], loading: ['Loading text'], loadingText: ['Loading text'], lock: ['Lock text'], locked: ['Locked text'], max: ['Maximum'], maxColumns: ['Columns', 'look'],
+  message: ['Message'], min: ['Minimum'], minimum: ['Smallest tile', 'look'], modalId: ['Sheet', 'behaviour'], modes: ['Modes', 'look'], name: ['Name'], navigation: ['Navigation', 'behaviour'],
+  off: ['Off text'], on: ['On text'], open: ['Open text'], openHint: ['Open hint'], openLabel: ['Open button label'], optimistic: ['Show change at once', 'advanced'], options: ['Options'], order: ['Order', 'advanced'],
+  otherTitle: ['Title for others', 'advanced'], ownTitle: ['Title for you', 'advanced'], pageLabel: ['Page label'], panel: ['Panel', 'look'], part: ['Part', 'look'], pendingText: ['Pending text'],
+  perPage: ['Per page', 'look'], pinned: ['Pinned', 'look'], placeholder: ['Placeholder'], pluralContacts: ['Plural contacts', 'advanced'], powerOff: ['Power off text'], powerOn: ['Power on text'],
+  powerSourceId: ['Power', 'advanced'], presentationProviderId: ['Presented by', 'advanced'], primary: ['Title'], primitive: ['Value'], props: ['Settings', 'advanced'], providerId: ['Provider', 'advanced'],
+  pullToRefresh: ['Pull to refresh', 'behaviour'], red: ['Red', 'look'], regularHours: ['Hours, regular', 'look'], resetOnPresentation: ['Reset when shown', 'advanced'], residentId: ['Resident', 'advanced'],
+  retainsAutomaticSelection: ['Keep the automatic tab', 'advanced'], reverseLabel: ['Reverse button label'], saveLabel: ['Save button label'], scopeProviderId: ['Scope', 'advanced'], searchPrompt: ['Search prompt'],
+  searchProviderId: ['Search provider', 'advanced'], secondary: ['Subtitle'], selected: ['Selected', 'look'], selection: ['When chosen', 'behaviour'], selectionOnly: ['Selection only', 'advanced'],
+  sendingCloseText: ['Closing text'], sendingOpenText: ['Opening text'], separator: ['Separator', 'look'], service: ['Service', 'behaviour'], shortRow: ['Short row', 'look'], showState: ['Show state', 'look'],
+  showsChevron: ['Show chevron', 'look'], showsIndicator: ['Show page dots', 'look'], showsSelector: ['Show selector', 'look'], sincePrefix: ['Since prefix'], sleep: ['Sleep text'],
+  sourceId: ['Entity', 'what'], stale: ['Stale text'], staleText: ['Stale text'], stateColors: ['Colours by state', 'look'], stateId: ['State', 'advanced'], stateLabels: ['Words by state', 'look'],
+  states: ['By state', 'look'], step: ['Step'], style: ['Style', 'look'], subtitleSourceIds: ['Subtitle from', 'advanced'], success: ['After saving', 'behaviour'], surface: ['Shown as', 'look'],
+  tankFault: ['Tank fault text'], template: ['Layout', 'look'], text: ['Text'], titleLines: ['Title lines', 'look'], titleProviderId: ['Title from', 'advanced'], toolbar: ['Header buttons', 'look'],
+  tone: ['Tone', 'look'], top: ['Top', 'advanced'], trailing: ['Trailing', 'advanced'], unavailable: ['Unavailable text'], unavailableText: ['Unavailable text'], unlock: ['Unlock text'],
+  value: ['Value'], waterFault: ['Water fault text'],
+};
+/** The label map: the authored entries over the words found by last key. */
+export const labelMap: Readonly<Record<string, FieldLabel>> = {
+  ...Object.fromEntries(Object.entries(byKey).map(([key, [label, group]]) => [`*.${key}`, group ? { label, group } : { label }])),
+  ...authored,
 };
 
 /** `key` split into words, sentence case, with "Id" as "ID". */

@@ -50,7 +50,7 @@ export const variantWords: Record<string, string> = {
 /** One field to show: where it is, what governs it and how it sits among its neighbours. */
 interface Entry { path: EditorPath; rel: EditorPath; schema: SchemaField; required: boolean; present: boolean; value: Json }
 
-const opaque = new Set(['action', 'visibleWhen', 'selectedWhen', 'isOn']);
+const opaque = new Set(['action', 'onAction', 'offAction', 'visibleWhen', 'selectedWhen', 'isOn']);
 const isEmptyObject = (schema: SchemaField) => schema.type === 'object' && !Object.keys(schema.properties ?? {}).length && typeof schema.additionalProperties !== 'object';
 
 /** The fields of the object at `path`, flattening plain nested objects (`props`, `layout`) so their members read as rows. */
