@@ -25,6 +25,10 @@ describe('product name in visible copy', () => {
       .flatMap(file => visibleStrings(readFileSync(file, 'utf8')).filter(text => !identifier.test(text) && banned.some(pattern => pattern.test(text))).map(text => `${file}: ${text.slice(0, 80)}`));
     expect(hits).toEqual([]);
   });
+  it('names the server log line and the deployment guide S+H Studio', () => {
+    expect(readFileSync('server/index.ts', 'utf8')).toContain('S+H Studio listening');
+    expect(readFileSync('docs/deployment.md', 'utf8')).not.toMatch(/native home/i);
+  });
   it('names the HTML title and the manifest S+H Studio', () => {
     expect(readFileSync('index.html', 'utf8')).toContain('<title>S+H Studio</title>');
     expect(readFileSync('config.yaml', 'utf8')).toMatch(/^name: S\+H Studio$/m);
