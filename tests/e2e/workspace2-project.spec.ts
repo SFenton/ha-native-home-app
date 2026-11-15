@@ -44,9 +44,16 @@ async function stubHomeAssistant(page: Page, options: { rollbackFails?: string; 
 
 /** Opens a Project item the way a person does: a menu command when wide, a row of the sheet when narrow. */
 async function project(page: Page, item: string) {
-  await page.getByRole('button', { name: 'Project' }).click();
+  await page.getByTestId('workspace2').getByRole('button', { name: 'Project' }).click();
   if (isPhone(page)) await page.getByRole('button', { name: item, exact: true }).click();
   else await page.getByRole('menuitem', { name: item, exact: true }).click();
+}
+
+/** Closes what `project` opened: the sheet when narrow (Escape, once per pushed page), the dialog when wide. */
+async function closeProject(page: Page) {
+  if (isPhone(page)) for (let at = 0; at < 3 && await page.locator('.w2-sheet').count(); at++) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
+  else await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+  await page.waitForTimeout(250);
 }
 
 /** A 1 x 1 PNG, enough for the server to accept as a wallpaper. */
@@ -149,8 +156,7 @@ test('Data counts what reads each source, Local State adds a state, and the rows
   await page.locator('[data-pushes]').first().click();
   await expect(page.locator('.w2-pushed')).toBeVisible();
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-data-source`);
-  await page.locator('.w2-back').first().click();
-  await page.getByRole('button', { name: 'Close', exact: true }).last().click().catch(() => undefined);
+  await closeProject(page);
   await project(page, 'Local State');
   await page.getByRole('button', { name: 'Add State' }).click();
   await expect(page.getByRole('button', { name: 'Remove State' })).toBeVisible();
@@ -161,13 +167,7 @@ test('every Project dialog and panel has a screenshot at this size', async ({ pa
   await stubHomeAssistant(page);
   await openWorkspace(page);
   const size = isPhone(page) ? 'phone' : 'desktop';
-  const close = async () => {
-    if (isPhone(page)) {
-      // The narrow sheet: a page pushed inside it goes back, then the sheet itself closes with Escape.
-      await page.keyboard.press('Escape');
-    } else await page.getByRole('button', { name: 'Close', exact: true }).last().click();
-    await page.waitForTimeout(250);
-  };
+  const close = () => closeProject(page);
   for (const [item, name] of [['Links', 'links'], ['App Launch', 'app-launch'], ['Live Activities', 'live-activities'], ['Import…', 'import'], ['About', 'about'], ['Activity', 'activity'], ['Edit as JSON…', 'json']] as const) {
     await project(page, item);
     await page.waitForTimeout(250);
