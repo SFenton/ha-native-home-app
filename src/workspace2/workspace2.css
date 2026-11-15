@@ -85,6 +85,8 @@
 .w2-menu-item[data-highlighted] { background: var(--w2-hover); }
 .w2-menu-item[data-disabled] { opacity: .45; }
 .w2-menu-item[data-checked] { font-weight: 600; }
+/* Declared after the 36 px base so it wins: every Base UI menu row is 44 px under a coarse pointer. */
+@media (pointer: coarse) { .w2-menu-item { min-height: 44px; } }
 .w2-menu-name { font-weight: 600; }
 .w2-project-menu { max-height: calc(100dvh - 72px); }
 .w2-danger-item { color: var(--w2-err-text); }

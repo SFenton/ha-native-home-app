@@ -233,6 +233,59 @@ test('under a coarse pointer no Studio control is under 44 px', async ({ page })
   expect(await small()).toEqual([]);
 });
 
+/** The heights of every row in the menu that is open now, with the row's name. */
+const menuRows = (page: Page) => page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.w2-menu [role^=menuitem]')].map(row => ({ name: row.textContent?.trim() ?? '', height: row.getBoundingClientRect().height })));
+/** Opens a menu, expects it to have rows, and expects every row to be 44 px tall. */
+async function expectTallRows(page: Page, open: () => Promise<void>, label: string) {
+  await open();
+  await expect(page.locator('.w2-menu [role^=menuitem]').first()).toBeVisible();
+  const rows = await menuRows(page);
+  expect(rows.length, `${label} has rows`).toBeGreaterThan(0);
+  expect(rows.filter(row => row.height < 43.5).map(row => `${row.name} ${row.height}`), `${label} rows under 44 px`).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.w2-menu')).toHaveCount(0);
+}
+
+test.describe('every menu row is 44 px under a coarse pointer', () => {
+  test('the tile More menu, the Pages More menu and the action value-source menu', async ({ page }) => {
+    test.skip(!isPhone(page), 'The measure is the touch family');
+    await stubHouse(page);
+    await openWorkspace(page);
+    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    const panel = await selectTile(page, 'Weather');
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
+    await expectTallRows(page, () => panel.getByRole('button', { name: 'More' }).click(), 'the tile More menu');
+    await panel.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByLabel('Properties')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Pages' }).first().click();
+    const pages = page.locator('.w2-pages');
+    await expect(pages).toBeVisible();
+    await expectTallRows(page, () => pages.getByRole('button', { name: /^More for / }).first().click(), 'the Pages More menu');
+    await page.keyboard.press('Escape');
+    await expect(pages).toHaveCount(0);
+    // The value-source menu of an action's data field.
+    await page.locator('.w2-bottom-add').click();
+    await page.getByTestId('add-picker').getByRole('listitem').filter({ hasText: 'Button' }).first().click();
+    await page.getByLabel('Properties').getByRole('button', { name: /When tapped/ }).click();
+    const editor = page.getByTestId('action-editor');
+    await editor.getByRole('button', { name: 'Call a Service' }).click();
+    await editor.getByRole('button', { name: 'Service', exact: true }).click();
+    await page.getByRole('option', { name: /Light: Turn on/ }).first().click();
+    await expectTallRows(page, () => editor.getByRole('button', { name: /^Value source for / }).first().click(), 'the value-source menu');
+  });
+
+  test.describe('at iPad width', () => {
+    test.use({ viewport: { width: 1180, height: 820 }, hasTouch: true });
+    test('the Project menu and the Window menu', async ({ page }) => {
+      test.skip(test.info().project.name === 'phone', 'The wide touch family runs once');
+      await openWorkspace(page);
+      expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+      await expectTallRows(page, () => page.getByRole('button', { name: 'Project', exact: true }).click(), 'the Project menu');
+      await expectTallRows(page, () => page.getByRole('button', { name: 'Window' }).click(), 'the Window menu');
+    });
+  });
+});
+
 test('the entity list stays smooth with 5,000 entities: frame times while scrolling and while typing', async ({ page }) => {
   await stubHouse(page, 5000);
   await openWorkspace(page);
