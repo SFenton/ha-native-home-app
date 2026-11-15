@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { componentLocations, compositionEditorSchema, fieldVariants, resolveField, valueAt } from '../src/composition-editor';
+import { componentLocations, compositionEditorSchema, fieldVariants, resolveField, valueAt, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { compositionPublicationSchema } from '../src/shared/composition/schema';
 import { homeRecipes, requireCompleteHomeRecipe } from './fixtures/home-recipes';
@@ -82,7 +82,7 @@ describe('Home primitives and exact closure', () => {
 describe('generated Home authoring controls', () => {
   it('edits weather paging and highlight order without raw JSON', () => {
     let value = document();
-    const nodeSchema = compositionEditorSchema.definitions?.__schema0;
+    const nodeSchema = nodeDefinition();
     expect(nodeSchema).toBeDefined();
     const schema = fieldVariants(nodeSchema!).find(variant => variant.properties?.type?.const === 'weather-panel')!;
     expect(schema).toBeDefined();
@@ -101,7 +101,7 @@ describe('generated Home authoring controls', () => {
   });
 
   it('exposes status mapping, fill, announcement and destination as schema fields', () => {
-    const nodeSchema = compositionEditorSchema.definitions?.__schema0;
+    const nodeSchema = nodeDefinition();
     const schema = fieldVariants(nodeSchema!).find(variant => variant.properties?.type?.const === 'status-chip')!;
     const props = resolveField(schema.properties!.props);
     expect(Object.keys(props?.properties ?? {})).toEqual(expect.arrayContaining(['sourceId', 'states', 'fallback', 'announcement']));

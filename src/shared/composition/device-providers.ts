@@ -1,11 +1,12 @@
 import { z } from 'zod/v4';
 import { identifierSchema as id } from '../schema';
+import { remoteSlotCalls, serviceCallAllowed } from './service-vocabulary';
+import { visibilityFields } from './expression';
 
 const object = z.strictObject;
 const text = (max: number, blank = false) => z.string().max(max).refine(v => blank || Boolean(v.trim()));
 const title = text(240), label = text(80);
 const entity = z.string().max(160).regex(/^[a-z][a-z0-9_]*\.[a-z0-9_]+$/);
-const serviceName = z.string().max(160).regex(/^[a-z][a-z0-9_]*$/);
 const states = z.array(text(160)).max(64);
 const dictionary = <K extends z.ZodString, V extends z.ZodType>(key: K, value: V, max: number) =>
   z.record(key, value).refine(v => Object.keys(v).length <= max);
@@ -23,7 +24,8 @@ const command = z.discriminatedUnion('type', [
     data: object({
       command: text(512).optional(), app_id: text(240).optional(), app_name: title.optional(),
       entity: entity.optional(), remote_entity: entity.optional(), entity_id: entity.optional(),
-      sonosdevice: z.array(entity).max(16).optional(), turn_on_projector: z.boolean().optional(),
+      sonosdevice: z.array(entity).max(16).optional(), speakerdevice: z.array(entity).max(16).optional(),
+      turn_on_projector: z.boolean().optional(),
       is_volume_muted: z.boolean().optional(), source: title.optional(), option: title.optional(),
       volume_level: z.number().min(0).max(1).optional(),
     }),
@@ -69,7 +71,7 @@ export const remoteConfigurationSchema = object({
 const bedConfiguration = object({
   id, title, side: z.enum(['left', 'right']), owner: id, climateEntityId: entity, targetLevelEntityId: entity,
   schedulePhaseEntityId: entity, stageLevelEntityIds: object({ bedtime: entity, asleep: entity, dawn: entity }),
-  tonightScript: serviceName, outsideScheduleScript: serviceName, alarmStateEntityId: entity,
+  alarmStateEntityId: entity,
   alarmSnoozeButtonEntityId: entity, alarmStopButtonEntityId: entity, hotFlashActiveEntityId: entity,
   hotFlashButtonEntityId: entity, hotFlashCancelButtonEntityId: entity, hotFlashRestoreAtEntityId: entity,
   hotFlashTimerEntityId: entity, heartRateEntityId: entity, breathingRateEntityId: entity, hrvEntityId: entity,
@@ -78,8 +80,7 @@ const bedConfiguration = object({
 export const bedroomConfigurationSchema = object({
   wakeProviderId: id, beds: z.array(object({ providerId: id, configuration: bedConfiguration })).min(1).max(2),
   environment: object({
-    scheduleEntityId: entity, scheduleSetTopic: z.string().max(240).regex(/^[A-Za-z0-9_/-]+$/),
-    hotFlashBrokerScript: serviceName, householdAwayEntityId: entity, householdAwayScript: serviceName,
+    scheduleEntityId: entity, householdAwayEntityId: entity,
     wakeLight: object({ id, title, roomTitle: title, statusEntityId: entity, sources: z.array(object({
       id: text(160), side: z.enum(['left', 'right']), alarmLabel: title, alarmsLabel: title, bedId: id,
     })).max(2) }),
@@ -112,6 +113,10 @@ export const deviceProviderSchemas = [
 export const deviceProviderSourceSchema = z.discriminatedUnion('model', deviceProviderSchemas);
 export type DeviceProviderSource = z.infer<typeof deviceProviderSourceSchema>;
 export const deviceProviderCapabilities = deviceProviderSchemas.map(s => `sh.${s.shape.model.value}`);
+export function remoteUsesSpeakerTargets(value: unknown): boolean {
+  return value !== null && typeof value === 'object'
+    && (Object.hasOwn(value, 'speakerdevice') || Object.values(value).some(remoteUsesSpeakerTargets));
+}
 export function isDeviceProvider(source: { kind: string; model?: string }): source is DeviceProviderSource {
   return source.kind === 'model' && deviceProviderSchemas.some(s => s.shape.model.value === source.model);
 }
@@ -132,6 +137,9 @@ export function deviceProviderIssues(source: DeviceProviderSource): string[] {
       unique(c.optimisticEntityIds, 'optimisticEntityIds'); unique(c.liveChangeEntityIds, 'liveChangeEntityIds');
       domain(c.mediaEntityId, ['media_player'], 'mediaEntityId'); domain(c.volumeEntityId, ['media_player'], 'volumeEntityId');
       if (c.liveChangeEntityIds.some(v => !c.optimisticEntityIds.includes(v))) invalid('liveChangeEntityIds');
+      for (const group of remoteSlotCalls(c)) {
+        if (!group.calls.every(serviceCallAllowed)) invalid(group.field);
+      }
       c.apps.forEach((v, i) => { if (v.imagePath?.split('/').includes('..')) invalid(`apps/${i}/imagePath`); });
       const validateDevice = (v: (typeof c.devices)[number], path: string) => {
         const r = v.stateResolver?.configuredConsole;
@@ -188,7 +196,7 @@ export function deviceProviderIssues(source: DeviceProviderSource): string[] {
 }
 
 export function deviceControlSchemas<A extends z.ZodType>(action: A) {
-  const node = { id, title, layout: object({ span: z.number().int().min(1).max(4) }) };
+  const node = { id, title, layout: object({ span: z.number().int().min(1).max(4) }), ...visibilityFields };
   const base = { sourceId: id };
   const zone = z.number().int().min(0).max(31);
   const confirmation = object({ title, message: text(2000), confirmLabel: label, cancelLabel: z.literal('Cancel') });

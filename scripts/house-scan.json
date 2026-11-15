@@ -1,0 +1,27 @@
+{
+  "addresses": [
+    "172.30.32.2"
+  ],
+  "hexPaths": [
+    "docs/"
+  ],
+  "debt": {
+    "src/ActionEditor.tsx": 2,
+    "src/Inspector.tsx": 2,
+    "src/ProjectPanels.tsx": 3,
+    "src/shared/native-entities.ts": 5,
+    "tests/camera-ui.test.tsx": 1,
+    "tests/chores.test.tsx": 2,
+    "tests/native-controls.test.tsx": 23,
+    "tests/native-destinations.test.ts": 96,
+    "tests/native-entities.test.ts": 4,
+    "tests/native-presentation.test.ts": 21,
+    "tests/native-preview.test.ts": 79,
+    "tests/native-schema.test.ts": 32,
+    "tests/native-state.test.ts": 15,
+    "tests/preview-data.test.tsx": 1,
+    "tests/read-endpoints.test.ts": 2,
+    "tests/runtime-ui.test.tsx": 26,
+    "tests/schema.test.ts": 4
+  }
+}

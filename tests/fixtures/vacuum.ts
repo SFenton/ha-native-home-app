@@ -14,7 +14,7 @@ export const vacuumDescriptor: VacuumDescriptor = {
   zoneDescription: ['Synthetic rooms'],
   zones: [{ title: 'Demo Room', entityId: 'input_boolean.demo_room', icon: 'mdi:sofa', mapName: 'Demo Segment', mopRequired: false }],
 };
-export const vacuumIcon = { type: 'sf-symbol', name: 'fan', rendering: 'canonical', unavailable: 'reject' } as const;
+export const vacuumIcon = { type: 'sf-symbol', name: 'fan', rendering: 'canonical', unavailable: 'fallback' } as const;
 export function vacuumNode(primitive: VacuumPrimitive, id = 'robot-control'): VacuumControl {
   return { id, title: 'Configured Robot', type: 'vacuum-control', layout: { span: 1 }, props: { sourceId: 'source-robot', primitive } };
 }

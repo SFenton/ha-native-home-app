@@ -5,7 +5,7 @@ import path from 'node:path';
 import { z } from 'zod/v4';
 import { createSampleDocument } from '../src/shared/sample';
 import { validateDocument } from '../src/shared/schema';
-import type { DraftEnvelope, PublishedEnvelope, StudioDocument } from '../src/shared/types';
+import type { DraftEnvelope, StudioDocument } from '../src/shared/types';
 import { CompositionStore } from './composition-store';
 
 export class HttpError extends Error {
@@ -17,12 +17,6 @@ const envelopeSchema = z.object({
   revision: z.number().int().positive(),
   updatedAt: z.string().datetime(),
 }).strict();
-const publishedSchema = envelopeSchema.extend({
-  publishedAt: z.string().datetime(),
-  capabilities: z.array(z.string()),
-}).strict();
-export const publishCapabilities = ['document-v1', 'tabs', 'modals', 'conditions', 'bindings', 'live-activity-layouts'];
-
 async function exists(file: string) {
   try { await access(file, constants.F_OK); return true; }
   catch (error) {
@@ -65,18 +59,11 @@ function draftFromDisk(raw: unknown): DraftEnvelope {
   const envelope = envelopeSchema.parse(raw);
   return { ...envelope, document: validateDocument(envelope.document) };
 }
-function publishedFromDisk(raw: unknown): PublishedEnvelope {
-  const envelope = publishedSchema.parse(raw);
-  return { ...envelope, document: validateDocument(envelope.document) };
-}
-
 export class StudioStore {
   native!: CompositionStore;
   private draft!: DraftEnvelope;
-  private published?: PublishedEnvelope;
   private sequence: Promise<unknown> = Promise.resolve();
   private lock?: Awaited<ReturnType<typeof open>>;
-  private readonly subscribers = new Set<(published: PublishedEnvelope) => void>();
   private constructor(private readonly directory: string) {}
 
   static async open(directory: string): Promise<StudioStore> {
@@ -99,13 +86,6 @@ export class StudioStore {
         store.draft = { document: validateDocument(createSampleDocument()), revision: 1, updatedAt: new Date().toISOString() };
         await atomicJson(draftPath, store.draft);
       }
-      const publishedPath = path.join(store.directory, 'published.json');
-      if (await exists(publishedPath)) {
-        store.published = publishedFromDisk(await readJson(publishedPath));
-        if (store.published.revision > store.draft.revision) throw new Error('Published revision is ahead of the stored draft');
-        const snapshot = publishedFromDisk(await readJson(path.join(store.directory, 'revisions', `${store.published.revision}.json`)));
-        if (JSON.stringify(snapshot) !== JSON.stringify(store.published)) throw new Error('Published pointer does not match its immutable revision snapshot');
-      }
       store.native = await CompositionStore.open(store.directory);
       return store;
     } catch (error) {
@@ -115,15 +95,6 @@ export class StudioStore {
   }
 
   getDraft(): DraftEnvelope { return structuredClone(this.draft); }
-  getPublished(): PublishedEnvelope {
-    if (!this.published) throw new HttpError(404, 'No configuration has been published');
-    return structuredClone(this.published);
-  }
-  publishedRevision(): number | null { return this.published?.revision ?? null; }
-  subscribe(listener: (published: PublishedEnvelope) => void) {
-    this.subscribers.add(listener);
-    return () => { this.subscribers.delete(listener); };
-  }
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.sequence.then(operation);
     this.sequence = result.catch(() => undefined);
@@ -142,25 +113,6 @@ export class StudioStore {
       return this.getDraft();
     });
   }
-  publish(expectedRevision: number): Promise<PublishedEnvelope> {
-    return this.serialize(async () => {
-      this.checkRevision(expectedRevision);
-      if (this.published?.revision === expectedRevision) return this.getPublished();
-      const snapshotPath = path.join(this.directory, 'revisions', `${this.draft.revision}.json`);
-      let next: PublishedEnvelope;
-      if (await exists(snapshotPath)) {
-        next = publishedFromDisk(await readJson(snapshotPath));
-        if (JSON.stringify(next.document) !== JSON.stringify(this.draft.document) || next.updatedAt !== this.draft.updatedAt) throw new Error('Immutable snapshot conflicts with draft');
-      } else {
-        next = { ...this.getDraft(), publishedAt: new Date().toISOString(), capabilities: [...publishCapabilities] };
-        await atomicJson(snapshotPath, next);
-      }
-      await atomicJson(path.join(this.directory, 'published.json'), next);
-      this.published = next;
-      for (const listener of this.subscribers) listener(this.getPublished());
-      return this.getPublished();
-    });
-  }
   queueFeedback(feedback: { kind: 'report-issue' | 'request-feature'; title: string; description: string }) {
     return this.serialize(async () => {
       const directory = path.join(this.directory, 'feedback');
@@ -173,7 +125,6 @@ export class StudioStore {
   async close() {
     await this.sequence;
     await this.native?.close();
-    this.subscribers.clear();
     if (this.lock) {
       await this.lock.close();
       this.lock = undefined;

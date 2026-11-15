@@ -131,17 +131,18 @@ errors are JSON with `error`; validation failures additionally include
 sends origin/fetch metadata. Non-browser callers use bearer authentication in
 production. Do not put credentials in URLs or configuration documents.
 
+Native composition 2.0 has its own `/native/api/*` surface, including
+`/native/api/ha/*` for publishing to Home Assistant; see
+[native-composition.md](native-composition.md#publishing-to-home-assistant).
+
 | Method and path | Request | Response |
 | --- | --- | --- |
 | `GET api/draft` | None | `DraftEnvelope` |
 | `PUT api/draft` | `{document, expectedRevision}` | Updated `DraftEnvelope`; stale revision is `409` with `currentRevision` |
 | `POST api/validate` | `{document}` | `{valid, errors: string[]}`; semantic invalidity is HTTP 200 with `valid:false` |
-| `POST api/publish` | `{expectedRevision}` | `PublishedEnvelope`; stale revision is `409` |
-| `GET api/published` | Optional `If-None-Match` | `PublishedEnvelope`, `304`, or `404` before the first publish |
-| `GET api/events` | SSE; optional `Last-Event-ID` | `published` event data `{revision,updatedAt}`, event ID is revision; 15-second comments keep it alive |
-| `GET api/export?format=json\|yaml&source=draft\|published` | Defaults: `json`, `draft` | Download of the document, not its revision envelope |
+| `GET api/export?format=json\|yaml&source=draft` | Defaults: `json`, `draft` | Download of the document, not its revision envelope |
 | `GET api/schema` | None | Draft-07 JSON Schema, plus a semantic-validation note |
-| `GET api/health` | None | `{status,mode,haConnected,publishedRevision,draftRevision,liveActionsEnabled,feedbackMode,schemaVersion}` |
+| `GET api/health` | None | `{status,mode,haConnected,draftRevision,liveActionsEnabled,feedbackMode,schemaVersion}` |
 | `GET api/data/:id` | Existing draft data-source ID; registered search sources accept `?q=` | `{data, mode:'sample'\|'live'}` |
 | `GET api/read-endpoints` | Authenticated authoring session or verified Ingress | Safe registered endpoint metadata only: `id`, `name`, `kind`, `searchable` |
 | `GET api/native-home` | Authenticated authoring session, bearer, or verified admin Ingress | `NativeSnapshot`: `{mode:'live',houseConfig:{schema:2,hash,config},states:NativeState[],currentUser?:NativeCurrentUser,warnings?:string[]}`; no sample fallback |
@@ -156,15 +157,13 @@ production. Do not put credentials in URLs or configuration documents.
 | `POST api/feedback` | `{kind:'report-issue'\|'request-feature',title,description}` | HTTP 201 local durable record `{id,status:'queued',createdAt,kind,title,description}` |
 | `POST api/auth` | `{token}` | `{authenticated:true}` and an eight-hour HttpOnly, SameSite=Strict session cookie |
 
-`DraftEnvelope` is `{document,revision,updatedAt}`. `PublishedEnvelope` adds
-`publishedAt` and `capabilities`. A new store starts at draft revision 1 with
-**nothing published**. Saving increments the revision; it does not publish.
-Publishing snapshots exactly the requested current draft revision. Repeating a
-publish for the same revision is idempotent. Editing a draft never changes the
-published snapshot. Published responses have ETags such as `"published-3"`.
-An SSE reconnect receives the current published revision when it differs from
-`Last-Event-ID`; this is invalidation, not an unlimited replay log.
-Reload is serialized with save/publish. If local edits occur while a reload is
+`DraftEnvelope` is `{document,revision,updatedAt}`. Saving increments the revision.
+These schema-1 endpoints edit a design-only preview: the native app reads no
+schema-1 document, so they no longer publish. `POST api/publish`,
+`GET api/published` and `GET api/events` were retired (they return 404), and a
+`published.json` left in the data directory is neither read nor changed. Delivery
+to the app is the schema-2 *Publish to Home Assistant* path.
+Reload is serialized with save. If local edits occur while a reload is
 pending, its response is discarded with a notice instead of erasing those edits
 or their undo history.
 

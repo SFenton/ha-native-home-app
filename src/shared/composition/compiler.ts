@@ -7,9 +7,11 @@ import { assertCompositionBounds, canonicalCompositionJSON, CompositionValidatio
   pointer, reject, type CompositionIssue } from './json';
 import { acceptsLocalValue, initialLocalValue } from './shell';
 import { deviceControlModel, isRoomDeviceSource, validateDeviceControl, validateDeviceSource, type RoomDeviceControl } from './room-devices';
-import { bedroomCapabilities, bedroomProviders, bedroomWeekdays, type BedroomKind } from './bedroom';
+import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroom';
 import { remoteCapabilities, remoteControlIssues } from './remote';
-import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues } from './device-providers';
+import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
+import { checkCallService, checkOperand, checkPredicate, type CallService, type ExpressionFacts, type Predicate, type WhenUnknown } from './expression';
+import { checkStateStyleLibrary, checkStateTileBinding } from './state-styles';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 
 export const firstSliceCapabilities = [
@@ -29,9 +31,10 @@ export const supportedCompositionCapabilities: readonly string[] = [
   'sh.section@1', 'sh.rows@1', 'sh.local-tabs@1', 'sh.local-state@1',
   'sh.local-controls@1', 'sh.primary-button@1', 'sh.row-collection@1',
   'sh.collection@1', 'sh.form@1', 'sh.recipe-part@1', 'sh.pinned-actions@1',
+  'sh.modal-handoff@1', 'sh.bedroom-collection-links@1',
   'sh.navigation-columns@1',
   'sh.adaptive-presentation@1',
-  'sh.pinned-tabs@1',
+  'sh.pinned-tabs@1', 'sh.supporting-text-styles@1', 'sh.section-title@1', 'sh.surface-title-source@1',
   'sh.shell-header@1',
   'sh.collection-navigation@1',
   'sh.info-box@1', 'sh.status-pill@1', 'sh.paged-row@1',
@@ -42,8 +45,11 @@ export const supportedCompositionCapabilities: readonly string[] = [
   'sh.air-purifier@1', 'sh.bathroom-fan@1', 'sh.grill@1', 'sh.humidifier@1', 'sh.humidifier-scheduling@1',
   ...remoteCapabilities,
   ...deviceProviderCapabilities,
+  'sh.remote-speaker-targets@1',
   'sh.camera-stream@1', 'sh.camera-tile@1', 'sh.camera-video@1', 'sh.camera-controls@1', 'sh.camera-viewer@1',
-  'sh.activity-presentation@1', 'sh.native-extensions@1',
+  'sh.activity-presentation@1', 'sh.native-extensions@1', 'sh.route-links@1',
+  'sh.call-service@1', 'sh.bound-control@1', 'sh.visible-when@1', 'sh.selected-when@1', 'sh.operands@1',
+  'sh.todo-collection@1', 'sh.state-style@1',
 ];
 const unsupported: Record<string, string> = {
   'room-app-launch': 'room-app-launch', 'section-sides': 'section-sides', 'content-panes': 'content-panes',
@@ -56,6 +62,15 @@ const unsupported: Record<string, string> = {
   'paged-row': 'paged-row', 'content-image': 'content-image',
   'humidifier-schedule-field': 'humidifier-schedule-editor', 'humidifier-schedule-activities': 'collections',
 };
+/** A route's `visibleWhen` may use `viewer` and the combinators only: the route catalog is built without entity state. */
+function asksOnlyAboutViewer(predicate: Predicate): boolean {
+  switch (predicate.type) {
+    case 'viewer': return true;
+    case 'not': return asksOnlyAboutViewer(predicate.of);
+    case 'all': case 'any': return predicate.of.every(asksOnlyAboutViewer);
+    default: return false;
+  }
+}
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -72,7 +87,17 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown): 
   const parsed = schema.safeParse(input);
   if (parsed.success) return parsed.data;
   const issues: CompositionIssue[] = [];
-  for (const issue of parsed.error.issues) {
+  /**
+   * A plain union reports one failure at its own path. The app names the exact field of the branch the value's `type` selects,
+   * so descend into the branch that matched the discriminator, whose first failure is not about `type` itself.
+   */
+  const expand = (list: readonly z.core.$ZodIssue[]): z.core.$ZodIssue[] => list.flatMap(issue => {
+    if (issue.code !== 'invalid_union' || !('errors' in issue) || !Array.isArray(issue.errors)) return [issue];
+    const branches = (issue.errors as z.core.$ZodIssue[][]).filter(branch => branch.length && !branch.some(inner => inner.path.at(-1) === 'type' && inner.path.length === 1));
+    if (branches.length !== 1) return [issue];
+    return expand(branches[0].map(inner => ({ ...inner, path: [...issue.path, ...inner.path] }) as z.core.$ZodIssue));
+  });
+  for (const issue of expand(parsed.error.issues)) {
     const path = issue.path;
     let capability: string | undefined;
     let unsupportedPath: PropertyKey[] = path;
@@ -90,6 +115,8 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown): 
     const toPointer = (parts: PropertyKey[]) => parts.reduce<string>((base, key) => pointer(base, String(key)), '');
     if (capability) {
       issues.push({ code: 'unsupported_capability', pointer: toPointer(unsupportedPath), capability });
+    } else if (issue.code === 'custom' && typeof issue.params?.shCode === 'string') {
+      issues.push({ code: issue.params.shCode as CompositionIssue['code'], pointer: toPointer(path) });
     } else if (issue.code === 'unrecognized_keys') {
       for (const key of issue.keys) issues.push({ code: 'unknown_field', pointer: pointer(toPointer(path), key) });
     } else {
@@ -145,9 +172,26 @@ export function compileCompositionDocument(input: unknown): { document: Composit
   });
   if (document.extensions) {
     require('native-extensions');
+    if (document.extensions.linkPrefixes) {
+      require('route-links');
+      const prefixes = new Set<string>();
+      document.extensions.linkPrefixes.forEach((prefix, index) => {
+        if (prefixes.has(prefix)) add('duplicate_id', `/document/extensions/linkPrefixes/${index}`);
+        prefixes.add(prefix);
+      });
+    }
     document.extensions.routes.forEach((route, index) => {
       register('extension-route', route.id, `/document/extensions/routes/${index}/id`);
       register('extension-path', route.path, `/document/extensions/routes/${index}/path`);
+      // A path or alias names one route only, so a link can never be ambiguous.
+      route.aliases?.forEach((alias, offset) => register('extension-path', alias, `/document/extensions/routes/${index}/aliases/${offset}`));
+      if (route.aliases?.length || route.keywords?.length || route.siri) require('route-links');
+      if (route.visibleWhen) {
+        require('visible-when');
+        // The catalog is built without entity state, so only a viewer-only rule is checked; it holds no source references.
+        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`).issues);
+        else add('invalid_combination', `/document/extensions/routes/${index}/visibleWhen`);
+      }
       refs.push({ kind: 'page', id: route.pageId, path: `/document/extensions/routes/${index}/pageId` });
       if (route.tabId) refs.push({ kind: 'tab', id: route.tabId, path: `/document/extensions/routes/${index}/tabId` });
       const fragments = new Set<string>();
@@ -161,6 +205,11 @@ export function compileCompositionDocument(input: unknown): { document: Composit
       register('extension-camera', camera.entityId, `/document/extensions/cameras/${index}/entityId`);
     });
   }
+  if (document.stateStyles) {
+    require('state-style');
+    document.stateStyles.styles.forEach((style, index) => register('state-style', style.id, `/document/stateStyles/styles/${index}/id`));
+    issues.push(...checkStateStyleLibrary(document.stateStyles, '/document/stateStyles'));
+  }
   const powerRefs: { id: string; path: string; code: CompositionIssue['code'] }[] = [];
   const alarmRefs: { id: string; path: string }[] = [];
   const homeRefs: { id: string; model: string; path: string }[] = [];
@@ -170,7 +219,8 @@ export function compileCompositionDocument(input: unknown): { document: Composit
   const roomRefs: { id: string; path: string; navigation: boolean }[] = [];
   const visibilityRefs: { id: string; path: string }[] = [];
   const deviceRefs: { control: RoomDeviceControl; path: string }[] = [];
-  const bedroomRefs: { id: string; kind: BedroomKind; path: string }[] = [];
+  const bedroomRefs: { id: string; providers: readonly string[]; path: string }[] = [];
+  const titleSourceRefs: { id: string; path: string }[] = [];
   const remoteRefs: { id: string; path: string }[] = [];
   const providerControls: { control: Extract<CompositionNode, { type: 'custom-light-control' | 'sprinkler-control' }>; path: string }[] = [];
   const vacuumRefs: { control: VacuumControl; path: string }[] = [];
@@ -179,6 +229,28 @@ export function compileCompositionDocument(input: unknown): { document: Composit
   const cameraRefs: { id: string; path: string; records: boolean }[] = [];
   const cameraPresentations: { source: string; modal: string; path: string }[] = [];
   const reads: { read: CompositionRead; path: string }[] = [];
+  const expressionRefs: ExpressionFacts['references'] = [];
+  const optimisticRefs: ExpressionFacts['optimisticReferences'] = [];
+  type Visibility = { visibleWhen?: Predicate; whenUnknown?: WhenUnknown };
+  /** Folds an expression walk's issues, source references and capability needs into this compile. */
+  function absorb(facts: ExpressionFacts) {
+    issues.push(...facts.issues);
+    expressionRefs.push(...facts.references);
+    optimisticRefs.push(...facts.optimisticReferences);
+    if (facts.usedOperands) require('operands');
+    if (facts.references.length || facts.optimisticReferences.length) require('bindings');
+  }
+  function useCall(call: CallService, path: string, control: boolean) { require('call-service'); absorb(checkCallService(call, path, control)); }
+  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path)); }
+  /** A node's or tab's `visibleWhen`; its policy means nothing without one. */
+  function visibility(item: Visibility, path: string) {
+    if (item.visibleWhen === undefined) { if (item.whenUnknown !== undefined) add('invalid_combination', `${path}/whenUnknown`); return; }
+    require('visible-when'); usePredicate(item.visibleWhen, `${path}/visibleWhen`);
+  }
+  /** Containers that lay their children out themselves cannot let one of them go (a gap, a separator or an empty page). */
+  function forbidRules(children: CompositionNode[], path: string) {
+    children.forEach((child, index) => { if ((child as Visibility).visibleWhen !== undefined) add('invalid_combination', `${path}/${index}/visibleWhen`); });
+  }
   const dependencies: { from: string; to: string; path: string }[] = [];
   const localFields = new Map(document.localState?.map(field => [field.id, field]));
   if (document.localState) {
@@ -221,6 +293,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
       else if (!acceptsLocalValue(field, value.value)) add('binding_type', `${path}/value`);
       return;
     }
+    if (value.type === 'call-service') { useCall(value, path, false); return; }
     if (value.type === 'domain') {
       require('power-toggle'); require('bindings');
       powerRefs.push({ id: value.sourceId, path: `${path}/sourceId`, code: 'invalid_combination' });
@@ -229,7 +302,10 @@ export function compileCompositionDocument(input: unknown): { document: Composit
     require('actions.navigation');
     switch (value.type) {
       case 'push': refs.push({ kind: 'page', id: value.pageId, path: `${path}/pageId` }); break;
-      case 'present': refs.push({ kind: 'modal', id: value.modalId, path: `${path}/modalId` }); break;
+      case 'present':
+        if (value.ifPresented === 'replace') require('modal-handoff');
+        refs.push({ kind: 'modal', id: value.modalId, path: `${path}/modalId` });
+        break;
       case 'select-tab': refs.push({ kind: 'tab', id: value.tabId, path: `${path}/tabId` }); break;
       case 'dismiss-then-push': action(value.destination, `${path}/destination`); break;
     }
@@ -267,6 +343,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
       const p = `${path}/${index}`;
       if (++nodes > 4096 || depth > 12) add('limit_exceeded', p);
       register('node', item.id, `${p}/id`);
+      visibility(item as Visibility, p);
       if (!grid && item.layout.span !== 1) add('invalid_combination', `${p}/layout/span`);
       if (depth > 1 && ['form', 'pinned-actions'].includes(item.type)) add('invalid_combination', `${p}/type`);
       switch (item.type) {
@@ -276,7 +353,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
           require('status-pill'); binding(item.props.value, 'string', `${p}/props/value`);
           binding(item.props.detail, 'string', `${p}/props/detail`); break;
         case 'paged-row':
-          require('paged-row'); components(item.children, `${p}/children`, depth + 1); break;
+          require('paged-row'); components(item.children, `${p}/children`, depth + 1); forbidRules(item.children, `${p}/children`); break;
         case 'section':
           require('section');
           if (item.props.presentationProviderId) require('presentation-providers');
@@ -289,9 +366,11 @@ export function compileCompositionDocument(input: unknown): { document: Composit
             ].includes(child.props.kind);
             if (settingsRow) require('module-settings-rows');
             if (!settingsRow && child.type !== 'row' && child.type !== 'local-control' && child.type !== 'settings-link'
-                && !(child.type === 'climate-control' && ['toggle', 'explicit-switch', 'status', 'link'].includes(child.props.kind)))
+                && !(child.type === 'climate-control' && ['toggle', 'explicit-switch', 'status', 'link'].includes(child.props.kind))
+                && !(child.type === 'bound-control' && child.props.kind !== 'button' && (child.props.surface ?? 'row') === 'row'))
               add('invalid_combination', `${p}/children/${index}/type`);
           });
+          if (item.props.style === 'module-list') forbidRules(item.children, `${p}/children`);
           components(item.children, `${p}/children`, depth + 1); break;
         case 'row':
           require('rows');
@@ -324,6 +403,14 @@ export function compileCompositionDocument(input: unknown): { document: Composit
                    field.options.map(option => option.label).join('\0') !== item.tabs.map(tab => tab.label).join('\0'))
             add('invalid_combination', `${p}/props/stateId`);
           if (new Set(item.tabs.map(tab => tab.id)).size !== item.tabs.length) add('duplicate_id', `${p}/tabs`);
+          if (item.props.automatic) {
+            require('selected-when');
+            item.props.automatic.forEach((rule, index) => {
+              if (!item.tabs.some(tab => tab.id === rule.tabId)) add('invalid_reference', `${p}/props/automatic/${index}/tabId`);
+              usePredicate(rule.selectedWhen, `${p}/props/automatic/${index}/selectedWhen`);
+            });
+            if (item.props.scopeProviderId) add('invalid_combination', `${p}/props/automatic`);
+          }
           item.tabs.forEach((tab, index) => components(tab.children, `${p}/tabs/${index}/children`, depth + 1));
           break;
         }
@@ -339,6 +426,38 @@ export function compileCompositionDocument(input: unknown): { document: Composit
             add('invalid_combination', `${p}/props/stateId`);
           break;
         }
+        case 'bound-control': {
+          require('bound-control');
+          const props = item.props, kind = props.kind;
+          if (props.surface !== undefined && kind !== 'toggle') add('invalid_combination', `${p}/props/surface`);
+          const allowed = ({ toggle: ['isOn'], stepper: ['value', 'range', 'format'], slider: ['value'], choice: ['options'], button: [] } as const)[kind] as readonly string[];
+          const actionKeys = ({ toggle: ['onAction', 'offAction'], stepper: ['action'], slider: ['action'], choice: [], button: ['action'] } as const)[kind] as readonly string[];
+          for (const key of ['isOn', 'value', 'range', 'format', 'options'] as const)
+            if (props[key] !== undefined && !allowed.includes(key)) add('invalid_combination', `${p}/props/${key}`);
+          for (const key of ['onAction', 'offAction', 'action'] as const)
+            if (item[key] !== undefined && !actionKeys.includes(key)) add('invalid_combination', `${p}/${key}`);
+          for (const key of actionKeys) if (item[key as 'action'] === undefined) add('missing_required', `${p}/${key}`);
+          for (const key of allowed) if (key !== 'format' && props[key as 'isOn'] === undefined) add('missing_required', `${p}/props/${key}`);
+          for (const key of ['onAction', 'offAction', 'action'] as const) {
+            const call = item[key];
+            if (call) useCall(call, `${p}/${key}`, kind !== 'button');
+          }
+          if (props.isOn) usePredicate(props.isOn, `${p}/props/isOn`);
+          if (props.value) absorb(checkOperand(props.value, `${p}/props/value`, false));
+          if (props.range && (props.range.min >= props.range.max || (props.range.max - props.range.min) % props.range.step !== 0))
+            add('invalid_value', `${p}/props/range`);
+          if (props.format !== undefined && !props.format.includes('{value}')) add('invalid_value', `${p}/props/format`);
+          if (props.options) {
+            if (props.options.length < 2) add('limit_exceeded', `${p}/props/options`);
+            props.options.forEach((option, index) => {
+              require('selected-when');
+              usePredicate(option.selectedWhen, `${p}/props/options/${index}/selectedWhen`);
+              useCall(option.action, `${p}/props/options/${index}/action`, kind !== 'button');
+            });
+            if (new Set(props.options.map(option => option.id)).size !== props.options.length) add('duplicate_id', `${p}/props/options`);
+          }
+          break;
+        }
         case 'primary-button':
           require('primary-button');
           if (item.action.type === 'domain') add('invalid_combination', `${p}/action/type`);
@@ -347,6 +466,12 @@ export function compileCompositionDocument(input: unknown): { document: Composit
         case 'collection':
           require('collection');
           if (item.selection) action(item.selection, `${p}/selection`);
+          if (item.props.bedroomLinks) {
+            require('bedroom-collection-links');
+            if (item.props.template !== 'rows' || new Set(item.props.bedroomLinks.map(link => link.side)).size !== item.props.bedroomLinks.length)
+              add('invalid_combination', `${p}/props/bedroomLinks`);
+            item.props.bedroomLinks.forEach((link, index) => action(link.action, `${p}/props/bedroomLinks/${index}/action`));
+          }
           break;
         case 'form':
           if (item.props.fields.some(field => field.control === 'schedule-date-time')) require('schedule-date-fields');
@@ -376,7 +501,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
           } else {
             if (item.children?.length || item.props.items.some(value => value.stateProviderId)) add('invalid_combination', `${p}/props`);
             item.props.items.forEach((value, index) => {
-              if (value.action.type === 'domain' || value.action.type === 'set-local') add('invalid_combination', `${p}/props/items/${index}/action/type`);
+              if (value.action.type === 'domain' || value.action.type === 'set-local' || value.action.type === 'call-service') add('invalid_combination', `${p}/props/items/${index}/action/type`);
             });
           }
           if (new Set(item.props.items.map(value => value.id)).size !== item.props.items.length)
@@ -390,7 +515,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
           item.children.forEach((child, i) => {
             if (child.type !== 'status-chip' && child.type !== 'room-chip') add('invalid_combination', `${p}/children/${i}/type`);
           });
-          components(item.children, `${p}/children`, depth + 1, false); break;
+          components(item.children, `${p}/children`, depth + 1, false); forbidRules(item.children, `${p}/children`); break;
         case 'status-chip': case 'room-overview-tile':
           require(item.type); require('home-status'); require('bindings');
           homeRefs.push({ id: item.props.sourceId, model: 'home-status@1', path: `${p}/props/sourceId` });
@@ -456,7 +581,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
         case 'room-section':
           require('room-section'); require('grid');
           roomVisibility(item.props.visibility, `${p}/props/visibility`);
-          components(item.children, `${p}/children`, depth + 1, true); break;
+          components(item.children, `${p}/children`, depth + 1, true); forbidRules(item.children, `${p}/children`); break;
         case 'room-card':
         case 'room-chip': {
           require(item.type); require('bindings');
@@ -509,7 +634,19 @@ export function compileCompositionDocument(input: unknown): { document: Composit
           if (props.control === 'bed-reading' && props.parameter === 'pump-status' && (!props.activeLabel || !props.inactiveLabel))
             add('invalid_combination', `${p}/props`);
           require(props.control); require('bindings');
-          bedroomRefs.push({ id: props.sourceId, kind: props.control, path: `${p}/props/sourceId` });
+          if ('showsExplanation' in props) require('wake-hold-explanation');
+          if ('episode' in props) require('wake-episode');
+          if ('showsHeading' in props) require('bedroom-field-headings');
+          if (props.control === 'alarm-weekdays' && props.options.some(option => option.accessibilityLabel !== undefined))
+            require('weekday-accessibility-labels');
+          const wakeMessage = props.control === 'alarm-delete' && props.confirmation.messageFormat === 'wake-alarm';
+          if (wakeMessage) {
+            require('wake-alarm-confirmation');
+            if (/[{}]/.test(props.confirmation.message.replaceAll('{time}', '').replaceAll('{schedule}', '')))
+              add('invalid_combination', `${p}/props/confirmation/message`);
+          }
+          bedroomRefs.push({ id: props.sourceId, providers: wakeMessage ? ['wake-alarm-draft'] : bedroomProviders(props.control),
+            path: `${p}/props/sourceId` });
           if ('options' in props) {
             const values = props.options.map(option => option.value);
             if (new Set(values).size !== values.length) add('invalid_combination', `${p}/props/options`);
@@ -576,7 +713,12 @@ export function compileCompositionDocument(input: unknown): { document: Composit
         }
         case 'notification-permission-banner': require('bootstrap-notifications'); break;
         case 'bootstrap-message': require('bootstrap-message'); break;
-        case 'text': require('text'); binding(item.props.value, 'string', `${p}/props/value`); break;
+        case 'text':
+          require('text');
+          if (['subheadline', 'footnote'].includes(item.props.style)) require('supporting-text-styles');
+          if (item.props.style === 'section-title') require('section-title');
+          binding(item.props.value, 'string', `${p}/props/value`);
+          break;
         case 'settings-control':
           require('settings-controls'); require('bindings');
           settingsRefs.push({ id: item.props.sourceId, kind: item.props.kind, path: `${p}/props/sourceId` });
@@ -626,6 +768,9 @@ export function compileCompositionDocument(input: unknown): { document: Composit
             });
           }
           binding(item.props.subtitle, 'string', `${p}/props/subtitle`); action(item.action, `${p}/action`); break;
+        case 'state-tile':
+          require('tiles'); require('state-style');
+          issues.push(...checkStateTileBinding(item.binding, document.stateStyles, `${p}/binding`)); break;
         case 'action-tile':
           require('tiles'); require('bindings'); require('power-toggle');
           if (item.props.powerLabels || item.props.family === 'occupancy') require('power-labels');
@@ -639,6 +784,14 @@ export function compileCompositionDocument(input: unknown): { document: Composit
     surfaces.forEach((surface, index) => {
       const p = `/document/${kind}s/${index}`;
       register('surface', surface.id, `${p}/id`); register(kind, surface.id, `${p}/id`);
+      if (surface.titleSourceId !== undefined) {
+        require('surface-title-source');
+        titleSourceRefs.push({ id: surface.titleSourceId, path: `${p}/titleSourceId` });
+        const containsSource = (nodes: CompositionNode[]): boolean => nodes.some(node =>
+          node.type === 'bedroom-control' && node.props.sourceId === surface.titleSourceId
+          || containsSource(compositionChildren(node)));
+        if (!containsSource(surface.components)) add('invalid_combination', `${p}/titleSourceId`);
+      }
       if (surface.toolbar.type === 'replace') chrome(surface.toolbar.groups, `${p}/toolbar/groups`);
       else if (kind === 'modal') add('invalid_combination', `${p}/toolbar`);
       components(surface.components, `${p}/components`);
@@ -658,6 +811,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
   if (navigation.tabs.length > 5) add('unsupported_capability', '/document/navigation/tabs', 'sh.extended-tabs@1');
   navigation.tabs.forEach((tab, i) => {
     register('tab', tab.id, `/document/navigation/tabs/${i}/id`);
+    visibility(tab, `/document/navigation/tabs/${i}`);
     refs.push({ kind: 'page', id: tab.pageId, path: `/document/navigation/tabs/${i}/pageId` });
   });
   refs.push({ kind: 'page', id: navigation.initialPageId, path: '/document/navigation/initialPageId' });
@@ -735,6 +889,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
     }
     if (isDeviceProvider(source)) {
       require(source.model.slice(0, -2));
+      if (source.model === 'media-remote-config@1' && remoteUsesSpeakerTargets(source.inputs)) require('remote-speaker-targets');
       deviceProviderIssues(source).forEach(path => add('invalid_combination', `${p}/inputs${path}`));
       return;
     }
@@ -798,6 +953,26 @@ export function compileCompositionDocument(input: unknown): { document: Composit
           if (seen.has(entry.entityId.value)) add('invalid_combination', `${path}/value`);
           seen.add(entry.entityId.value);
         });
+      } else if (source.model === 'todo-collection@1') {
+        const seen = new Set<string>();
+        source.inputs.lists.forEach((entry, index) => {
+          const base = `${p}/inputs/lists/${index}`;
+          literalEntity(entry.entityId.value, `${base}/entityId`, 'todo');
+          if (seen.has(entry.entityId.value)) add('invalid_combination', `${base}/entityId/value`);
+          seen.add(entry.entityId.value);
+          if (entry.completionScript) literalEntity(entry.completionScript.value, `${base}/completionScript`, 'script');
+          visibility(entry, base);
+          if (entry.visibleWhen !== undefined) {
+            const rule = entry.visibleWhen;
+            if (rule.type !== 'viewer' || rule.isAdmin !== undefined || !rule.userIds?.length) add('invalid_combination', `${base}/visibleWhen`);
+            if (entry.whenUnknown !== 'hide') add('invalid_combination', `${base}/whenUnknown`);
+          }
+        });
+        const action = source.inputs.addAction;
+        if (action.type !== 'task') {
+          literalEntity(action.entityId.value, `${p}/inputs/addAction/entityId`, 'todo');
+          if (!seen.has(action.entityId.value)) add('invalid_reference', `${p}/inputs/addAction/entityId/value`);
+        }
       }
       return;
     }
@@ -860,6 +1035,19 @@ export function compileCompositionDocument(input: unknown): { document: Composit
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== ref.model) add('binding_type', ref.path);
   }
+  for (const ref of expressionRefs) {
+    const at = ref.pointer + (ref.kind === undefined ? '/sourceId' : '/from/sourceId');
+    const source = sources.get(ref.sourceId);
+    if (!source) { add('invalid_reference', at); continue; }
+    if (source.kind !== 'ha-entity') { add('binding_type', at); continue; }
+    if (ref.path.length === 1 && ref.path[0] === 'state') { if (ref.kind === 'boolean') add('binding_type', `${ref.pointer}/as`); }
+    else if (ref.path.length < 2 || ref.path[0] !== 'attributes') add('invalid_reference', ref.pointer + (ref.kind === undefined ? '/path' : '/from/path'));
+  }
+  for (const ref of optimisticRefs) {
+    const source = sources.get(ref.sourceId);
+    if (!source) add('invalid_reference', ref.pointer);
+    else if (source.kind !== 'ha-entity') add('binding_type', ref.pointer);
+  }
   for (const ref of visibilityRefs) {
     const source = sources.get(ref.id);
     if (!source) add('invalid_reference', ref.path);
@@ -888,10 +1076,16 @@ export function compileCompositionDocument(input: unknown): { document: Composit
     else if (source.model === 'grill@1' && !source.inputs.details.some(detail => detail.entityId === control.props.detailEntityId))
       add('invalid_reference', `${path}/props/detailEntityId`);
   }
+  for (const ref of titleSourceRefs) {
+    const source = sources.get(ref.id);
+    if (!source) add('invalid_reference', ref.path);
+    else if (source.kind !== 'model' || source.model !== 'bedroom-provider@1'
+      || !['bed-alarm-draft', 'wake-alarm-draft'].includes(source.inputs.kind)) add('binding_type', ref.path);
+  }
   for (const ref of bedroomRefs) {
     const source = sources.get(ref.id);
     if (!source) add('invalid_reference', ref.path);
-    else if (source.kind !== 'model' || source.model !== 'bedroom-provider@1' || !bedroomProviders(ref.kind).includes(source.inputs.kind))
+    else if (source.kind !== 'model' || source.model !== 'bedroom-provider@1' || !ref.providers.includes(source.inputs.kind))
       add('binding_type', ref.path);
   }
   for (const ref of remoteRefs) {
@@ -950,7 +1144,7 @@ export function compileCompositionDocument(input: unknown): { document: Composit
       else if (read.as !== 'string') add('binding_type', `${path}/as`);
     } else if (source.model === 'media-remote@1' || isDeviceProvider(source)) {
       add('invalid_reference', `${path}/from/path`);
-    } else if (source.model === 'profile-account@1' || source.model === 'settings-provider@1') {
+    } else if (source.model === 'profile-account@1' || source.model === 'settings-provider@1' || source.model === 'todo-collection@1') {
       add('invalid_reference', `${path}/from/path`);
     } else {
       if (source.model === 'room-navigation@1') { add('invalid_reference', `${path}/from/path`); continue; }

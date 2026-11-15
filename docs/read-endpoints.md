@@ -19,7 +19,7 @@ and permissions restricted to the administrator and server process.
     "id": "room-temperature",
     "name": "Room temperature",
     "kind": "home-assistant",
-    "path": "/api/states/sensor.room_temperature",
+    "path": "/api/states/sensor.demo_room_temperature",
     "response": {
       "shape": "object",
       "fields": {
@@ -33,7 +33,7 @@ and permissions restricted to the administrator and server process.
     "id": "catalog-search",
     "name": "Household catalog",
     "kind": "http",
-    "url": "http://192.168.1.50:8080/catalog",
+    "url": "http://example.local:8080/catalog",
     "queryParam": "term",
     "bearerTokenEnv": "CATALOG_BEARER",
     "response": {

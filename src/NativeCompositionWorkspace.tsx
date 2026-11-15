@@ -2,16 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiUrl, request } from './api';
 import { componentLocations, compositionEditorSchema, compositionErrors, compositionSourceText, importCompositionText, moveCompositionNode } from './composition-editor';
 import CompositionFields from './CompositionFields';
+import HomeAssistantPublication from './HomeAssistantPublication';
+import RoutesEditor from './RoutesEditor';
+import StateStyles from './StateStyles';
 import { useCompositionStudio } from './useCompositionStudio';
 import type { Json } from './shared/types';
 import type { CompositionDocument } from './shared/composition/schema';
+import { compositionWarnings } from './shared/composition/lints';
 import { formatCompositionIssue, type UploadedCompositionAsset } from './shared/composition/workspace';
 import { CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES } from './shared/composition/json';
 import { uid } from './editor';
 import { Dialog, Field, SelectField, TextField } from './ui';
 import './NativeCompositionWorkspace.css';
 
-const sections = ['Overview', 'Tabs', 'Chrome', 'Pages', 'Modals', 'Local state', 'Data sources', 'Wallpaper', 'Bootstrap', 'Live Activities', 'Native policies'] as const;
+const sections = ['Overview', 'Tabs', 'Chrome', 'Pages', 'Modals', 'Local state', 'Styles', 'Data sources', 'Wallpaper', 'Bootstrap', 'Routes', 'Live Activities', 'Native policies', 'Home Assistant'] as const;
 type Section = typeof sections[number];
 type Operation = 'import' | 'advanced' | 'reload' | 'keep-local' | undefined;
 function exportLocal(document: CompositionDocument) {
@@ -31,6 +35,7 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
   const [moving, setMoving] = useState(''), [parent, setParent] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const errors = useMemo(() => document ? compositionErrors(document) : [], [document]);
+  const warnings = useMemo(() => document ? compositionWarnings(document) : [], [document]);
   const locations = useMemo(() => document ? componentLocations(document) : [], [document]);
   const loadAssets = async () => {
     try {
@@ -96,16 +101,22 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
       <button disabled={working || !studio.canRedo} onClick={studio.redo}>Redo</button>
       <button disabled={!document || working || !studio.dirty || errors.length > 0} onClick={() => void studio.save()}>Save draft</button>
       <button className="primary" disabled={!document || working || errors.length > 0} onClick={() => void studio.save(true)}>Publish native</button>
+      <button className="primary" disabled={!document || working || errors.length > 0} onClick={() => void studio.save('home-assistant')}>Publish to Home Assistant</button>
     </header>
     <div className="composition-notice">First-slice native contract, not a browser fidelity preview or production-parity certification. Schema-1 saved work is separate and unchanged. Actions are never executed here.</div>
     {studio.error && <div role="alert" className="inline-error">{studio.error}</div>}
     {studio.status && <div role="status" className="composition-status">{studio.status}</div>}
+    {studio.houseImport && studio.houseImport.dropped.length > 0 && <details className="composition-status" open>
+      <summary>{studio.houseImport.dropped.length} house-config behaviours were not carried over</summary>
+      <ul>{studio.houseImport.dropped.map(note => <li key={note.path}><code>{note.path}</code>: {note.reason}</li>)}</ul>
+    </details>}
     {studio.conflict && <div className="conflict-banner"><strong>Revision conflict. Local edits are still here.</strong><button disabled={studio.busy} onClick={() => open('reload')}>Reload server draft</button><button disabled={studio.busy} onClick={() => open('keep-local')}>Keep local work...</button></div>}
     <div className="composition-layout">
       <nav aria-label="Native composition sections">
         {sections.map(item => <button key={item} aria-current={section === item ? 'page' : undefined} onClick={() => setSection(item)}>{item}</button>)}
         <hr/>
         <button disabled={!document || working} onClick={() => open('import')}>Import JSON...</button>
+        <button disabled={!document || working || studio.dirty} title="Adds chores pages and rooms the draft does not author yet from the live house config. Save or discard local changes first." onClick={() => void studio.importHouse()}>Import from house config</button>
         <button disabled={!document} onClick={() => document && exportLocal(document)}>Export local JSON</button>
         <button disabled={!document || working} onClick={() => open('advanced')}>Advanced JSON...</button>
         <button disabled={working} onClick={() => studio.dirty ? open('reload') : void studio.reload()}>Reload saved draft</button>
@@ -115,10 +126,11 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
         {!document ? <p>{studio.busy ? 'Loading the separate native workspace...' : 'Native composition requires the existing authenticated Studio session. Resolve the error and reload.'}</p> : <fieldset disabled={studio.busy || uploading} className="composition-authoring">
           {section === 'Overview' && <>
             <TextField label="Composition name" value={document.name} onChange={name => studio.apply({ ...document, name })}/>
-            <dl><dt>Publisher identity</dt><dd>{studio.envelope?.publisherId}</dd><dt>Document identity</dt><dd>{document.id}</dd><dt>Native endpoint</dt><dd><code>{typeof window === 'undefined' ? '/native' : new URL('./native', window.location.href).href}</code></dd></dl>
+            <dl><dt>Publisher identity</dt><dd>{studio.envelope?.publisherId}</dd><dt>Document identity</dt><dd>{document.id}</dd><dt>Preview endpoint (debug only)</dt><dd><code>{typeof window === 'undefined' ? '/native' : new URL('./native', window.location.href).href}</code></dd></dl>
             <p>Save validates and durably stores a draft. Publish saves valid local work first, then atomically selects an immutable publication. Export includes current local edits. Import replaces content only, retaining this workspace's publisher/document identity; referenced assets must already be uploaded to this publisher.</p>
             <p>Stable IDs are read-only. Edit titles and labels freely; use destination selectors to reassign relationships before deleting referenced definitions.</p>
-            {studio.publishedRevision && <p>Published this session: revision {studio.publishedRevision}</p>}
+            {studio.publishedRevision && <p>Frozen locally this session: revision {studio.publishedRevision}</p>}
+            {studio.homeAssistant && <p>Published to Home Assistant this session: revision {studio.homeAssistant.revision}</p>}
           </>}
           {section === 'Tabs' && <>
             {field(['navigation', 'initialPageId'], document.navigation.initialPageId, 'Initial page')}
@@ -189,17 +201,21 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
               Job Id must exactly match the engine job ID (the tag without job.). The engine still owns state,
               timing, safe controls and links. Watch remains the production stub, not a configurable dashboard.</p>
             {field(['liveActivities'], document.liveActivities, 'Live Activities')}
-            {document.extensions ? field(['extensions'], document.extensions, 'Native Extensions')
-              : <button onClick={() => studio.apply({ ...document, extensions: {
-                type: 'native-extensions@1', watch: 'stub@1', routes: [], cameras: [],
-              } })}>Add native extension delivery</button>}
-            <p>Routes attach existing system shortcuts, Spotlight and notification paths to authored pages.
-              Camera entries change copy only, never camera targets, streams or notification actions.
+            {document.extensions ? field(['extensions', 'cameras'], document.extensions.cameras, 'Camera copy')
+              : <p>Add native extension delivery under Routes first.</p>}
+            <p>Camera entries change copy only, never camera targets, streams or notification actions.
               Changes appear on the next engine/system render; no new polling or push budget is introduced.</p>
           </>}
+          {section === 'Styles' && <StateStyles document={document} onChange={studio.apply}/>}
+          {section === 'Routes' && <>
+            <RoutesEditor document={document} onChange={studio.apply}/>
+            {document.extensions && field(['extensions', 'routes'], document.extensions.routes, 'Route targets (page, tab, anchors)')}
+            <p>Routes attach existing system shortcuts, Spotlight and notification paths to authored pages.</p>
+          </>}
+          {section === 'Home Assistant' && <HomeAssistantPublication published={studio.homeAssistant} busy={working} onChange={studio.setStatus}/>}
           {section === 'Native policies' && <>
             <p>Supported controls include native tabs and chrome; sections, rows, inline local tabs and scene-local controls; room navigation; status, weather, lights, alarms, locks and garages; climate, room devices, bedroom, remotes, vacuums and cameras. Bindings, targets, ordered options, labels, symbols and supported presentation policies are editable fields, not browser approximations.</p>
-            <p>Collections, account headers, remotes and bedroom controls require matching native providers. Unsupported: whole-feature dispatch, arbitrary service commands, complete save/discard form composition, route arguments, split panes, pinned modal bars, content images and external assets. Implemented controls do not certify complete production pages or pixel parity.</p>
+            <p>Collections, account headers, remotes and bedroom controls require matching native providers. Authored actions can call any Home Assistant service on a tap (Call service), controls can be bound to entities (Bound control), and any node or tab can be shown by a rule (Visible when). Unsupported: whole-feature dispatch, complete save/discard form composition, route arguments, split panes, pinned modal bars, content images and external assets. Implemented controls do not certify complete production pages or pixel parity.</p>
             {field(['navigation', 'policy'], document.navigation.policy, 'Shell policies')}
             {field(['theme'], document.theme, 'Theme')}
           </>}
@@ -208,6 +224,8 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
       <aside aria-label="Native composition validation">
         <h2>Validation</h2>
         {errors.length ? <div role="alert" className="inline-error">{errors.join('\n')}</div> : <p>{document ? 'Document compiler accepted the current tree. Asset bytes are checked by the server on save/publish.' : 'No document loaded.'}</p>}
+        {warnings.length > 0 && <div role="status" className="safety-note"><strong>Warnings (they never block a save or publish)</strong>
+          <ul>{warnings.map(warning => <li key={`${warning.pointer}:${warning.message}`}><code>{warning.pointer}</code> {warning.message}</li>)}</ul></div>}
         <p>Errors name exact document pointers. Unsupported capabilities are rejected, never silently approximated. Invalid drafts cannot replace the last publication.</p>
         <h2>Last saved manifest</h2>
         <code>{studio.envelope?.assetManifestSha256}</code>

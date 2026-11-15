@@ -8,3 +8,7 @@ data/
 test-results/
 playwright-report/
 .DS_Store
+dist-groups/
+
+# House-specific values for maintenance scripts (see scripts/local-house.ts)
+.local/

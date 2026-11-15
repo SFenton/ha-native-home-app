@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, expect, test as base, type APIRequestContext, type BrowserContext, type CDPSession, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { mobileDescendants, mobileEditorDocument, mobileViewports } from '../fixtures/mobile-editor';
-import type { DraftEnvelope, PublishedEnvelope, StudioDocument } from '../../src/shared/types';
+import type { DraftEnvelope, StudioDocument } from '../../src/shared/types';
 
 const origin = 'http://127.0.0.1:4801';
 type Pane = 'Project' | 'Preview' | 'Inspect';
@@ -13,7 +13,7 @@ const node = (page: Page, id: string) => canvas(page).locator(`[data-component-i
 
 async function guardRequests(context: BrowserContext) {
   const forbidden: string[] = [];
-  const localAPIs = new Set(['/api/health', '/api/draft', '/api/events', '/api/validate', '/api/publish', '/api/published', '/api/export']);
+  const localAPIs = new Set(['/api/health', '/api/draft', '/api/validate', '/api/export']);
   await context.route(/^https?:\/\//, async route => {
     const url = new URL(route.request().url());
     if (url.origin !== origin || (url.pathname.startsWith('/api/') && !localAPIs.has(url.pathname))) {
@@ -252,7 +252,7 @@ for (const viewport of mobileViewports) {
       '3D', 'View controls', 'Fit', 'Zoom out', 'Reset preview zoom to 100 percent', 'Zoom in',
       'Closed', 'Partial', 'Open', 'Reset view',
     ]) await reachable(page, page.getByRole('button', { name, exact: true }));
-    for (const name of ['Save', 'Publish', 'Undo (Ctrl+Z)', 'Redo (Ctrl+Shift+Z)']) {
+    for (const name of ['Save', 'Undo (Ctrl+Z)', 'Redo (Ctrl+Shift+Z)']) {
       await reachable(page, page.getByRole('button', { name, exact: true }));
     }
     await noDocumentOverflow(page);
@@ -649,27 +649,12 @@ test('M3 project routes, shared/unassigned pages, modal and activity variants ca
   expect(document.pages.find(item => item.id === 'mobile-unassigned')?.title).toBe('Renamed unassigned');
 });
 
-test('M3 compact Save differs from Publish and stale conflicts preserve local work across pane switches', async ({ page, request }) => {
+test('M3 compact Save and stale conflicts preserve local work across pane switches', async ({ page, request }) => {
   await page.goto('/');
-  const publishedBefore = await request.get(`${origin}/api/published`);
-  const previous = publishedBefore.ok() ? await publishedBefore.json() : null;
   await pane(page, 'Inspect');
   await inspector(page).getByLabel('Page title', { exact: true }).fill('Saved mobile revision');
   await page.getByRole('button', { name: 'Save', exact: true }).tap();
   await expect.poll(async () => (await draft(request)).document.pages[0].title).toBe('Saved mobile revision');
-  const unpublished = await request.get(`${origin}/api/published`);
-  expect(unpublished.status()).toBe(publishedBefore.status());
-  if (previous) expect(await unpublished.json()).toEqual(previous);
-  const saved = await draft(request);
-  await page.getByRole('button', { name: 'Publish', exact: true }).tap();
-  await page.getByRole('dialog').getByRole('button', { name: 'Publish configuration', exact: true }).tap();
-  await expect.poll(async () => {
-    const response = await request.get(`${origin}/api/published`);
-    return response.ok() ? (await response.json()).revision : null;
-  }).toBe(saved.revision);
-  const published: PublishedEnvelope = await (await request.get(`${origin}/api/published`)).json();
-  expect(published.revision).toBe(saved.revision);
-  expect(published.document).toEqual(saved.document);
   await page.reload();
   await pane(page, 'Inspect');
   await expect(inspector(page).getByLabel('Page title', { exact: true })).toHaveValue('Saved mobile revision');
@@ -689,13 +674,12 @@ test('M3 compact Save differs from Publish and stale conflicts preserve local wo
   expect((await draft(request)).document.name).toBe('Other synthetic session');
   await conflict.getByRole('button', { name: 'Keep local & replace server', exact: true }).tap();
   await expect.poll(async () => (await draft(request)).document.pages[0].title).toBe('Local mobile work');
-  expect((await (await request.get(`${origin}/api/published`)).json()).document).toEqual(published.document);
 });
 
 test('M4 compact pane focus, hidden accessibility, Escape restoration, keyboard and 44px editor alternatives', async ({ page }, testInfo) => {
   await page.goto('/');
   const targets = [];
-  for (const name of ['Project', 'Preview', 'Inspect', 'Insert', 'Save', 'Publish', 'Undo (Ctrl+Z)', 'Redo (Ctrl+Shift+Z)']) {
+  for (const name of ['Project', 'Preview', 'Inspect', 'Insert', 'Save', 'Undo (Ctrl+Z)', 'Redo (Ctrl+Shift+Z)']) {
     const control = page.getByRole('button', { name, exact: true });
     await reachable(page, control);
     const box = await control.boundingBox();
@@ -872,7 +856,7 @@ test('M4 actual Chromium tab zoom at 200 and 400 percent reflows independently f
       await reachable(zoomPage, project(zoomPage).getByRole('button', { name: /^Variables & conditions/ }));
       await noDocumentOverflow(zoomPage);
       await pane(zoomPage, 'Preview');
-      for (const name of ['Project', 'Preview', 'Inspect', 'Insert', 'Save', 'Publish', 'View and edit source']) {
+      for (const name of ['Project', 'Preview', 'Inspect', 'Insert', 'Save', 'View and edit source']) {
         await reachable(zoomPage, zoomPage.getByRole('button', { name, exact: true }));
       }
       await noDocumentOverflow(zoomPage);
@@ -937,7 +921,7 @@ test('M4 320px editor reflows with user text-spacing overrides without clipping 
   await noDocumentOverflow(page);
   await screenshot(page, testInfo, 'editor-320px-text-spacing-project');
   await pane(page, 'Preview');
-  for (const name of ['Save', 'Publish', 'View and edit source', 'Import JSON or YAML']) {
+  for (const name of ['Save', 'View and edit source', 'Import JSON or YAML']) {
     await reachable(page, page.getByRole('button', { name, exact: true }));
   }
   await noDocumentOverflow(page);

@@ -24,13 +24,13 @@
         "id": "group-demo", "placement": "leading", "horizontal": "separate-circles@1", "vertical": "shared@1",
         "items": [{
           "id": "item-demo-menu", "type": "shell-menu", "label": "Sections", "visibility": "root-when-menu-available",
-          "icon": { "type": "sf-symbol", "name": "line.3.horizontal", "rendering": "canonical", "unavailable": "reject" }
+          "icon": { "type": "sf-symbol", "name": "line.3.horizontal", "rendering": "canonical", "unavailable": "fallback" }
         }]
       }] }
     },
     "pages": [{
       "id": "page-demo", "title": "Demo controls", "parameters": {}, "navigation": { "type": "stack" },
-      "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "reject" },
+      "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "fallback" },
       "toolbar": { "type": "inherit" },
       "layout": {
         "type": "column", "padding": {
@@ -46,11 +46,11 @@
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "keys", "layout": "pad", "label": "Demo remote", "keys": [
             { "position": 2, "slot": "power", "label": "Power", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "reject" } },
+              "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "fallback" } },
             { "position": 1, "slot": "up", "label": "Up", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "chevron.up", "rendering": "canonical", "unavailable": "reject" } },
+              "icon": { "type": "sf-symbol", "name": "chevron.up", "rendering": "canonical", "unavailable": "fallback" } },
             { "position": 8, "slot": "keyboard", "label": "Text", "rotation": 0, "activeText": "Expanded", "inactiveText": "Collapsed",
-              "icon": { "type": "sf-symbol", "name": "keyboard", "rendering": "canonical", "unavailable": "reject" } },
+              "icon": { "type": "sf-symbol", "name": "keyboard", "rendering": "canonical", "unavailable": "fallback" } },
             { "position": 4, "slot": "select", "label": "Select", "rotation": 0, "activeText": "On", "inactiveText": "Off", "icon": { "type": "none" } }
           ] }
         },
@@ -59,9 +59,9 @@
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "keys", "layout": "transport", "label": "Playback", "keys": [
             { "position": 0, "slot": "pause", "label": "Pause", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "pause.fill", "rendering": "canonical", "unavailable": "reject" } },
+              "icon": { "type": "sf-symbol", "name": "pause.fill", "rendering": "canonical", "unavailable": "fallback" } },
             { "position": 2, "slot": "play", "label": "Play", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "play.fill", "rendering": "canonical", "unavailable": "reject" } }
+              "icon": { "type": "sf-symbol", "name": "play.fill", "rendering": "canonical", "unavailable": "fallback" } }
           ] }
         },
         {
@@ -69,11 +69,11 @@
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "volume", "unavailableText": "Speaker unavailable", "errorText": "Volume rejected", "keys": [
             { "position": 0, "slot": "volume-mute", "label": "Mute", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "speaker.slash", "rendering": "canonical", "unavailable": "reject" } },
+              "icon": { "type": "sf-symbol", "name": "speaker.slash", "rendering": "canonical", "unavailable": "fallback" } },
             { "position": 1, "slot": "volume-down", "label": "Quieter", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "minus", "rendering": "canonical", "unavailable": "reject" } },
+              "icon": { "type": "sf-symbol", "name": "minus", "rendering": "canonical", "unavailable": "fallback" } },
             { "position": 2, "slot": "volume-up", "label": "Louder", "rotation": 0, "activeText": "On", "inactiveText": "Off",
-              "icon": { "type": "sf-symbol", "name": "plus", "rendering": "canonical", "unavailable": "reject" } }
+              "icon": { "type": "sf-symbol", "name": "plus", "rendering": "canonical", "unavailable": "fallback" } }
           ] }
         },
         {
@@ -86,20 +86,20 @@
           "id": "demo-app", "title": "Demo app", "type": "remote-control", "layout": { "span": 1 },
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "app", "key": "Demo app", "artwork": "provider", "whiteBackground": true, "activeText": "Playing",
-            "icon": { "type": "sf-symbol", "name": "play.tv", "rendering": "canonical", "unavailable": "reject" } }
+            "icon": { "type": "sf-symbol", "name": "play.tv", "rendering": "canonical", "unavailable": "fallback" } }
         },
         {
           "id": "demo-device", "title": "Demo player", "type": "remote-control", "layout": { "span": 1 },
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "device", "key": "Demo player", "states": [{ "value": "playing", "label": "Playing" }],
             "fallbackText": "Player", "unavailableText": "Player unavailable",
-            "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "reject" } }
+            "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "fallback" } }
         },
         {
           "id": "demo-hue-power", "title": "Sync power", "type": "remote-control", "layout": { "span": 1 },
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "hue-toggle", "target": "power", "onText": "On", "offText": "Off", "unavailableText": "Sync unavailable",
-            "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "reject" } }
+            "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "fallback" } }
         },
         {
           "id": "demo-hue-mode", "title": "Mode", "type": "remote-control", "layout": { "span": 1 },
@@ -118,7 +118,7 @@
           "binding": { "sourceId": "source-demo" }, "feedback": { "loadingText": "Reading", "errorText": "Command rejected" },
           "props": { "kind": "hue-input", "option": "HDMI 1", "selectedText": "Selected", "connectedText": "Connected",
             "disconnectedText": "Disconnected", "unavailableText": "Input unavailable",
-            "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "reject" } }
+            "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "fallback" } }
         },
         {
           "id": "demo-card", "title": "Demo remote card", "type": "remote-control", "layout": { "span": 1 },
@@ -126,13 +126,13 @@
           "props": { "kind": "card", "key": "Demo player", "states": [{ "value": "playing", "label": "Playing" }],
             "fallbackText": "Player", "unavailableText": "Player unavailable", "errorText": "Player rejected",
             "showsVolume": true, "volumeLabel": "Demo speaker volume",
-            "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "reject" },
+            "icon": { "type": "sf-symbol", "name": "tv", "rendering": "canonical", "unavailable": "fallback" },
             "actions": [
-              { "slot": "power", "label": "Power", "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "reject" } },
-              { "slot": "previous", "label": "Previous", "icon": { "type": "sf-symbol", "name": "backward.fill", "rendering": "canonical", "unavailable": "reject" } },
-              { "slot": "pause", "label": "Pause", "icon": { "type": "sf-symbol", "name": "pause.fill", "rendering": "canonical", "unavailable": "reject" } },
-              { "slot": "play", "label": "Play", "icon": { "type": "sf-symbol", "name": "play.fill", "rendering": "canonical", "unavailable": "reject" } },
-              { "slot": "next", "label": "Next", "icon": { "type": "sf-symbol", "name": "forward.fill", "rendering": "canonical", "unavailable": "reject" } }
+              { "slot": "power", "label": "Power", "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "fallback" } },
+              { "slot": "previous", "label": "Previous", "icon": { "type": "sf-symbol", "name": "backward.fill", "rendering": "canonical", "unavailable": "fallback" } },
+              { "slot": "pause", "label": "Pause", "icon": { "type": "sf-symbol", "name": "pause.fill", "rendering": "canonical", "unavailable": "fallback" } },
+              { "slot": "play", "label": "Play", "icon": { "type": "sf-symbol", "name": "play.fill", "rendering": "canonical", "unavailable": "fallback" } },
+              { "slot": "next", "label": "Next", "icon": { "type": "sf-symbol", "name": "forward.fill", "rendering": "canonical", "unavailable": "fallback" } }
             ],
             "action": { "type": "push", "pageId": "page-demo", "arguments": {}, "origin": "sender", "duplicate": "reuse-nearest" }
           }

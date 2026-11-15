@@ -10,10 +10,13 @@ import { createCompositionDocument, type CompositionDraft, type UploadedComposit
 import { compositionAssetManifestHash, validateCompositionPublication } from './composition';
 import { compositionAssetName, inspectCompositionImage, MAX_COMPOSITION_ASSET_BYTES } from './composition-assets';
 import { atomicJson, HttpError } from './store';
-import { PublicationReaders } from './publication-readers';
 
 const stateSchema = z.strictObject({
   draft: compositionPublicationSchema.omit({ publishedAt: true }),
+  publishedRevision: z.number().int().positive().nullable(),
+});
+const migrationStateSchema = z.object({
+  draft: z.looseObject({ publisherId: z.string(), revision: z.number().int().positive(), document: z.unknown() }),
   publishedRevision: z.number().int().positive().nullable(),
 });
 async function boundedRead(file: string, maximum: number): Promise<Buffer> {
@@ -46,7 +49,6 @@ async function immutableWrite(file: string, bytes: Buffer) {
 
 /** Owned by StudioStore's existing DATA_DIR lock; schema 1 files are never read or modified here. */
 export class CompositionStore {
-  readers!: PublicationReaders;
   private draft!: CompositionDraft;
   private published?: CompositionPublication;
   private sequence: Promise<unknown> = Promise.resolve();
@@ -56,7 +58,6 @@ export class CompositionStore {
     const store = new CompositionStore(path.join(dataDirectory, 'native-v2'));
     await mkdir(path.join(store.directory, 'revisions'), { recursive: true, mode: 0o700 });
     await mkdir(path.join(store.directory, 'assets'), { recursive: true, mode: 0o700 });
-    store.readers = await PublicationReaders.open(store.directory);
     const bytes = await optionalRead(path.join(store.directory, 'state.json'), MAX_COMPOSITION_ENVELOPE_BYTES + 1024);
     if (bytes) {
       const state = parseCompositionShape(stateSchema, parseCompositionJSON(bytes));
@@ -77,12 +78,34 @@ export class CompositionStore {
     } else {
       if ((await readdir(path.join(store.directory, 'revisions'))).length
         || (await readdir(path.join(store.directory, 'assets'))).length
-        || (await readdir(store.directory)).some(name => !['revisions', 'assets', 'publication-readers.json'].includes(name)))
+        || (await readdir(store.directory)).some(name => !['revisions', 'assets', 'publication-readers.json' /* retired reader grants: tolerated, never read */].includes(name)))
         throw new Error('Native state is missing but namespace artifacts exist; existing work was not reset');
       store.draft = store.makeDraft(createCompositionDocument(`document-${randomUUID()}`), 1, `publisher-${randomUUID()}`);
       await store.persist(store.draft, null);
     }
     return store;
+  }
+  /**
+   * Rewrites the saved draft through the store's own draft path, for a draft the current rules no longer accept (so
+   * {@link open} would refuse it). The transform runs on the stored document; the result is compiled, its assets are
+   * verified and it is saved as the next draft revision. The published revision is immutable and must still validate.
+   * Returns `null`, writing nothing, when the transform changes nothing. Never call this while a server owns the directory.
+   */
+  static async migrateDraft(dataDirectory: string, transform: (document: unknown) => unknown): Promise<{ from: number; to: number } | null> {
+    const store = new CompositionStore(path.join(dataDirectory, 'native-v2'));
+    const bytes = await boundedRead(path.join(store.directory, 'state.json'), MAX_COMPOSITION_ENVELOPE_BYTES + 1024);
+    // The draft's own shape is what changed, so only its identity is read strictly here.
+    const state = parseCompositionShape(migrationStateSchema, parseCompositionJSON(bytes));
+    if (state.publishedRevision !== null) {
+      validateCompositionPublication(parseCompositionJSON(await boundedRead(
+        path.join(store.directory, 'revisions', `${state.publishedRevision}.json`), MAX_COMPOSITION_ENVELOPE_BYTES)));
+    }
+    const rewritten = transform(structuredClone(state.draft.document));
+    if (canonicalCompositionJSON(rewritten) === canonicalCompositionJSON(state.draft.document)) return null;
+    const next = store.makeDraft(rewritten, state.draft.revision + 1, state.draft.publisherId);
+    await store.verifyAssets(next.document);
+    await store.persist(next, state.publishedRevision);
+    return { from: state.draft.revision, to: next.revision };
   }
   private validateDraft(draft: CompositionDraft): CompositionDraft {
     const publication = validateCompositionPublication({ ...draft, publishedAt: draft.updatedAt });

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { compositionEditorSchema, fieldVariants, resolveField, valueAt, type SchemaField, type EditorPath } from '../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, resolveField, valueAt, type SchemaField, type EditorPath, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import type { CompositionDocument } from '../src/shared/composition/schema';
@@ -53,18 +53,18 @@ describe('configured atomic vacuums', () => {
     expect(compileCompositionDocument(vacuumDocument()).capabilities.filter(c => c.startsWith('sh.vacuum'))).toEqual(['sh.vacuum-controls@1', 'sh.vacuum@1']);
   });
   it('rejects wrong domains, room membership, unknown fields, duplicate roles and wrong source types', () => {
-    const document = vacuumDocument({ kind: 'choice', selection: 'rooms', entityId: 'input_boolean.not_assigned' });
+    const document = vacuumDocument({ kind: 'choice', selection: 'rooms', entityId: 'input_boolean.demo_not_assigned' });
     expect(() => compileCompositionDocument(document)).toThrow(CompositionValidationError);
     document.pages[0].components = [vacuumNode({ kind: 'settings', rows: [
       { role: 'mode', title: 'A', hint: 'A' }, { role: 'mode', title: 'B', hint: 'B' },
     ] })];
     expect(() => compileCompositionDocument(document)).toThrow(CompositionValidationError);
     document.pages[0].components = [vacuumNode({ kind: 'status', metric: 'battery' })];
-    document.dataSources = [{ id: 'source-robot', kind: 'model', model: 'power-toggle@1', inputs: { entityId: { type: 'literal', value: 'switch.demo' } } }];
+    document.dataSources = [{ id: 'source-robot', kind: 'model', model: 'power-toggle@1', inputs: { entityId: { type: 'literal', value: 'switch.demo_unit' } } }];
     expect(() => compileCompositionDocument(document)).toThrow(CompositionValidationError);
     const source = vacuumDocument().dataSources[0];
     if (source.kind !== 'model' || source.model !== 'vacuum@1') throw Error('Expected vacuum source');
-    source.inputs.entityId = 'switch.demo';
+    source.inputs.entityId = 'switch.demo_unit';
     document.dataSources = [source];
     expect(() => compileCompositionDocument(document)).toThrow(CompositionValidationError);
     expect(() => compileCompositionDocument({ ...vacuumDocument(), dispatchPage: 'vacuum-sheet' })).toThrow(CompositionValidationError);
@@ -73,17 +73,17 @@ describe('configured atomic vacuums', () => {
     const document = vacuumDocument(), schema = resolveField(compositionEditorSchema.properties!.dataSources);
     if (!schema.items || Array.isArray(schema.items)) throw Error('Expected source items');
     const current = fields(document, schema.items, ['dataSources', 0]);
-    fireEvent.change(screen.getAllByLabelText('Entity Id')[0], { target: { value: 'vacuum.renamed' } });
+    fireEvent.change(screen.getAllByLabelText('Entity Id')[0], { target: { value: 'vacuum.demo_renamed' } });
     fireEvent.change(screen.getByLabelText('Map Rotation Degrees'), { target: { value: '-90' } });
     fireEvent.change(screen.getByLabelText('Map Scale'), { target: { value: '1.2' } });
     fireEvent.change(within(screen.getByRole('group', { name: 'Zones (1)' })).getByLabelText('Title'), { target: { value: 'Renamed Room' } });
     const result = compileCompositionDocument(current());
-    expect(result.document.dataSources[0]).toMatchObject({ inputs: { entityId: 'vacuum.renamed', mapRotationDegrees: -90, mapScale: 1.2,
+    expect(result.document.dataSources[0]).toMatchObject({ inputs: { entityId: 'vacuum.demo_renamed', mapRotationDegrees: -90, mapScale: 1.2,
       zones: [{ title: 'Renamed Room' }] } });
   });
   it('offers every atomic vacuum variant through structured primitive controls', () => {
     const document = vacuumDocument();
-    const nodes = compositionEditorSchema.definitions!.__schema0;
+    const nodes = nodeDefinition();
     const node = fieldVariants(nodes).find(v => v.properties?.type?.const === 'vacuum-control')!;
     const primitive = resolveField(node.properties!.props).properties!.primitive;
     const current = fields(document, primitive, ['pages', 0, 'components', 0, 'props', 'primitive']);

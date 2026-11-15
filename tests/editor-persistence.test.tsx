@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, loadDraft, publishDraft, request, saveDraft, validateDocument } from '../src/api';
+import { ApiError, loadDraft, request, saveDraft, validateDocument } from '../src/api';
 import { useStudio } from '../src/useStudio';
 import { createSampleDocument } from '../src/shared/sample';
 import type { DraftEnvelope } from '../src/shared/types';
@@ -10,36 +10,20 @@ vi.mock('../src/api', async importOriginal => ({
   ...await importOriginal<typeof import('../src/api')>(),
   loadDraft: vi.fn(),
   saveDraft: vi.fn(),
-  publishDraft: vi.fn(),
   validateDocument: vi.fn(),
   request: vi.fn(),
 }));
-class FakeEventSource extends EventTarget { close() {} }
 const timestamp = '2026-11-12T12:00:00.000Z';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.stubGlobal('EventSource', FakeEventSource);
   vi.mocked(loadDraft).mockResolvedValue({ document: createSampleDocument(), revision: 1, updatedAt: timestamp });
-  vi.mocked(request).mockResolvedValue({ mode: 'sample', publishedRevision: null });
+  vi.mocked(request).mockResolvedValue({ mode: 'sample' });
   vi.mocked(saveDraft).mockImplementation(async (document, expectedRevision) => ({ document, revision: expectedRevision + 1, updatedAt: timestamp }));
-  vi.mocked(publishDraft).mockImplementation(async expectedRevision => ({ document: createSampleDocument(), revision: expectedRevision, updatedAt: timestamp, publishedAt: timestamp, capabilities: [] }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('server-backed editor persistence', () => {
-  it('saves dirty work before publishing exactly the returned revision', async () => {
-    const { result } = renderHook(useStudio);
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    act(() => result.current.apply(document => { document.name = 'Edited household'; }));
-    await act(async () => { await result.current.publish(); });
-    expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ name: 'Edited household' }), 1);
-    expect(publishDraft).toHaveBeenCalledWith(2);
-    expect(vi.mocked(saveDraft).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(publishDraft).mock.invocationCallOrder[0]);
-    expect(result.current.dirty).toBe(false);
-    expect(result.current.publishedRevision).toBe(2);
-  });
-
   it('preserves edits made while an earlier snapshot is saving', async () => {
     let finish!: (envelope: DraftEnvelope) => void;
     vi.mocked(saveDraft).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
@@ -72,10 +56,8 @@ describe('server-backed editor persistence', () => {
     act(() => result.current.apply(document => { document.name = 'Edited during reload'; }));
     await act(async () => {
       expect(await result.current.save()).toBe(false);
-      await result.current.publish();
     });
     expect(saveDraft).not.toHaveBeenCalled();
-    expect(publishDraft).not.toHaveBeenCalled();
     await act(async () => {
       finish({ document: { ...createSampleDocument(), name: 'Server version' }, revision: 7, updatedAt: timestamp });
       await pending;
@@ -95,11 +77,10 @@ describe('server-backed editor persistence', () => {
     const { result } = renderHook(useStudio);
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.apply(document => { document.name = 'Local work'; }));
-    await act(async () => { await result.current.publish(); });
+    await act(async () => { await result.current.save(); });
     expect(result.current.conflict).toBe(true);
     expect(result.current.document?.name).toBe('Local work');
     expect(result.current.dirty).toBe(true);
-    expect(publishDraft).not.toHaveBeenCalled();
     vi.mocked(loadDraft).mockResolvedValue({ document: createSampleDocument(), revision: 7, updatedAt: timestamp });
     await act(async () => { await result.current.keepLocal(); });
     expect(saveDraft).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Local work' }), 7);

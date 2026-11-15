@@ -1,5 +1,4 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import type { ServerResponse } from 'node:http';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { once } from 'node:events';
 import { stringify } from 'yaml';
@@ -10,9 +9,11 @@ import { HomeAssistantClient } from './ha';
 import { HttpError, StudioStore } from './store';
 import { readEndpointQuery } from './read-endpoints';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { validateCompositionPublication } from './composition';
 import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON } from '../src/shared/composition/json';
 import { compositionDocumentSchema } from '../src/shared/composition/schema';
 import { MAX_COMPOSITION_ASSET_BYTES } from './composition-assets';
+import { importHouseLayout } from '../src/shared/composition/house-import';
 import { formatCompositionIssue } from '../src/shared/composition/workspace';
 
 const revision = z.number().int().positive();
@@ -52,8 +53,6 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   const app = express();
   const ha = new HomeAssistantClient(config);
   const sessions = new Map<string, number>();
-  const streams = new Set<ServerResponse>();
-  const heartbeatTimers = new Set<ReturnType<typeof setInterval>>();
   const rateLimits = new Map<string, { count: number; until: number }>();
   const authenticated = (req: Request) => {
     const header = req.get('authorization');
@@ -61,14 +60,6 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const cookie = req.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith('studio_session='))?.slice('studio_session='.length);
     return Boolean((config.authToken && bearer && equalSecret(bearer, config.authToken)) ||
       (cookie && (sessions.get(cookie) ?? 0) > Date.now()) || validIngress(req, config));
-  };
-  const publicationReader = (req: Request) => {
-    if (!['GET', 'HEAD'].includes(req.method) || Object.keys(req.query).length) return false;
-    const resource = req.baseUrl + req.path;
-    if (resource !== '/native/api/published' && !/^\/native\/api\/assets\/[a-f0-9]{64}\.(png|jpg)$/.test(resource)) return false;
-    const header = req.get('authorization');
-    if (!header?.startsWith('Bearer shr_')) return false;
-    return store.native.readers.permits(header.slice(7), store.native.getPublished(), resource);
   };
   let stopping = false;
   app.disable('x-powered-by');
@@ -116,7 +107,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     res.json({ authenticated: true });
   });
   app.use((req, res, next) => {
-    if (authenticated(req) || publicationReader(req) || (!config.production && !config.authToken && !config.ingress)) { next(); return; }
+    if (authenticated(req) || (!config.production && !config.authToken && !config.ingress)) { next(); return; }
     if (req.method === 'GET' && req.accepts('html') && !req.path.startsWith('/api/') && !req.path.startsWith('/native/api/')) {
       const nonce = randomBytes(16).toString('base64');
       res.set('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`);
@@ -126,22 +117,24 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     res.status(401).json({ error: 'Authentication required' });
   });
   app.use('/native/api', (req, _res, next) => {
-    if (!authenticated(req) && !publicationReader(req)) throw new HttpError(401, 'Authentication required for native composition');
+    if (!authenticated(req)) throw new HttpError(401, 'Authentication required for native composition');
     if (Buffer.isBuffer(req.body) && req.is('application/json')) req.body = parseCompositionJSON(req.body);
     next();
   });
   app.get('/native/api/draft', (_req, res) => { res.json(store.native.getDraft()); });
-  app.post('/native/api/readers', async (req, res) => {
-    res.status(201).json(await store.native.readers.issue(req.body, store.native.getPublished()));
-  });
-  app.delete('/native/api/readers/:id', async (req, res) => {
-    z.strictObject({}).parse(req.body);
-    await store.native.readers.revoke(z.uuid().parse(req.params.id));
-    res.status(204).end();
-  });
   app.put('/native/api/draft', async (req, res) => {
     const body = writeSchema.parse(req.body);
     res.json(await store.native.save(body.document, body.expectedRevision));
+  });
+  // Adds the layout house configuration used to carry (chores pages, rooms) to the draft: only what the draft does not yet
+  // author, and a list of every house-config behaviour the publication cannot express. Reads house config; writes only the draft.
+  app.post('/native/api/import-house-config', async (req, res) => {
+    const { expectedRevision } = publishSchema.parse(req.body);
+    const draft = store.native.getDraft();
+    if (draft.revision !== expectedRevision) throw new HttpError(409, 'The draft changed; reload and import again');
+    const imported = importHouseLayout(compositionDocumentSchema.parse(draft.document), await ha.houseConfig());
+    const saved = imported.added.length > 0 ? await store.native.save(imported.document, expectedRevision) : draft;
+    res.json({ revision: saved.revision, added: imported.added, kept: imported.kept, dropped: imported.dropped });
   });
   app.post('/native/api/validate', (req, res) => {
     const body = z.strictObject({ document: z.unknown() }).parse(req.body);
@@ -150,6 +143,28 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   });
   app.post('/native/api/publish', async (req, res) => {
     res.json(await store.native.publish(publishSchema.parse(req.body).expectedRevision));
+  });
+  // Publish to Home Assistant (`fenton_home` integration): the production delivery path. The Studio's own
+  // /native/api/published stays only as the DEBUG publication preview; nothing authenticates a native reader to it.
+  app.get('/native/api/ha/publication', async (_req, res) => { res.json(await ha.publication.get()); });
+  app.post('/native/api/ha/publish', async (req, res) => {
+    const { expectedRevision } = publishSchema.parse(req.body);
+    const published = await store.native.publish(expectedRevision);
+    res.json(await ha.publication.publish(published, name => store.native.readAsset(name)));
+  });
+  app.post('/native/api/ha/rollback', async (req, res) => {
+    res.json(await ha.publication.rollback(z.strictObject({ revision: revision }).parse(req.body).revision));
+  });
+  // Read-only lookups for the style editor: the entity list, one entity's states, and whether a script or timer exists.
+  app.get('/native/api/ha/entities', async (req, res) => {
+    const { domain } = z.strictObject({ domain: z.string().regex(/^[a-z][a-z0-9_]*$/).optional() }).parse(req.query);
+    res.json(await ha.entities.list(domain));
+  });
+  app.get('/native/api/ha/entity-states', async (req, res) => {
+    res.json(await ha.entities.states(z.strictObject({ entityId: z.string().max(160) }).parse(req.query).entityId));
+  });
+  app.get('/native/api/ha/exists', async (req, res) => {
+    res.json({ exists: await ha.entities.exists(z.strictObject({ id: z.string().max(160) }).parse(req.query).id) });
   });
   app.get('/native/api/published', (req, res) => {
     const published = store.native.getPublished();
@@ -197,43 +212,15 @@ export function createApp(store: StudioStore, config: ServerConfig) {
       res.json({ valid: false, errors: error.errors });
     }
   });
-  app.post('/api/publish', async (req, res) => {
-    res.json(await store.publish(publishSchema.parse(req.body).expectedRevision));
-  });
-  app.get('/api/published', (req, res) => {
-    const published = store.getPublished();
-    const etag = `"published-${published.revision}"`;
-    res.set({ ETag: etag, 'Cache-Control': 'private, no-cache' });
-    if (req.get('if-none-match')?.split(',').map((value) => value.trim()).includes(etag)) { res.status(304).end(); return; }
-    res.json(published);
-  });
-  app.get('/api/events', (req, res) => {
-    if (streams.size >= 100) { res.status(503).json({ error: 'Too many event streams' }); return; }
-    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-    res.flushHeaders();
-    res.write(': connected\n\n');
-    streams.add(res);
-    const send = (published: ReturnType<StudioStore['getPublished']>) => {
-      if (!res.write(`id: ${published.revision}\nevent: published\ndata: ${JSON.stringify({ revision: published.revision, updatedAt: published.updatedAt })}\n\n`)) res.end();
-    };
-    const unsubscribe = store.subscribe(send);
-    const currentRevision = store.publishedRevision();
-    if (currentRevision !== null && req.get('last-event-id') !== String(currentRevision)) send(store.getPublished());
-    const timer = setInterval(() => { if (!res.write(': keepalive\n\n')) res.end(); }, 15000);
-    timer.unref();
-    heartbeatTimers.add(timer);
-    const cleanup = () => { clearInterval(timer); heartbeatTimers.delete(timer); unsubscribe(); streams.delete(res); };
-    req.once('close', cleanup);
-    res.once('close', cleanup);
-  });
+  // The schema-1 workspace is a design-only preview now: the app reads no schema-1 document, so nothing here publishes one.
   app.get('/api/export', (req, res) => {
-    const query = z.object({ format: z.enum(['json', 'yaml']).default('json'), source: z.enum(['draft', 'published']).default('draft') }).strict().parse(req.query);
-    const envelope = query.source === 'published' ? store.getPublished() : store.getDraft();
+    const query = z.object({ format: z.enum(['json', 'yaml']).default('json'), source: z.literal('draft').default('draft') }).strict().parse(req.query);
+    const envelope = store.getDraft();
     res.set('Content-Disposition', `attachment; filename="native-home-${query.source}.${query.format === 'yaml' ? 'yaml' : 'json'}"`);
     res.type(query.format === 'yaml' ? 'application/yaml' : 'application/json').send(query.format === 'yaml' ? stringify(envelope.document) : `${JSON.stringify(envelope.document, null, 2)}\n`);
   });
   app.get('/api/health', async (_req, res) => {
-    res.json({ status: 'ok', mode: ha.configured ? 'live' : 'sample', haConnected: await ha.probe(), publishedRevision: store.publishedRevision(), draftRevision: store.getDraft().revision, liveActionsEnabled: config.enableLiveActions, feedbackMode: 'local-queue', schemaVersion: '1.0' });
+    res.json({ status: 'ok', mode: ha.configured ? 'live' : 'sample', haConnected: await ha.probe(), draftRevision: store.getDraft().revision, liveActionsEnabled: config.enableLiveActions, feedbackMode: 'local-queue', schemaVersion: '1.0' });
   });
   app.get('/api/schema', (_req, res) => {
     res.json({ ...z.toJSONSchema(studioDocumentSchema, { target: 'draft-7' }), 'x-semantic-validation': 'POST api/validate additionally checks references, uniqueness, safe URLs and bounded nesting.' });
@@ -359,10 +346,6 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     close() {
       stopping = true;
       ha.close();
-      for (const timer of heartbeatTimers) clearInterval(timer);
-      heartbeatTimers.clear();
-      for (const stream of streams) stream.end();
-      streams.clear();
       sessions.clear();
       rateLimits.clear();
     },

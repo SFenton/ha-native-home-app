@@ -41,10 +41,10 @@ it('compiles atomic controls and a Quick Links modal-local push with exact capab
 
 it.each([
   ['wrong alarm target', (document: ReturnType<typeof securityExample>) => { document.dataSources[0] = {
-    id: 'demo-alarm', kind: 'model', model: 'alarm-mode@1', inputs: { entityId: { type: 'literal', value: 'switch.demo' } },
+    id: 'demo-alarm', kind: 'model', model: 'alarm-mode@1', inputs: { entityId: { type: 'literal', value: 'switch.demo_unit' } },
   }; }],
   ['wrong garage target', (document: ReturnType<typeof securityExample>) => { document.dataSources[2] = {
-    id: 'demo-garage', kind: 'model', model: 'security-door@1', inputs: { kind: 'garage', entityId: { type: 'literal', value: 'lock.demo' } },
+    id: 'demo-garage', kind: 'model', model: 'security-door@1', inputs: { kind: 'garage', entityId: { type: 'literal', value: 'lock.demo_unit' } },
   }; }],
   ['wrong consumer type', (document: ReturnType<typeof securityExample>) => {
     const panel = document.pages[1].components[0];

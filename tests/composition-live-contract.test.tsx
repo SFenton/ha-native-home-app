@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { compositionEditorSchema, fieldVariants, resolveField, valueAt, type EditorPath, type SchemaField } from '../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, resolveField, valueAt, type EditorPath, type SchemaField, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CompositionDocument, CompositionNode } from '../src/shared/composition/schema';
 import { createCompositionDocument } from '../src/shared/composition/workspace';
@@ -48,7 +48,7 @@ it('edits sprinkler entities and thresholds using generated structured controls'
 it('authors an independent inventory list space through structured source fields', () => {
   const document = createCompositionDocument('demo-document');
   document.dataSources = [{ id: 'demo-source', kind: 'model', model: 'alarm-mode@1',
-    inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo' } } }];
+    inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo_unit' } } }];
   const schema = resolveField(compositionEditorSchema.properties!.dataSources);
   if (!schema.items || Array.isArray(schema.items)) throw Error('Expected source items');
   const current = fields(document, schema.items, ['dataSources', 0]);
@@ -66,7 +66,7 @@ it('authors an independent inventory list space through structured source fields
 it('authors inventory targets and copy using the existing schema-derived inspector, without JSON', () => {
   const document = createCompositionDocument('demo-document');
   document.dataSources = [{ id: 'demo-source', kind: 'model', model: 'alarm-mode@1',
-    inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo' } } }];
+    inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo_unit' } } }];
   const schema = resolveField(compositionEditorSchema.properties!.dataSources);
   if (!schema.items || Array.isArray(schema.items)) throw Error('Expected source items');
   const current = fields(document, schema.items, ['dataSources', 0]);
@@ -108,7 +108,7 @@ it('authors alarm source selection, state appearance and all status copy through
     action: { type: 'push', pageId: document.pages[0].id, arguments: {}, origin: 'sender', duplicate: 'reuse-nearest' },
   };
   document.pages[0].components = [tile];
-  const nodes = compositionEditorSchema.definitions!.__schema0;
+  const nodes = nodeDefinition();
   const navigation = fieldVariants(nodes).find(variant => variant.properties?.type?.const === 'navigation-tile')!;
   const alarm = resolveField(navigation.properties!.props).properties!.alarm;
   const current = fields(document, alarm, ['pages', 0, 'components', 0, 'props', 'alarm']);

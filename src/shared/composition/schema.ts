@@ -9,6 +9,9 @@ import { remoteControlSchema, remoteSourceSchema } from './remote';
 import { vacuumControlSchema, vacuumDescriptorSchema, type VacuumControl } from './vacuum';
 import { cameraInputs, cameraLabels } from './camera';
 import { deviceProviderSchemas, deviceControlSchemas } from './device-providers';
+import { stateStyleLibrarySchema, stateTileBindingSchema } from './state-styles';
+import { callServiceSchema, predicateSchema, operandSchema, visibilityFields, type WhenUnknown, type Predicate } from './expression';
+import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;
 const id = identifierSchema;
@@ -20,7 +23,7 @@ const integer = (minimum: number, maximum: number) => z.number().int().min(minim
 const empty = object({});
 const symbol = object({
   type: z.literal('sf-symbol'), name: text(80),
-  rendering: z.literal('canonical'), unavailable: z.literal('reject'),
+  rendering: z.literal('canonical'), unavailable: symbolUnavailable,
 });
 const space = z.discriminatedUnion('type', [
   object({ type: z.literal('token'), name: z.enum(['zero', 'xs', 's', 'm', 'l', 'xl', 'section-header']) }),
@@ -58,11 +61,21 @@ const domainAction = object({
 const navigationAction = z.discriminatedUnion('type', [
   push,
   object({ type: z.literal('select-tab'), tabId: id }),
+  object({ type: z.literal('present'), modalId: id, arguments: empty, ifPresented: z.enum(['reject', 'replace']) }),
+  object({ type: z.literal('dismiss-then-push'), destination: push }),
+]);
+/**
+ * The navigation the app accepts on Home, weather and climate nodes: the same four actions, except that a presented modal
+ * can only be rejected when already shown (`ServerUIHomeShape.homeNavigationAction`), never replaced.
+ */
+const homeNavigationAction = z.discriminatedUnion('type', [
+  push,
+  object({ type: z.literal('select-tab'), tabId: id }),
   object({ type: z.literal('present'), modalId: id, arguments: empty, ifPresented: z.literal('reject') }),
   object({ type: z.literal('dismiss-then-push'), destination: push }),
 ]);
 export const compositionActionSchema = z.union([
-  navigationAction, domainAction,
+  navigationAction, domainAction, callServiceSchema,
   object({ type: z.literal('back') }),
   object({ type: z.literal('dismiss'), scope: z.literal('current-modal') }),
   object({ type: z.literal('set-local'), stateId: id, value: localValueSchema }),
@@ -92,20 +105,20 @@ const toolbar = z.discriminatedUnion('type', [
   object({ type: z.literal('inherit') }),
   object({ type: z.literal('replace'), groups }),
 ]);
-const node = { id, title, layout: object({ span: integer(1, 4) }) };
+const node = { id, title, layout: object({ span: integer(1, 4) }), ...visibilityFields };
 const infoBox = object({ ...node, type: z.literal('info-box'),
   props: object({ message: value(2000, true), tone: z.enum(['neutral', 'success']), unavailableText: label }) });
 const statusPill = object({ ...node, type: z.literal('status-pill'), icon: symbol,
   props: object({ value: value(2000, true), detail: value(2000, true),
     tone: z.enum(['neutral', 'ok', 'active', 'warning', 'danger', 'unavailable']), unavailableText: label }) });
 const pagedRowProps = object({ perPage: integer(1, 8), pageLabel: label, showsIndicator: z.boolean() });
-const climateNode = object({ ...node, type: z.literal('climate-control'), props: climatePropsSchema, action: navigationAction.optional() });
+const climateNode = object({ ...node, type: z.literal('climate-control'), props: climatePropsSchema, action: homeNavigationAction.optional() });
 const bedroomControl = object({ ...node, type: z.literal('bedroom-control'),
   props: z.discriminatedUnion('control', [...bedroomPropsSchema.options, ...bedroomTileSchemas(navigationAction)]) });
 const [customLightControl, sprinklerControl] = deviceControlSchemas(compositionActionSchema);
 const textNode = object({
   ...node, type: z.literal('text'),
-  props: object({ value: value(16384, true), style: z.enum(['body', 'headline', 'caption1']), unavailableText: text(16384) }),
+  props: object({ value: value(16384, true), style: z.enum(['body', 'headline', 'caption1', 'subheadline', 'footnote', 'section-title']), unavailableText: text(16384) }),
 });
 const settingsLink = object({
   ...node, type: z.literal('settings-link'), icon: symbol,
@@ -226,6 +239,11 @@ const actionTile = object({
   }),
   action: domainAction,
 });
+/**
+ * A tile whose look comes from a state style (`sh.state-style@1`): the entity, the library style it applies by id, its own
+ * built-in style (used when the style id is unknown or the device lacks the capability) and per-layer overrides.
+ */
+const stateTile = object({ ...node, type: z.literal('state-tile'), icon: symbol, binding: stateTileBindingSchema, props: empty });
 const gridProps = object({
   minimum: z.enum(['tile@1', 'tile-dynamic-type@1', 'section-wide@1']), maxColumns: integer(1, 4), spacing: space,
   equalRowHeights: z.boolean(), shortRow: z.enum(['share', 'leading']), fold: z.enum(['page', 'container']),
@@ -243,6 +261,18 @@ const localControl = object({
   props: object({ stateId: id, kind: z.enum(['toggle', 'stepper', 'choice', 'text-field', 'segmented-choice']), placeholder: text(240, true) }),
 });
 const button = object({ ...node, type: z.literal('primary-button'), props: empty, icon: symbol.optional(), action: compositionActionSchema });
+const boundControl = object({
+  ...node, type: z.literal('bound-control'), icon: symbol.optional(),
+  props: object({
+    kind: z.enum(['toggle', 'stepper', 'slider', 'choice', 'button']), surface: z.enum(['row', 'tile']).optional(),
+    isOn: predicateSchema.optional(), value: operandSchema.optional(),
+    range: object({ min: integer(-1_000_000, 1_000_000), max: integer(-1_000_000, 1_000_000), step: integer(1, 1_000_000) }).optional(),
+    format: text(240).optional(),
+    options: z.array(object({ id, label, selectedWhen: predicateSchema, action: callServiceSchema })).max(12).optional(),
+    unavailableText: title,
+  }),
+  onAction: callServiceSchema.optional(), offAction: callServiceSchema.optional(), action: callServiceSchema.optional(),
+});
 const rowCollection = object({
   ...node, type: z.literal('row-collection'),
   props: object({ providerId: id, loadingText: title, emptyText: title, unavailableText: title, errorText: title, staleText: title }),
@@ -250,7 +280,10 @@ const rowCollection = object({
 const collection = object({
   ...node, type: z.literal('collection'),
   props: object({ providerId: id, template: z.enum(['rows', 'todo', 'inventory', 'recipes', 'carousel']),
-    loadingText: title, emptyText: title }),
+    loadingText: title, emptyText: title,
+    /** Offers pull-to-refresh on the page. Off unless the document opts in; adds no capability beyond `sh.collection@1`. */
+    pullToRefresh: z.boolean().optional(),
+    bedroomLinks: z.array(object({ side: z.enum(['left', 'right']), label: title, action: navigationAction })).min(1).max(2).optional() }),
   selection: navigationAction.optional(),
 });
 const recordForm = object({
@@ -278,10 +311,10 @@ const statusProps = {
   sourceId: id, states: z.array(object({ state: text(80), appearance: statusAppearance, text: title.optional() })).max(32),
   fallback: statusAppearance, announcement: z.enum(['none', 'value-change']),
 };
-const statusChip = object({ ...node, type: z.literal('status-chip'), props: object(statusProps), action: navigationAction.optional() });
+const statusChip = object({ ...node, type: z.literal('status-chip'), props: object(statusProps), action: homeNavigationAction.optional() });
 const roomOverviewTile = object({
   ...node, type: z.literal('room-overview-tile'),
-  props: object({ ...statusProps, hidesContactSubtitle: z.boolean(), powerSourceId: id.optional() }), action: navigationAction.optional(),
+  props: object({ ...statusProps, hidesContactSubtitle: z.boolean(), powerSourceId: id.optional() }), action: homeNavigationAction.optional(),
 });
 const lightGroupTile = object({ ...node, type: z.literal('light-group-tile'), props: object({ sourceId: id }) });
 const weatherMode = z.enum(['condition', 'precipitation', 'wind']);
@@ -294,7 +327,7 @@ const weatherPanel = object({
       'feels', 'uv', 'wind', 'sun', 'visibility', 'pressure'])).max(11),
     compactHours: integer(1, 12), regularHours: integer(1, 12),
     labels: object({ loading: title, empty: title, stale: title, error: title, open: title }),
-  }), action: navigationAction.optional(),
+  }), action: homeNavigationAction.optional(),
 });
 const remoteNode = object({
   ...node, type: z.literal('remote-control'), binding: object({ sourceId: id }), props: remoteControlSchema,
@@ -321,37 +354,39 @@ const settingsControl = object({
 });
 export type CompositionNode = z.infer<typeof settingsControl> | z.infer<typeof customLightControl> | z.infer<typeof sprinklerControl>
  | z.infer<typeof infoBox> | z.infer<typeof statusPill> | z.infer<typeof textNode> | z.infer<typeof collection> | z.infer<typeof recordForm>
- | z.infer<typeof recipePart> | (z.infer<typeof pinnedActions> & { children?: CompositionNode[] }) | z.infer<typeof navigationTile> | z.infer<typeof actionTile> | z.infer<typeof row> | z.infer<typeof localControl> | z.infer<typeof button> | z.infer<typeof rowCollection> | z.infer<typeof statusChip> | z.infer<typeof roomOverviewTile> | z.infer<typeof lightGroupTile> | z.infer<typeof weatherPanel> | z.infer<typeof alarmPanel> | z.infer<typeof doorTile> | z.infer<typeof climateNode> | z.infer<typeof settingsLink> | z.infer<typeof roomCard> | z.infer<typeof roomChip> | z.infer<typeof roomNavigationGrid> | z.infer<typeof roomDeviceControlSchema> | z.infer<typeof bedroomControl> | z.infer<typeof remoteNode> | VacuumControl | z.infer<typeof accountHeader> | z.infer<typeof cameraTile> | z.infer<typeof cameraVideo> | z.infer<typeof cameraControls> | z.infer<typeof cameraViewer> | z.infer<typeof bootstrapMessage> | z.infer<typeof notificationBanner> | {
-  id: string; title: string; type: 'tile-grid'; layout: { span: number };
+ | z.infer<typeof recipePart> | (z.infer<typeof pinnedActions> & { children?: CompositionNode[] }) | z.infer<typeof navigationTile> | z.infer<typeof actionTile> | z.infer<typeof stateTile> | z.infer<typeof row> | z.infer<typeof localControl> | z.infer<typeof boundControl> | z.infer<typeof button> | z.infer<typeof rowCollection> | z.infer<typeof statusChip> | z.infer<typeof roomOverviewTile> | z.infer<typeof lightGroupTile> | z.infer<typeof weatherPanel> | z.infer<typeof alarmPanel> | z.infer<typeof doorTile> | z.infer<typeof climateNode> | z.infer<typeof settingsLink> | z.infer<typeof roomCard> | z.infer<typeof roomChip> | z.infer<typeof roomNavigationGrid> | z.infer<typeof roomDeviceControlSchema> | z.infer<typeof bedroomControl> | z.infer<typeof remoteNode> | VacuumControl | z.infer<typeof accountHeader> | z.infer<typeof cameraTile> | z.infer<typeof cameraVideo> | z.infer<typeof cameraControls> | z.infer<typeof cameraViewer> | z.infer<typeof bootstrapMessage> | z.infer<typeof notificationBanner> | {
+  id: string; title: string; type: 'tile-grid'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof gridProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'section'; layout: { span: number };
+  id: string; title: string; type: 'section'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof sectionProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'paged-row'; layout: { span: number };
+  id: string; title: string; type: 'paged-row'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof pagedRowProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'local-tabs'; layout: { span: number };
+  id: string; title: string; type: 'local-tabs'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: { stateId: string; transition: 'canonical-swap@1'; resetOnPresentation?: boolean; pinned?: boolean;
-    scopeProviderId?: string; showsSelector?: boolean; retainsAutomaticSelection?: boolean };
+    scopeProviderId?: string; showsSelector?: boolean; retainsAutomaticSelection?: boolean;
+    automatic?: { tabId: string; selectedWhen: Predicate }[] };
   tabs: { id: string; label: string; children: CompositionNode[]; icon?: z.infer<typeof symbol>; centerWhenFits?: boolean }[];
 } | {
-  id: string; title: string; type: 'status-rail'; layout: { span: number }; props: Record<string, never>; children: CompositionNode[];
+  id: string; title: string; type: 'status-rail'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown; props: Record<string, never>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'room-section'; layout: { span: number };
+  id: string; title: string; type: 'room-section'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof roomSectionProps>; children: CompositionNode[];
 };
 export const compositionNodeSchema: z.ZodType<CompositionNode> = z.lazy(() => z.discriminatedUnion('type', [
   customLightControl, sprinklerControl,
-  textNode, navigationTile, actionTile, statusChip, roomOverviewTile, lightGroupTile, weatherPanel, alarmPanel, doorTile, settingsLink, roomCard, roomChip, roomNavigationGrid, roomDeviceControlSchema, bedroomControl, remoteNode, vacuumControlSchema, cameraTile, cameraVideo, cameraControls, cameraViewer,
+  textNode, navigationTile, actionTile, stateTile, statusChip, roomOverviewTile, lightGroupTile, weatherPanel, alarmPanel, doorTile, settingsLink, roomCard, roomChip, roomNavigationGrid, roomDeviceControlSchema, bedroomControl, remoteNode, vacuumControlSchema, cameraTile, cameraVideo, cameraControls, cameraViewer,
   object({ ...node, type: z.literal('tile-grid'), props: gridProps, children: z.array(compositionNodeSchema).max(100) }),
-  row, localControl, button, rowCollection, collection, recordForm, recipePart,
+  row, localControl, boundControl, button, rowCollection, collection, recordForm, recipePart,
   pinnedActions.extend({ children: z.array(compositionNodeSchema).max(1).optional() }),
   infoBox, statusPill,
   object({ ...node, type: z.literal('paged-row'), props: pagedRowProps, children: z.array(compositionNodeSchema).max(100) }),
   object({ ...node, type: z.literal('section'), props: sectionProps, children: z.array(compositionNodeSchema).max(100) }),
   object({ ...node, type: z.literal('local-tabs'), props: object({ stateId: id, transition: z.literal('canonical-swap@1'), resetOnPresentation: z.boolean().optional(), pinned: z.boolean().optional(),
-    scopeProviderId: id.optional(), showsSelector: z.boolean().optional(), retainsAutomaticSelection: z.boolean().optional() }),
+    scopeProviderId: id.optional(), showsSelector: z.boolean().optional(), retainsAutomaticSelection: z.boolean().optional(),
+    automatic: z.array(object({ tabId: id, selectedWhen: predicateSchema })).max(5).optional() }),
     tabs: z.array(object({ id, label, children: z.array(compositionNodeSchema).max(100), icon: symbol.optional(), centerWhenFits: z.boolean().optional() })).min(2).max(5) }),
   object({ ...node, type: z.literal('status-rail'), props: empty, children: z.array(compositionNodeSchema).max(20) }),
   climateNode,
@@ -365,7 +400,7 @@ export function compositionChildren(node: CompositionNode): CompositionNode[] {
       : node.type === 'pinned-actions' ? node.children ?? [] : [];
 }
 const surface = {
-  id, title, icon: symbol, parameters: empty, toolbar,
+  id, title, icon: symbol, parameters: empty, toolbar, titleSourceId: id.optional(),
   layout: object({
     type: z.literal('column'), padding: insets, spacing: space, maxWidth: width,
     scroll: z.literal('content-fit@1'), chrome: z.literal('canonical-page@1'), ground: z.literal('host'),
@@ -393,6 +428,31 @@ const modal = object({
       placement: z.literal('trailing'), rail: z.enum(['automatic', 'keep-horizontal-when-allowed']),
       guard: object({ type: z.literal('none') }),
     }),
+  }),
+});
+/**
+ * One record page of todo lists: the definition the app used to read from house configuration's `chores.pages`. A `collection`
+ * node with the `todo` template names this source's id as its provider; its forms are `<id>-add` and `<id>-edit`.
+ * A list's `visibleWhen` accepts only a viewer rule naming user ids, hidden until the user is known (a list is read where
+ * only the user id is known).
+ */
+const todoEntity = object({ type: z.literal('literal'), value: text(160) });
+export const todoCollectionSource = object({
+  id, kind: z.literal('model'), model: z.literal('todo-collection@1'),
+  inputs: object({
+    title,
+    lists: z.array(object({
+      title: label, entityId: todoEntity, completionScript: todoEntity.optional(),
+      hideCompleted: z.boolean(), hideWhenNoOpenItems: z.boolean(), ...visibilityFields,
+    })).min(1).max(32),
+    addAction: z.discriminatedUnion('type', [
+      object({ type: z.literal('task'), defaultAssignee: text(160, true) }),
+      object({ type: z.literal('grocery'), entityId: todoEntity }),
+      object({ type: z.literal('admin'), entityId: todoEntity }),
+    ]),
+    hideListHeaders: z.boolean(), hiddenByVacation: z.boolean(),
+    empty: object({ title, description: text(2000, true) }),
+    personalization: object({ residentId: id, ownTitle: title, otherTitle: title, ownEmptyDescription: text(2000, true).optional() }).optional(),
   }),
 });
 const source = z.discriminatedUnion('kind', [
@@ -500,6 +560,7 @@ const source = z.discriminatedUnion('kind', [
     }),
     object({ id, kind: z.literal('model'), model: z.literal('inventory-list@1'),
       inputs: object({ space: z.enum(['all-food', 'pantry', 'fridge', 'freezer', 'spice-rack', 'cabinet']) }) }),
+    todoCollectionSource,
   ]),
 ]);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -537,6 +598,8 @@ export const activityPresentationSchema = object({
   source: z.literal('activity-engine@1'), privacy: z.literal('system-sensitive@1'),
   updates: z.literal('engine@1'), intents: z.literal('engine-safe@1'),
 });
+/** A plain route path: lower-case, hyphenated. Aliases and link prefixes follow the same rule as `path`. */
+const routePath = text(80).regex(/^[a-z][a-z0-9-]{0,79}$/);
 export const extensionPresentationSchema = object({
   type: z.literal('native-extensions@1'), watch: z.literal('stub@1'),
   routes: z.array(object({
@@ -545,7 +608,17 @@ export const extensionPresentationSchema = object({
     summary: title.refine(value => !/[\p{Cc}\p{Cf}]/u.test(value)),
     icon: text(80).regex(/^[a-z0-9][a-z0-9.-]{0,79}$/),
     tabId: id.optional(), anchors: z.array(object({ fragment: id, modalId: id })).max(32).optional(),
+    /** Other paths that open the route (older links); unique across every route path and alias. */
+    aliases: z.array(routePath).max(8).optional(),
+    /** Words that find the route in Spotlight and Siri besides its title. */
+    keywords: z.array(text(40).refine(value => !/[\p{Cc}\p{Cf}]/u.test(value))).max(12).optional(),
+    /** Whether Siri and Shortcuts suggest the route by name. Every route can still be named in a phrase. */
+    siri: z.boolean().optional(),
+    /** Viewer predicates only: the catalog is built without entity state. The compiler rejects anything else. */
+    visibleWhen: predicateSchema.optional(),
   })).max(64),
+  /** The first path segments that mark a link as the dashboard's. The app reads three legacy slugs while this is absent. */
+  linkPrefixes: z.array(routePath).min(1).max(8).optional(),
   cameras: z.array(object({
     entityId: text(160).regex(/^camera\.[a-z0-9_]+$/),
     title: label.refine(value => !/[\p{Cc}\p{Cf}]/u.test(value)),
@@ -560,7 +633,7 @@ export const compositionDocumentSchema = object({
   theme: object({ appearance: z.literal('dark'), tokens: z.literal('canonical@1'), typography: z.literal('dynamic-type@1'), background }),
   navigation: object({
     initialPageId: id, initialTabId: id.nullable(), initialArguments: empty,
-    tabs: z.array(object({ id, label, icon: symbol, pageId: id, arguments: empty })).max(8),
+    tabs: z.array(object({ id, label, icon: symbol, pageId: id, arguments: empty, ...visibilityFields })).max(8),
     policy: object({
       type: z.literal('canonical-shell@1'), tabSwitch: z.literal('preserve-cut@1'), reselect: z.literal('pop-root-then-scroll@1'),
       stackMotion: z.literal('canonical-stack@1'), restoration: z.literal('scene@1'), selectionWhileModal: z.literal('reject'),
@@ -572,6 +645,8 @@ export const compositionDocumentSchema = object({
   localState: z.array(localFieldSchema).max(100).optional(),
   liveActivities: z.array(activityPresentationSchema).max(16),
   extensions: extensionPresentationSchema.optional(),
+  /** The style library `state-tile` nodes apply by id (`sh.state-style@1`). */
+  stateStyles: stateStyleLibrarySchema.optional(),
   bootstrap: object({
     type: z.literal('native-bootstrap@1'), arrivalAnnouncement: title,
     recovery: object({ loadingTitle: title, unavailableTitle: title, unavailableMessage: text(2000), retryLabel: label }),
@@ -587,6 +662,7 @@ export const compositionPublicationSchema = object({
 });
 export type CompositionDocument = z.infer<typeof compositionDocumentSchema>;
 export type CompositionPublication = z.infer<typeof compositionPublicationSchema>;
+export { type Operand, type Predicate, type CallService } from './expression';
 export type CompositionGroups = z.infer<typeof groups>;
 export type CompositionRead = z.infer<typeof read>;
 export type CompositionValue = z.infer<ReturnType<typeof value>>;

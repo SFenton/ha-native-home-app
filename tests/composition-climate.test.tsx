@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { compositionEditorSchema, fieldVariants, valueAt } from '../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, valueAt, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { climateCapabilities, type ClimateProps } from '../src/shared/composition/climate';
 import { CompositionValidationError } from '../src/shared/composition/json';
@@ -105,7 +105,7 @@ describe('climate composition contract', () => {
   });
   it('authors dial bounds, units, targets and ordered choices through generated controls', () => {
     const document = fixture();
-    const nodeSchema = compositionEditorSchema.definitions?.__schema0;
+    const nodeSchema = nodeDefinition();
     if (!nodeSchema) throw Error('Missing component schema');
     const climate = fieldVariants(nodeSchema).find(variant => variant.properties?.type?.const === 'climate-control');
     const schema = climate?.properties?.props;
@@ -134,7 +134,7 @@ describe('climate composition contract', () => {
     fireEvent.click(screen.getByLabelText('Include Tracking'));
     expect(valueAt(updated, ['dataSources', 1, 'inputs', 'tracking'])).toHaveProperty('rooms');
     cleanup();
-    const nodeSchema = compositionEditorSchema.definitions?.__schema0;
+    const nodeSchema = nodeDefinition();
     const climate = nodeSchema && fieldVariants(nodeSchema).find(variant => variant.properties?.type?.const === 'climate-control');
     if (!climate?.properties?.props) throw Error('Missing climate inspector');
     render(<CompositionFields schema={climate.properties.props} value={JSON.parse(JSON.stringify(document.pages[0].components[9].props))}

@@ -5,7 +5,7 @@ import baseline from './fixtures/composition-first-slice.json';
 import camera from './fixtures/camera-composition.json';
 import { compileCompositionDocument, supportedCompositionCapabilities } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
-import { compositionEditorSchema, fieldVariants, replaceAt, resolveField, valueAt, type EditorPath, type SchemaField } from '../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, replaceAt, resolveField, valueAt, type EditorPath, type SchemaField, nodeDefinition } from '../src/composition-editor';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { Json } from '../src/shared/types';
 import CompositionFields from '../src/CompositionFields';
@@ -111,7 +111,7 @@ it('authors native camera targets, privacy/permission copy and recording through
 });
 
 it('authors control order, labels, symbols and source selection without raw JSON', () => {
-  const nodes = compositionEditorSchema.definitions!.__schema0;
+  const nodes = nodeDefinition();
   const schema = fieldVariants(nodes).find(variant => variant.properties?.type?.const === 'camera-viewer')!;
   const current = fields(fixture(), schema, ['modals', 0, 'components', 0]);
   expect(screen.getByLabelText('Source Id').tagName).toBe('SELECT');

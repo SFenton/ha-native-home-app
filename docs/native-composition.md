@@ -188,11 +188,11 @@ still applies; never remove a live server's lock.
 
 ## Authenticated native API
 
-Configure the native transport with the prefix-preserving endpoint
-`http://host:4800/native` (or its externally mounted prefix). It appends
-`/api/published` and descriptor asset paths. Asset descriptors deliberately keep
-`source.path` as `/api/assets/<sha256>.<png|jpg>`; do not insert `/native` into the
-document.
+The native app no longer reads this API. Production delivery goes through Home
+Assistant (see [Publishing to Home Assistant](#publishing-to-home-assistant));
+`GET /native/api/published` remains only for local inspection and the DEBUG
+publication preview. Asset descriptors keep `source.path` as
+`/api/assets/<sha256>.<png|jpg>`; do not insert `/native` into the document.
 
 All `/native/api/*` reads and writes require the existing Studio bearer token,
 session cookie or verified Supervisor Ingress identity, even in otherwise
@@ -207,7 +207,10 @@ No Home Assistant requests/actions are added by this workspace.
 | `PUT /native/api/draft` | JSON `{document, expectedRevision}`; full compilation, server manifest hash and asset verification before persistence |
 | `POST /native/api/validate` | JSON `{document}`; structural/semantic compilation only, not asset-byte or native preparation |
 | `POST /native/api/publish` | JSON `{expectedRevision}`; revalidates draft/manifest/assets and selects immutable snapshot |
-| `GET /native/api/published` | Exact 2.0 publication envelope, private ETag revalidation and 304 support |
+| `GET /native/api/published` | Exact 2.0 publication envelope, private ETag revalidation and 304 support. Debug preview only; Studio authentication required |
+| `GET /native/api/ha/publication` | Home Assistant's current and history entries (`revision`, `publishedAt`, `publishedBy`, `envelopeSha256`, `capabilities`) and `storedAssets`; never an envelope |
+| `POST /native/api/ha/publish` | JSON `{expectedRevision}`; freezes that draft as the local publication, uploads the images Home Assistant lacks, then publishes. Returns `{epoch, revision, envelopeSha256, uploadedAssets, skippedAssets}` |
+| `POST /native/api/ha/rollback` | JSON `{revision}` from the history; Home Assistant makes it current under a new revision. Returns `{epoch, revision, envelopeSha256}` |
 | `GET /native/api/schema` | Generated closed structural JSON Schema, not a replacement for compilation |
 | `GET /native/api/export?source=draft\|published` | Saved document JSON (not publisher metadata or embedded image bytes) |
 | `GET /native/api/assets` | Uploaded immutable image descriptors, without document-specific ID/role |
@@ -299,26 +302,58 @@ variables, route arguments, extended tabs, arbitrary styling/fonts, other servic
 models, external asset URLs and full-screen modals are
 not supported. It adds no product-specific feature dispatcher.
 
-## Trusted native readers and extension delivery
+## Publishing to Home Assistant
 
-Author authorization can `POST /native/api/readers` with exactly `haServer`
-(normalized HTTPS or local-HTTP HA origin), `haUserID`, `publisherURL` (HTTPS
-base ending in `/native`, including a proxy prefix if applicable), and
-`expiresAt` (Unix seconds, within 366 days). It returns one enrollment export:
-version, grantID, the requested binding, current published publisherID/documentID,
-scope `publication-read@1`, and a one-time `shr_` credential. Only its hash is
-persisted. Keep the export private, transfer it directly to the intended user,
-and delete the transfer copy after enrollment. Do not put an author token in it.
-Author-only `DELETE /native/api/readers/:grantID` with an empty JSON object revokes
-it. Reader Bearer authorization permits GET/HEAD of the current publication and
-only that publication's referenced assets, including conditional 304 responses.
-It never changes Studio author authentication or `ENABLE_LIVE_ACTIONS`.
+The Studio is the only writer of native compositions. It delivers them through
+the `fenton_home` integration (1.4.0 or newer, `ui_publication`); the native app
+follows that publication over its one Home Assistant websocket and fetches images
+from `GET /api/fenton_home/ui_assets/<sha256>`. The Studio no longer issues
+reader credentials: the former `POST /native/api/readers`, `shr_` credentials,
+enrollment export and Bearer reader access to `/native/api/published` and assets
+are removed. A leftover `native-v2/publication-readers.json` in an existing data
+directory is tolerated and never read; delete it when convenient.
 
-The native system document picker plus explicit trust confirmation checks the
-existing websocket's authenticated user, pins the publisher and binds the export
-to the exact OAuth session. Renewal preserves mounted last-good content.
-No endpoint or token is embedded in the app. Before enrollment only native
-sign-in/recovery is available, not a compiled dashboard fallback.
+**Connection.** As a Home Assistant app the server uses its own `SUPERVISOR_TOKEN`
+(`homeassistant_api: true`) against `ws://supervisor/core/websocket` and
+`http://supervisor/core/api`, so no user token is stored. In development it uses
+`HA_URL` and `HA_TOKEN`. The credential stays on the server: it is never
+returned, logged, or included in an error.
+
+**Publish to Home Assistant** (workspace header, needs a valid document):
+
+1. Saves local edits, then freezes that draft revision as the local publication
+   (the same step as **Publish native**; idempotent for an unchanged revision).
+2. `fenton_home/ui_publication/get` lists the images Home Assistant already holds.
+3. Each image in `document.assets[]` that is not listed is sent with
+   `POST /api/fenton_home/ui_assets/<sha256>` and its content type. Uploads run
+   immediately before the publish, because Home Assistant prunes stored images
+   that no publication references.
+4. `fenton_home/ui_publication/publish {envelope}` stores the validated envelope as
+   the next revision and notifies subscribed apps. The result is
+   `{epoch, revision, envelopeSha256}`; the Studio shows the revision.
+
+Publishes and rollbacks are serialized, so an upload is never separated from its
+publish by another Studio request.
+
+**History and rollback.** The *Home Assistant* section lists the current revision
+and Home Assistant's history (revision, time, publisher). *Roll back* asks for
+confirmation, then makes that entry current as a new revision; the Studio draft
+is not changed.
+
+**Errors.** Integration reasons become fixed Studio messages and Home Assistant's
+own text is never forwarded: `too_large`, `not_json`, `too_deep`,
+`bad_capabilities`, `bad_asset_manifest_hash`, `bad_document_hash`, `bad_document`
+and `bad_assets` (HTTP 422), `missing_asset` (409), unknown rollback revision
+(404); asset upload failures `hash_mismatch`, `bad_hash`, `empty` (422),
+`too_large` (413), `unsupported_type` (415) and `store_full` (507); an unknown
+command (integration missing or older than 1.4.0), a non-administrator
+credential, or an unreachable Home Assistant (502); Home Assistant not
+configured (503). Assets are limited to JPEG, PNG, HEIC and WebP (the Studio
+produces PNG and JPEG), 15 MiB each and 64 MiB in total on the integration.
+
+The native app trusts Home Assistant's authenticated user, not a publisher
+address. Before anything is published it uses only its compiled sign-in and
+configuration-recovery boundary, never a compiled dashboard fallback.
 
 `sh.activity-presentation@1` now has a production consumer: the existing widget
 reads the accepted app-group copy and injects it into every `ActivityCard`.
@@ -339,7 +374,7 @@ The allowed tint families include `cooling` for the existing Hot Flash job;
     "anchors": [{"fragment": "details", "modalId": "modal-details"}]
   }],
   "cameras": [{
-    "entityId": "camera.demo", "title": "Entry",
+    "entityId": "camera.demo_unit", "title": "Entry",
     "liveLabel": "Live", "unavailableLabel": "Stream unavailable"
   }]
 }
@@ -371,6 +406,47 @@ curations, and perform native preparation/device comparison. The production
 server, live `dist/`, existing saved 1.0 data and `ENABLE_LIVE_ACTIONS` must not be
 changed by validation.
 
+## Contract with the app
+
+The app compiles whatever the Studio publishes, so the two must accept and reject the same documents. The shared
+corpus in [`contract/corpus`](../contract/corpus/README.md) is copied byte for byte into the app; `tests/contract-corpus.test.ts`
+runs every file through the Studio compiler and compares the first issue, and the app runs the same files through its own.
+`contract/corpus/capabilities.json` is the app's capability list; the Studio test fails when either list changes alone.
+
+Rules the corpus pins down:
+
+- **Bedroom configuration** (`bedroom-config@1`) carries entity IDs only. `tonightScript`, `outsideScheduleScript`,
+  `scheduleSetTopic`, `hotFlashBrokerScript` and `householdAwayScript` are rejected as unknown fields; the app resolves
+  scripts and topics from the house document by role.
+- **Remote commands** (`media-remote-config@1`) may call any domain, service or script. Only the shape is checked
+  (`src/shared/composition/service-vocabulary.ts`, mirroring the app's `ServerUIServiceVocabulary.allows`): a target must
+  start with the called domain and a `script` call has no target. The per-slot service tables and the publish-time
+  house-script check are gone; Home Assistant enforces what each person may call.
+- **Generic actions and rules** (`src/shared/composition/expression.ts`, native-home 7154723). `call-service` is an action
+  (`sh.call-service@1`): any `domain.service`, a `target` of operands (`entity_id`, `device_id`, `area_id`, `floor_id`,
+  `label_id`), `data` as an `object` operand, `optimistic[]` keyed by a declared `ha-entity` source, and an optional
+  `confirmation` (`policy`, or `additional` with `exemptUserIds`). It runs only on a tap. `bound-control`
+  (`sh.bound-control@1`) is a toggle (row or tile, `isOn`, `onAction`, `offAction`), stepper (`value`, `range`, `format`,
+  `action`), slider (`value`, `action`; no range or format), choice (2 to 12 `options`, each with `selectedWhen` and an
+  `action`) or button (`action`). Operands (`sh.operands@1`) are `literal`, `read`, `control` (only inside a bound control's
+  own call), `viewer`, `format`, `map`, `math`, `object` and `list`; there is no template language. Predicates are `state`,
+  `numeric`, `viewer`, `viewer-person`, `all`, `any` and `not`. Limits: depth 8, 64 nodes per expression (128 per call),
+  texts 2,000 characters. `visibleWhen` (`sh.visible-when@1`) with `whenUnknown` (`show`, `hide`, `keep`, default `keep`) sits
+  on nodes and navigation tabs, never on children of a module list, paged row, status rail or room section, and never on a
+  room device control. `selectedWhen` (`sh.selected-when@1`) is on choice options and `local-tabs.props.automatic`. Reads in
+  expressions name an `ha-entity` source with path `["state"]` or `["attributes", ...]`. `visibleWhen` is presentation, not
+  access control: every signed-in person receives the whole publication, so no secret belongs in `data`.
+- **Warnings**, never blocks (`src/shared/composition/lints.ts`): a `lock`, `alarm_control_panel` or `cover` call without an
+  `additional` confirmation, and data fields named like secrets. They show in the validation panel and beside the call.
+- **Object keys** that are equal after Unicode NFC normalisation are duplicates, in the streaming parser and in the bounds walk.
+- **`collection.props.pullToRefresh`** is an optional boolean, off unless true, and adds no capability beyond `sh.collection@1`.
+- **Home nodes** (status chip, room tile, weather panel, climate control) accept `present` actions with `ifPresented: "reject"` only.
+- **State styles** (`sh.state-style@1`, `src/shared/composition/state-styles.ts`). A document may carry
+  `stateStyles: { type: "state-styles@1", styles: [...] }` (at most 32) and a page may carry `state-tile` nodes. The capability is
+  required when either is present. See [State styles](#state-styles-shstate-style1) below.
+
+The schema-1 workspace is a design-only preview: it publishes to no reader, and its publish endpoints were retired.
+
 ## Configured live adapters
 
 ### Atomic vacuums
@@ -378,7 +454,7 @@ changed by validation.
 `vacuum@1` is a model source with a closed `inputs` descriptor. Targets, scripts,
 map ID/focus/rotation/scale, room membership/order, consumables, and report
 names/reconciliation entities are editable structured fields. The synthetic
-descriptor in `tests/fixtures/vacuum.ts` matches the native
+descriptor in the vacuum fixture module under `tests/fixtures` matches the native
 `ServerUIVacuumDescriptorFixture.json`; no production configuration is supplied.
 
 Each `vacuum-control` component has `props.sourceId` and an explicit
@@ -465,6 +541,72 @@ Camera, contacts/status rail, split sections and conditional guest-presence
 composition still require the owning camera/shell interfaces. No unsupported
 surface is replaced with a successful placeholder.
 
+### State styles (`sh.state-style@1`)
+
+A style is a named state map the app resolves into the four layers of the state-styled tile: icon, text, indicator and colour.
+The design rules are `.agents/design/state-styles.md` and `state-styled-tile.md` in the app repository. Capability name and shape
+are identical in both repositories.
+
+```json
+"stateStyles": { "type": "state-styles@1", "styles": [{
+  "id": "tidy-vacuum", "name": "Tidy vacuum", "base": "robot", "domain": "vacuum",
+  "rules": [
+    { "states": ["cleaning"], "class": "resting", "active": true, "icon": "fan", "text": "Tidying", "indicator": "breathe" },
+    { "states": ["unavailable", "unknown"], "class": "unknown", "active": false }
+  ],
+  "fallback": { "class": "unknown", "active": false },
+  "request": { "lockoutSeconds": 2, "ackTimeoutSeconds": 10, "settleTimeoutSeconds": 45, "errorHoldSeconds": 8, "onTimeout": "error" }
+}] }
+```
+
+A tile applies a style by id:
+
+```json
+{ "id": "robot-tile", "title": "Vacuum", "type": "state-tile", "layout": { "span": 1 }, "icon": { "type": "sf-symbol", "name": "fan",
+  "rendering": "canonical", "unavailable": "fallback" }, "props": {},
+  "binding": { "entityId": "vacuum.demo_robot", "styleId": "tidy-vacuum", "builtIn": "robot",
+               "overrides": [{ "state": "cleaning", "text": "Vacuuming", "indicator": "pulse" }] } }
+```
+
+- **Rules** are tried in order, first match wins; `fallback` is the rule for every other state. A rule gives `class`
+  (`resting`, `in-progress`, `warning`, `error`, `unknown`), `active` (lit or unlit face) and optionally `icon` (SF Symbol name),
+  `text`, `indicator` and `colour`. `unavailable` and `unknown` must be the `unknown` class.
+- **Indicators** are the closed list `none`, `arc-spinner`, `pulse`, `breathe`, `bounce`, `wiggle`. `arc-spinner` is rejected
+  (`invalid_combination` at the rule's `indicator`) on a rule that has an `action`, and on the `unknown` class: the arc stands in
+  for the disc, so a state whose tap does something keeps its disc. The same check applies to a tile override, against the style
+  the tile resolves to.
+- **Colour** is `unlit` or `lit`, the face of a resting or in-progress state; never changes the class. A colour on a warning, error
+  or unknown state (a rule, or a tile override resolved against its style) is `invalid_combination` at the `colour` pointer.
+- **Action**: `verb`, `icon`, `service` on the style's `domain` (absent: nothing to send), `tappable` (default true),
+  `confirmation`, and `requiresFeature` (a `supported_features` bit) with `otherwise` (the same action without it).
+- **Request**: client timings in whole seconds, `onTimeout` (`error` or `revert`), `pendingWords` by service, `errorWords`, and an
+  optional Home Assistant `script` with its `errorTimer` (a `script.*` and a `timer.*`, named together). The Studio installs
+  neither; it checks they exist and warns when one is missing.
+- **Tile binding**: a literal `entityId`; `styleId` (the library style) and `builtIn` (the tile's own built-in style) - at least
+  one; `overrides` per state, one layer or more each, a state once. The entity is in the domain of the style it ends up with.
+- **Fallbacks, never rejections**: a `styleId` the library does not define is accepted and the app uses `builtIn`; a device
+  without the capability keeps the built-in style; a state no rule names resolves to `fallback`.
+- **An unavailable or unknown entity** takes the style's first rule of the `unknown` class, whatever the authored `fallback` says.
+  A style with none gets one made for it, as the app does: the node's own icon, the words "Unavailable", unlit, and an untappable
+  copy of the style's first action. The preview (`ruleFor`, `unknownRuleFor`) draws the same.
+- **Built-in styles** (`garage-door`, `lock`, `blind`, `alarm`, `robot`, `detector`, `notice`, `switch`) are data in
+  `state-styles.ts` and in `contract/corpus/state-styles/built-in.json`. The app decodes that file and tests it equal to its own
+  `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Regenerate with `scripts/generate-state-style-corpus.ts`.
+
+**Authoring** (the Styles section, `src/StateStyles.tsx`). The library lists the built-ins read-only; Duplicate makes a saved
+style, Rename and Delete apply to saved styles, and Delete is blocked while a tile uses the style ("Used by N tiles"; editing a
+used style warns how many tiles change). The state-map editor offers the arc spinner only for a state with no action ("No arc while
+this state has an action") and names the iOS 17 fallbacks beside Breathe (Pulse) and Wiggle (Bounce). A tile's per-state overrides
+are one layer each, with reset, and Save as New Style folds them into a saved style. The picker lists live entities and fills a
+state map from Home Assistant's own states and translated names; states seen only in history are listed as unclassified, and the
+map always ends in a fallback. The preview (`state-style-preview.ts`) resolves a state the way the app does and draws it at iPhone,
+Duo and iPad widths, with the 0.2 s disc and arc cross-fade and the VoiceOver value ("dimmed" while the arc shows).
+
+The picker reads Home Assistant through three read-only endpoints (`GET /native/api/ha/entities?domain=`,
+`/native/api/ha/entity-states?entityId=`, `/native/api/ha/exists?id=`) in `server/ha-entities.ts`: the entity list, a domain's states
+with their translated names plus the states of the last ten days of history, and whether a `script.*` or `timer.*` exists. Nothing
+is written or installed.
+
 ### Todo counts (`sh.todo-counts@1`)
 
 An authored `todo-counts@1` model sums the states of one to 64 distinct literal
@@ -511,6 +653,14 @@ the binding supplies the state line. This also requires the existing
 `{ "type": "standard" }`; the alarm appearance owns the fill, avoiding ignored
 competing RGB values. Layout, title lines and body hint remain editable there.
 
+Every wire symbol is `{ "type": "sf-symbol", "name", "rendering": "canonical", "unavailable": "fallback" }`. `unavailable` says
+what the app does when the device has no such symbol: it draws a fallback symbol (`questionmark.circle`) and never rejects the
+document. The Studio emits only `"fallback"`. An older or imported document may carry `"reject"`; the validator accepts it as a
+legacy alias and the compiler rewrites it to `"fallback"`, so a compiled document never holds it (`symbol-unavailable.ts`).
+
+The app's three rejection classes, for reference: validation rejects a document, a source that is still pending defers its node, and a
+device gap (an absent symbol, an unsupported capability on a device) degrades to a fallback. `unavailable` belongs to the third.
+
 Example `props.alarm`:
 
 ```json
@@ -521,7 +671,7 @@ Example `props.alarm`:
     {
       "state": "disarmed",
       "appearance": {
-        "icon": { "type": "sf-symbol", "name": "shield.slash", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "shield.slash", "rendering": "canonical", "unavailable": "fallback" },
         "fill": { "type": "solid-rgb", "red": 67, "green": 160, "blue": 71 },
         "text": "Disarmed"
       }
@@ -529,14 +679,14 @@ Example `props.alarm`:
     {
       "state": "armed_home",
       "appearance": {
-        "icon": { "type": "sf-symbol", "name": "shield.lefthalf.filled", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "shield.lefthalf.filled", "rendering": "canonical", "unavailable": "fallback" },
         "fill": { "type": "solid-rgb", "red": 30, "green": 136, "blue": 229 },
         "text": "Armed Home"
       }
     }
   ],
   "fallback": {
-    "icon": { "type": "sf-symbol", "name": "shield", "rendering": "canonical", "unavailable": "reject" },
+    "icon": { "type": "sf-symbol", "name": "shield", "rendering": "canonical", "unavailable": "fallback" },
     "fill": { "type": "solid-rgb", "red": 84, "green": 110, "blue": 122 },
     "text": "Security System"
   },
@@ -700,9 +850,9 @@ Every node also has ordinary `id`, `title` and `layout.span`. A control is:
 {
   "intent": "snapshot", "title": "Snapshot", "activeTitle": "Saved to Photos",
   "busyTitle": "Saving", "failureTitle": "Not Saved", "tint": "action",
-  "icon": { "type": "sf-symbol", "name": "camera.fill", "rendering": "canonical", "unavailable": "reject" },
-  "activeIcon": { "type": "sf-symbol", "name": "checkmark.circle.fill", "rendering": "canonical", "unavailable": "reject" },
-  "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "reject" }
+  "icon": { "type": "sf-symbol", "name": "camera.fill", "rendering": "canonical", "unavailable": "fallback" },
+  "activeIcon": { "type": "sf-symbol", "name": "checkmark.circle.fill", "rendering": "canonical", "unavailable": "fallback" },
+  "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "fallback" }
 }
 ```
 

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import CompositionFields from '../src/CompositionFields';
-import { compositionEditorSchema, fieldVariants } from '../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import {
@@ -25,7 +25,7 @@ function source(model: typeof deviceModels[number]) {
   if (model === 'bathroom-fan@1') Object.assign(inputs, { id: 'synthetic-fan', roomTitle: 'Synthetic Room', scriptService: 'synthetic_fan_command' });
   if (model === 'grill@1') Object.assign(inputs, {
     title: 'Synthetic Grill', roomTitle: 'Synthetic Room',
-    details: [{ title: 'Probe', entityId: 'sensor.synthetic_probe', icon: 'thermometer' }, { title: 'Warm', entityId: 'switch.synthetic_warm', icon: 'flame' }],
+    details: [{ title: 'Probe', entityId: 'sensor.demo_probe', icon: 'thermometer' }, { title: 'Warm', entityId: 'switch.demo_warm', icon: 'flame' }],
   });
   if (model === 'humidifier@1') Object.assign(inputs, {
     id: 'synthetic-humidifier', title: 'Synthetic Mist', scheduleId: 'synthetic_schedule',
@@ -46,7 +46,7 @@ function atom(kind: DeviceControlKind): RoomDeviceControl {
     binding: { sourceId: `source-${deviceControlModel(kind).slice(0, -2)}` },
     props: { control: kind, family: 'water', options, labels,
       ...(kind === 'fan-timer' ? { initialMinutes: 10 } : {}),
-      ...(kind === 'grill-detail' ? { detailEntityId: 'sensor.synthetic_probe' } : {}),
+      ...(kind === 'grill-detail' ? { detailEntityId: 'sensor.demo_probe' } : {}),
       ...(kind === 'humidifier-info' ? { info: 'humidity' } : {}),
       ...(kind === 'fan-room' ? { modalId: 'synthetic-fan-modal', fanRail: {
         order: ['power', 'lock'],
@@ -94,7 +94,7 @@ describe('room-device contract', () => {
     const wrong = document('humidifier-mode');
     const model = wrong.dataSources[0];
     if (model.kind !== 'model' || model.model !== 'humidifier@1') throw new Error('Expected humidifier');
-    model.inputs.modeEntityId = 'switch.synthetic_mode';
+    model.inputs.modeEntityId = 'switch.demo_mode';
     expect(issues(wrong)).toContainEqual({ code: 'invalid_combination', pointer: '/document/dataSources/0/inputs/modeEntityId' });
     const unknown = structuredClone(wrong);
     Reflect.set(unknown.dataSources[0], 'service', 'homeassistant.toggle');
@@ -118,7 +118,7 @@ describe('room-device contract', () => {
   it('rejects unconfigured grill targets, unsupported timer values and unimplemented schedule composition', () => {
     const grill = document('grill-detail'), node = grill.pages[0].components[0];
     if (node.type !== 'room-device-control') throw new Error('Expected atom');
-    node.props.detailEntityId = 'switch.not_in_descriptor';
+    node.props.detailEntityId = 'switch.demo_not_in_descriptor';
     expect(issues(grill)).toContainEqual({ code: 'invalid_reference', pointer: '/document/pages/0/components/0/props/detailEntityId' });
     const fan = document('fan-timer'), timer = fan.pages[0].components[0];
     if (timer.type !== 'room-device-control') throw new Error('Expected atom');
@@ -156,7 +156,7 @@ describe('structured device authoring', () => {
   it('exposes domain targets, ordered options, states, labels and relationship selectors without JSON editing', () => {
     const initial = document('fan-timer');
     let updated: CompositionDocument | undefined;
-    const components = compositionEditorSchema.definitions?.__schema0;
+    const components = nodeDefinition();
     expect(components).toBeDefined();
     const schema = fieldVariants(components!).find(field => field.properties?.type?.const === 'room-device-control')!;
     render(<CompositionFields schema={schema} value={initial.pages[0].components[0]} path={['pages', 0, 'components', 0]}

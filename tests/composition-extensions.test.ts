@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { importLegacyAliases, legacyAliases, legacyLinkPrefixes, updateRoute, words } from '../src/routes-editor';
 import { compositionDocumentSchema, type CompositionPublication } from '../src/shared/composition/schema';
 
 function document() {
@@ -12,10 +13,10 @@ function document() {
       title: 'Home', summary: 'Your house', icon: 'house.fill', tabId: document.navigation.tabs[0].id,
       anchors: [{ fragment: 'details', modalId: document.modals[0].id }],
     }],
-    cameras: [{ entityId: 'camera.demo', title: 'Entry', liveLabel: 'Live', unavailableLabel: 'Stream unavailable' }],
+    cameras: [{ entityId: 'camera.demo_unit', title: 'Entry', liveLabel: 'Live', unavailableLabel: 'Stream unavailable' }],
   };
   document.liveActivities = [{
-    id: 'appearance', jobId: 'fan.demo', type: 'activity-presentation@1', title: 'Authored Fan', glyph: 'fan', tint: 'air',
+    id: 'appearance', jobId: 'fan.demo_unit', type: 'activity-presentation@1', title: 'Authored Fan', glyph: 'fan', tint: 'air',
     source: 'activity-engine@1', privacy: 'system-sensitive@1', updates: 'engine@1', intents: 'engine-safe@1',
   }];
   return document;
@@ -76,5 +77,73 @@ describe('delivered extension contract', () => {
     }));
     expect(new TextEncoder().encode(JSON.stringify(value.extensions)).length).toBeGreaterThan(32_768);
     expect(() => compileCompositionDocument(value)).toThrow();
+  });
+});
+
+describe('routes as plain authored paths', () => {
+  const withRoutes = () => {
+    const value = document();
+    const base = value.extensions!.routes[0];
+    value.extensions!.routes = [
+      { ...base, path: 'home', aliases: ['overview'], keywords: ['house'], siri: true },
+      { ...base, id: 'climate', path: 'climate', aliases: ['thermostat'] },
+    ];
+    value.extensions!.linkPrefixes = ['my-dash'];
+    return value;
+  };
+  const issue = (value: ReturnType<typeof document>) => {
+    try { compileCompositionDocument(value); } catch (error) { return (error as { issues?: { code: string; pointer: string }[] }).issues?.[0]; }
+    return undefined;
+  };
+  it('derives route-links only when a route link field is used', () => {
+    expect(compileCompositionDocument(document()).capabilities).not.toContain('sh.route-links@1');
+    expect(compileCompositionDocument(withRoutes()).capabilities).toContain('sh.route-links@1');
+  });
+  it('refuses an alias that is another route path or repeats across routes', () => {
+    const asPath = withRoutes(); asPath.extensions!.routes[0].aliases = ['climate'];
+    expect(issue(asPath)?.code).toBe('duplicate_id');
+    const repeated = withRoutes(); repeated.extensions!.routes[1].aliases = ['overview'];
+    expect(issue(repeated)?.code).toBe('duplicate_id');
+  });
+  it('bounds and shapes aliases, keywords, siri and link prefixes', () => {
+    for (const mutate of [
+      (v: ReturnType<typeof document>) => { v.extensions!.routes[0].aliases = Array.from({ length: 9 }, (_, i) => `a${i}`); },
+      (v: ReturnType<typeof document>) => { v.extensions!.routes[0].aliases = ['Not A Path']; },
+      (v: ReturnType<typeof document>) => { v.extensions!.routes[0].keywords = Array.from({ length: 13 }, (_, i) => `k${i}`); },
+      (v: ReturnType<typeof document>) => { (v.extensions!.routes[0] as { siri: unknown }).siri = 'yes'; },
+      (v: ReturnType<typeof document>) => { v.extensions!.linkPrefixes = []; },
+    ]) {
+      const value = withRoutes(); mutate(value);
+      expect(() => compositionDocumentSchema.parse(value)).toThrow();
+    }
+  });
+  it('allows only viewer rules on a route', () => {
+    const value = withRoutes();
+    value.extensions!.routes[0].visibleWhen = { type: 'viewer', isAdmin: true };
+    expect(compileCompositionDocument(value).capabilities).toContain('sh.visible-when@1');
+    value.extensions!.routes[0].visibleWhen = { type: 'viewer-person', in: ['home'] } as never;
+    expect(issue(value)).toMatchObject({ code: 'invalid_combination' });
+  });
+  it('imports the legacy aliases once, skipping any another route already uses', () => {
+    const value = document();
+    const base = value.extensions!.routes[0];
+    value.extensions!.routes = [{ ...base, path: 'home' }, { ...base, id: 'settings', path: 'settings' }];
+    const first = importLegacyAliases(value.extensions!);
+    expect(first.extensions.routes[0].aliases).toEqual([...legacyAliases.home]);
+    expect(first.extensions.routes[1].aliases).toEqual([...legacyAliases.settings]);
+    expect(first.extensions.linkPrefixes).toEqual([...legacyLinkPrefixes]);
+    expect(first.skipped).toEqual([]);
+    expect(importLegacyAliases(first.extensions).added).toEqual([]);
+    expect(compileCompositionDocument({ ...value, extensions: first.extensions }).capabilities).toContain('sh.route-links@1');
+    const taken = { ...value.extensions!, routes: [{ ...base, path: 'home' }, { ...base, id: 'x', path: 'overview' }] };
+    expect(importLegacyAliases(taken).skipped).toEqual(['overview']);
+  });
+  it('edits words and drops emptied optional fields', () => {
+    expect(words(' a, b\n,a ,, c ')).toEqual(['a', 'b', 'c']);
+    const value = withRoutes();
+    const next = updateRoute(value.extensions!, 0, { aliases: [], siri: false });
+    expect(next.routes[0]).not.toHaveProperty('aliases');
+    expect(next.routes[0]).not.toHaveProperty('siri');
+    expect(next.routes[1]).toEqual(value.extensions!.routes[1]);
   });
 });
