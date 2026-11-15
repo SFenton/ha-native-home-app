@@ -156,12 +156,12 @@ and Typography (Dynamic Type), and Motion (the existing reduced-motion branch).
 The module-list, primary-button, segmented-choice and page-section-header atlas
 entries remain the design references; no device/visual certification is implied.
 
-## Separate workspace and durable storage
+## Workspace and durable storage
 
-The header's **Native composition** button opens a separate 2.0 authoring
-workspace. The 1.0 workspace and `/api/*` APIs remain available, including
-unsaved local edits when switching between workspaces. There is no automatic
-conversion or import of schema-1 documents.
+The Studio has one workspace, the 2.0 workspace. Files an earlier Studio left
+beside the composition namespace (`draft.json`, `published.json`, `revisions/`
+and `feedback/` from the retired schema-1 workspace) are never read, validated,
+migrated or removed, and a new data directory does not create them.
 
 `StudioStore` holds the existing exclusive `DATA_DIR` lock and opens a
 `native-v2/` namespace beneath that same directory:
@@ -410,7 +410,7 @@ This is **not** a pixel-perfect browser/native preview or full production parity
 The parent must deploy matching server and client artifacts together, configure
 the authenticated `/native` endpoint, extend typed native primitives for further
 curations, and perform native preparation/device comparison. The production
-server, live `dist/`, existing saved 1.0 data and `ENABLE_LIVE_ACTIONS` must not be
+server, live `dist/` and existing saved data must not be
 changed by validation.
 
 ## Contract with the app
@@ -449,7 +449,34 @@ Rules the corpus pins down:
 - **`collection.props.pullToRefresh`** is an optional boolean, off unless true, and adds no capability beyond `sh.collection@1`.
 - **Home nodes** (status chip, room tile, weather panel, climate control) accept `present` actions with `ifPresented: "reject"` only.
 
-The schema-1 workspace is a design-only preview: it publishes to no reader, and its publish endpoints were retired.
+## Additional capability notes
+
+Schema-2 configured remotes accept the native `speakerdevice` argument as an
+array of at most 16 entity IDs. Its use, including in a conditional command,
+requires `sh.remote-speaker-targets@1`. Existing `sonosdevice` calls retain their
+original capability requirements; unknown argument fields are still rejected.
+The read-only `wake-summary` bedroom atom exposes canonical modal status copy,
+typography and alerts through `sh.wake-summary@1`; it requires a wake-light provider.
+`wake-hold.showsExplanation` opts into the integration-aware hold footnote through
+`sh.wake-hold-explanation@1`. Text supports secondary-ink Dynamic Type subheadline
+and footnote styles through `sh.supporting-text-styles@1`; original styles remain unchanged.
+`section-title` text uses the native sheet's bold title3 font and accessibility
+heading trait through `sh.section-title@1`, without changing existing page headers.
+`wake-stop.episode` adds the canonical active-episode card through `sh.wake-episode@1`,
+with editable heading, detail and pending label. Omission keeps the original button.
+Alarm name/type fields expose optional `showsHeading` through
+`sh.bedroom-field-headings@1`; weekday choices can pair abbreviated visible labels
+with `accessibilityLabel` through `sh.weekday-accessibility-labels@1`.
+Surface `titleSourceId` (`sh.surface-title-source@1`) must name an alarm draft
+used on that surface. The native title stays tied to the opened alarm until reload.
+`alarm-feedback` offers shared native `error` and `problems` slots through
+`sh.alarm-feedback@1`; place the error slot at the top level to avoid repeating
+provider feedback under individual fields. Draft state controls Reload, Delete,
+creation-only bed targets and guarded Back without authoring a second save flow.
+Wake `alarm-delete` questions offer `messageFormat: "wake-alarm"` through
+`sh.wake-alarm-confirmation@1`. Edit the message normally, using `{time}` and
+`{schedule}` for the opened alarm's details. Other placeholders, malformed braces
+and non-wake draft sources are rejected. Omit the format for literal copy.
 
 ## Configured live adapters
 
