@@ -11,12 +11,11 @@ export default function RoutesEditor({ document, onChange }: { document: Composi
   const [note, setNote] = useState('');
   const extensions = document.extensions;
   if (!extensions) {
-    return <button onClick={() => onChange({ ...document, extensions: { type: 'native-extensions@1', watch: 'stub@1', routes: [], cameras: [] } })}>Add native extension delivery</button>;
+    return <button onClick={() => onChange({ ...document, extensions: { type: 'native-extensions@1', watch: 'stub@1', routes: [], cameras: [] } })}>Add extensions</button>;
   }
   const apply = (next: typeof extensions) => onChange({ ...document, extensions: next });
   return <>
-    <p>Each route is a plain path. Push links, Live Activity links, Spotlight, Siri and Shortcuts open any path listed here or any of its aliases.
-      A route marked for Siri may be suggested; every route can still be named in a phrase.</p>
+    <p>A path that opens a page from a notification, Siri, Spotlight or a Live Activity link.</p>
     <button onClick={() => {
       const result = importLegacyAliases(extensions);
       apply(result.extensions);

@@ -45,21 +45,21 @@ export default function HomeAssistantPublication({ published, busy, onChange }: 
   };
   const disabled = busy || loading;
   return <section aria-label="Home Assistant publication">
-    <p>The native app follows the publication stored in Home Assistant. <strong>Publish to Home Assistant</strong> uploads the images Home Assistant does not hold yet, then publishes this composition as the next revision. The app picks it up live.</p>
+    <p>The app follows what is published here. <strong>Publish</strong> uploads new images, then saves this draft as the next revision. The app updates live.</p>
     {published && <p>Last published from this session: revision {published.revision}
       {published.uploadedAssets !== undefined && ` (${published.uploadedAssets} image${published.uploadedAssets === 1 ? '' : 's'} uploaded, ${published.skippedAssets ?? 0} already stored)`}.</p>}
     {error && <div role="alert" className="inline-error">{error}</div>}
     <div className="composition-actions"><button disabled={disabled} onClick={() => void refresh()}>{loading ? 'Loading...' : 'Refresh history'}</button></div>
     {summary && (summary.current ? <table className="composition-history">
-      <caption>Published revisions (newest first, up to six kept by Home Assistant)</caption>
+      <caption>History (last 6)</caption>
       <thead><tr><th scope="col">Revision</th><th scope="col">Published</th><th scope="col">Publisher</th><th scope="col"><span className="sr-only">Action</span></th></tr></thead>
       <tbody>
         <Row entry={summary.current} current disabled={disabled}/>
         {summary.history.map(entry => <Row key={entry.revision} entry={entry} disabled={disabled} onRollback={() => setTarget(entry)}/>)}
       </tbody>
-    </table> : <p>Nothing has been published to Home Assistant yet.</p>)}
+    </table> : <p>Nothing published yet.</p>)}
     {target && <Dialog title={`Roll back to revision ${target.revision}?`} onClose={() => setTarget(undefined)}>
-      <p>Home Assistant will serve the content of revision {target.revision} again, as a new revision. Apps follow the change immediately. Your draft is not changed.</p>
+      <p>Publishes revision {target.revision} again as a new revision. Apps update at once. Your draft is unchanged.</p>
       <div className="dialog-actions"><button onClick={() => setTarget(undefined)}>Keep current</button><button className="primary" onClick={() => void rollback(target)}>Roll back</button></div>
     </Dialog>}
   </section>;

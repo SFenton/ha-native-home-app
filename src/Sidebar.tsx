@@ -138,9 +138,9 @@ export function ComponentLibrary({ selection, onAdd, onAddInside, searchRef }: C
       if (typeof searchRef === 'function') searchRef(element);
       else if (searchRef) searchRef.current = element;
     }} aria-label="Search components" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a component..."/></div>
-    <p className="library-hint">{selection ? 'Tap to insert after selection. Use Actions to nest in a selected group.' : 'Tap to add. Drag a handle to choose a position.'}</p>
+    <p className="library-hint">{selection ? 'Tap to add after the selection.' : 'Tap to add, or drag to place.'}</p>
     <div className="component-library-categories">{[...new Set(palette.map(entry => entry.category))].map(category => <div className="component-library-category" key={category}><div className="section-label">{category}</div>{palette.filter(entry => entry.category === category).map(entry => <PaletteItem key={entry.type} {...entry} dragPrefix={`palette:${dragPrefix}`} openMenu={openMenu} onAdd={() => onAdd(entry.type)}/>)}</div>)}</div>
-    {!palette.length && <EmptyState icon="search" title="No components found">Try a shorter search or another component name.</EmptyState>}
+    {!palette.length && <EmptyState icon="search" title="No matches"/>}
     {menu && selectedType && <ContextMenu menu={menu} title={componentCatalog.find(entry => entry.type === selectedType)?.label ?? 'Component'} actions={paletteActions(selectedType, selection, onAdd, onAddInside)} onClose={() => setMenu(undefined)} fallbackFocus={() => localSearch.current?.focus()}/>}
   </div>;
 }
@@ -212,7 +212,7 @@ function TabDialog({ document, commit, onClose, onTarget, error }: { document: S
   }}>
     <TextField label="Tab label" value={label} onChange={setLabel} maxLength={240}/>
     <Field label="Tab root page"><select value={root} onChange={event => setRoot(event.target.value)}><option value="">Create a new page</option>{document.pages.map(page => <option value={page.id} key={page.id}>{page.title}</option>)}</select></Field>
-    <p className="dialog-description">A tab opens its root page. Links from that page define its child pages; no content is copied.</p>
+    <p className="dialog-description">The tab opens this page.</p>
     {error}<div className="dialog-actions"><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={!label.trim() || document.navigation.tabs.length >= 8}>Add tab</button></div>
   </form></Dialog>;
 }
@@ -232,7 +232,7 @@ function MoveDialog({ document, target, id, commit, onClose, onMoved, error }: {
     event.preventDefault();
     if (destination && commit(draft => relocateComponent(draft, target, id, destination, placement))) { onMoved(destination); onClose(); }
   }}>
-    <p className="dialog-description">Move this component and its children. Choose an exact position or nest it in a group. Undo restores the previous location.</p>
+    <p className="dialog-description">Choose where it goes. Undo reverses the move.</p>
     <Field label="Destination surface"><select value={destinationKey} onChange={event => { setDestinationKey(event.target.value); setPlacement({ kind: 'end' }); }}>{choices.map(choice => <option value={targetKey(choice.target)} key={targetKey(choice.target)}>{choice.label}</option>)}</select></Field>
     <PlacementFields components={destination ? getComponents(document, destination) : []} placement={placement} onChange={setPlacement} excluded={excluded}/>
     {error}<div className="dialog-actions"><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={!destination || !component}>Move component</button></div>
@@ -251,16 +251,16 @@ function LinksDialog({ document, pageId, commit, onClose, error }: { document: S
   const source = document.pages.find(item => item.id === sourceId);
   const moving = reference?.kind === 'component' ? findComponent(getComponents(document, reference.source), reference.id) : undefined;
   const excluded = moving ? [moving.id, ...flattenComponents(moving.children ?? []).map(item => item.id)] : [];
-  return <Dialog title={`${confirmUnlink ? 'Remove link to' : 'Links & placement for'} ${page?.title ?? 'page'}`} onClose={onClose}>
+  return <Dialog title={`${confirmUnlink ? 'Remove link to' : 'Links to'} ${page?.title ?? 'page'}`} onClose={onClose}>
     {confirmUnlink ? <>
-      <p className="dialog-description">Clear only the selected navigation action. Keep its component or toolbar item, this page, and every other link. Undo restores the action.</p>
+      <p className="dialog-description">Removes this link only. The component and the page stay.</p>
       {error}<div className="dialog-actions"><button onClick={() => setConfirmUnlink(false)}>Cancel</button><button className="danger-button" disabled={!reference} onClick={() => { if (reference && commit(draft => unlinkPage(draft, pageId, reference))) { setChosen('new'); setConfirmUnlink(false); } }}>Remove link</button></div>
     </> : <form onSubmit={event => {
       event.preventDefault();
       if (stale) return;
       if (commit(draft => reference ? movePageLink(draft, pageId, reference, sourceId, placement) : addPageLink(draft, pageId, sourceId, placement))) onClose();
     }}>
-      <p className="dialog-description">Pages are connected by editable actions, not folders. Add a link, or move one existing link to a page in the destination tab. Other links remain unchanged, so shared pages may still belong to multiple tabs.</p>
+      <p className="dialog-description">Pages are reached by links. Add one or move an existing link. Other links stay.</p>
       <Field label="Navigation link"><select value={chosen} onChange={event => { setChosen(event.target.value); setPlacement({ kind: 'end' }); }}>
         <option value="new">Add a new navigation tile</option>
         {stale && <option value={chosen}>Link no longer available</option>}
@@ -336,14 +336,14 @@ export default function Sidebar(props: SidebarProps) {
   const requestDelete = (subject: Subject) => {
     const title = titleOf(subject);
     openDialog({ kind: 'delete', subject, title, description: subject.kind === 'tab'
-      ? 'Remove this tab only. Its root page, child pages, and configured links stay in the document. Their navigation ownership will be recalculated. Undo restores the tab.'
-      : 'Delete this surface and its components. Links to it will be cleared, and tabs rooted on it will be removed. Child pages are kept. Undo restores the previous structure.' });
+      ? 'Removes the tab. Its pages stay. Undo restores it.'
+      : 'Deletes the page and its components, clears links to it and removes tabs that open it. Undo restores it.' });
   };
   const actionsFor = (subject: Subject): MenuAction[] => {
     const rename: MenuAction = { label: 'Rename...', run: () => openDialog({ kind: 'rename', subject, title: titleOf(subject), value: titleOf(subject) }) };
     if (subject.kind === 'project') return [
       { label: 'Add tab...', run: () => openDialog({ kind: 'tab' }) },
-      { label: 'Add unassigned page', run: () => addPage() },
+      { label: 'Add page (no link)', run: () => addPage() },
     ];
     if (subject.kind === 'tab') {
       const current = document.navigation.tabs.find(item => item.id === subject.id);
@@ -360,10 +360,10 @@ export default function Sidebar(props: SidebarProps) {
     if (subject.kind === 'surface') {
       const current = subject.target;
       return [
-        { label: 'Edit surface', run: () => { selectSurface(current); props.onSelect(undefined); } }, rename,
+        { label: 'Edit page', run: () => { selectSurface(current); props.onSelect(undefined); } }, rename,
         ...(current.kind === 'page' ? [
           { label: 'Add child page', run: () => addPage(current.id) },
-          { label: 'Links & placement...', run: () => openDialog({ kind: 'links', pageId: current.id }) },
+          { label: 'Links…', run: () => openDialog({ kind: 'links', pageId: current.id }) },
           { label: 'Make initial page', disabled: document.navigation.initialPageId === current.id, run: () => commit(draft => { draft.navigation.initialPageId = current.id; }) },
         ] : []),
         { label: `Delete ${current.kind === 'activity' ? 'activity' : current.kind}...`, disabled: current.kind === 'page' && document.pages.length <= 1, destructive: true, run: () => requestDelete(subject) },
@@ -422,7 +422,7 @@ export default function Sidebar(props: SidebarProps) {
     })) props.onSelect(item.id);
   } : undefined;
   return <aside ref={sidebarRef} className="sidebar" aria-label="Project navigation and component library">
-    <div className="sidebar-top"><div className="sidebar-project"><span className="project-avatar"><Icon name="home" size={18}/></span><div><strong>{document.name}</strong><small>Personal workspace</small></div><span className="project-dot"/></div>
+    <div className="sidebar-top"><div className="sidebar-project"><span className="project-avatar"><Icon name="home" size={18}/></span><div><strong>{document.name}</strong></div><span className="project-dot"/></div>
       <div className="sidebar-tabs" role="tablist" aria-label="Sidebar" onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
@@ -439,7 +439,7 @@ export default function Sidebar(props: SidebarProps) {
         <section aria-label="Pages and tabs" {...contextHandlers(openMenu, { kind: 'project' })}>
           <div className="sidebar-section-heading"><span>PAGES & TABS</span><IconButton label="Page organization actions" aria-haspopup="menu" onClick={event => openMenu(event, { kind: 'project' })}><Ellipsis size={14}/></IconButton></div>
           <div className="sidebar-create-actions"><button aria-label="Create page" disabled={document.pages.length >= 50} title={target.kind === 'page' ? `Add a child page linked from ${surfaceName(document, target)}` : 'Add an unassigned page'} onClick={() => addPage(target.kind === 'page' ? target.id : undefined)}><Plus size={13}/> Add page</button><button disabled={document.navigation.tabs.length >= 8} onClick={() => openDialog({ kind: 'tab' })}><Plus size={13}/> Add tab</button></div>
-          <p className="sidebar-help">Tabs open root pages. Children follow the first configured route, not folders. Use an item's actions to move or reorder its links.</p>
+          <p className="sidebar-help">Pages link to each other; they are not folders.</p>
           {document.navigation.tabs.map(navTab => {
             const isCollapsed = collapsed.has(navTab.id);
             const root = document.pages.find(page => page.id === navTab.pageId);
@@ -463,24 +463,24 @@ export default function Sidebar(props: SidebarProps) {
               </div>
               {!isCollapsed && <div className="sidebar-tab-pages">{root && surfaceRow(root, { kind: 'page', id: root.id }, 'Tab root')}
                 {children.map(({ page, via, depth }) => surfaceRow(page, { kind: 'page', id: page.id }, `Linked from ${via}`, depth))}
-                {!children.length && <p className="sidebar-help">Use + to add a linked page.</p>}
+                
               </div>}
             </section>;
           })}
           {document.pages.some(page => (owners.get(page.id)?.length ?? 0) > 1 && !document.navigation.tabs.some(tab => tab.pageId === page.id)) && <><div className="sidebar-section-heading"><span>SHARED PAGES</span></div>{document.pages.filter(page => (owners.get(page.id)?.length ?? 0) > 1 && !document.navigation.tabs.some(tab => tab.pageId === page.id)).map(page => surfaceRow(page, { kind: 'page', id: page.id }, `Linked from ${document.navigation.tabs.filter(tab => owners.get(page.id)?.includes(tab.id)).map(tab => tab.label).join(', ')}`))}</>}
-          {document.pages.some(page => !owners.get(page.id)?.length) && <><div className="sidebar-section-heading"><span>UNASSIGNED PAGES</span></div><p className="sidebar-help">No tab route reaches these pages. Use Links & placement to connect them.</p>{document.pages.filter(page => !owners.get(page.id)?.length).map(page => surfaceRow(page, { kind: 'page', id: page.id }))}</>}
+          {document.pages.some(page => !owners.get(page.id)?.length) && <><div className="sidebar-section-heading"><span>NOT LINKED</span></div><p className="sidebar-help">No tab reaches these pages. Add a link to use them.</p>{document.pages.filter(page => !owners.get(page.id)?.length).map(page => surfaceRow(page, { kind: 'page', id: page.id }))}</>}
         </section>
         <div className="sidebar-section-heading"><span>MODALS</span><IconButton label="Create modal" onClick={() => onNewSurface('modal')}><Plus size={14}/></IconButton></div>
         {document.modals.map(modal => surfaceRow(modal, { kind: 'modal', id: modal.id }))}
-        {!document.modals.length && <p className="inline-empty">No modals yet. Add a sheet or focused dialog.</p>}
+        {!document.modals.length && <p className="inline-empty">No modals.</p>}
         <div className="sidebar-section-heading"><span>LIVE ACTIVITIES</span><IconButton label="Create Live Activity" onClick={() => onNewSurface('activity')}><Plus size={14}/></IconButton></div>
         {document.liveActivities.map(activity => surfaceRow(activity, { kind: 'activity', id: activity.id, variant: 'lockScreen' }))}
         {target.kind === 'activity' && view === 'design' && <div className="variant-list">{variants.map(variant => <button key={variant} className={target.variant === variant ? 'active' : ''} onClick={() => onTarget({ ...target, variant })}>{variantLabels[variant]}</button>)}</div>}
-        {view === 'design' && <><div className="sidebar-divider"/><div className="sidebar-section-heading"><span><ListTree size={13}/> LAYERS</span><IconButton label="Add component" onClick={() => setTab('library')}><Plus size={14}/></IconButton></div><button className={`page-root ${selection ? '' : 'selected'}`} {...contextHandlers(openMenu, { kind: 'surface', target })} onClick={() => props.onSelect(undefined)}><Layers size={13}/> {target.kind === 'activity' ? variantLabels[target.variant] : 'Page & header'}<Settings2 size={12}/></button><Tree components={components} selection={selection} onSelect={props.onSelect} onMove={props.onMove} onDelete={props.onDelete} openMenu={openMenu} target={target} onPlace={id => openDialog({ kind: 'move', target, id })}/>{!components.length && <EmptyState title="A fresh canvas">Add components from the library to start building.</EmptyState>}<button className="outline-add" onClick={() => setTab('library')}><Plus size={14}/> Add component</button><button className="delete-surface" disabled={target.kind === 'page' && document.pages.length <= 1} onClick={props.onDeleteSurface}><Trash2 size={12}/> Delete {target.kind === 'activity' ? 'activity' : target.kind}</button></>}
+        {view === 'design' && <><div className="sidebar-divider"/><div className="sidebar-section-heading"><span><ListTree size={13}/> LAYERS</span><IconButton label="Add component" onClick={() => setTab('library')}><Plus size={14}/></IconButton></div><button className={`page-root ${selection ? '' : 'selected'}`} {...contextHandlers(openMenu, { kind: 'surface', target })} onClick={() => props.onSelect(undefined)}><Layers size={13}/> {target.kind === 'activity' ? variantLabels[target.variant] : 'Page'}<Settings2 size={12}/></button><Tree components={components} selection={selection} onSelect={props.onSelect} onMove={props.onMove} onDelete={props.onDelete} openMenu={openMenu} target={target} onPlace={id => openDialog({ kind: 'move', target, id })}/>{!components.length && <EmptyState title="No components yet."/>}<button className="outline-add" onClick={() => setTab('library')}><Plus size={14}/> Add component</button><button className="delete-surface" disabled={target.kind === 'page' && document.pages.length <= 1} onClick={props.onDeleteSurface}><Trash2 size={12}/> Delete {target.kind === 'activity' ? 'activity' : target.kind}</button></>}
       </div>
       {!dialog && errorNotice}
     </div>
-    <nav className="sidebar-footer" aria-label="Project tools"><button className={view === 'navigation' ? 'active' : ''} onClick={() => onView('navigation')}><ListTree size={16}/> Navigation & theme<ChevronRight size={13}/></button><button className={view === 'data' ? 'active' : ''} onClick={() => onView('data')}><Database size={16}/> Data sources<span>{document.dataSources.length}</span></button><button className={view === 'variables' ? 'active' : ''} onClick={() => onView('variables')}><SlidersHorizontal size={16}/> Variables & conditions<span>{Object.keys(document.variables).length}</span></button><div className="workspace-note"><span className="status-dot enabled"/> Safe preview workspace <span>v1.0</span></div></nav>
+    <nav className="sidebar-footer" aria-label="Project tools"><button className={view === 'navigation' ? 'active' : ''} onClick={() => onView('navigation')}><ListTree size={16}/> Navigation & theme<ChevronRight size={13}/></button><button className={view === 'data' ? 'active' : ''} onClick={() => onView('data')}><Database size={16}/> Data sources<span>{document.dataSources.length}</span></button><button className={view === 'variables' ? 'active' : ''} onClick={() => onView('variables')}><SlidersHorizontal size={16}/> Variables & conditions<span>{Object.keys(document.variables).length}</span></button></nav>
     {menu && <ContextMenu menu={menu} title={titleOf(menu.subject)} actions={actionsFor(menu.subject)} onClose={() => setMenu(undefined)} fallbackFocus={() => projectButton.current?.focus()}/>}
     {dialog?.kind === 'tab' && <TabDialog document={document} commit={commit} onClose={closeDialog} onTarget={selectSurface} error={errorNotice}/>}
     {dialog?.kind === 'move' && <MoveDialog document={document} target={dialog.target} id={dialog.id} commit={commit} onClose={closeDialog} onMoved={next => { selectSurface(next); props.onSelect(dialog.id); }} error={errorNotice}/>}
@@ -501,6 +501,6 @@ export default function Sidebar(props: SidebarProps) {
     {dialog?.kind === 'delete' && <Dialog title={`${dialog.subject.kind === 'tab' ? 'Remove tab' : 'Delete'} ${dialog.title}?`} onClose={closeDialog}><p className="dialog-description">{dialog.description}</p>{errorNotice}<div className="dialog-actions"><button onClick={closeDialog}>Cancel</button><button className="danger-button" disabled={dialog.subject.kind === 'surface' && dialog.subject.target.kind === 'page' && document.pages.length <= 1} onClick={() => {
       const subject = dialog.subject;
       if (commit(draft => { if (subject.kind === 'tab') removeTab(draft, subject.id); else if (subject.kind === 'surface') deleteSurface(draft, subject.target); })) closeDialog();
-    }}>{dialog.subject.kind === 'tab' ? 'Remove tab' : 'Delete surface'}</button></div></Dialog>}
+    }}>{dialog.subject.kind === 'tab' ? 'Remove tab' : 'Delete'}</button></div></Dialog>}
   </aside>;
 }

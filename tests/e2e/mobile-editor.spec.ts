@@ -252,7 +252,7 @@ for (const viewport of mobileViewports) {
       '3D', 'View controls', 'Fit', 'Zoom out', 'Reset preview zoom to 100 percent', 'Zoom in',
       'Closed', 'Partial', 'Open', 'Reset view',
     ]) await reachable(page, page.getByRole('button', { name, exact: true }));
-    for (const name of ['Save', 'Undo (Ctrl+Z)', 'Redo (Ctrl+Shift+Z)']) {
+    for (const name of ['Save', 'Undo', 'Redo']) {
       await reachable(page, page.getByRole('button', { name, exact: true }));
     }
     await noDocumentOverflow(page);
@@ -374,11 +374,11 @@ test('M3 touch quick Insert coexists with canvas; tap insertion, selection, and 
   await added.tap();
   await expect(added).toHaveClass(/is-selected/);
   await screenshot(page, testInfo, 'compact-tap-insertion');
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).tap();
+  await page.getByRole('button', { name: 'Undo', exact: true }).tap();
   await expect(canvas(page).getByRole('button', { name: 'Select Text', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).tap();
+  await page.getByRole('button', { name: 'Undo', exact: true }).tap();
   await expect(canvas(page).locator('[data-component-id]')).toHaveCount(8);
-  await page.getByRole('button', { name: 'Redo (Ctrl+Shift+Z)', exact: true }).tap();
+  await page.getByRole('button', { name: 'Redo', exact: true }).tap();
   await expect(canvas(page).locator('[data-component-id]')).toHaveCount(9);
   expect((await draft(request)).document).toEqual(mobileEditorDocument());
 });
@@ -398,7 +398,7 @@ test('M3 touch delayed canvas drag nests with a cue, handle drag places after, a
     await screenshot(page, testInfo, 'touch-nested-drop-cue');
     await touch(session, 'touchEnd');
     await expect(node(page, 'mobile-group').locator('[data-component-id="mobile-first"]')).toBeVisible();
-    await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).tap();
+    await page.getByRole('button', { name: 'Undo', exact: true }).tap();
     await expect(node(page, 'mobile-group').locator('[data-component-id="mobile-first"]')).toHaveCount(0);
 
     from = await holdDrag(page, session, node(page, 'mobile-first').getByRole('button', { name: 'Drag First item on canvas', exact: true }));
@@ -679,7 +679,7 @@ test('M3 compact Save and stale conflicts preserve local work across pane switch
 test('M4 compact pane focus, hidden accessibility, Escape restoration, keyboard and 44px editor alternatives', async ({ page }, testInfo) => {
   await page.goto('/');
   const targets = [];
-  for (const name of ['Project', 'Preview', 'Inspect', 'Insert', 'Save', 'Undo (Ctrl+Z)', 'Redo (Ctrl+Shift+Z)']) {
+  for (const name of ['Project', 'Preview', 'Inspect', 'Insert', 'Save', 'Undo', 'Redo']) {
     const control = page.getByRole('button', { name, exact: true });
     await reachable(page, control);
     const box = await control.boundingBox();
@@ -948,7 +948,7 @@ test('M3 compact import rejects invalid content, accepts synthetic data, and und
   await dialog.getByRole('button', { name: 'Validate & import', exact: true }).tap();
   await expect(dialog).toHaveCount(0);
   expect(await editorDocument(page)).toEqual(imported);
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).tap();
+  await page.getByRole('button', { name: 'Undo', exact: true }).tap();
   expect(await editorDocument(page)).toEqual(before);
   expect((await draft(request)).document).toEqual(before);
 });

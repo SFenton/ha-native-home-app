@@ -80,7 +80,7 @@ export function SelectField({ label, value, options, onChange }: { label: string
 }
 export function IconField({ value, onChange, label = 'Icon' }: { value?: string; onChange: (value: string) => void; label?: string }) {
   const listId = useId();
-  return <Field label={label} hint={value && !hasIcon(value) ? 'No matching icon. Choose a supported icon; the preview uses a question mark.' : undefined}><div className="icon-field"><Icon name={value}/><input aria-label={label} list={listId} value={value ?? ''} onChange={event => onChange(event.target.value)}/></div><datalist id={listId}>{iconNames.map(name => <option key={name} value={name}/>)}</datalist></Field>;
+  return <Field label={label} hint={value && !hasIcon(value) ? 'No such icon. The preview shows ?.' : undefined}><div className="icon-field"><Icon name={value}/><input aria-label={label} list={listId} value={value ?? ''} onChange={event => onChange(event.target.value)}/></div><datalist id={listId}>{iconNames.map(name => <option key={name} value={name}/>)}</datalist></Field>;
 }
 export function JsonField({ label, value, onChange, primitive = false, shape }: { label: string; value: Json; onChange: (value: Json) => void; primitive?: boolean; shape?: 'object' | 'primitive-record' }) {
   const hintId = useId();
@@ -103,8 +103,8 @@ export function JsonField({ label, value, onChange, primitive = false, shape }: 
 export function PrimitiveField({ label, value, onChange }: { label: string; value: Primitive; onChange: (value: Primitive) => void }) {
   return <JsonField label={label} value={value} primitive onChange={value => onChange(value as Primitive)}/>;
 }
-export function EmptyState({ icon = 'layers', title, children }: { icon?: string; title: string; children: ReactNode }) {
-  return <div className="empty-state"><span><Icon name={icon} size={25}/></span><strong>{title}</strong><p>{children}</p></div>;
+export function EmptyState({ icon = 'layers', title, children }: { icon?: string; title: string; children?: ReactNode }) {
+  return <div className="empty-state"><span><Icon name={icon} size={25}/></span><strong>{title}</strong>{children && <p>{children}</p>}</div>;
 }
 export function Dialog({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   const titleId = useId();
@@ -135,5 +135,5 @@ export function Dialog({ title, children, onClose, wide = false }: { title: stri
     if (event.target !== event.currentTarget) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
-  }}><div className="dialog-heading"><div><span className="eyebrow">NATIVE HOME STUDIO</span><h2 ref={heading} tabIndex={-1} id={titleId}>{title}</h2></div><IconButton label="Close dialog" onClick={onClose}><X size={18}/></IconButton></div><div className="dialog-content">{children}</div></dialog>;
+  }}><div className="dialog-heading"><div><h2 ref={heading} tabIndex={-1} id={titleId}>{title}</h2></div><IconButton label="Close dialog" onClick={onClose}><X size={18}/></IconButton></div><div className="dialog-content">{children}</div></dialog>;
 }

@@ -71,7 +71,7 @@ export default function CompositionFields(props: Props) {
     if (!properties.length && typeof schema.additionalProperties === 'object') {
       return <DictionaryFields {...props} schema={schema} itemSchema={schema.additionalProperties} value={value}/>;
     }
-    if (!properties.length) return <p className="field-note">{label}: no configurable fields in this native capability.</p>;
+    if (!properties.length) return null;
     const editable = properties.filter(([, child]) => child.const === undefined);
     const fixed = properties.filter(([, child]) => child.const !== undefined);
     return <fieldset className="composition-fieldset"><legend>{label}</legend>
@@ -87,8 +87,6 @@ export default function CompositionFields(props: Props) {
           {(required || present) && <CompositionFields {...props} schema={child} label={nameOf(name)} value={value[name] ?? null} path={[...path, name]}/>}
         </div>;
       })}
-      {fixed.length > 0 && <details><summary>Native policies (fixed)</summary>{fixed.map(([name, child]) =>
-        <CompositionFields {...props} key={name} schema={child} label={nameOf(name)} value={value[name] ?? null} path={[...path, name]}/>)}</details>}
     </fieldset>;
   }
 
@@ -111,13 +109,13 @@ export default function CompositionFields(props: Props) {
       })}
       {!tuple && maximum > 0 && <button type="button" className="add-button" disabled={value.length >= maximum}
         onClick={() => set([...value, defaultField(itemSchema, document)])}>Add {label.toLowerCase()} item</button>}
-      {maximum === 0 && <p className="field-note">Not supported by the current native contract.</p>}
+      {maximum === 0 && <p className="field-note">Not supported.</p>}
     </fieldset>;
   }
   if (schema.type === 'boolean') return <label className="checkbox-field"><input type="checkbox" checked={Boolean(value)} onChange={event => set(event.target.checked)}/>{label}</label>;
   if (schema.type === 'number' || schema.type === 'integer') return <NumberField label={label} value={Number(value)} min={schema.minimum ?? 0} max={schema.maximum ?? Number.MAX_SAFE_INTEGER} step={schema.type === 'integer' ? 1 : 0.01} onChange={set}/>;
   if (schema.type === 'null') return <p className="field-note">{label}: none</p>;
-  if (key === 'id' || key === 'schemaVersion') return <TextField label={label} value={String(value)} readOnly onChange={() => {}} title="Stable IDs are read-only; edit labels and destinations instead."/>;
+  if (key === 'id' || key === 'schemaVersion') return <TextField label={label} value={String(value)} readOnly onChange={() => {}} title="IDs cannot be changed."/>;
   if (schema.maxLength && schema.maxLength > 1000) return <Field label={label}><textarea value={String(value ?? '')} maxLength={schema.maxLength} onChange={event => set(event.target.value)}/></Field>;
   return <TextField label={label} value={String(value ?? '')} maxLength={schema.maxLength} onChange={set}/>;
 }

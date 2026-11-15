@@ -301,7 +301,7 @@ describe('separate authenticated native composition pipeline', () => {
   });
 });
 
-describe('Publish to Home Assistant', () => {
+describe('Publish', () => {
   const haToken = 'synthetic-ha-token-that-must-never-leave-the-server';
   async function home(options: Partial<FakeHaOptions> = {}) {
     const fake = await fakeHomeAssistant({ token: haToken, ...options });

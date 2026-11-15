@@ -76,7 +76,7 @@ describe('sidebar navigation and contextual editing', () => {
     expect(within(screen.getByRole('region', { name: 'Home tab' })).getByText('Child')).toBeTruthy();
     expect(screen.getByText('SHARED PAGES')).toBeTruthy();
     expect(screen.getByText('Linked from Home, Settings')).toBeTruthy();
-    expect(screen.getByText('UNASSIGNED PAGES')).toBeTruthy();
+    expect(screen.getByText('NOT LINKED')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add page to Settings tab' }));
     const document = currentDocument();
     const created = document.pages.at(-1)!;
@@ -122,7 +122,7 @@ describe('sidebar navigation and contextual editing', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete page...' }));
     expect(currentDocument().pages).toHaveLength(5);
     expect(screen.getByRole('dialog', { name: 'Delete Settings?' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete surface' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(currentDocument().pages.some(page => page.id === 'home')).toBe(true);
     expect(currentDocument().pages.some(page => page.id === 'settings')).toBe(false);
     expect(currentDocument().navigation.tabs.map(tab => tab.id)).toEqual(['tab-home']);
@@ -135,7 +135,7 @@ describe('sidebar navigation and contextual editing', () => {
     const button = pageButton('Settings');
     button.focus();
     fireEvent.keyDown(button, { key: 'F10', shiftKey: true });
-    const first = screen.getByRole('menuitem', { name: 'Edit surface' });
+    const first = screen.getByRole('menuitem', { name: 'Edit page' });
     expect(globalThis.document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: 'ArrowDown' });
     expect(globalThis.document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename...' }));
@@ -217,7 +217,7 @@ describe('sidebar navigation and contextual editing', () => {
   it('moves a child-page link to another tab using the page menu without replacing other content', () => {
     render(<Harness/>);
     fireEvent.contextMenu(pageButton('Child'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Links & placement...' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Links…' }));
     const links = screen.getByLabelText<HTMLSelectElement>('Navigation link');
     fireEvent.change(links, { target: { value: links.options[1].value } });
     fireEvent.change(screen.getByLabelText('Link from page'), { target: { value: 'settings' } });
@@ -238,7 +238,7 @@ describe('sidebar navigation and contextual editing', () => {
     const order = () => [...screen.getByRole('region', { name: 'Home tab' }).querySelectorAll('.page-row')].map(button => button.textContent);
     expect(order()).toEqual(['HomeStart', 'Sibling', 'Child']);
     fireEvent.contextMenu(pageButton('Child'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Links & placement...' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Links…' }));
     const links = screen.getByLabelText<HTMLSelectElement>('Navigation link');
     fireEvent.change(links, { target: { value: links.options[1].value } });
     fireEvent.change(screen.getByLabelText('Insertion position'), { target: { value: 'start' } });

@@ -188,7 +188,7 @@ export default function MobileWorkspace({ ref, project, preview, inspector, pane
       <div id={`${id}-preview`} ref={element => { regions.current.preview = element; }} className="mobile-pane mobile-pane-preview" data-editor-pane="preview" role="region" aria-label="Preview pane" tabIndex={-1} hidden={!visible.preview} inert={!visible.preview} onFocusCapture={event => { if (event.target instanceof HTMLElement && event.target !== event.currentTarget) lastFocus.current.preview = event.target; }}>
         <div className="mobile-preview-content">{preview}</div>
         <div ref={tray} id={`${id}-insert`} className="mobile-insert-tray" role="region" aria-label="Quick insert components" tabIndex={-1} hidden={!trayVisible} inert={!trayVisible} onFocusCapture={() => { focusInTray.current = true; }} onBlurCapture={event => { if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) focusInTray.current = false; }}>
-          <div className="mobile-insert-heading"><strong>Insert components</strong><span>Tap to add, or drag a handle onto the preview.</span><IconButton label="Close insert tray" disabled={dragging} onClick={closeInsert}><X size={18}/></IconButton></div>
+          <div className="mobile-insert-heading"><strong>Insert components</strong><span>Tap to add, or drag onto the preview.</span><IconButton label="Close insert tray" disabled={dragging} onClick={closeInsert}><X size={18}/></IconButton></div>
           <div ref={traySearch} className="mobile-insert-library">{insert}</div>
         </div>
       </div>

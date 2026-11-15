@@ -69,7 +69,7 @@ describe('native reference initialization', () => {
     ];
     const { document } = importNativeHome(snapshot), serialized = JSON.stringify(document);
     expect(document.dataSources).toEqual([
-      { id: 'native-states', name: 'Native Home entities', kind: 'native-home', endpoint: 'house-states', refreshSeconds: 30, sample: [] },
+      { id: 'native-states', name: 'S+H entities', kind: 'native-home', endpoint: 'house-states', refreshSeconds: 30, sample: [] },
       { id: 'native-profile', name: 'Signed-in Home Assistant user', kind: 'native-home', endpoint: 'house-profile', refreshSeconds: 30, sample: null },
     ]);
     expect(document.variables).toEqual({});

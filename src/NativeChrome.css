@@ -7,7 +7,7 @@
 }
 .native-page-header { display: contents; }
 .native-toolbar { position: sticky; top: 0; z-index: 8; min-height: 44px; padding: 0 16px; isolation: isolate; }
-.native-toolbar::before { content: ''; position: absolute; inset: 0; z-index: -1; opacity: var(--header-progress, 0); background: color-mix(in srgb, var(--native-bg) 88%, transparent); backdrop-filter: blur(16px); border-bottom: 1px solid var(--native-line); }
+.native-toolbar::before { content: ''; position: absolute; inset: 0; z-index: -1; opacity: var(--header-progress, 0); background: color-mix(in srgb, var(--native-bg) 88%, transparent); backdrop-filter: blur(16px); }
 .native-toolbar .native-inline-title { font-size: calc(17px * var(--app-font-scale, 1)); font-weight: 600; line-height: 1.2; text-align: center; opacity: var(--header-progress, 0); transform: translateY(calc(4px * (1 - var(--header-progress, 0)))); }
 .native-page-title { padding: 8px 16px 18px; }
 .native-page-title h1 { font-size: calc(34px * var(--app-font-scale, 1)); line-height: 1.2; font-weight: 700; opacity: calc(1 - var(--header-progress, 0)); transform: translateY(calc(-8px * var(--header-progress, 0))) scale(calc(1 - .15 * var(--header-progress, 0))); transform-origin: left top; }
@@ -94,3 +94,14 @@
 @supports not (backdrop-filter: blur(1px)) {
   .native-app .native-toolbar::before, .native-app .native-tabbar, .native-app .native-sheet-tabbar { background: var(--native-bg); }
 }
+
+/* Soft top scroll edge. The status bar floats over the scroller, so content passes beneath both bars. A blur
+   layer 40 px taller than the bars fades out with a gradient mask (the app's pre-iOS 26 edge fade; iOS 26 draws a soft edge). */
+.native-app { --sb-h: 48px; --edge-fade: 40px; }
+.native-modal { --sb-h: 0px; }
+.native-app:not(.activity-preview-app) > .native-statusbar { position: absolute; inset: 0 0 auto 0; z-index: 9; pointer-events: none; }
+.native-app:not(.activity-preview-app) > .native-scroll { padding-top: var(--sb-h); }
+.native-app > .native-scroll .native-toolbar { top: var(--sb-h); }
+.native-app .native-toolbar::before { inset: calc(-1 * var(--sb-h)) 0 calc(-1 * var(--edge-fade)) 0; -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--edge-fade)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--edge-fade)), transparent); }
+.native-app.opaque-chrome { --edge-fade: 0px; }
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) { .native-app { --edge-fade: 0px; } }

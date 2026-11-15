@@ -16,6 +16,7 @@ import type { Action, Component, Json, LiveActivity, Page, Primitive, StudioDocu
 import { containers, findComponent, getComponents, getPage, readPath, variantLabels, variants, type Target, type Variant } from './editor';
 import { EmptyState, Icon, IconButton } from './ui';
 import { apiUrl } from './api';
+import { usePreviewPointer } from './preview-pointer';
 import { owningTabIds } from './shared/navigation';
 import { choreLinkPresentation, choreUserId } from './shared/native-chores';
 import { ChoresSimulationProvider, NativeChores, useChoreStates } from './NativeChores';
@@ -36,7 +37,7 @@ function Media({ component }: { component: Component }) {
   const [failed, setFailed] = useState(false);
   const image = mediaUrl(component.props.imageUrl ?? component.props.src);
   const stream = mediaUrl(component.props.url);
-  const label = String(component.props.placeholder ?? 'No camera image configured. Add an image or stream URL in the inspector.');
+  const label = String(component.props.placeholder ?? 'No camera image. Add a URL in the inspector.');
   if (failed) return <div className="camera-empty"><Camera size={28}/><strong>Media could not be loaded</strong><span>Check the URL and browser format support.</span><button onClick={() => setFailed(false)}>Retry</button></div>;
   if (stream) return <video className="camera-image" aria-label={component.title} src={stream} poster={image} controls playsInline onError={() => setFailed(true)}/>;
   if (image) return <img className="camera-image" alt={component.title} src={image} onError={() => setFailed(true)}/>;
@@ -166,7 +167,7 @@ function RuntimeNode({ component, context, columns = 1, layoutStyle }: { compone
       let rowKeys: string[] | undefined, rowKeyError: string | undefined;
       if (component.rowActions && !['idle', 'unsaved', 'loading', 'error'].includes(dataState ?? '')) {
         try {
-          if (!Array.isArray(bound) || !component.rowActions.keyPath) throw new Error('Row actions require an array and a configured stable row key path.');
+          if (!Array.isArray(bound) || !component.rowActions.keyPath) throw new Error('Row actions need a list and a row key.');
           rowKeys = collectionKeys(bound, component.rowActions.keyPath);
         } catch (reason) { rowKeyError = reason instanceof Error ? reason.message : String(reason); }
       }
@@ -481,7 +482,7 @@ function NativePage({ page, context, onBack }: { page: Page; context: RuntimeCon
     {page.search && <SurfaceSearch search={page.search} document={context.document} variables={context.variables} editing={context.editing} onSelect={() => context.onSelect(undefined)} onVariable={context.onSearchVariable} queryLiveEnabled={context.queryLiveEnabled} onEnable={context.onEnableQuery} onSubmit={context.onSearchSubmit} mode={searchMode} error={sourceId ? context.dataErrors?.[sourceId] : undefined} active={surfaceActive}/>}
     <main className="native-page-content" data-fold-aware={page.layout.foldAware ?? false} style={{ paddingBottom: 'max(24px, var(--interaction-dock-height, 24px))' }}>
       <NativeComponents components={page.components} context={{ ...context, search, onPageChrome: setDetail }} columns={page.layout.columns} gap={page.layout.gap} fold={page.layout.foldAware ? context.duo?.foldColumns : undefined}/>
-      {!page.components.length && <EmptyState title={context.editing ? 'Make yourself at home' : 'Nothing here yet'}>{context.editing ? 'Add a heading, some shortcuts, or a section from Components.' : 'This page has no content configured.'}</EmptyState>}
+      {!page.components.length && <EmptyState title={context.editing ? 'Empty page' : 'Nothing here yet'}>{context.editing ? 'Add components from the sidebar.' : 'No content.'}</EmptyState>}
       {context.editing && active && over?.id === 'drop:root' && <div className="canvas-root-drop-cue" role="status">Drop at end of {page.title}</div>}
     </main></InteractionSurface>;
 }
@@ -527,7 +528,7 @@ function NativePageDeck({ page, context, obscured }: { page: Page; context: Runt
 }
 function ActivityRegion({ activity, variant, context }: { activity: LiveActivity; variant: Variant; context: RuntimeContext }) {
   if (variant === 'compactLeading' || variant === 'compactTrailing') return <div className="activity-island-expanded"><div className={`island-half ${variant === 'compactLeading' ? 'active-variant' : ''}`} inert={context.editing && variant !== 'compactLeading'}><NativeComponents components={activity.variants.compactLeading} context={{ ...context, editing: context.editing && variant === 'compactLeading' }}/></div><div className="island-camera"/><div className={`island-half ${variant === 'compactTrailing' ? 'active-variant' : ''}`} inert={context.editing && variant !== 'compactTrailing'}><NativeComponents components={activity.variants.compactTrailing} context={{ ...context, editing: context.editing && variant === 'compactTrailing' }}/></div></div>;
-  return <div className={`activity-region activity-${variant}`}><NativeComponents components={activity.variants[variant]} context={context}/>{!activity.variants[variant].length && <span className="activity-empty">Add components to {variantLabels[variant]}.</span>}</div>;
+  return <div className={`activity-region activity-${variant}`}><NativeComponents components={activity.variants[variant]} context={context}/>{!activity.variants[variant].length && <span className="activity-empty">Empty. Add components.</span>}</div>;
 }
 export default function DevicePreview(props: DeviceProps) {
   const { document, target, settings, onSettings, editing, onTarget } = props;
@@ -599,12 +600,14 @@ export default function DevicePreview(props: DeviceProps) {
     {settings.device === 'notch' && <div className="hardware-notch"/>}
     {closedDuo && <div className="duo-cover-camera" aria-hidden="true"/>}
     {geometry?.trailingControls && page && !activity && <div className="native-side-actions" inert={Boolean(modal)}>{page.toolbar.map(action => <button key={action.id} aria-label={action.label} onClick={() => context.editing ? context.onSelect(undefined) : context.onAction(action.action)}><Icon name={action.icon} size={22}/></button>)}</div>}
-    {activity ? <div className={`activity-scene scene-${target.kind === 'activity' ? target.variant : ''}`}><div className="activity-scene-label"><Activity size={14}/>{activity.name}<span className="sample-badge">sample</span></div>{target.kind === 'activity' && target.variant === 'lockScreen' && <div className="lock-clock"><span>Lock Screen study</span><strong>9:41</strong></div>}{target.kind === 'activity' && <ActivityRegion activity={activity} variant={target.variant} context={context}/>}<p className="activity-preview-caption">{target.kind === 'activity' && variantLabels[target.variant]} · layout preview<br/>ActivityKit / APNs integration pending</p>{!activity.enabled && <span className="activity-disabled">Disabled in configuration</span>}</div> : page ? <><NativePageDeck key={`${document.id}:${editing}`} page={page} context={context} obscured={Boolean(modal)}/><nav className="native-tabbar" aria-label="App tabs" inert={Boolean(modal)}>{document.navigation.tabs.map(tab => <button key={tab.id} className={activeTab === tab.id ? 'active' : ''} aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => { setTabOrigin({ documentId: document.id, tabId: tab.id }); if (editing) onTarget({ kind: 'page', id: tab.pageId }); else props.onAction({ type: 'navigate', pageId: tab.pageId }); }}><Icon name={tab.icon} size={21}/><span>{tab.label}</span></button>)}</nav></> : null}
+    {activity ? <div className={`activity-scene scene-${target.kind === 'activity' ? target.variant : ''}`}><div className="activity-scene-label"><Activity size={14}/>{activity.name}<span className="sample-badge">sample</span></div>{target.kind === 'activity' && target.variant === 'lockScreen' && <div className="lock-clock"><span>Lock Screen</span><strong>9:41</strong></div>}{target.kind === 'activity' && <ActivityRegion activity={activity} variant={target.variant} context={context}/>}{!activity.enabled && <span className="activity-disabled">Disabled in configuration</span>}</div> : page ? <><NativePageDeck key={`${document.id}:${editing}`} page={page} context={context} obscured={Boolean(modal)}/><nav className="native-tabbar" aria-label="App tabs" inert={Boolean(modal)}>{document.navigation.tabs.map(tab => <button key={tab.id} className={activeTab === tab.id ? 'active' : ''} aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => { setTabOrigin({ documentId: document.id, tabId: tab.id }); if (editing) onTarget({ kind: 'page', id: tab.pageId }); else props.onAction({ type: 'navigate', pageId: tab.pageId }); }}><Icon name={tab.icon} size={21}/><span>{tab.label}</span></button>)}</nav></> : null}
     {modal && <div className={`native-modal-backdrop presentation-${modal.presentation}`}><motion.section key={modal.id} initial={reduceMotion || editing ? false : { y: 48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 360, damping: 36, mass: 1 }} role="dialog" aria-modal={false} aria-label={modal.title} className={`native-modal modal-${modal.presentation} detent-${modal.detent} ${modal.components.some(component => component.type === 'camera-feed') ? 'modal-camera' : ''} ${modal.components.some(component => component.type === 'weather-summary') ? 'modal-weather' : ''}`}><div className="modal-grabber"/>{geometry?.trailingControls && <div className="native-sheet-status" aria-hidden="true"><strong>9:41</strong><Wifi size={24}/></div>}<button className="native-modal-close" aria-label="Dismiss app modal" onClick={props.onDismiss}><X size={22}/></button><div className="native-modal-scroll" onScroll={event => updateHeaderProgress(event.currentTarget)}><NativePage key={modal.id} page={modal} context={{ ...context, portraitMenu: false, layoutWidth: (geometry?.sheetWidth ?? width - 48) - 32 - (geometry?.trailingControls ? 83 : 0) }}/></div></motion.section></div>}
     {duo && !closedDuo && <div className={`duo-crease ${posture}`} aria-hidden="true"/>}
     <div className="home-indicator"/>
   </div>;
   };
+  const frameRef = useRef<HTMLDivElement>(null);
+  usePreviewPointer(frameRef, !editing && !settings.threeD);
   const fitDevice = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
@@ -625,10 +628,9 @@ export default function DevicePreview(props: DeviceProps) {
   }, [settings.autoFit, fitDevice]);
   const choresIdentityKey = JSON.stringify([document.id, ...document.dataSources.filter(source => (source.kind === 'native-home' && source.endpoint === 'house-profile') || source.id === 'native-profile').map(source => record(source.sample).id)]);
   return <ChoresSimulationProvider identityKey={choresIdentityKey}><section className={`canvas-workspace ${isOver ? 'drop-over' : ''}`} ref={setCanvasRef} aria-label="Device canvas">
-    <div className="canvas-breadcrumb"><span>Workspace</span><ChevronRight size={12}/><span>{target.kind === 'activity' ? 'Live Activities' : target.kind === 'modal' ? 'Modals' : 'Pages'}</span><ChevronRight size={12}/><strong>{activity?.name ?? page?.title}</strong><span className="canvas-edit-badge">{editing ? 'Editing' : 'Interactive preview'}</span></div>
-    <div className="canvas-stage"><div className="device-caption"><span className="device-caption-line"/><span>{settings.device === 'duo' ? 'A NEW PERSPECTIVE' : 'YOUR HOME, REIMAGINED'}</span><span className="device-caption-line"/></div>
+    <div className="canvas-stage">
       {target.kind === 'activity' && <div className="activity-variant-switch" aria-label="Activity variant">{variants.map(variant => <button key={variant} className={target.variant === variant ? 'active' : ''} onClick={() => onTarget({ ...target, variant })}>{variantLabels[variant]}</button>)}</div>}
-      {target.kind === 'activity' && target.variant !== 'lockScreen' && ['notch', 'ipad'].includes(settings.device) && <p className="canvas-tip">This profile has no Dynamic Island. The selected variant is a standalone template study.</p>}
+      {target.kind === 'activity' && target.variant !== 'lockScreen' && ['notch', 'ipad'].includes(settings.device) && <p className="canvas-tip">This device has no Dynamic Island.</p>}
       <div className={`device-stage ${settings.threeD ? 'is-3d' : ''} ${orbiting ? 'orbiting' : ''}`} style={{ width: width * zoom + 40, height: height * zoom + 36, perspective: 1300 }}
         tabIndex={settings.threeD ? 0 : undefined} role={settings.threeD ? 'group' : undefined} aria-label={settings.threeD ? '3D device. Drag to rotate, or use arrow keys.' : undefined}
         onPointerDownCapture={event => {
@@ -654,26 +656,26 @@ export default function DevicePreview(props: DeviceProps) {
           event.preventDefault();
           onSettings({ ...settings, yaw: Math.max(-180, Math.min(180, settings.yaw + (event.key === 'ArrowLeft' ? -5 : event.key === 'ArrowRight' ? 5 : 0))), pitch: Math.max(-85, Math.min(85, settings.pitch + (event.key === 'ArrowUp' ? 5 : event.key === 'ArrowDown' ? -5 : 0))) });
         }}>
-        <div className={`device-model device-${settings.device} posture-${posture} ${folding && foldedFrame ? 'duo-folding' : ''} ${closedDuo ? 'duo-closed' : ''} ${settings.landscape ? 'landscape' : ''}`} data-posture={posture} data-orientation={rotation} data-layout={duo && (settings.landscape || closedDuo) ? 'side-controls' : 'bottom-controls'} style={{ width, height, left: (width * zoom + 40 - width) / 2, top: (height * zoom + 36 - height) / 2, transform: `scale(${zoom}) ${settings.threeD ? `rotateX(${settings.pitch}deg) rotateY(${settings.yaw}deg)` : ''}`, '--fold-angle': `${(180 - settings.fold) / 2}deg` } as CSSProperties}>
+        <div ref={frameRef} data-pan={!editing && !settings.threeD ? '' : undefined} className={`device-model device-${settings.device} posture-${posture} ${folding && foldedFrame ? 'duo-folding' : ''} ${closedDuo ? 'duo-closed' : ''} ${settings.landscape ? 'landscape' : ''}`} data-posture={posture} data-orientation={rotation} data-layout={duo && (settings.landscape || closedDuo) ? 'side-controls' : 'bottom-controls'} style={{ width, height, left: (width * zoom + 40 - width) / 2, top: (height * zoom + 36 - height) / 2, transform: `scale(${zoom}) ${settings.threeD ? `rotateX(${settings.pitch}deg) rotateY(${settings.yaw}deg)` : ''}`, '--fold-angle': `${(180 - settings.fold) / 2}deg` } as CSSProperties}>
         <div className="device-button power"/><div className="device-button volume"/>
         <div className="device-screen">{renderScreen()}</div>
         {folding && foldedFrame && (['leading', 'trailing'] as const).map(side => <div key={side} className={`duo-fold-face ${side}`} aria-hidden="true">
           <img alt="" src={foldedFrame} style={{ width: screenWidth, height: screenHeight, maxWidth: 'none' }}/>
         </div>)}
       </div></div>
-      {settings.threeD && <p className="canvas-tip">Drag or use arrow keys to rotate. Duo folding uses a captured frame, not a second live app. Switch to Flat to edit or interact.</p>}
-      {folding && !foldedFrame && <p className="canvas-tip" role="status">{frame?.key === frameKey && frame.error ? `3D frame unavailable: ${frame.error} Flat display retained; switch to Flat to interact.` : 'Capturing the display for the hinge study…'}</p>}
-      <p className="preview-disclaimer"><Monitor size={12}/> Interactive browser preview · layout approximation, not an iOS emulator</p><div className="canvas-tip"><span className="tip-dot"/>{closedDuo ? 'Compact cover viewport; illustrative silhouette and corner camera, not verified hardware. State is preserved when unfolding.' : geometry?.horizontalFoldUnverified ? 'Portrait stays single-column. The horizontal crease is illustrative; its native exclusion geometry is not verified.' : posture === 'partial' && settings.landscape ? 'Partial landscape: fold-aware pages keep assigned sections clear of the source-derived active hinge.' : duo ? 'Continuous content: native Home only splits for an active landscape hinge.' : editing ? 'Select anything to make it yours. Drag components from the library or canvas.' : 'Try your experience. All Home Assistant service actions stay simulated.'}</div>
+      {settings.threeD && <p className="canvas-tip">Drag to rotate. Switch to Flat to edit.</p>}
+      {folding && !foldedFrame && <p className="canvas-tip" role="status">{frame?.key === frameKey && frame.error ? 'Showing the flat view.' : 'Capturing…'}</p>}
+      
     </div>
     <div className="device-dock">
       <div className="dock-device"><Icon name={settings.device === 'ipad' ? 'grid' : 'smartphone'} size={15}/><select aria-label="Preview device" value={settings.device} onChange={event => onSettings({ ...settings, device: event.target.value as DeviceKind })}>{Object.entries(deviceLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div>
       <span className="dock-divider"/>
       <select aria-label="Device theme" value={settings.appearance ?? 'document'} onChange={event => onSettings({ ...settings, appearance: event.target.value as PreviewSettings['appearance'] })}><option value="document">App theme</option><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select>
-      <button aria-pressed={opaqueChrome} onClick={() => setOpaqueChrome(value => !value)}>Opaque chrome</button>
+      <button aria-pressed={opaqueChrome} onClick={() => setOpaqueChrome(value => !value)}>Solid bars</button>
       <IconButton label="Rotate device 90 degrees counterclockwise" onClick={() => rotate(-1)}><RotateCcw size={15}/></IconButton>
       <IconButton label="Rotate device 90 degrees clockwise" onClick={() => rotate(1)}><RotateCw size={15}/></IconButton>
       <button className={settings.threeD ? 'dock-active' : ''} onClick={() => onSettings({ ...settings, threeD: !settings.threeD })}>{settings.threeD ? '3D' : 'Flat'}</button>
-      <button className={deviceControls ? 'dock-active' : ''} onClick={() => setDeviceControls(!deviceControls)} aria-expanded={deviceControls}>View controls</button>
+      <button className={deviceControls ? 'dock-active' : ''} onClick={() => setDeviceControls(!deviceControls)} aria-expanded={deviceControls}>More</button>
       <span className="dock-divider"/><button onClick={fitDevice}>Fit</button>
       <button aria-label="Zoom out" disabled={settings.zoom <= 25} onClick={() => onSettings({ ...settings, zoom: Math.max(25, settings.zoom - 5), autoFit: false })}>−</button>
       <button className="zoom-label" aria-label="Reset preview zoom to 100 percent" onClick={() => onSettings({ ...settings, zoom: 100, autoFit: false })}>{settings.zoom}%</button>
@@ -684,7 +686,7 @@ export default function DevicePreview(props: DeviceProps) {
         <label>Fold angle <input aria-label="Fold angle" type="range" min={0} max={180} value={settings.fold} onChange={event => onSettings({ ...settings, fold: Number(event.target.value), threeD: true })}/><output>{settings.fold}°</output></label></>}
       {settings.threeD && <><label>Yaw <input aria-label="Device yaw" type="range" min={-180} max={180} value={settings.yaw} onChange={event => onSettings({ ...settings, yaw: Number(event.target.value) })}/><output>{settings.yaw}°</output></label>
         <label>Pitch <input aria-label="Device pitch" type="range" min={-85} max={85} value={settings.pitch} onChange={event => onSettings({ ...settings, pitch: Number(event.target.value) })}/><output>{settings.pitch}°</output></label></>}
-      <p>Dragging the fold angle opens the 3D hinge study. Flat mode is for editing and interaction. Browser geometry is illustrative, not verified hardware.</p>
+      
       <button onClick={() => onSettings({ ...initialPreview, device: settings.device })}>Reset view</button>
     </div>}
     </div>

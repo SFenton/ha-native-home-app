@@ -44,9 +44,9 @@ export function PageInteractionEditor({ page, document, update, createFilterVari
   };
   return <>
     <details className="inspector-section" open><summary>Floating actions</summary><div>
-      {page.floatingButtons === undefined ? <><p className="field-note">Legacy controls: {inherited.map(item => item.label).join(', ') || 'none'}. Customize to edit the inherited template.</p><button onClick={() => update(item => { item.floatingButtons = inherited.map(button => ({ ...button, id: uid('floating') })); })}>Customize floating actions</button></>
+      {page.floatingButtons === undefined ? <><p className="field-note">Default controls: {inherited.map(item => item.label).join(', ') || 'none'}. Customize to edit them.</p><button onClick={() => update(item => { item.floatingButtons = inherited.map(button => ({ ...button, id: uid('floating') })); })}>Customize floating actions</button></>
         : <><p className="field-note">{page.floatingButtons.length ? 'One bottom-trailing dock; order is top to bottom.' : 'Floating actions disabled, including legacy Add.'}</p>
-          {page.floatingButtons.length > 4 && <p role="alert">This inherited template has more than four controls. Remove controls before saving, or use legacy actions to retain all controls in overflow.</p>}
+          {page.floatingButtons.length > 4 && <p role="alert">More than four controls. Remove some, or use the legacy actions.</p>}
           {page.floatingButtons.map((button, index) => <details className="chrome-editor" key={button.id}><summary>{button.label || 'Floating action'}</summary><div>
             <TextField label="Floating label" value={button.label} maxLength={80} onChange={label => update(item => { item.floatingButtons![index].label = label; })}/>
             <IconField value={button.icon} onChange={icon => update(item => { item.floatingButtons![index].icon = icon; })}/>
@@ -86,8 +86,8 @@ export function ListInteractionEditor({ component, document, update }: { compone
   const defaults = todo ? legacyRowActions({ taskForm: owner?.props.hasTaskForm === true || component.props.hasTaskForm === true || component.props.collectionKind === 'resident-todo-items', grocery: Object.hasOwn(add, 'groceryItem'), admin: Object.hasOwn(add, 'adminTodo') }) : { keyPath: 'id', leading: [], trailing: [] };
   const row = component.rowActions;
   return <details className="inspector-section" open><summary>Row swipe / menu actions</summary><div>
-    <p className="field-note">{todo ? 'Chores permissions still apply: groceries cannot be edited; admin to-dos cannot be deleted; task editing needs a supported UID. Completion, Undo and eligible edit accessories remain available.' : 'Rows need stable, unique string keys. Actions are simulated without row interpolation.'}</p>
-    {!row ? <><p className="field-note">{todo ? 'Using legacy Chores swipe and confirmation defaults.' : 'No row actions configured.'}</p><button onClick={() => update(item => { item.rowActions = structuredClone(defaults); })}>Customize row actions</button></> : <>
+    <p className="field-note">{todo ? 'Chores rules still apply: no grocery edits, no admin deletes.' : 'Each row needs a unique key.'}</p>
+    {!row ? <><p className="field-note">{todo ? 'Using the default Chores actions.' : 'No row actions configured.'}</p><button onClick={() => update(item => { item.rowActions = structuredClone(defaults); })}>Customize row actions</button></> : <>
       {!todo && <TextField label="Row key path" value={row.keyPath} onChange={keyPath => update(item => { item.rowActions!.keyPath = keyPath; })}/>}
       {(['leading', 'trailing'] as const).map(side => <section key={side}><h4>{side === 'leading' ? 'Leading' : 'Trailing'} edge</h4>{row[side].map((descriptor, index) => {
         const change = (edit: (action: RowSwipeAction) => void) => update(item => edit(item.rowActions![side][index]));
@@ -204,7 +204,7 @@ export function SurfaceSearch({ search, document, variables, editing, onSelect, 
       else if (variable) onVariable?.(variable, event.target.value);
     }} onKeyDown={event => { if (!editing && active && !blocked && event.key === 'Enter' && !event.nativeEvent.isComposing && composition === undefined && endpoint && query.trim()) { event.preventDefault(); onSubmit?.(search.sourceId); } }}/>{(composition ?? query) && <button aria-label={`Clear ${search.label}`} disabled={editing || blocked || !active} onClick={() => { setComposition(undefined); if (variable) onVariable?.(variable, ''); }}><X size={16}/></button>}</div></label>
     <small role={mode === 'error' ? 'alert' : 'status'}>{status}</small>
-    {!editing && blocked && active && <button onClick={onEnable}>Enable endpoint search reads</button>}
+    {!editing && blocked && active && <button onClick={onEnable}>Allow search requests</button>}
   </div>;
 }
 function Confirmation({ confirmation, root, onCancel, onConfirm }: { confirmation: ActionConfirmation; root: HTMLElement | null; onCancel: () => void; onConfirm: () => void }) {
@@ -250,7 +250,7 @@ export function RowInteractions({ actions, title, completed, disabled, generatio
   const label = (action: RowSwipeAction) => completed && action.action.type === 'todo-row' && action.action.operation === 'toggle' ? action.completedLabel ?? action.label : action.label;
   return <motion.div ref={root} className="chore-row interaction-row" layout={!reduced} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} aria-hidden={!present} inert={!present} data-swipe={edge} data-entity-id={entityId} onKeyDown={event => { if (event.key === 'Escape') { setEdge(undefined); setDrag(undefined); } }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setEdge(undefined); }}>
     <div className={`chore-swipe-actions ${chosen}`} data-active={!!edge || !!drag} aria-hidden={!edge} inert={!edge || disabled}>{actions[chosen].map(action => <button key={action.id} disabled={disabled || !!reason?.(action)} title={reason?.(action)} style={{ background: action.color ?? accent, color: contrastForeground(action.color ?? accent) }} onClick={() => activate(action)}><Icon name={action.icon} size={18}/>{label(action)}</button>)}</div>
-    <motion.div className={`chore-row-front ${completed ? 'is-completed' : ''}`} animate={{ x: drag ?? (edge ? (edge === 'leading' ? 1 : -1) * rtl() * actions[edge].length * 90 : 0) }} transition={reduced || drag !== undefined ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 38 }}
+    <motion.div data-no-pan-x className={`chore-row-front ${completed ? 'is-completed' : ''}`} animate={{ x: drag ?? (edge ? (edge === 'leading' ? 1 : -1) * rtl() * actions[edge].length * 90 : 0) }} transition={reduced || drag !== undefined ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 38 }}
       onClickCapture={event => { if (Math.abs(travel.current) > 10) { event.stopPropagation(); event.preventDefault(); travel.current = 0; } }} onPointerDown={event => {
         if (disabled || event.button !== 0 || (event.target as HTMLElement).closest('.chore-accessory,details')) return;
         start.current = { x: event.clientX, y: event.clientY }; travel.current = 0;

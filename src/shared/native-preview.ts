@@ -116,7 +116,7 @@ export function nativeHelperFill(value: Json | undefined): string | undefined {
 }
 
 export function importNativeHome(snapshot: NativeSnapshot): { document: StudioDocument; warnings: string[] } {
-  if (snapshot.mode !== 'live' || snapshot.houseConfig.schema !== 2) throw new Error('Native Home requires a live schema-2 configuration.');
+  if (snapshot.mode !== 'live' || snapshot.houseConfig.schema !== 2) throw new Error('Importing needs a live Home Assistant connection.');
   const config = snapshot.houseConfig.config;
   if (!config.home || !config.rooms || !config.security || !config.climate || !config.chores) throw new Error('Native configuration is missing required sections.');
   const home = record(config.home), rooms = record(config.rooms), security = record(config.security), climate = record(config.climate), chores = record(config.chores);
@@ -419,12 +419,12 @@ export function importNativeHome(snapshot: NativeSnapshot): { document: StudioDo
   ];
   return {
     document: {
-      schemaVersion: '1.0', id: createId('native-reference'), name: 'Native Home reference',
+      schemaVersion: '1.0', id: createId('native-reference'), name: 'S+H reference',
       theme: { accent: '#409cff', appearance: 'system', fontScale: 1, background: { image: '/api/native-wallpaper', blur: 16.8, dim: .46 } },
       navigation: { initialPageId: 'home', tabs: pages.slice(0, 5).map(value => ({ id: `tab-${value.id}`, label: value.title, icon: value.icon, pageId: value.id })) },
       pages, modals, liveActivities: [],
       dataSources: [
-        { id: 'native-states', name: 'Native Home entities', kind: 'native-home', endpoint: 'house-states', refreshSeconds: 30, sample: [] },
+        { id: 'native-states', name: 'S+H entities', kind: 'native-home', endpoint: 'house-states', refreshSeconds: 30, sample: [] },
         { id: 'native-profile', name: 'Signed-in Home Assistant user', kind: 'native-home', endpoint: 'house-profile', refreshSeconds: 30, sample: null },
       ],
       variables: {},

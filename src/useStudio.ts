@@ -3,6 +3,8 @@ import { ApiError, loadDraft, request, saveDraft, validateDocument } from './api
 import type { DataSource, DraftEnvelope, StudioDocument } from './shared/types';
 import type { Edit } from './editor';
 
+/** Info and success notices leave on their own after this long; errors stay until dismissed. */
+export const NOTICE_LIFETIME_MS = 4000;
 export type Notice = { id: number; message: string; tone: 'success' | 'error' | 'info' };
 export function useStudio() {
   const [document, setDocument] = useState<StudioDocument>();
@@ -23,7 +25,9 @@ export function useStudio() {
   const [savedDataSources, setSavedDataSources] = useState<DataSource[]>([]);
   const busyRef = useRef(false);
   const notify = useCallback((message: string, tone: Notice['tone'] = 'info') => {
-    setNotices(previous => [...previous.slice(-3), { id: Date.now() + Math.random(), message, tone }]);
+    const id = Date.now() + Math.random();
+    setNotices(previous => [...previous.slice(-3), { id, message, tone }]);
+    if (tone !== 'error') window.setTimeout(() => setNotices(previous => previous.filter(notice => notice.id !== id)), NOTICE_LIFETIME_MS);
   }, []);
   const install = useCallback((envelope: DraftEnvelope) => {
     current.current = envelope.document; revision.current = envelope.revision; saved.current = JSON.stringify(envelope.document);
@@ -32,13 +36,13 @@ export function useStudio() {
     setDocument(envelope.document); setUpdatedAt(envelope.updatedAt); setConflict(false); setError(''); setHistoryVersion(value => value + 1);
   }, []);
   const reload = useCallback(async () => {
-    if (busyRef.current) { notify('Wait for the current server operation before reloading.', 'info'); return; }
+    if (busyRef.current) return;
     busyRef.current = true; setBusy(true); setLoading(true);
     const generation = editGeneration.current;
     try {
       const envelope = await loadDraft();
       if (generation !== editGeneration.current) {
-        notify('Reload cancelled because the draft changed while loading. Your local edits and undo history were kept.', 'info');
+        notify('Reload cancelled; the draft changed while loading. Your edits are kept.', 'info');
       } else install(envelope);
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason);
@@ -91,7 +95,7 @@ export function useStudio() {
   const save = useCallback(async () => {
     if (busyRef.current) return false;
     busyRef.current = true; setBusy(true);
-    try { const result = await persist(); notify(`Draft saved · revision ${result.revision}`, 'success'); return true; }
+    try { const result = await persist(); notify(`Saved (revision ${result.revision})`, 'success'); return true; }
     catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) setConflict(true);
       notify(reason instanceof Error ? reason.message : String(reason), 'error');
@@ -102,7 +106,7 @@ export function useStudio() {
     const validation = await validateDocument(value);
     if (!validation.valid) throw new Error(validation.errors.join('\n'));
     replace(value as StudioDocument);
-    notify('Document imported into your draft. Save when you are ready.', 'success');
+    notify('Imported. Save to keep it.', 'success');
   }, [replace, notify]);
   const keepLocal = useCallback(async () => {
     if (busyRef.current) return;
@@ -111,7 +115,7 @@ export function useStudio() {
       const latest = await loadDraft();
       revision.current = latest.revision;
       const result = await persist();
-      notify(`Your local document replaced server revision ${latest.revision}; saved as revision ${result.revision}.`, 'success');
+      notify(`Saved over revision ${latest.revision} as revision ${result.revision}.`, 'success');
     } catch (reason) { notify(reason instanceof Error ? reason.message : String(reason), 'error'); }
     finally { busyRef.current = false; setBusy(false); }
   }, [notify, persist]);

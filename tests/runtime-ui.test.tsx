@@ -551,7 +551,7 @@ describe('document-driven browser preview', () => {
       expect(screen.getByRole('button', { name: 'Unmute camera sound' }).hasAttribute('disabled')).toBe(true);
       fireEvent.click(screen.getByRole('button', { name: 'Snapshot (simulated)' }));
       act(() => vi.advanceTimersByTime(350));
-      expect(screen.getByText('Snapshot simulated. No actual photo was saved.')).toBeTruthy();
+      expect(screen.getByText('Snapshot simulated.')).toBeTruthy();
       expect(fetch).not.toHaveBeenCalled();
     } finally { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); }
   });

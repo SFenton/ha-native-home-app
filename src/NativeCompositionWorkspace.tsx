@@ -14,7 +14,7 @@ import { uid } from './editor';
 import { Dialog, Field, SelectField, TextField } from './ui';
 import './NativeCompositionWorkspace.css';
 
-const sections = ['Overview', 'Tabs', 'Chrome', 'Pages', 'Modals', 'Local state', 'Data sources', 'Wallpaper', 'Bootstrap', 'Routes', 'Live Activities', 'Native policies', 'Home Assistant'] as const;
+const sections = ['Overview', 'Tabs', 'Chrome', 'Pages', 'Modals', 'Local state', 'Data sources', 'Wallpaper', 'Bootstrap', 'Routes', 'Live Activities', 'Shell and theme', 'Home Assistant'] as const;
 type Section = typeof sections[number];
 type Operation = 'import' | 'advanced' | 'reload' | 'keep-local' | undefined;
 function exportLocal(document: CompositionDocument) {
@@ -75,7 +75,7 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
   };
   async function upload(file: File) {
     if (file.size < 1 || file.size > 8388608 || !['image/png', 'image/jpeg'].includes(file.type)) {
-      setAssetError('Choose a PNG/JPEG file containing 1 to 8388608 bytes.'); return;
+      setAssetError('Use a PNG or JPEG up to 8 MB.'); return;
     }
     setUploading(true); setAssetError('');
     try {
@@ -94,40 +94,40 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
   return <div className="studio native-composition">
     <header className="studio-header">
       <button onClick={onLegacy}>1.0 workspace</button>
-      <strong>Native composition <span className="badge">2.0</span></strong>
+      <strong>2.0 workspace</strong>
       <span className={`save-status ${studio.dirty ? 'unsaved' : ''}`}>{studio.busy ? 'Working...' : studio.dirty ? 'Unsaved local changes' : `Draft ${studio.envelope?.revision ?? ''}`}</span>
       <button disabled={working || !studio.canUndo} onClick={studio.undo}>Undo</button>
       <button disabled={working || !studio.canRedo} onClick={studio.redo}>Redo</button>
       <button disabled={!document || working || !studio.dirty || errors.length > 0} onClick={() => void studio.save()}>Save draft</button>
-      <button className="primary" disabled={!document || working || errors.length > 0} onClick={() => void studio.save(true)}>Publish native</button>
-      <button className="primary" disabled={!document || working || errors.length > 0} onClick={() => void studio.save('home-assistant')}>Publish to Home Assistant</button>
+      <button className="primary" disabled={!document || working || errors.length > 0} onClick={() => void studio.save(true)}>Publish to preview</button>
+      <button className="primary" disabled={!document || working || errors.length > 0} onClick={() => void studio.save('home-assistant')}>Publish</button>
     </header>
-    <div className="composition-notice">First-slice native contract, not a browser fidelity preview or production-parity certification. Schema-1 saved work is separate and unchanged. Actions are never executed here.</div>
+    
     {studio.error && <div role="alert" className="inline-error">{studio.error}</div>}
     {studio.status && <div role="status" className="composition-status">{studio.status}</div>}
     {studio.houseImport && studio.houseImport.dropped.length > 0 && <details className="composition-status" open>
       <summary>{studio.houseImport.dropped.length} house-config behaviours were not carried over</summary>
       <ul>{studio.houseImport.dropped.map(note => <li key={note.path}><code>{note.path}</code>: {note.reason}</li>)}</ul>
     </details>}
-    {studio.conflict && <div className="conflict-banner"><strong>Revision conflict. Local edits are still here.</strong><button disabled={studio.busy} onClick={() => open('reload')}>Reload server draft</button><button disabled={studio.busy} onClick={() => open('keep-local')}>Keep local work...</button></div>}
+    {studio.conflict && <div className="conflict-banner"><strong>A newer draft was saved. Your edits are kept.</strong><button disabled={studio.busy} onClick={() => open('reload')}>Use the server draft</button><button disabled={studio.busy} onClick={() => open('keep-local')}>Keep my changes</button></div>}
     <div className="composition-layout">
-      <nav aria-label="Native composition sections">
+      <nav aria-label="Sections">
         {sections.map(item => <button key={item} aria-current={section === item ? 'page' : undefined} onClick={() => setSection(item)}>{item}</button>)}
         <hr/>
         <button disabled={!document || working} onClick={() => open('import')}>Import JSON...</button>
-        <button disabled={!document || working || studio.dirty} title="Adds chores pages and rooms the draft does not author yet from the live house config. Save or discard local changes first." onClick={() => void studio.importHouse()}>Import from house config</button>
+        <button disabled={!document || working || studio.dirty} title="Adds chores pages and rooms from the live house config. Save or discard changes first." onClick={() => void studio.importHouse()}>Import from house config</button>
         <button disabled={!document} onClick={() => document && exportLocal(document)}>Export local JSON</button>
         <button disabled={!document || working} onClick={() => open('advanced')}>Advanced JSON...</button>
         <button disabled={working} onClick={() => studio.dirty ? open('reload') : void studio.reload()}>Reload saved draft</button>
       </nav>
       <main>
         <h1>{section}</h1>
-        {!document ? <p>{studio.busy ? 'Loading the separate native workspace...' : 'Native composition requires the existing authenticated Studio session. Resolve the error and reload.'}</p> : <fieldset disabled={studio.busy || uploading} className="composition-authoring">
+        {!document ? <p>{studio.busy ? 'Loading…' : 'Sign in to load the draft.'}</p> : <fieldset disabled={studio.busy || uploading} className="composition-authoring">
           {section === 'Overview' && <>
             <TextField label="Composition name" value={document.name} onChange={name => studio.apply({ ...document, name })}/>
-            <dl><dt>Publisher identity</dt><dd>{studio.envelope?.publisherId}</dd><dt>Document identity</dt><dd>{document.id}</dd><dt>Preview endpoint (debug only)</dt><dd><code>{typeof window === 'undefined' ? '/native' : new URL('./native', window.location.href).href}</code></dd></dl>
-            <p>Save validates and durably stores a draft. Publish saves valid local work first, then atomically selects an immutable publication. Export includes current local edits. Import replaces content only, retaining this workspace's publisher/document identity; referenced assets must already be uploaded to this publisher.</p>
-            <p>Stable IDs are read-only. Edit titles and labels freely; use destination selectors to reassign relationships before deleting referenced definitions.</p>
+            <dl></dl>
+            
+            
             {studio.publishedRevision && <p>Frozen locally this session: revision {studio.publishedRevision}</p>}
             {studio.homeAssistant && <p>Published to Home Assistant this session: revision {studio.homeAssistant.revision}</p>}
           </>}
@@ -154,16 +154,16 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
             <p className="field-note">Use Up/Down in the component list to set exact order. Moving outside a grid resets span to 1.</p>
           </fieldset>}
           {section === 'Local state' && <>
-            <p>Scene-local selections and values only, not saved settings or Home Assistant state. Add a choice field before local tabs, then choose its option IDs for each tab. Tabs must match the field's option order and labels. Save/discard forms require a native domain draft adapter and remain unsupported.</p>
+            <p>Values that live on one screen, such as the selected tab. Add a choice field before local tabs.</p>
             {document.localState ? field(['localState'], document.localState, 'Local state')
               : <button onClick={() => studio.apply({ ...document, localState: [] })}>Add local state definitions</button>}
           </>}
           {section === 'Data sources' && <>
-            <p>Typed entity and domain sources. Targets, labels, symbols, ordered controls, states and confirmations are structured fields. Providers resolve on-device; Studio never fetches private account data or camera streams and never operates Home Assistant.</p>
+            
             {field(['dataSources'], document.dataSources, 'Data sources')}
           </>}
           {section === 'Bootstrap' && <>
-            <p>Trusted post-authentication copy only. Home Assistant sign-in, secure fields, system permission decisions and sign-out confirmation remain native. Notifications must precede Time Sensitive; all three setup steps stay present.</p>
+            <p>Text the app shows after sign-in. Sign-in, permissions and sign-out stay native.</p>
             <label className="checkbox-field"><input type="checkbox" checked={Boolean(document.bootstrap)} onChange={event => {
               const next = structuredClone(document);
               if (event.target.checked) next.bootstrap = {
@@ -178,61 +178,56 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
               };
               else delete next.bootstrap;
               studio.apply(next);
-            }}/>Include trusted bootstrap policy</label>
+            }}/>Show first-run setup</label>
             {document.bootstrap && field(['bootstrap'], document.bootstrap, 'Bootstrap policy')}
-            <p>The post-authentication destination is the authored Initial page and Initial tab, not a feature ID. This policy cannot configure a publisher address, OAuth client, credential, permission grant, or sign-out bypass. Before a trusted publication exists the app uses only its compiled sign-in and configuration-recovery boundary, never a compiled dashboard.</p>
+            
           </>}
           {section === 'Wallpaper' && <>
-            <Field label="Upload wallpaper (PNG/JPEG, at most 8 MiB)"><input type="file" accept="image/png,image/jpeg" onChange={event => {
+            <Field label="Upload wallpaper (PNG or JPEG, up to 8 MB)"><input type="file" accept="image/png,image/jpeg" onChange={event => {
               const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = '';
             }}/></Field>
             {assetError && <p role="alert" className="inline-error">{assetError}</p>}
-            <SelectField label="Uploaded immutable asset" value={document.assets[0]?.sha256 ?? ''} options={[{ value: '', label: 'Choose an uploaded image' }, ...assets.map(asset => ({
+            <SelectField label="Wallpaper" value={document.assets[0]?.sha256 ?? ''} options={[{ value: '', label: 'Choose an uploaded image' }, ...assets.map(asset => ({
               value: asset.sha256, label: `${asset.sha256.slice(0, 16)}... ${asset.pixelWidth}x${asset.pixelHeight} (${asset.byteLength} bytes)`,
             }))]} onChange={hash => { const asset = assets.find(item => item.sha256 === hash); if (asset) selectAsset(asset); }}/>
-            <button onClick={() => studio.apply({ ...document, assets: [], theme: { ...document.theme, background: { type: 'solid', token: 'shell-base@1' } } })}>Use solid native background</button>
-            {document.assets.map(asset => <p key={asset.id}><code>{asset.id}</code> <a href={apiUrl(`/native${asset.source.path}`)} target="_blank" rel="noreferrer">View authenticated image</a></p>)}
+            <button onClick={() => studio.apply({ ...document, assets: [], theme: { ...document.theme, background: { type: 'solid', token: 'shell-base@1' } } })}>Use a solid background</button>
+            {document.assets.map(asset => <p key={asset.id}><code>{asset.id}</code> <a href={apiUrl(`/native${asset.source.path}`)} target="_blank" rel="noreferrer">View image</a></p>)}
             {field(['theme', 'background'], document.theme.background, 'Background policies')}
-            <p>Uploads are immutable and same-publisher only. Earlier published images survive selection changes and restarts. Native decoding, symbol availability and pixel comparison remain native verification gates.</p>
+            
           </>}
           {section === 'Live Activities' && <>
-            <p>Accepted appearance is delivered privately to the existing widget and camera-notification targets.
-              Job Id must exactly match the engine job ID (the tag without job.). The engine still owns state,
-              timing, safe controls and links. Watch remains the production stub, not a configurable dashboard.</p>
+            <p>Appearance for the widget and camera notifications. Job ID must match the engine job (the tag without "job.").</p>
+            
             {field(['liveActivities'], document.liveActivities, 'Live Activities')}
             {document.extensions ? field(['extensions', 'cameras'], document.extensions.cameras, 'Camera copy')
-              : <p>Add native extension delivery under Routes first.</p>}
-            <p>Camera entries change copy only, never camera targets, streams or notification actions.
-              Changes appear on the next engine/system render; no new polling or push budget is introduced.</p>
+              : <p>Add extensions under Routes first.</p>}
+            
           </>}
           {section === 'Routes' && <>
             <RoutesEditor document={document} onChange={studio.apply}/>
             {document.extensions && field(['extensions', 'routes'], document.extensions.routes, 'Route targets (page, tab, anchors)')}
-            <p>Routes attach existing system shortcuts, Spotlight and notification paths to authored pages.</p>
+            <p>Paths that open a page from Siri, Spotlight or a notification.</p>
           </>}
           {section === 'Home Assistant' && <HomeAssistantPublication published={studio.homeAssistant} busy={working} onChange={studio.setStatus}/>}
-          {section === 'Native policies' && <>
-            <p>Supported controls include native tabs and chrome; sections, rows, inline local tabs and scene-local controls; room navigation; status, weather, lights, alarms, locks and garages; climate, room devices, bedroom, remotes, vacuums and cameras. Bindings, targets, ordered options, labels, symbols and supported presentation policies are editable fields, not browser approximations.</p>
-            <p>Collections, account headers, remotes and bedroom controls require matching native providers. Authored actions can call any Home Assistant service on a tap (Call service), controls can be bound to entities (Bound control), and any node or tab can be shown by a rule (Visible when). Unsupported: whole-feature dispatch, complete save/discard form composition, route arguments, split panes, pinned modal bars, content images and external assets. Implemented controls do not certify complete production pages or pixel parity.</p>
+          {section === 'Shell and theme' && <>
+            
+            
             {field(['navigation', 'policy'], document.navigation.policy, 'Shell policies')}
             {field(['theme'], document.theme, 'Theme')}
           </>}
         </fieldset>}
       </main>
-      <aside aria-label="Native composition validation">
+      <aside aria-label="Validation">
         <h2>Validation</h2>
-        {errors.length ? <div role="alert" className="inline-error">{errors.join('\n')}</div> : <p>{document ? 'Document compiler accepted the current tree. Asset bytes are checked by the server on save/publish.' : 'No document loaded.'}</p>}
-        {warnings.length > 0 && <div role="status" className="safety-note"><strong>Warnings (they never block a save or publish)</strong>
+        {errors.length ? <div role="alert" className="inline-error">{errors.join('\n')}</div> : <p>{document ? 'No errors.' : 'No document loaded.'}</p>}
+        {warnings.length > 0 && <div role="status" className="safety-note"><strong>Warnings</strong>
           <ul>{warnings.map(warning => <li key={`${warning.pointer}:${warning.message}`}><code>{warning.pointer}</code> {warning.message}</li>)}</ul></div>}
-        <p>Errors name exact document pointers. Unsupported capabilities are rejected, never silently approximated. Invalid drafts cannot replace the last publication.</p>
-        <h2>Last saved manifest</h2>
-        <code>{studio.envelope?.assetManifestSha256}</code>
-        <ul>{studio.envelope?.capabilities.map(capability => <li key={capability}><code>{capability}</code></li>)}</ul>
-      </aside>
+        
+              </aside>
     </div>
-    {operation && <Dialog title={operation === 'reload' ? 'Discard local changes and reload?' : operation === 'keep-local' ? 'Replace latest server draft with local work?' : operation === 'import' ? 'Import native composition content' : 'Advanced native composition JSON'} onClose={() => setOperation(undefined)} wide>
+    {operation && <Dialog title={operation === 'reload' ? 'Discard local changes and reload?' : operation === 'keep-local' ? 'Replace latest server draft with local work?' : operation === 'import' ? 'Import 2.0 content' : 'Advanced JSON'} onClose={() => setOperation(undefined)} wide>
       {(operation === 'import' || operation === 'advanced') ? <>
-        <p>JSON document only (2.0, at most 2 MiB plus 64 KiB of input whitespace). Unknown fields, duplicate keys and unsupported capabilities are rejected. Content import preserves the current document identity. Assets are not embedded; upload their exact bytes separately.</p>
+        <p>Paste or choose a 2.0 JSON document (up to 2 MB). Images are not included; upload them separately.</p>
         <Field label="Composition JSON"><textarea className="code-input composition-source" value={source} onChange={event => setSource(event.target.value)}/></Field>
         <input ref={fileInput} hidden type="file" accept=".json,application/json" onChange={async event => {
           const file = event.target.files?.[0]; event.target.value = '';
@@ -248,9 +243,9 @@ export default function NativeCompositionWorkspace({ onLegacy, active }: { onLeg
           } catch (reason) {
             setDialogError(reason instanceof CompositionValidationError ? reason.issues.map(formatCompositionIssue).join('\n') : reason instanceof Error ? reason.message : String(reason));
           }
-        }}>Validate and apply locally</button></div>
+        }}>Import</button></div>
       </> : <>
-        <p>{operation === 'reload' ? 'This discards the local native document and undo history. Export local JSON first if you need a copy. Schema-1 work is unaffected.' : 'This explicitly replaces the latest server native draft with your local document. A concurrent change can still produce another conflict. Publishing remains a separate operation.'}</p>
+        <p>{operation === 'reload' ? 'Discards your unsaved changes and undo history. Export first if you need a copy.' : 'Replaces the server draft with yours. If someone saved meanwhile, you may see another conflict.'}</p>
         <button className="primary" disabled={studio.busy} onClick={async () => {
           if (operation === 'reload') await studio.reload(); else await studio.save(false, true);
           setOperation(undefined);

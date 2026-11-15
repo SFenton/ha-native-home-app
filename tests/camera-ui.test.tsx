@@ -132,15 +132,15 @@ describe('consent-gated browser camera media', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Snapshot (simulated)' }));
     expect(screen.getByRole('button', { name: 'Snapshot (simulated)' }).getAttribute('aria-busy')).toBe('true');
     act(() => vi.advanceTimersByTime(350));
-    expect(screen.getByText('Snapshot simulated. No actual photo was saved.')).toBeTruthy();
+    expect(screen.getByText('Snapshot simulated.')).toBeTruthy();
     rerender(<CameraMedia entityId={camera} enabled viewer controls={['snapshot', 'sound', 'record']}/>);
     fireEvent.click(screen.getByRole('button', { name: 'Record (simulated)' }));
     act(() => vi.advanceTimersByTime(350));
     expect(screen.getByRole('button', { name: 'Stop (simulated)' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByText(/No actual recording is being saved or Home Assistant recording invoked/)).toBeTruthy();
+    expect(screen.getByText(/Recording started \(simulated\)/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Stop (simulated)' }));
     act(() => vi.advanceTimersByTime(350));
-    expect(screen.getByText(/Recording simulation stopped/)).toBeTruthy();
+    expect(screen.getByText(/Recording stopped \(simulated\)/)).toBeTruthy();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

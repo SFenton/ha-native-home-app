@@ -49,7 +49,7 @@ export function createSampleDocument(): StudioDocument {
     pages: [
       {
         ...page('home', 'Home', 'House', [
-          item('home-welcome', 'heading', 'Welcome home, Sam', { subtitle: 'A little calmer. A little more connected.', layout: { span: 2 } }),
+          item('home-welcome', 'heading', 'Welcome home, Sam', { layout: { span: 2 } }),
           item('home-summary', 'section', 'At a glance', { layout: { span: 2 }, children: [
             item('home-temp', 'status-chip', 'Living room', { icon: 'Thermometer', binding: { sourceId: 'climate', path: 'state' }, props: { suffix: ' \u00b0C', value: '21.5 \u00b0C' } }),
             item('home-safe', 'status-chip', 'All secure', { icon: 'ShieldCheck', props: { value: 'Doors locked', tone: 'success' } }),
@@ -70,16 +70,16 @@ export function createSampleDocument(): StudioDocument {
       },
       {
         ...page('food', 'Food', 'CookingPot', [
-          item('food-heading', 'heading', 'Good food, less planning', { subtitle: 'Your kitchen, all in one place.', layout: { span: 2 } }),
+          item('food-heading', 'heading', 'Good food, less planning', { layout: { span: 2 } }),
           item('food-categories-view', 'carousel', 'Suggested categories', { binding: { sourceId: 'food-categories' }, layout: { span: 2 }, props: { itemTitle: 'title', itemSubtitle: 'count' } }),
-          item('food-list', 'list', 'Shopping list', { subtitle: 'Keep the household in sync', binding: { sourceId: 'groceries' }, layout: { span: 2 }, props: { itemTitle: 'title', itemSubtitle: 'subtitle', showChecks: true } }),
+          item('food-list', 'list', 'Shopping list', { binding: { sourceId: 'groceries' }, layout: { span: 2 }, props: { itemTitle: 'title', itemSubtitle: 'subtitle', showChecks: true } }),
           item('food-shop', 'action-tile', 'Shopping mode', { icon: 'ShoppingBasket', subtitle: 'A focused list for the store', action: { type: 'toggle', variable: 'groceryMode' } }),
           item('food-planning', 'navigation-tile', 'Tonight is sorted', { subtitle: 'See the meal plan', icon: 'CalendarDays', action: { type: 'modal', modalId: 'meals' } }),
         ]),
         toolbar: [{ id: 'food-add', label: 'Plan dinner', icon: 'Plus', placement: 'trailing', action: { type: 'modal', modalId: 'meals' } }],
       },
       page('chores', 'Chores', 'CircleCheck', [
-        item('chores-heading', 'heading', 'Small jobs, shared fairly', { subtitle: 'A home that works for everyone.', layout: { span: 2 } }),
+        item('chores-heading', 'heading', 'Small jobs, shared fairly', { layout: { span: 2 } }),
         item('chores-progress', 'progress', 'This week', { subtitle: '7 of 10 complete', props: { value: 0.7 }, layout: { span: 2 } }),
         item('chores-list', 'list', 'Coming up', { binding: { sourceId: 'chores' }, layout: { span: 2 }, props: { itemTitle: 'title', itemSubtitle: 'subtitle', showChecks: true } }),
         item('chores-done', 'toggle', 'Plants watered', { subtitle: 'Mark your first task complete', icon: 'Leaf', props: { variable: 'choreComplete' }, action: { type: 'toggle', variable: 'choreComplete' } }),
@@ -87,14 +87,14 @@ export function createSampleDocument(): StudioDocument {
       page('settings', 'Settings', 'Settings', [
         item('settings-profile', 'profile', 'Sam Taylor', { subtitle: 'Maple House \u00b7 Household member', icon: 'UserRound', binding: { sourceId: 'household' }, props: { initials: 'ST' }, layout: { span: 2 }, action: { type: 'modal', modalId: 'profile' } }),
         item('settings-preferences', 'section', 'Your preferences', { layout: { span: 2 }, children: [
-          item('settings-notifications', 'toggle', 'Notifications', { subtitle: 'Only the helpful things', icon: 'Bell', props: { variable: 'notifications' }, action: { type: 'toggle', variable: 'notifications' } }),
+          item('settings-notifications', 'toggle', 'Notifications', { icon: 'Bell', props: { variable: 'notifications' }, action: { type: 'toggle', variable: 'notifications' } }),
           item('settings-cameras', 'toggle', 'Show cameras', { subtitle: 'Camera shortcuts on Home', icon: 'Camera', props: { variable: 'showCameras' }, action: { type: 'toggle', variable: 'showCameras' } }),
-          item('settings-guests', 'toggle', 'Guest mode', { subtitle: 'A simpler household experience', icon: 'UsersRound', props: { variable: 'guestMode' }, action: { type: 'toggle', variable: 'guestMode' } }),
+          item('settings-guests', 'toggle', 'Guest mode', { icon: 'UsersRound', props: { variable: 'guestMode' }, action: { type: 'toggle', variable: 'guestMode' } }),
         ] }),
         item('settings-support', 'section', 'Support & feedback', { layout: { span: 2 }, children: [
           item('settings-report', 'report-issue', 'Report an issue', { subtitle: 'Tell us what went wrong', icon: 'Bug', action: { type: 'report-issue' } }),
-          item('settings-request', 'request-feature', 'Request a feature', { subtitle: 'Help shape your home', icon: 'Lightbulb', action: { type: 'request-feature' } }),
-          item('settings-about', 'settings-row', 'About Native Home', { subtitle: 'Designed around your household', icon: 'Info', action: { type: 'modal', modalId: 'about' } }),
+          item('settings-request', 'request-feature', 'Request a feature', { subtitle: 'Send feedback', icon: 'Lightbulb', action: { type: 'request-feature' } }),
+          item('settings-about', 'settings-row', 'About S+H', { icon: 'Info', action: { type: 'modal', modalId: 'about' } }),
         ] }),
       ]),
     ],
@@ -110,9 +110,8 @@ export function createSampleDocument(): StudioDocument {
         item('meals-title', 'heading', 'Roasted vegetable bowls', { subtitle: 'A simple weeknight favorite' }),
         item('meals-details', 'text', 'Dinner plan', { props: { text: '30 minutes \u00b7 Serves 2\nUse what is fresh, add your favorite grains, and finish with lemon.' } }),
       ]), presentation: 'sheet', detent: 'medium' },
-      { ...page('about', 'Native Home', 'House', [
+      { ...page('about', 'S+H', 'House', [
         item('about-title', 'heading', 'A home that feels like yours'),
-        item('about-copy', 'text', 'Studio preview', { props: { text: 'This editable example runs in sample mode. Publishing creates a server-driven configuration snapshot; current iOS integration requires a separate renderer adapter.' } }),
       ]), presentation: 'sheet', detent: 'medium' },
     ],
     liveActivities: [{

@@ -132,13 +132,12 @@ function ChoreEditor({ editor, lists, taskForm, onTarget, onClose, onSave }: {
       onSave(entityId, item);
     }}>
     <header><button type="button" onClick={onClose}>Cancel</button><strong>{editor.item ? 'Edit Task' : 'New Task'}</strong><button disabled={!summary.trim()} type="submit">{editor.item ? 'Save' : 'Add'}</button></header>
-    <p role="note">Simulation only. No Home Assistant chores are changed.</p>
     <label>Task Name<input required maxLength={2000} value={summary} onChange={event => setSummary(event.target.value)}/></label>
     {taskForm && <><label>Description<textarea maxLength={16384} value={description} onChange={event => setDescription(event.target.value)}/></label>
       <label>Due Date<input type="date" value={due} onChange={event => setDue(event.target.value)}/></label>
       {due && <label>Due Time<input type="time" value={time} onChange={event => setTime(event.target.value)}/></label>}
       {!editor.item && lists.length > 1 && <label>Simulated list<select value={entityId} onChange={event => onTarget(event.target.value)}>{lists.map(list => <option key={list.entityId} value={list.entityId}>{list.title}</option>)}</select></label>}
-      <p>Assignment, priority, recurrence and attachment metadata require the separate native task-form contract; they are not inferred from todo items.</p></>}
+      </>}
   </form>;
 }
 
@@ -169,7 +168,7 @@ function ChoresContent({ component, document, dataState, editing, entities = {},
   const vacation = entities[String(component.props.vacationEntityId)] === 'on';
   const viewer = choreResident(component, document);
   const emptyText = component.props.hiddenByVacation && vacation ? component.props.vacationEmptyText
-    : component.props.resident && viewer?.key === component.props.resident ? 'You have no chores due. Nice job!' : component.props.emptyText;
+    : component.props.resident && viewer?.key === component.props.resident ? 'Nothing due.' : component.props.emptyText;
   const toggle = (entityId: string, item: NativeTodoItem) => {
     simulation?.put(entityId, { ...item, status: item.status === 'completed' ? 'needs_action' : 'completed' });
     setAnnouncement(item.status === 'completed' ? 'Task reopened in simulation.' : 'Task completed in simulation. Undo is available for five seconds.');
@@ -205,7 +204,7 @@ function ChoresContent({ component, document, dataState, editing, entities = {},
   const filtering = typeof search?.query === 'string' && !!search.query.trim();
   const noMatches = filtering && sections.some(section => section.eligible.length && search?.targetIds.includes(section.node.id)) && !shown.length;
   return <div ref={root} className="native-chores" data-chore-page={isPage || undefined}>
-    {Object.keys(simulation?.patches ?? {}).length > 0 && <div className="chore-simulation-status" role="status">Simulated changes only <button onClick={() => { simulation?.reset(); setAnnouncement('Chores simulation reset.'); }}>Reset Chores simulation</button></div>}
+    {Object.keys(simulation?.patches ?? {}).length > 0 && <div className="chore-simulation-status" role="status"><button onClick={() => { simulation?.reset(); setAnnouncement('Chores simulation reset.'); }}>Reset Chores simulation</button></div>}
     <span className="sr-only" aria-live="polite">{announcement}</span>
     {dataState === 'loading' ? <p role="status">Loading chores...</p> : dataState === 'error' || profileError
       ? <p role="alert">{profileError ? 'Signed-in user unavailable. Refresh live preview data.' : 'Chores could not be loaded. Refresh live preview data.'}</p>
@@ -235,7 +234,7 @@ function ChoresContent({ component, document, dataState, editing, entities = {},
     {editor && validEditor(editor) && <ChoresOverlay root={root.current}><ChoreEditor key={editor.item ? `${editor.entityId}:${editor.item.uid}` : 'new'} editor={editor} taskForm={taskForm && !grocery}
       lists={readyLists} onTarget={entityId => setEditor(previous => previous ? { ...previous, entityId } : undefined)} onClose={() => setEditor(undefined)} onSave={(entityId, item) => {
         if (!validEditor(editor) || !current.current.sections.some(section => section.entityId === entityId && section.read.status === 'ready' && section.node.props.disabled !== true)) { setEditor(undefined); setAnnouncement('This operation is no longer available.'); return; }
-        simulation?.put(entityId, item); setEditor(undefined); setAnnouncement('Task saved in simulation only.');
+        simulation?.put(entityId, item); setEditor(undefined); setAnnouncement('Task saved (simulated).');
       }}/></ChoresOverlay>}
   </div>;
 }

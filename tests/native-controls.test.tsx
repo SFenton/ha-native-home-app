@@ -160,10 +160,10 @@ describe('native weather primitives', () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Controls' }));
       expect((screen.getByRole('textbox', { name: 'Draft setting' }) as HTMLInputElement).value).toBe('edited');
       expect(screen.getByRole('button', { name: 'Clean' }).hasAttribute('disabled')).toBe(true);
-      expect(screen.getByText('Selected-room command payload unavailable. Selection is a local preview only.')).toBeTruthy();
+      expect(screen.getByText('Room selection is preview only.')).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Cleaning Area' }));
       expect(onChrome).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Cleaning Area', close: false, back: expect.any(Function) }));
-      expect(screen.getByText(/Cleaning-area preview unavailable/)).toBeTruthy();
+      expect(screen.getByText(/No map available/)).toBeTruthy();
       expect(onAction).not.toHaveBeenCalled();
     });
     it.each([['cleaning', 'return_to_base'], ['paused', 'return_to_base'], ['error', 'stop']])('uses the source Stop policy for %s and actual feature gates', (state, service) => {

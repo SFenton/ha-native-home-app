@@ -1,7 +1,7 @@
-name: Native Home Studio
+name: S+H Studio
 version: "0.1.0"
 slug: native_home_studio
-description: Design, preview, validate, and publish Native Home configurations.
+description: Design and publish the S+H app layout.
 arch:
   - amd64
   - aarch64
@@ -14,7 +14,7 @@ backup: cold
 ingress: true
 ingress_port: 4800
 panel_icon: mdi:cellphone-cog
-panel_title: Native Home Studio
+panel_title: S+H Studio
 panel_admin: true
 homeassistant_api: true
 environment:

@@ -62,7 +62,7 @@ describe('preview live data lifecycle', () => {
     expect(result.current.queryLiveEnabled).toBe(false);
     await act(async () => { await result.current.fetchData('search'); });
     expect(request).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith(expect.stringContaining('Enable endpoint search reads'), 'info');
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining('Turn on endpoint search'), 'info');
     act(() => result.current.enableQueryReads());
     rerender({ query: false });
     await act(async () => { await vi.advanceTimersByTimeAsync(400); });
@@ -164,7 +164,7 @@ describe('preview live data lifecycle', () => {
     const { result } = renderHook(() => usePreviewData(document, [], 'live', notify));
     await waitFor(() => expect(result.current.dataModes[native.id]).toBe('live'));
     expect(result.current.dataResults[native.id]).toEqual(reading);
-    expect(notify).toHaveBeenCalledWith('Native Home: Forecast temporarily unavailable.', 'info');
+    expect(notify).toHaveBeenCalledWith('Import notes: Forecast temporarily unavailable.', 'info');
     await act(async () => result.current.fetchData(native.id));
     expect(notify).toHaveBeenCalledTimes(1);
   });

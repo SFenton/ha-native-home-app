@@ -246,7 +246,7 @@ test('canvas dragging reorders existing components and library clicks insert aft
   await page.getByRole('button', { name: 'Save', exact: true }).click({ delay: 80 });
   await expect.poll(async () => (await (await request.get('/api/draft')).json()).document.pages[0].components.map((item: { title: string }) => item.title))
     .toEqual(['Second item', 'Inserted chip', 'Third item', 'First item']);
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.locator('.native-page-content>.native-layout>[data-component-id]').first()).toHaveAttribute('data-component-id', 'first');
 });
 
@@ -278,10 +278,10 @@ test('tab-linked pages keep their tab selected and contextual deletion targets t
   await expect(pages).toHaveCount(originalCount + 1);
   await child.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Delete page...' }).click();
-  await page.getByRole('button', { name: 'Delete surface', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(pages).toHaveCount(originalCount);
   await expect(home).toBeVisible();
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(pages).toHaveCount(originalCount + 1);
   await expect(child).toContainText('Weekly menus');
 });
@@ -600,9 +600,9 @@ test('native initialization is reviewed and undoable, with live values kept out 
   await expect(page.getByText('Live data received', { exact: false })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'App tabs' }).getByRole('button')).toHaveText(['Home', 'Security', 'Climate', 'Chores', 'Settings']);
   await expect(page.locator('.native-status small')).toHaveText('Lights');
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByRole('navigation', { name: 'App tabs' }).getByRole('button', { name: 'Food', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Redo (Ctrl+Shift+Z)', exact: true }).click();
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(async () => (await (await request.get('/api/draft')).json()).document.dataSources[0]).toMatchObject({ endpoint: 'house-states', sample: [] });
   expect(JSON.stringify((await (await request.get('/api/draft')).json()).document)).not.toContain('Test weather');
@@ -687,7 +687,7 @@ test('native camera viewers expose configured controls and stop private reads wh
   await expect(viewer.getByText('Live camera reads are off. Enable live data to connect.', { exact: true })).toBeVisible();
   await expect(viewer.getByRole('button', { name: 'Unmute camera sound', exact: true })).toBeDisabled();
   await viewer.getByRole('button', { name: 'Snapshot (simulated)', exact: true }).click();
-  await expect(viewer.locator('.camera-media-control-status')).toContainText('Snapshot simulated. No actual photo was saved.');
+  await expect(viewer.locator('.camera-media-control-status')).toContainText('Snapshot simulated.');
   await viewer.getByRole('button', { name: 'Record (simulated)', exact: true }).click();
   await expect(viewer.getByRole('button', { name: 'Stop (simulated)', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(mediaRequests).toHaveLength(stoppedAt);

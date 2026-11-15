@@ -74,7 +74,7 @@ export default function NativeVacuum({ component, states, editing, disabled: ext
           </div>;
         })}
         {!tab.children?.some(child => child.props.vacuumAction === 'clean') && <p className="native-control-note">No clean script configured.</p>}
-        {selectedRooms.length > 0 && <p className="native-control-note">Selected-room command payload unavailable. Selection is a local preview only.</p>}
+        {selectedRooms.length > 0 && <p className="native-control-note">Room selection is preview only.</p>}
         <div className="native-control-actions">
           {policy.cleaning && command('Pause', 'pause', 4)}
           {policy.paused && command('Resume', 'start', 8192)}
@@ -83,7 +83,7 @@ export default function NativeVacuum({ component, states, editing, disabled: ext
           {command('Dock', 'return_to_base', 16)}
           {command('Locate', 'locate', 512, 'Asks the robot to play a sound.')}
         </div><p className="native-control-note">Asks the robot to play a sound.</p>
-        <p className="native-control-note">Pending-resume and error-reason policy telemetry is unavailable.</p>
+        
         <div className="native-control-actions">{all.filter(child => child.props.vacuumPage).map(child =>
           <button type="button" key={child.id} onClick={() => navigate(child.id, true)}>{child.title}</button>)}</div>
       </> : tab.props.vacuumTab === 'zones' ? <>
@@ -109,8 +109,8 @@ export default function NativeVacuum({ component, states, editing, disabled: ext
       hidden={page?.id !== child.id} inert={page?.id !== child.id}>
       {!onChrome && page?.id === child.id && <button type="button" onClick={back}>Back</button>}
       <p className="native-control-note">{child.props.vacuumPage === 'area'
-        ? 'Cleaning-area preview unavailable: no supported map or area-command contract.'
-        : 'Cleaning report telemetry unavailable.'}</p>
+        ? 'No map available.'
+        : 'No cleaning report.'}</p>
       {renderComponent(child, true)}
     </div>)}
     {!page && <NativeLocalTabs tabs={tabs.map(tab => ({ id: tab.id, title: tab.title, icon: <Icon name={tab.icon} size={22}/> }))}

@@ -44,6 +44,7 @@
 button.primary:hover:not(:disabled){background:#23564d;border-color:#23564d}
 .sidebar,.sidebar-footer{background:#fffefa;color:var(--ink);border-color:var(--line)}
 .sidebar button{color:#48574e}
+.sidebar button.primary,.sidebar button.primary:hover:not(:disabled){color:#fff}
 .sidebar .sidebar-section-heading,.sidebar .section-label,.sidebar-project small,.sidebar .library-hint,.sidebar .workspace-note,.sidebar .inline-empty{color:#59625d}
 .sidebar-project strong{font-size:13px;color:var(--ink)}
 .project-avatar{background:#e5efe9;color:#2d6b60;border-color:#d4dfd4}
@@ -291,7 +292,7 @@ button.primary:hover:not(:disabled){background:#23564d;border-color:#23564d}
 @media(prefers-color-scheme:dark){.appearance-system .native-modal{--native-bg:#1c1c1e;--native-card:#2c2c2e;--native-ink:#fff;--native-secondary:#ebebf5ad;--native-line:#fff2}}
 @media(prefers-reduced-transparency:reduce),(prefers-contrast:more){.native-app,.native-app.appearance-dark{--native-card:#1c1c1e}.native-wallpaper{display:none}.native-status,.native-tile,.native-weather{background-image:none}.native-tabbar{backdrop-filter:none}}
 .native-scroll[hidden]{display:none!important}
-.native-scroll.navigation-exit{position:absolute;top:48px;left:0;right:0;pointer-events:none}
+.native-scroll.navigation-exit{position:absolute;top:0;left:0;right:0;pointer-events:none}
 .navigation-forward.navigation-enter{animation:native-push-in .3s ease-out}
 .navigation-forward.navigation-exit{animation:native-push-out .3s ease-out}
 .navigation-back.navigation-enter{animation:native-push-out .3s ease-out reverse}
@@ -301,3 +302,12 @@ button.primary:hover:not(:disabled){background:#23564d;border-color:#23564d}
 @keyframes native-push-in{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @keyframes native-push-out{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 @media(prefers-reduced-motion:reduce){.native-scroll.navigation-enter:not(.navigation-none){animation:native-crossfade .2s ease-out!important}.native-scroll.navigation-exit{visibility:hidden}}
+
+/* Device containment: nothing inside the preview scrolls the Studio, selects text or ghost-drags. */
+.device-screen,.device-screen *{overscroll-behavior:contain;-webkit-tap-highlight-color:transparent}
+.device-screen,.device-screen *:not(input):not(textarea){user-select:none;-webkit-user-select:none}
+.device-screen input,.device-screen textarea{user-select:text;-webkit-user-select:text}
+.device-screen img,.device-screen a{-webkit-user-drag:none;user-drag:none}
+.device-model[data-pan] .device-screen{cursor:grab}
+.device-model.preview-panning,.device-model.preview-panning *{cursor:grabbing!important}
+.device-model.preview-panning *{scroll-snap-type:none!important;scroll-behavior:auto!important}

@@ -189,7 +189,7 @@ export default function CameraMedia({ entityId, enabled, viewer = false, aspectR
     const start = async () => {
       const nativeHls = Boolean(media.canPlayType('application/vnd.apple.mpegurl'));
       if (!nativeHls && !Hls.isSupported()) {
-        fail('Live HLS playback is unavailable in this browser. No static image is being presented as video.');
+        fail('Live video is unavailable in this browser.');
         return;
       }
       try {
@@ -257,13 +257,13 @@ export default function CameraMedia({ entityId, enabled, viewer = false, aspectR
     simulation.current = setTimeout(() => {
       setPending(undefined);
       if (control === 'snapshot') {
-        setResult('Snapshot simulated. No actual photo was saved.');
-        onFeedback?.('Snapshot simulated. No actual photo was saved.');
+        setResult('Snapshot simulated.');
+        onFeedback?.('Snapshot simulated.');
       }
       else {
         setRecording(!recording);
-        const message = recording ? 'Recording simulation stopped. No actual recording was saved or Home Assistant recording invoked.'
-          : 'Recording simulated. No actual recording is being saved or Home Assistant recording invoked.';
+        const message = recording ? 'Recording stopped (simulated).'
+          : 'Recording started (simulated).';
         setResult(message);
         onFeedback?.(message);
       }
@@ -315,7 +315,7 @@ export default function CameraMedia({ entityId, enabled, viewer = false, aspectR
       })}
       <div className="camera-media-control-status">
         {configured.includes('sound') && <p>{!active ? 'Sound unavailable until live playback starts.' : playback === 'error' ? 'Sound unavailable while playback is disconnected.' : transport === 'mjpeg' ? 'Sound unavailable: MJPEG carries video frames only, without audio.' : audio === 'available' ? muted ? 'Sound muted' : 'Sound on' : audio === 'unknown' ? 'Checking camera audio...' : 'Sound unavailable: no audio track detected by this browser.'}</p>}
-        {(configured.includes('snapshot') || configured.includes('record')) && <p>Snapshot and Record are simulations only.</p>}
+        {(configured.includes('snapshot') || configured.includes('record')) && <p>Snapshot and Record are simulated.</p>}
         <p role="status" aria-live="polite">{result}</p>
       </div>
     </div>}

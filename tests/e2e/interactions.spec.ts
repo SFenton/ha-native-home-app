@@ -133,7 +133,7 @@ test('endpoint search requires consent, encodes the query, and never shows sampl
   await page.getByRole('button', { name: 'Live data: off', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Live data: on', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(search).toBeDisabled();
-  await canvas.getByRole('button', { name: 'Enable endpoint search reads', exact: true }).click();
+  await canvas.getByRole('button', { name: 'Allow search requests', exact: true }).click();
   await search.fill('rice & beans/?');
   await search.press('Enter');
   await expect(canvas.getByText('Found: rice & beans/?', { exact: true })).toBeVisible();

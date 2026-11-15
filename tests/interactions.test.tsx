@@ -210,7 +210,7 @@ describe('endpoint search controls', () => {
     const { rerender } = render(<Harness/>);
     expect((screen.getByRole('searchbox') as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByRole('status').textContent).toContain('sample');
-    fireEvent.click(screen.getByRole('button', { name: 'Enable endpoint search reads' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Allow search requests' }));
     expect(enable).toHaveBeenCalledTimes(1);
     expect(submit).not.toHaveBeenCalled();
     rerender(<Harness enabled/>);

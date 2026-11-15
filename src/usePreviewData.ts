@@ -63,7 +63,7 @@ export function usePreviewData(
       window.clearTimeout(queryTimers.current.get(id));
       queryTimers.current.delete(id);
       if (!current.current.queryLiveEnabled || !current.current.activeQueries.has(id)) {
-        notify('Enable endpoint search reads and open this search in Interact mode before querying.', 'info');
+        notify('Turn on endpoint search in Interact mode first.', 'info');
         return;
       }
       if (typeof query === 'string' && !query.trim()) return;
@@ -138,7 +138,7 @@ export function usePreviewData(
       if (!stillCurrent()) return;
       if (warnings !== nativeWarnings.current) {
         nativeWarnings.current = warnings;
-        if (warnings) notify(`Native Home: ${warnings}`, 'info');
+        if (warnings) notify(`Import notes: ${warnings}`, 'info');
       }
       for (const update of updates) {
         if (!update.error) failures.current.delete(update.source.id);

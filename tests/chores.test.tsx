@@ -242,7 +242,7 @@ describe('configured Chores contract and safe native simulations', () => {
     expect(actions.closest('.chore-row')?.hasAttribute('data-swipe')).toBe(false);
     fireEvent.click(within(actions).getByRole('button', { name: 'Delete' }));
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
-    expect(screen.getByRole('status').textContent).toContain('Simulated changes only');
+    expect(screen.getByRole('status').textContent).toContain('Reset Chores simulation');
     expect(JSON.stringify(document)).toBe(original);
   });
   it('retains sorted row positions through multiple completions and Undo in an unsorted response', () => {
@@ -290,7 +290,7 @@ describe('configured Chores contract and safe native simulations', () => {
     if (staleForm) fireEvent.submit(staleForm);
     if (staleDelete) fireEvent.click(staleDelete);
     expect(screen.getByRole('button', { name: 'Complete Other assignment' })).toBeTruthy();
-    expect(screen.queryByText('Simulated changes only')).toBeNull();
+    expect(screen.queryByText('Reset Chores simulation')).toBeNull();
     rendered.rerender(content('user-one'));
     expect(screen.getByRole('button', { name: 'Complete Task Alpha' })).toBeTruthy();
     expect(screen.queryByText('Stale identity edit')).toBeNull();

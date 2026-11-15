@@ -171,9 +171,9 @@ describe('native composition structured controls', () => {
     fireEvent.change(screen.getByLabelText('Glyph'), { target: { value: 'vacuum' } });
     fireEvent.change(screen.getByLabelText('Job Id'), { target: { value: 'vacuum.demo_unit' } });
     fireEvent.click(screen.getByRole('button', { name: 'Routes' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add native extension delivery' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add extensions' }));
     expect(screen.getByRole('button', { name: 'Import legacy aliases' })).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Publish native' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Publish to preview' }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -249,15 +249,15 @@ describe('native composition structured controls', () => {
     };
     vi.mocked(request).mockResolvedValueOnce([asset]);
     fireEvent.click(screen.getByRole('button', { name: 'Wallpaper' }));
-    await waitFor(() => expect(within(screen.getByLabelText('Uploaded immutable asset')).getAllByRole('option')).toHaveLength(2));
-    fireEvent.change(screen.getByLabelText('Uploaded immutable asset'), { target: { value: asset.sha256 } });
-    expect(screen.getByRole('link', { name: 'View authenticated image' }).getAttribute('href')).toBe(`./native${asset.source.path}`);
+    await waitFor(() => expect(within(screen.getByLabelText('Wallpaper')).getAllByRole('option')).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText('Wallpaper'), { target: { value: asset.sha256 } });
+    expect(screen.getByRole('link', { name: 'View image' }).getAttribute('href')).toBe(`./native${asset.source.path}`);
     const file = new File(['synthetic'], 'synthetic.png', { type: 'image/png' });
     vi.mocked(request).mockResolvedValueOnce(asset);
-    fireEvent.change(screen.getByLabelText('Upload wallpaper (PNG/JPEG, at most 8 MiB)'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('Upload wallpaper (PNG or JPEG, up to 8 MB)'), { target: { files: [file] } });
     await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/assets', { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: file }));
-    fireEvent.click(screen.getByRole('button', { name: 'Use solid native background' }));
-    expect(screen.queryByRole('link', { name: 'View authenticated image' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Use a solid background' }));
+    expect(screen.queryByRole('link', { name: 'View image' })).toBeNull();
   });
 
   it('authors optional native tile presentation with structured controls and removes it without a null field', async () => {
@@ -303,7 +303,7 @@ describe('native composition structured controls', () => {
     fireEvent.change(name, { target: { value: 'Local work survives failed import' } });
     fireEvent.click(screen.getByRole('button', { name: 'Import JSON...' }));
     fireEvent.change(screen.getByLabelText('Composition JSON'), { target: { value: '{"schemaVersion":"2.0","schemaVersion":"2.0"}' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Validate and apply locally' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
     expect(screen.getByRole('alert').textContent).toContain('duplicate_key');
     expect(screen.getByDisplayValue('Local work survives failed import')).toBeDefined();
     expect(request).toHaveBeenCalledTimes(1);
@@ -366,7 +366,7 @@ describe('native composition persistence controls', () => {
   });
 });
 
-describe('Publish to Home Assistant', () => {
+describe('Publish', () => {
   const entry = (revision: number, publishedBy: string | null = 'supervisor-user-id') => ({
     revision, publishedAt: '2026-11-14T12:00:00+00:00', publishedBy, envelopeSha256: 'b'.repeat(64), capabilities: [],
   });
@@ -381,7 +381,7 @@ describe('Publish to Home Assistant', () => {
     });
     render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
     await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Publish to Home Assistant' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/ha/publish', expect.objectContaining({ method: 'POST', body: JSON.stringify({ expectedRevision: 1 }) })));
     expect((await screen.findByRole('status')).textContent).toContain('Published to Home Assistant as revision 2');
     fireEvent.click(screen.getByRole('button', { name: 'Home Assistant' }));
@@ -406,7 +406,7 @@ describe('Publish to Home Assistant', () => {
     render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
     await screen.findByDisplayValue('Native composition');
     fireEvent.change(screen.getByDisplayValue('Native composition'), { target: { value: 'Edited' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Publish to Home Assistant' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     expect((await screen.findByRole('alert')).textContent).toContain('needs an administrator');
     expect(screen.getByText('Unsaved local changes')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Home Assistant' }));

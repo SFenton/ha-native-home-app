@@ -72,8 +72,8 @@ export function useCompositionStudio() {
       } else if (publish) {
         const published = await request<CompositionPublication>('/native/api/publish', { method: 'POST', body: JSON.stringify({ expectedRevision: next.revision }) });
         setPublishedRevision(published.revision);
-        setStatus(`Published native revision ${published.revision}. Native preparation and visual parity are separate gates.`);
-      } else setStatus(`Saved native draft revision ${next.revision}`);
+        setStatus(`Published revision ${published.revision}.`);
+      } else setStatus(`Saved draft revision ${next.revision}`);
       return true;
     } catch (reason) { report(reason); return false; }
     finally { locked.current = false; setBusy(false); }
