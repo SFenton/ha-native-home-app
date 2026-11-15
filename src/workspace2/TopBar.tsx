@@ -37,6 +37,8 @@ export function ChecksPill({ ws, narrow, onOpenChange, open, onGo, showPill = tr
   </Overlay></>;
 }
 
+const DRAFT = 'Draft · ';
+
 export interface TopBarProps {
   ws: Workspace2; narrow: boolean; window: PreviewWindow; onWindow: (window: PreviewWindow) => void;
   pagesOpen: boolean; onPagesOpen: (open: boolean) => void; projectOpen: boolean; onProjectOpen: (open: boolean) => void;
@@ -53,9 +55,11 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
   const blocked = ws.problemCount > 0;
   const pageTrigger = <button type="button" className="w2-page-button" aria-label="Pages"><Icon name={title?.icon.name ?? 'grid'} size={18}/><span>{title?.title ?? ''}</span><ChevronDown size={14} aria-hidden/></button>;
   if (!document) return <header className="w2-topbar"><span className="w2-wordmark">S+H Studio</span></header>;
+  // Narrow, "Draft · " gives way so the page name keeps its room; the text a test or a screen reader reads still carries it.
+  const words = (ws.status.text.startsWith(DRAFT) ? <><span className="w2-tag-draft">{DRAFT}</span>{ws.status.text.slice(DRAFT.length)}</> : ws.status.text);
   const tag = (className?: string) => ws.status.tone === 'error'
-    ? <button type="button" className={`w2-tag w2-tag-error w2-tag-button ${className ?? ''}`} data-testid="status-tag" onClick={ws.studio.conflict ? ws.reopenConflict : onChecks}>{ws.status.text}</button>
-    : <Tag tone={ws.status.tone} role="status" data-testid="status-tag" className={className}>{ws.status.text}</Tag>;
+    ? <button type="button" className={`w2-tag w2-tag-error w2-tag-button ${className ?? ''}`} data-testid="status-tag" onClick={ws.studio.conflict ? ws.reopenConflict : onChecks}>{words}</button>
+    : <Tag tone={ws.status.tone} role="status" data-testid="status-tag" className={className}>{words}</Tag>;
   return <header className="w2-topbar">
     {!narrow && <span className="w2-wordmark">S+H Studio</span>}
     <Overlay narrow={narrow} open={pagesOpen} onOpenChange={onPagesOpen} trigger={pageTrigger} label="Pages" popupWidth={320} fullHeight className="w2-pages-pop">

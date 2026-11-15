@@ -48,8 +48,10 @@
 .w2-scope .w2-segment-pill button[aria-pressed=true], .w2-scope .w2-segment-pill button[aria-checked=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
 .w2-window-button { font-variant-numeric: tabular-nums; }
 .w2-status-narrow { margin-inline-start: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 0 7px; flex: 0 1 auto; }
-.w2-narrow .w2-page-button { flex: 1 1 0; max-width: none; min-width: 96px; justify-content: flex-start; padding: 0 8px; }
+.w2-narrow .w2-page-button { flex: 1 1 auto; max-width: none; min-width: 96px; justify-content: flex-start; padding: 0 8px; }
 .w2-narrow .w2-trailing { flex: none; margin-inline-start: 0; }
+/* The status tag shrinks before the page name does: "Draft · Saved" reads "Saved" on a phone. */
+.w2-narrow .w2-tag-draft { display: none; }
 .w2-narrow .w2-status-narrow { flex: none; overflow: visible; }
 .w2-tag { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--w2-field); color: var(--w2-ink-card); }
 .w2-scope button.w2-tag-button { border: 0; min-height: 22px; padding: 0 9px; border-radius: 11px; }
@@ -63,7 +65,8 @@
 .w2-canvas[data-card=open] .w2-stage { padding-inline-end: calc(376px + 32px); }
 .w2-narrow .w2-stage { padding: 0; }
 .w2-checks-slot { position: absolute; left: 16px; bottom: 16px; z-index: 1; }
-.w2-narrow .w2-checks-slot { top: 8px; bottom: auto; left: 50%; transform: translateX(-50%); }
+/* Below the preview's safe area (62 px at iPhone size), so it never sits on the Dynamic Island or the status bar. */
+.w2-narrow .w2-checks-slot { top: 68px; bottom: auto; left: 50%; transform: translateX(-50%); }
 .w2-pill { border-radius: 16px; min-height: 32px; background: var(--w2-card); box-shadow: var(--w2-shadow); }
 .w2-scope .w2-pill-note, .w2-scope .w2-pill-note:hover:not(:disabled) { background: var(--w2-ink); color: var(--w2-bg); border-color: var(--w2-ink); font-weight: 600; }
 .w2-scope .w2-pill-error { color: var(--w2-err-text); border-color: var(--w2-err); }

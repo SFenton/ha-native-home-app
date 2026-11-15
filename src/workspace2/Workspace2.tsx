@@ -108,7 +108,10 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
       </main>
       {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/>{ws.mode === 'edit' && <BottomAdd/>}
         <button type="button" className="w2-bottom-pages" aria-label="Pages" onClick={() => setPagesOpen(true)}><Layers size={16} aria-hidden/>Pages</button></nav>}
-      {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={next => { if (!dialogOpen()) setSnap(next); }}
+      {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={(next, details) => {
+          // A press outside the sheet (Undo, a dialog) is not a drag: the sheet keeps the snap point it had.
+          if (!dialogOpen() && details.reason !== 'outside-press') setSnap(next);
+        }}
         onOpenChange={(open, details) => {
           // A dialog opened from inside the sheet (New Page…, New Sheet…) sits outside it; pressing in the dialog is not a press outside the sheet.
           if (!open && details.reason === 'outside-press' && (details.event.target as Element | null)?.closest?.('[role=dialog], [role=alertdialog]')) return;
