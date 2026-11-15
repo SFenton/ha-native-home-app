@@ -97,7 +97,7 @@ test('evidence: rest, tile selected, Pages, Project menu and Publish, in light a
     await shot('advanced');
     await frame.locator('.w2-back').click();
     await frame.getByRole('button', { name: 'Close', exact: true }).first().click();
-    await frame.getByRole('button', { name: 'Pages' }).click();
+    await frame.getByRole('button', { name: 'Pages' }).locator('visible=true').first().click();
     await page.waitForTimeout(500);
     await shot('pages');
     await page.keyboard.press('Escape');

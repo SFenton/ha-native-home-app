@@ -52,7 +52,8 @@ async function reachable(panel: Locator): Promise<Set<string>> {
     for (let round = 0; round < 6; round++) {
       const closed = panel.locator('.w2-disclosure-head[aria-expanded=false]:not(.w2-advanced-row)');
       if (await closed.count() === 0) break;
-      for (const button of await closed.all()) await button.click({ timeout: 2000 }).catch(() => undefined);
+      // Clicks go straight to the heads: a head scrolled under the panel edge is still a row a person reaches by scrolling.
+      await closed.evaluateAll(heads => heads.forEach(head => (head as HTMLElement).click()));
     }
     await collect();
   };
