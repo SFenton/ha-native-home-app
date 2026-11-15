@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type CSSProperties, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, type CSSProperties, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { usePreviewPointer } from '../preview-pointer';
 
 /** Room the stage keeps around the model, in px at zoom 1. */
@@ -49,6 +49,8 @@ export interface DeviceFrameProps {
   frameRef?: RefObject<HTMLDivElement | null>;
   /** Stage perspective for the 3D view; leave unset for a flat frame. */
   perspective?: number;
+  /** Room kept around the model; defaults to {@link STAGE_PADDING}. */
+  padding?: { x: number; y: number };
   children: ReactNode;
 }
 
@@ -57,22 +59,15 @@ export interface DeviceFrameProps {
  * its centre, and the scroll host behaviour (wheel and touch stay inside, a mouse pans in Interact mode; see
  * `attachPreviewPointer`). It draws nothing inside: callers pass the screen as children and the look as classes.
  */
-export function DeviceFrame({ width, height, zoom, pan, transform = '', stageClassName = '', stageProps, modelClassName = '', modelProps, modelStyle, frameRef, perspective, children }: DeviceFrameProps) {
+export function DeviceFrame({ width, height, zoom, pan, transform = '', stageClassName = '', stageProps, modelClassName = '', modelProps, modelStyle, frameRef, perspective, padding = STAGE_PADDING, children }: DeviceFrameProps) {
   const own = useRef<HTMLDivElement>(null);
   const ref = frameRef ?? own;
   usePreviewPointer(ref, pan);
   const { style: stageStyle, ...stageRest } = stageProps ?? {};
-  return <div {...stageRest} className={`device-stage ${stageClassName}`.trim()} style={{ width: width * zoom + STAGE_PADDING.x, height: height * zoom + STAGE_PADDING.y, ...(perspective ? { perspective } : {}), ...stageStyle }}>
+  return <div {...stageRest} className={`device-stage ${stageClassName}`.trim()} style={{ width: width * zoom + padding.x, height: height * zoom + padding.y, ...(perspective ? { perspective } : {}), ...stageStyle }}>
     <div {...modelProps} ref={ref} data-pan={pan ? '' : undefined} className={`device-model ${modelClassName}`.trim()}
-      style={{ width, height, left: (width * zoom + STAGE_PADDING.x - width) / 2, top: (height * zoom + STAGE_PADDING.y - height) / 2, transform: `scale(${zoom}) ${transform}`.trim(), ...modelStyle }}>
+      style={{ width, height, left: (width * zoom + padding.x - width) / 2, top: (height * zoom + padding.y - height) / 2, transform: `scale(${zoom}) ${transform}`.trim(), ...modelStyle }}>
       {children}
     </div>
   </div>;
-}
-
-/** A stable callback ref helper for components that need both their own ref and a caller's. */
-export function useStableCallback<T extends (...args: never[]) => unknown>(callback: T): T {
-  const latest = useRef(callback);
-  latest.current = callback;
-  return useCallback(((...args: never[]) => latest.current(...args)) as T, []);
 }
