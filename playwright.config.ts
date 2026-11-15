@@ -14,6 +14,8 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: `http://127.0.0.1:${port}`,
+    // The 1.0 specs drive the 1.0 editor, which is no longer the default workspace.
+    storageState: { cookies: [], origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: 'studio.workspace', value: '1.0' }] }] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

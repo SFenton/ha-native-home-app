@@ -67,6 +67,7 @@ test('the chrome follows a live theme change in the parent, and the preview does
 
 test('evidence: rest, tile selected, Pages, Project menu and Publish, in light and dark Home Assistant themes', async ({ page }) => {
   test.skip(!evidence, 'Set STUDIO_EVIDENCE_DIR to write the screenshots');
+  test.setTimeout(180_000);
   await mkdir(evidence!, { recursive: true });
   await page.route('**/native/api/ha/publication', route => route.fulfill({ json: { epoch: 'e2e', current: { revision: 12, publishedAt: '2026-11-14T10:00:00Z', publishedBy: null, envelopeSha256: 'a'.repeat(64), capabilities: [] }, history: [], storedAssets: 0 } }));
   const size = isPhone(page) ? 'phone' : 'desktop';
@@ -83,7 +84,6 @@ test('evidence: rest, tile selected, Pages, Project menu and Publish, in light a
     await page.waitForTimeout(500);
     await shot('pages');
     await page.keyboard.press('Escape');
-    if (isPhone(page)) await frame.getByRole('button', { name: 'Done' }).click({ trial: true }).catch(() => undefined);
     await page.waitForTimeout(400);
     await frame.getByRole('button', { name: 'Project' }).click();
     await page.waitForTimeout(500);
