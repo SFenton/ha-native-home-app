@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { CompositionDocument } from '../src/shared/composition';
+import type { CompositionDocument } from '../src/shared/composition/schema';
 import { fillTabGroups, groupWithRoom, tabGroups } from '../src/workspace2/capacity';
 import { runChecks } from '../src/workspace2/checks';
 import { labelFor, labelText, mechanicalLabel } from '../src/workspace2/labels';
