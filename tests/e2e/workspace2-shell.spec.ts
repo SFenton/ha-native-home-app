@@ -48,6 +48,41 @@ test('selecting a tile on a phone shows its properties without hiding the tile',
   expect((await visibleControls(page)).length).toBeLessThanOrEqual(30);
 });
 
+test('a tile low on the page is scrolled above the half sheet when it is selected', async ({ page }) => {
+  test.skip(!isPhone(page), 'The sheet is the narrow layout');
+  await openWorkspace(page);
+  // The lowest tile that is fully on screen before the sheet opens: the half sheet would cover it unless the preview reveals it.
+  const lowest = await page.evaluate(() => {
+    const found = [...document.querySelectorAll<HTMLElement>('[data-preview-root] .sh-page[data-current] .sh-node[data-type$="tile"]')]
+      .map(element => ({ element, box: element.getBoundingClientRect() })).filter(item => item.box.bottom < innerHeight - 90 && item.box.top > 100);
+    found.sort((a, b) => b.box.top - a.box.top);
+    return found[0]?.element.getAttribute('data-sel') ?? null;
+  });
+  expect(lowest, 'a tile low on the home page').toBeTruthy();
+  const tile = page.locator(`[data-preview-root] [data-sel="${lowest}"]`).first();
+  await tile.click({ position: { x: 4, y: 4 } });
+  const sheet = page.getByLabel('Properties');
+  await expect(sheet.getByLabel('Title')).toBeVisible();
+  await page.waitForTimeout(900);
+  const box = await tile.boundingBox(), sheetBox = await sheet.boundingBox();
+  expect(box && sheetBox && box.y >= 0 && box.y + box.height <= sheetBox.y + 1, `tile ${JSON.stringify(box)} sits above sheet ${JSON.stringify(sheetBox)}`).toBeTruthy();
+});
+
+test('a title typed in properties reaches the preview in the same frame', async ({ page }) => {
+  await openWorkspace(page);
+  await selectTile(page, 'Lights');
+  const seen = await page.evaluate(async () => {
+    const input = document.querySelector<HTMLInputElement>('[aria-label="Properties"] input[aria-label="Title"], [aria-label="Properties"] input[id]') ;
+    const field = [...document.querySelectorAll<HTMLInputElement>('[aria-label="Properties"] input')].find(item => item.value === 'Lights') ?? input!;
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, 'Lamps');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    return document.querySelector('[data-preview-root]')!.textContent!.includes('Lamps') && !document.querySelector('[data-preview-root]')!.textContent!.includes('Lights');
+  });
+  expect(seen, 'the preview shows the new title one frame after the input').toBeTruthy();
+});
+
 test('the phone sheet opens at half, snaps to its header, and a swipe down from there closes it', async ({ page }) => {
   test.skip(!isPhone(page), 'The sheet is the narrow layout');
   await openWorkspace(page);

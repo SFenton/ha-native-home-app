@@ -50,7 +50,8 @@ test('a theme that sets only its primary colour recolours the chrome and keeps e
 
 test('the chrome follows a live theme change in the parent, and the preview does not', async ({ page }) => {
   const frame = await openInHomeAssistant(page, themes.light);
-  const preview = frame.locator('[data-preview-root]').first();
+  // The device itself: the preview's root also holds the stage around it, which follows the chrome.
+  const preview = frame.locator('[data-preview-root] .sh-model').first();
   const box = (await preview.boundingBox())!;
   // Inside the device, clear of its rounded corners (which show the stage behind) and of any sheet.
   const clip = { x: box.x + 4, y: box.y + 40, width: box.width - 8, height: 300 };
