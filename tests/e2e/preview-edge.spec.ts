@@ -35,7 +35,7 @@ const ancestors = (page: Page) => scroller(page).evaluate(element => {
   return { pageY: window.scrollY, ancestors: positions };
 });
 async function touchSwipe(page: Page, session: CDPSession, x: number, from: number, to: number) {
-  const send = (type: string, y?: number) => session.send('Input.dispatchTouchEvent', { type, touchPoints: y === undefined ? [] : [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }] });
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', y?: number) => session.send('Input.dispatchTouchEvent', { type, touchPoints: y === undefined ? [] : [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }] });
   await send('touchStart', from);
   for (let step = 1; step <= 12; step++) { await send('touchMove', from + (to - from) * step / 12); await page.waitForTimeout(16); }
   await send('touchEnd');
