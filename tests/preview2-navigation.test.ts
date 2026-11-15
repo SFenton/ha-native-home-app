@@ -5,7 +5,7 @@ import { basePageId, currentSurface, initialNav, isNavAction, navigateTo, presen
 import fixture from './fixtures/home-domains.json';
 
 const document: CompositionDocument = compileCompositionDocument(structuredClone(fixture.document)).document;
-const push = (pageId: string): NavAction => ({ type: 'push', pageId, arguments: {}, origin: 'sender', duplicate: 'reuse-nearest' });
+const push = (pageId: string) => ({ type: 'push' as const, pageId, arguments: {}, origin: 'sender' as const, duplicate: 'reuse-nearest' as const });
 const present = (modalId: string, ifPresented: 'reject' | 'replace' = 'reject'): NavAction => ({ type: 'present', modalId, arguments: {}, ifPresented });
 const run = (state: NavState, ...actions: NavAction[]) => actions.reduce((now, action) => reduceNavigation(document, now, action), state);
 const start = initialNav(document);

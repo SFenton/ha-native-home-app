@@ -19,6 +19,7 @@ test('Edit draws the home page, selects on click and clears with Esc', async ({ 
   await page.locator('[data-sel="node:hc-chip-0"]').click();
   await expect(page.getByTestId('selection')).toHaveText('node:hc-chip-0');
   await expect(page.locator('[data-sel="node:hc-chip-0"] .sh-handle-slot')).toHaveCount(1);
+  await page.locator('.sh-rail').evaluate(rail => { rail.scrollLeft = 0; });
   await shot(page, 'home-edit-selected');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('selection')).toHaveText('node:hc-status-rail');
@@ -44,8 +45,33 @@ test('A sheet is drawn presented over its page', async ({ page }) => {
   await shot(page, 'lights-sheet-edit');
 });
 
-test('Phone width: no bezel, full width', async ({ page }) => {
-  await page.setViewportSize({ width: 402, height: 874 });
-  await page.goto(story('surface=page:page-home&bezel=0&panel=0'));
-  await expect(page.locator('.sh-page[data-current] .sh-large-title')).toHaveText('Home');
+test('Use keeps the wheel inside the device and pans with the mouse', async ({ page }) => {
+  await page.goto(story('mode=use&surface=page:page-security'));
+  const scroller = page.locator('.sh-page[data-current] .sh-scroll');
+  await expect(scroller).toBeVisible();
+  const box = (await scroller.boundingBox())!;
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const before = await scroller.evaluate(element => element.scrollTop);
+  await page.mouse.move(x, y + 120);
+  await page.mouse.down();
+  for (let step = 1; step <= 10; step++) await page.mouse.move(x, y + 120 - step * 10);
+  await page.mouse.up();
+  await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+});
+
+test.describe('iPhone size, no bezel', () => {
+  test.use({ viewport: { width: 402, height: 874 } });
+  for (const [name, surface] of [['home', 'page:page-home'], ['security', 'page:page-security'], ['climate', 'page:page-climate']]) {
+    test(`draws ${name} at 402 by 874`, async ({ page }) => {
+      await page.goto(story(`surface=${surface}&bezel=0&panel=0`));
+      await expect(page.locator('.sh-page[data-current] .sh-large-title')).toHaveText(name[0].toUpperCase() + name.slice(1));
+      const frame = (await host(page).boundingBox())!;
+      expect(Math.round(frame.width)).toBe(402);
+      await shot(page, `iphone-${name}`);
+    });
+  }
 });
