@@ -27,7 +27,7 @@ async function openWindow(page: Page) {
 }
 async function chooseWindow(page: Page, label: string) {
   await openWindow(page);
-  if (isPhone(page)) { await page.getByRole('button', { name: label }).click(); await page.keyboard.press('Escape'); }
+  if (isPhone(page)) { await page.getByRole('button', { name: label }).click(); await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); }
   else await page.getByRole('menuitemradio', { name: label }).click();
 }
 /** The split read-out line, read from the Window menu (or the Project sheet's Window page) and closed again. */
@@ -35,6 +35,7 @@ async function readout(page: Page): Promise<string> {
   await openWindow(page);
   const text = (await page.getByTestId('split-readout').textContent()) ?? '';
   await page.keyboard.press('Escape');
+  if (isPhone(page)) await page.keyboard.press('Escape');
   return text;
 }
 
