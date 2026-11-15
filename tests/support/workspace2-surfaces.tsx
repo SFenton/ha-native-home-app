@@ -27,7 +27,7 @@ function workspace(document: CompositionDocument, target?: PropertiesTarget, stu
     refreshPublication: stub.refreshPublication ?? vi.fn(async () => publication), persist: vi.fn(async () => true),
     selectAnywhere: vi.fn(), select: vi.fn(), setSurface: vi.fn(), houseStates: { status: 'idle' },
     surface: { kind: 'page', id: document.navigation.initialPageId }, mode: 'edit', setMode: vi.fn(), status: { text: 'Draft · Saved', tone: 'neutral' }, flash: '', failedSave: false, saveReason: '',
-    retrySave: vi.fn(), saveNow: vi.fn(), phase: 'idle', publishError: '', openPublish: vi.fn(), closePublish: vi.fn(), publish: vi.fn(async () => true), conflictDecided: false, decideLater: vi.fn(),
+    retrySave: vi.fn(), saveNow: vi.fn(), phase: 'idle', publishError: '', openPublish: vi.fn(), closePublish: vi.fn(), publish: vi.fn(async () => true), conflictDecided: false, decideLater: vi.fn(), reopenConflict: vi.fn(),
     ...extra,
   } as unknown as Workspace2;
 }

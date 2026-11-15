@@ -28,7 +28,11 @@ export function ChecksPill({ ws, narrow, onOpenChange, open, showPill = true }: 
   // Narrow: the pill is a plain button and the sheet opens on its own, so the Not Saved tag can open it while a properties sheet hides the pill.
   return <>{narrow && pill}<Overlay narrow={narrow} open={open} onOpenChange={onOpenChange} trigger={narrow ? undefined : pill} label="Checks" className="w2-checks-pop" popupWidth={360}>
     <PushStack rootTitle="Checks" root={<ChecksPanel checks={ws.checks} saveFailure={ws.failedSave ? ws.saveReason || 'Try again.' : undefined}
-      onRetry={() => { ws.retrySave(); ws.saveNow(); }} onPick={row => { if (row.select) ws.selectAnywhere(row.select); onOpenChange(false); }}/>}/>
+      onRetry={() => {
+        // A conflict has no retry: it needs the choice again, so Try Again brings the dialog back.
+        if (ws.studio.conflict) { ws.reopenConflict(); onOpenChange(false); return; }
+        ws.retrySave(); ws.saveNow();
+      }} onPick={row => { if (row.select) ws.selectAnywhere(row.select); onOpenChange(false); }}/>}/>
   </Overlay></>;
 }
 
@@ -47,7 +51,7 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
   const pageTrigger = <button type="button" className="w2-page-button" aria-label="Pages"><Icon name={title?.icon.name ?? 'grid'} size={18}/><span>{title?.title ?? ''}</span><ChevronDown size={14} aria-hidden/></button>;
   if (!document) return <header className="w2-topbar"><span className="w2-wordmark">S+H Studio</span></header>;
   const tag = (className?: string) => ws.status.tone === 'error'
-    ? <button type="button" className={`w2-tag w2-tag-error w2-tag-button ${className ?? ''}`} data-testid="status-tag" onClick={onChecks}>{ws.status.text}</button>
+    ? <button type="button" className={`w2-tag w2-tag-error w2-tag-button ${className ?? ''}`} data-testid="status-tag" onClick={ws.studio.conflict ? ws.reopenConflict : onChecks}>{ws.status.text}</button>
     : <Tag tone={ws.status.tone} role="status" data-testid="status-tag" className={className}>{ws.status.text}</Tag>;
   return <header className="w2-topbar">
     {!narrow && <span className="w2-wordmark">S+H Studio</span>}

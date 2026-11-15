@@ -182,7 +182,8 @@ test('a save that fails shows Not Saved, the reason under Checks, and recovers w
 test('a conflict asks which version to keep, and Decide Later leaves Not Saved with Publish off', async ({ page }) => {
   test.skip(isPhone(page), 'The disabled Publish is the wide layout');
   await openWorkspace(page);
-  await page.route('**/native/api/draft', route => route.request().method() === 'PUT' ? route.fulfill({ status: 409, json: { error: 'The draft changed' } }) : route.continue());
+  let conflicting = true;
+  await page.route('**/native/api/draft', route => route.request().method() === 'PUT' && conflicting ? route.fulfill({ status: 409, json: { error: 'The draft changed' } }) : route.continue());
   await selectTile(page, 'Lights');
   await page.getByLabel('Title', { exact: true }).first().fill('Lamps');
   const dialog = page.getByRole('dialog', { name: 'This Draft Changed Somewhere Else' });
@@ -193,6 +194,19 @@ test('a conflict asks which version to keep, and Decide Later leaves Not Saved w
   await dialog.getByRole('button', { name: 'Decide Later' }).click();
   await expect(page.getByTestId('status-tag')).toHaveText('Not Saved');
   await expect(page.getByRole('button', { name: 'Publish' })).toBeDisabled();
+  // Deciding later is never a dead end: the tag and Try Again both bring the choice back, and Keep Mine saves the local edit.
+  await expect(dialog).toHaveCount(0);
+  await page.getByTestId('status-tag').click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Decide Later' }).click();
+  await page.getByTestId('checks-pill').click();
+  await page.getByRole('button', { name: 'Try Again' }).click();
+  await expect(dialog).toBeVisible();
+  conflicting = false;
+  await dialog.getByRole('button', { name: 'Keep Mine' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+  await expect(page.getByRole('button', { name: 'Publish' })).toBeEnabled();
 });
 
 test('not signed in, and a draft that will not load, each say so with a way forward', async ({ page }) => {

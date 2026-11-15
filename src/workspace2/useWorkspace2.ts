@@ -182,7 +182,7 @@ export function useWorkspace2(active: boolean) {
     status, saveNow, persist, failedSave: failedFor !== undefined && failedFor === document, saveReason,
     retrySave: () => { setFailedFor(undefined); studio.setError(''); setSaveReason(''); },
     publication, publicationError, liveRevision, refreshPublication, publishedJson, phase, publishError, openPublish, closePublish, publish,
-    conflictDecided, decideLater: () => setConflictDecided(true),
+    conflictDecided, decideLater: () => setConflictDecided(true), reopenConflict: () => setConflictDecided(false),
     activity, log, houseStates, simulated, flash,
     /** Moves the preview to the surface a selection key lives on, then selects it. */
     selectAnywhere: (key: SelectionKey) => {
