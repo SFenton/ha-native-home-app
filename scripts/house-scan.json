@@ -10,6 +10,7 @@
     "tests/allowed-hosts.test.ts": 3,
     "tests/native-entities.test.ts": 4,
     "tests/native-state.test.ts": 15,
+    "tests/preview2-projections.test.ts": 1,
     "tests/server.test.ts": 6
   }
 }

@@ -93,24 +93,6 @@ function entityZones(line: string, suffix: string): string[] {
   return zones;
 }
 
-/** The line with string literals and the line comment blanked, so what remains is code. */
-function maskLiterals(line: string): string {
-  const blank = (x: string) => " ".repeat(x.length);
-  const noStrings = line.replace(STRING, blank);
-  const mark = noStrings.search(/(?<!:)\/\/|(?<![\w$])#/);
-  return mark >= 0 ? noStrings.slice(0, mark) + blank(noStrings.slice(mark)) : noStrings;
-}
-
-/** A `.local` match that is a JS or TS property access, not a host: outside strings and comments, a bare identifier (no `-`),
- * followed by punctuation that ends an expression (a property read of the overlay, in a spread, an argument or an index). Shell,
- * CSS, JSX text and prose never qualify, and a hyphenated host never does. */
-function isPropertyAccess(m: RegExpMatchArray, masked: string, suffix: string): boolean {
-  if (![".ts", ".tsx", ".js", ".mjs", ".cjs"].includes(suffix) || m[1].includes("-")) return false;
-  const start = m.index ?? 0;
-  if (masked.slice(start, start + m[0].length) !== m[0]) return false;
-  return /^(?:[\]),;:}?]|$)/.test(masked.slice(start + m[0].length)) || masked[start + m[0].length] === ".";
-}
-
 function lineRules(line: string, suffix: string, wholeLine: boolean, allow: Allowlist, path: string): string[] {
   const rules: string[] = [];
   for (const zone of wholeLine ? [line] : entityZones(line, suffix)) {
@@ -121,12 +103,7 @@ function lineRules(line: string, suffix: string, wholeLine: boolean, allow: Allo
     }
   }
   if (line.toLowerCase().includes(".local")) {
-    const masked = wholeLine || !CODE_SUFFIXES.has(suffix) ? line : maskLiterals(line);
-    for (const m of line.matchAll(LOCAL_HOST)) {
-      if (`${m[1]}.local`.toLowerCase() === "example.local") continue;
-      if (!wholeLine && isPropertyAccess(m, masked, suffix)) continue;
-      rules.push("localhost");
-    }
+    for (const m of line.matchAll(LOCAL_HOST)) if (`${m[1]}.local`.toLowerCase() !== "example.local") rules.push("localhost");
   }
   for (const m of line.matchAll(PRIVATE_IP)) if (!allow.addresses.includes(m[0])) rules.push("ipv4");
   for (const _ of line.matchAll(IPV6_ULA)) rules.push("ipv6");
