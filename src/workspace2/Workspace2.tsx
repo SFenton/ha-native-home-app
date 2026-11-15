@@ -68,10 +68,10 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
   return <div className={className} data-testid="workspace2" hidden={!active}>
     <ToastHost>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
-        dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError}/>
+        dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError} onChecks={() => setChecksOpen(true)}/>
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
         {loadingState ?? <div className="w2-stage" data-mode={ws.mode}>{stage}</div>}
-        {document && (!narrow || ws.problemCount > 0 || ws.failedSave) && !(narrow && target) && <div className="w2-checks-slot"><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen}/></div>}
+        {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave}/></div>}
         {!narrow && properties && <aside className="w2-card" aria-label="Properties">{properties}</aside>}
       </main>
       {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/></nav>}

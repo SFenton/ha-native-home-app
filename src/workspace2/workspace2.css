@@ -50,6 +50,7 @@
 .w2-narrow .w2-page-button { max-width: 36vw; min-width: 0; padding: 0 8px; }
 .sh-stub button:hover:not(:disabled) { background: #26262a; border-color: #3a3a3f; }
 .w2-tag { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--w2-field); color: var(--w2-ink-card); }
+.w2-scope button.w2-tag-button { border: 0; min-height: 22px; padding: 0 9px; border-radius: 11px; }
 .w2-tag-success { color: var(--w2-ok-text); background: color-mix(in srgb, var(--w2-ok) 16%, var(--w2-card)); }
 .w2-tag-warning { color: var(--w2-warn-text); background: color-mix(in srgb, var(--w2-warn) 16%, var(--w2-card)); }
 .w2-tag-error { color: var(--w2-err-text); background: color-mix(in srgb, var(--w2-err) 14%, var(--w2-card)); }

@@ -6,6 +6,8 @@ const dataDir = process.env.STUDIO_E2E_DATA_DIR ?? './test-results/studio-data';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // The 2.0 workspace has its own server and test token, so its specs run from the workspace2 config.
+  testIgnore: /workspace2-.*\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

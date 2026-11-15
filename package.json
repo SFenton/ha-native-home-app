@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:workspace2": "playwright test -c playwright.workspace2.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
