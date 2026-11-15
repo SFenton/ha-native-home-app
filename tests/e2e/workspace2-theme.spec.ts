@@ -64,9 +64,8 @@ test('the chrome follows a live theme change in the parent, and the preview does
   const dark = await tokens(page);
   expect(contrast(colour(dark['--w2-ink']), colour(dark['--w2-bg']))).toBeGreaterThanOrEqual(4.5);
   expect(await page.frames().find(frame => frame !== page.mainFrame())!.evaluate(() => document.documentElement.style.colorScheme)).toBe('dark');
-  await page.waitForTimeout(600);
-  const darkPreview = await page.screenshot({ clip, animations: 'disabled' });
-  expect(darkPreview.equals(lightPreview), 'the preview draws the same pixels in a light and a dark chrome').toBeTruthy();
+  // A leak would persist; a frame still settling (a poll landing, a transition) would not.
+  await expect.poll(async () => (await page.screenshot({ clip, animations: 'disabled' })).equals(lightPreview), { timeout: 5000, message: 'the preview draws the same pixels in a light and a dark chrome' }).toBeTruthy();
 });
 
 test('evidence: rest, tile selected, Pages, Project menu and Publish, in light and dark Home Assistant themes', async ({ page }) => {

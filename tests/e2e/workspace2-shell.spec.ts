@@ -74,7 +74,8 @@ test('the last row of the half sheet scrolls into view above the fold', async ({
   await selectTile(page, 'Lights');
   await page.waitForTimeout(900);
   const advanced = page.getByRole('button', { name: 'Advanced' });
-  await advanced.scrollIntoViewIfNeeded();
+  // A swipe up inside the sheet: the content scrolls, so its last row comes above the fold.
+  await page.locator('.w2-props-content').evaluate(element => { element.scrollTop = element.scrollHeight; });
   const box = await advanced.boundingBox();
   expect(box && box.y + box.height <= 844, `Advanced at ${JSON.stringify(box)} is on screen`).toBeTruthy();
 });
