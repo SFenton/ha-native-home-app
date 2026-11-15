@@ -60,3 +60,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## TanStack Virtual
+
+The 2.0 workspace's long pickers (entities, icons, services) use
+[@tanstack/react-virtual 3.14.24](https://github.com/TanStack/virtual) (MIT,
+Copyright (c) 2021-present Tanner Linsley), installed from npm unmodified.
