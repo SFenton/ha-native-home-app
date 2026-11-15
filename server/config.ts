@@ -16,6 +16,20 @@ export interface ServerConfig {
   readEndpoints?: readonly RegisteredReadEndpoint[];
 }
 
+/**
+ * Local development: not production, no Supervisor Ingress, no Supervisor credential and no `STUDIO_AUTH_TOKEN`.
+ * Every route works without signing in; setting a token (or running behind Ingress or in production) turns protection on.
+ */
+export function localDevelopment(config: Pick<ServerConfig, 'production' | 'ingress' | 'authToken' | 'supervisorToken'>) {
+  return !config.production && !config.ingress && !config.authToken && !config.supervisorToken;
+}
+
+/** True for a loopback bind address (`localhost`, `127.0.0.0/8`, `::1`, or the IPv4-mapped form). */
+export function isLoopbackHost(host: string) {
+  const bare = host.replace(/^\[|\]$/g, '').replace(/^::ffff:/i, '').toLowerCase();
+  return bare === 'localhost' || bare === '::1' || /^127(?:\.\d{1,3}){3}$/.test(bare);
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const production = env.NODE_ENV === 'production';
   const port = Number(env.PORT ?? 4800);

@@ -16,7 +16,12 @@ it to the public internet.
 `npm run build` checks TypeScript and creates `dist` with relative asset paths.
 For production, set `STUDIO_AUTH_TOKEN` privately before running `npm start`.
 Production refuses to start without that token or verified Supervisor Ingress.
-Credentialed HA connections require the same protection even in development.
+Local development needs no token: with no `STUDIO_AUTH_TOKEN`, no Ingress and
+not production, every route works without signing in. Setting
+`STUDIO_AUTH_TOKEN` in development turns sign-in on. Because that server has no
+sign-in, with HA credentials (`HA_TOKEN`) or registered read endpoints it
+refuses to start unless `HOST` is a loopback address such as `127.0.0.1`; set
+`STUDIO_AUTH_TOKEN` to bind elsewhere.
 The bearer token must be at least 24 characters. The sign-in page exchanges it
 for an HttpOnly authoring session; API clients can instead use an Authorization
 bearer header. Never place tokens in query strings, screenshots, saved

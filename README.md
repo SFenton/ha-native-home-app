@@ -28,6 +28,8 @@ npm start
 
 Production requires `STUDIO_AUTH_TOKEN` (at least 24 characters) or verified
 Supervisor Ingress. Configure authentication before running `npm start`.
+Local development needs no token: `npm run dev` without `STUDIO_AUTH_TOKEN`
+works without signing in, including the 2.0 workspace.
 
 Drafts, publications, and local feedback are stored in the `data/` directory
 (or `DATA_DIR`). They are not committed to Git. Keep that directory or mount

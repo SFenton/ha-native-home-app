@@ -12,7 +12,7 @@ import { parse } from 'yaml';
 import { createSampleDocument } from '../src/shared/sample';
 import { validateDocument } from '../src/shared/schema';
 import { createApp } from '../server/app';
-import { loadConfig, type ServerConfig } from '../server/config';
+import { isLoopbackHost, loadConfig, localDevelopment, type ServerConfig } from '../server/config';
 import { readCameraStream, rewriteCameraManifest } from '../server/camera';
 import { readNativeHouseConfig } from '../server/native-home';
 import { StudioStore } from '../server/store';
@@ -181,7 +181,7 @@ describe('authenticated native camera HLS transport',() => {
   });
 
   it('requires actual authentication and resolves unknown cameras only from server-loaded native configuration',async () => {
-    const anonymous=await fixture();
+    const anonymous=await fixture({ authToken: 'synthetic-anonymous-check-token' });
     expect((await anonymous.request(start)).status).toBe(401);
     const upstream=await mockNativeHome();
     const { request }=await fixture({ authToken,haToken,haUrl: upstream.url });
@@ -800,8 +800,8 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       expect(upstream.paths).toEqual(['/api/websocket', '/api/states']);
     });
 
-    it('does not inherit the unauthenticated sample-demo bypass and fails explicitly without HA configuration', async () => {
-      const demo = await fixture();
+    it('does not inherit the sample-demo bypass once a token is set, and fails explicitly without HA configuration', async () => {
+      const demo = await fixture({ authToken: authoringToken });
       expect((await demo.request('/api/native-home')).status).toBe(401);
       const { request } = await fixture({ authToken: authoringToken });
       const response = await request('/api/native-home', 'GET', undefined, headers);
@@ -989,7 +989,44 @@ describe('authentication, origin checks, and safe HA boundary', () => {
   });
   it('refuses production or credentialed HA authoring without authentication', async () => {
     await expect(fixture({ production: true })).rejects.toThrow('require STUDIO_AUTH_TOKEN');
-    await expect(fixture({ haUrl: 'http://example.test', haToken: 'test-backend-only-credential' })).rejects.toThrow('require STUDIO_AUTH_TOKEN');
+    await expect(fixture({ production: true, haUrl: 'http://example.test', haToken: 'test-backend-only-credential' })).rejects.toThrow('require STUDIO_AUTH_TOKEN');
+    await expect(fixture({ supervisorToken: 'test-supervisor-credential' })).rejects.toThrow('require STUDIO_AUTH_TOKEN');
+  });
+  describe('local development without a token', () => {
+    it('reaches every authoring route, including native composition, without signing in', async () => {
+      const { request } = await fixture();
+      expect((await request('/api/draft')).status).toBe(200);
+      expect((await request('/native/api/draft')).status).toBe(200);
+      expect((await request('/native/api/published')).status).not.toBe(401);
+      expect((await request('/api/native-home')).status).toBe(503);
+    });
+    it('allows HA credentials on loopback and refuses a reachable bind with one message', async () => {
+      const ha = { haUrl: 'http://example.test', haToken: 'test-backend-only-credential' };
+      for (const host of ['127.0.0.1', 'localhost', '::1', '[::1]', '::ffff:127.0.0.1']) {
+        const { request } = await fixture({ ...ha, host });
+        expect((await request('/api/draft')).status).toBe(200);
+        expect((await request('/native/api/draft')).status).toBe(200);
+      }
+      for (const host of ['0.0.0.0', '::', '192.168.1.20', 'studio.example.test'])
+        await expect(fixture({ ...ha, host })).rejects.toThrow(/^Local development without STUDIO_AUTH_TOKEN[^\n]*loopback HOST[^\n]*$/);
+    });
+    it('keeps plain development without credentials open on a LAN bind', async () => {
+      const { request } = await fixture({ host: '0.0.0.0' });
+      expect((await request('/native/api/draft')).status).toBe(200);
+    });
+    it('turns sign-in on when STUDIO_AUTH_TOKEN is set, and does not treat Ingress or production as local', async () => {
+      const token = 'a-long-test-token-not-a-real-secret';
+      const { request } = await fixture({ authToken: token, haUrl: 'http://example.test', haToken: 'test-backend-only-credential', host: '0.0.0.0' });
+      expect((await request('/api/draft')).status).toBe(401);
+      expect((await request('/native/api/draft')).status).toBe(401);
+      expect((await request('/native/api/draft', 'GET', undefined, { Authorization: `Bearer ${token}` })).status).toBe(200);
+      expect(localDevelopment({ production: false })).toBe(true);
+      expect(localDevelopment({ production: true })).toBe(false);
+      expect(localDevelopment({ production: false, authToken: token })).toBe(false);
+      expect(localDevelopment({ production: false, ingress: { proxyAddress: '172.30.32.2', path: '/api/hassio_ingress/x' } })).toBe(false);
+      expect(isLoopbackHost('127.0.0.1')).toBe(true);
+      expect(isLoopbackHost('10.0.0.1')).toBe(false);
+    });
   });
   it('protects reads and writes with a token, supports HttpOnly authoring sessions, and does not leak the token', async () => {
     const token = 'a-long-test-token-not-a-real-secret';

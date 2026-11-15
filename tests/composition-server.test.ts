@@ -190,10 +190,17 @@ describe('separate authenticated native composition pipeline', () => {
     expect(await readFile(path.join(f.directory, 'native-v2/revisions/2.json'))).toEqual(snapshot);
   });
 
-  it('requires real auth even in development, shares session login, and retains origin and JSON write restrictions', async () => {
+  it('works without sign-in in local development, and keeps its write restrictions', async () => {
     const dev = await fixture(false);
-    for (const endpoint of ['/native/api/draft', '/native/api/published', '/native/api/assets', `/native/api/assets/${'a'.repeat(64)}.png`])
-      expect((await dev.request(endpoint, 'GET', undefined, {})).status).toBe(401);
+    expect((await dev.request('/native/api/draft', 'GET', undefined, {})).status).toBe(200);
+    for (const endpoint of ['/native/api/published', '/native/api/assets', `/native/api/assets/${'a'.repeat(64)}.png`])
+      expect((await dev.request(endpoint, 'GET', undefined, {})).status).not.toBe(401);
+    expect((await dev.request('/native/api/draft', 'GET', undefined, { Cookie: 'studio_session=forged' })).status).toBe(200);
+    expect((await dev.request('/native/api/publish', 'POST', { expectedRevision: 1 }, { Origin: 'https://other.invalid' })).status).toBe(403);
+    expect((await dev.raw('/native/api/publish', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' })).status).toBe(415);
+  });
+
+  it('requires real auth when a token is set, shares session login, and retains origin and JSON write restrictions', async () => {
     const f = await fixture();
     expect((await f.request('/native/api/draft', 'GET', undefined, {})).status).toBe(401);
     expect((await f.request('/native/api/publish', 'POST', { expectedRevision: 1 }, { ...auth, Origin: 'https://other.invalid' })).status).toBe(403);

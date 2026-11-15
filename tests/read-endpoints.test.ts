@@ -149,14 +149,15 @@ describe('administrator read endpoint configuration', () => {
     expect(() => registry([external('https://host.test/data', { name: externalToken, bearerTokenEnv: 'CATALOG_BEARER' })])).toThrow('contain server credentials');
   });
 
-  it('requires authoring authentication even in development with an external-only registry', async () => {
+  it('allows an external-only registry in loopback local development, but refuses a reachable bind', async () => {
     const dir = await directory();
     const store = await StudioStore.open(dir);
     cleanup.push(() => store.close());
-    expect(() => createApp(store, {
-      production: false, port: 0, host: '127.0.0.1', dataDir: dir, enableLiveActions: false,
-      readEndpoints: parseReadEndpoints([external('https://host.test/data')], {}, []),
-    })).toThrow('require STUDIO_AUTH_TOKEN');
+    const readEndpoints = parseReadEndpoints([external('https://host.test/data')], {}, []);
+    const base = { production: false, port: 0, dataDir: dir, enableLiveActions: false, readEndpoints };
+    expect(() => createApp(store, { ...base, host: '127.0.0.1' })).not.toThrow();
+    expect(() => createApp(store, { ...base, host: '0.0.0.0' })).toThrow('loopback HOST');
+    expect(() => createApp(store, { ...base, host: '0.0.0.0', production: true })).toThrow('require STUDIO_AUTH_TOKEN');
   });
 });
 

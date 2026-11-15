@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { stringify } from 'yaml';
 import { z } from 'zod/v4';
 import { actionSchema, assertJsonBounds, DocumentValidationError, MAX_DOCUMENT_BYTES, studioDocumentSchema, validateDocument } from '../src/shared/schema';
-import type { ServerConfig } from './config';
+import { isLoopbackHost, localDevelopment, type ServerConfig } from './config';
 import { HomeAssistantClient } from './ha';
 import { HttpError, StudioStore } from './store';
 import { readEndpointQuery } from './read-endpoints';
@@ -49,7 +49,11 @@ function sameOrigin(req: Request, config: ServerConfig) {
 }
 
 export function createApp(store: StudioStore, config: ServerConfig) {
-  if ((config.production || config.haToken || config.supervisorToken || config.readEndpoints?.length) && !config.authToken && !config.ingress) throw new Error('Production, credentialed HA connections and registered read endpoints require STUDIO_AUTH_TOKEN or verified Supervisor Ingress');
+  const localDev = localDevelopment(config);
+  const credentialed = Boolean(config.haToken || config.readEndpoints?.length);
+  if ((config.production || config.supervisorToken || (credentialed && !localDev)) && !config.authToken && !config.ingress) throw new Error('Production, credentialed HA connections and registered read endpoints require STUDIO_AUTH_TOKEN or verified Supervisor Ingress');
+  // Local development has no sign-in, so a server holding credentials must not be reachable from the network.
+  if (localDev && credentialed && !isLoopbackHost(config.host)) throw new Error('Local development without STUDIO_AUTH_TOKEN with HA credentials or read endpoints must bind to a loopback HOST (for example 127.0.0.1), or set STUDIO_AUTH_TOKEN');
   const app = express();
   const ha = new HomeAssistantClient(config);
   const sessions = new Map<string, number>();
@@ -58,7 +62,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const header = req.get('authorization');
     const bearer = header?.startsWith('Bearer ') ? header.slice(7) : '';
     const cookie = req.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith('studio_session='))?.slice('studio_session='.length);
-    return Boolean((config.authToken && bearer && equalSecret(bearer, config.authToken)) ||
+    return localDev || Boolean((config.authToken && bearer && equalSecret(bearer, config.authToken)) ||
       (cookie && (sessions.get(cookie) ?? 0) > Date.now()) || validIngress(req, config));
   };
   let stopping = false;
@@ -107,7 +111,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     res.json({ authenticated: true });
   });
   app.use((req, res, next) => {
-    if (authenticated(req) || (!config.production && !config.authToken && !config.ingress)) { next(); return; }
+    if (authenticated(req)) { next(); return; }
     if (req.method === 'GET' && req.accepts('html') && !req.path.startsWith('/api/') && !req.path.startsWith('/native/api/')) {
       const nonce = randomBytes(16).toString('base64');
       res.set('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`);
