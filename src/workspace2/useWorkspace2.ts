@@ -78,14 +78,16 @@ export function useWorkspace2(active: boolean) {
   const [savedAt, setSavedAt] = useState(0);
   const [now, setNow] = useState(0);
   const [saveReason, setSaveReason] = useState('');
-  const { save: saveDraft, dirty, busy, conflict } = studio;
+  const { save: saveDraft, whenIdle, latestDocument, dirty, busy, conflict } = studio;
   const persist = useCallback(async (publish: boolean | 'home-assistant' = false, keepLocal = false) => {
-    const sent = studio.document;
+    // A save already under way is not this call's failure: wait for it, then save (or publish) what is newest.
+    await whenIdle();
+    const sent = latestDocument() ?? studio.document;
     const ok = await saveDraft(publish, keepLocal);
     if (ok) { setFailedFor(undefined); setSaveReason(''); setSavedAt(Date.now()); }
     else setFailedFor(sent);
     return ok;
-  }, [saveDraft, studio.document]);
+  }, [saveDraft, whenIdle, latestDocument, studio.document]);
   const latest = useRef({ persist, dirty, busy, conflict, problemCount, document });
   latest.current = { persist, dirty, busy, conflict, problemCount, document };
   useEffect(() => {

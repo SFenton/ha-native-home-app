@@ -49,6 +49,12 @@ export function useCompositionStudio() {
   const typing = useRef<{ path: string; at: number } | undefined>(undefined);
   const future = useRef<CompositionDocument[]>([]);
   const [busy, setBusy] = useState(false), locked = useRef(false);
+  /** Settles when the operation holding the lock ends, so a caller can wait its turn instead of failing. */
+  const idle = useRef<Promise<void>>(Promise.resolve()), release = useRef<() => void>(() => {});
+  const acquire = useCallback(() => { locked.current = true; idle.current = new Promise<void>(resolve => { release.current = resolve; }); }, []);
+  const free = useCallback(() => { locked.current = false; release.current(); }, []);
+  const whenIdle = useCallback(async () => { while (locked.current) await idle.current; }, []);
+  const latestDocument = useCallback(() => current.current, []);
   const [error, setError] = useState(''), [status, setStatus] = useState(''), [conflict, setConflict] = useState(false);
   const [publishedRevision, setPublishedRevision] = useState<number>();
   const [homeAssistant, setHomeAssistant] = useState<HaPublishResult>();
@@ -61,7 +67,7 @@ export function useCompositionStudio() {
   }, []);
   const reload = useCallback(async () => {
     if (locked.current) return;
-    locked.current = true; setBusy(true); setError('');
+    acquire(); setBusy(true); setError('');
     const snapshot = current.current;
     try {
       const next = await request<CompositionDraft>('/native/api/draft');
@@ -71,8 +77,8 @@ export function useCompositionStudio() {
       current.current = next.document; past.current = []; future.current = [];
       setEnvelope(next); setDocument(next.document); setConflict(false); setStatus(`Loaded native draft revision ${next.revision}`);
     } catch (reason) { report(reason); }
-    finally { locked.current = false; setBusy(false); }
-  }, [report]);
+    finally { free(); setBusy(false); }
+  }, [report, acquire, free]);
   useEffect(() => { void reload(); }, [reload]);
   const apply = useCallback((next: CompositionDocument) => {
     if (!current.current || canonicalCompositionJSON(next) === canonicalCompositionJSON(current.current)) return;
@@ -91,7 +97,7 @@ export function useCompositionStudio() {
   }, []);
   const save = useCallback(async (publish: boolean | 'home-assistant' = false, keepLocal = false) => {
     if (locked.current || !metadata.current || !current.current) return false;
-    locked.current = true; setBusy(true); setError(''); setStatus('');
+    acquire(); setBusy(true); setError(''); setStatus('');
     try {
       let expected = metadata.current.revision;
       if (keepLocal) expected = (await request<CompositionDraft>('/native/api/draft')).revision;
@@ -108,12 +114,12 @@ export function useCompositionStudio() {
       } else setStatus(`Saved draft revision ${next.revision}`);
       return true;
     } catch (reason) { report(reason); return false; }
-    finally { locked.current = false; setBusy(false); }
-  }, [persist, report]);
+    finally { free(); setBusy(false); }
+  }, [persist, report, acquire, free]);
   /** Adds the layout parts missing from the saved draft from the live house config, then reloads the draft. */
   const importHouse = useCallback(async () => {
     if (locked.current || !metadata.current) return false;
-    locked.current = true; setBusy(true); setError(''); setStatus('');
+    acquire(); setBusy(true); setError(''); setStatus('');
     try {
       const report = await request<HouseImportReport>('/native/api/import-house-config', { method: 'POST', body: JSON.stringify({ expectedRevision: metadata.current.revision }) });
       const next = await request<CompositionDraft>('/native/api/draft');
@@ -124,7 +130,7 @@ export function useCompositionStudio() {
       setStatus(`Imported from house config: ${report.added.length} added, ${report.kept.length} already authored, ${report.dropped.length} not expressible.`);
       return true;
     } catch (reason) { report(reason); return false; }
-    finally { locked.current = false; setBusy(false); }
+    finally { free(); setBusy(false); }
   }, [report]);
   // Leaving a field ends its undo step.
   useEffect(() => {
@@ -151,6 +157,6 @@ export function useCompositionStudio() {
   return {
     document, envelope, publishedRevision, homeAssistant, houseImport, importHouse, setStatus, busy, error, status, conflict, dirty,
     canUndo: past.current.length > 0, canRedo: future.current.length > 0,
-    apply, save, reload, undo, redo, setError, report,
+    apply, save, reload, undo, redo, setError, report, whenIdle, latestDocument,
   };
 }
