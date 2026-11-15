@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { ChevronDown } from 'lucide-react';
 import { canBook, isBook, previewWindows, splitReadout, windowLabel, withPose, type PreviewWindow } from '../../preview2';
@@ -29,12 +30,15 @@ export function WindowMenu({ window: current, onWindow }: { window: PreviewWindo
 }
 
 /** The same choices as a list, for the narrow Project sheet's "Window" page. */
-export function WindowChoices({ window: current, onWindow }: { window: PreviewWindow; onWindow: (window: PreviewWindow) => void }) {
+export function WindowChoices({ window: initial, onWindow }: { window: PreviewWindow; onWindow: (window: PreviewWindow) => void }) {
+  // The sheet pushes this page once, so it keeps the choice itself rather than reading a prop that cannot change under it.
+  const [current, setCurrent] = useState(initial);
+  const choose = (next: PreviewWindow) => { setCurrent(next); onWindow(next); };
   return <div className="w2-window-choices">
     <ul className="w2-menu-list">{previewWindows.map(item => <li key={item.name}>
-      <button type="button" className="w2-list-row" aria-pressed={item.name === current.name} onClick={() => onWindow(item)}>{windowLabel(item)}</button></li>)}</ul>
+      <button type="button" className="w2-list-row" aria-pressed={item.name === current.name} onClick={() => choose(item)}>{windowLabel(item)}</button></li>)}</ul>
     {canBook(current) && <div className="w2-segment" role="group" aria-label="Pose">
-      {(['flat', 'book'] as const).map(pose => <button key={pose} type="button" aria-pressed={isBook(current) === (pose === 'book')} onClick={() => onWindow(withPose(current, pose))}>{pose === 'flat' ? 'Flat' : 'Book'}</button>)}
+      {(['flat', 'book'] as const).map(pose => <button key={pose} type="button" aria-pressed={isBook(current) === (pose === 'book')} onClick={() => choose(withPose(current, pose))}>{pose === 'flat' ? 'Flat' : 'Book'}</button>)}
     </div>}
     <SplitReadout window={current}/>
   </div>;

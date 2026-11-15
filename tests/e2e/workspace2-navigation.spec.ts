@@ -25,8 +25,15 @@ async function openWindow(page: Page) {
 }
 async function chooseWindow(page: Page, label: string) {
   await openWindow(page);
-  if (isPhone(page)) { await page.getByRole('button', { name: label }).click(); }
+  if (isPhone(page)) { await page.getByRole('button', { name: label }).click(); await page.keyboard.press('Escape'); }
   else await page.getByRole('menuitemradio', { name: label }).click();
+}
+/** The split read-out line, read from the Window menu (or the Project sheet's Window page) and closed again. */
+async function readout(page: Page): Promise<string> {
+  await openWindow(page);
+  const text = (await page.getByTestId('split-readout').textContent()) ?? '';
+  await page.keyboard.press('Escape');
+  return text;
 }
 
 test('the Pages overlay shows Page, Sheet and Tab at the bottom, wide and narrow', async ({ page }) => {
@@ -111,16 +118,12 @@ test('Page settings: the split switch turns two panes on at iPad sideways and of
   // iPad sideways: two panes and the read-out says on.
   await chooseWindow(page, 'iPad sideways · 1194 × 834');
   await expect(previewRoot(page).locator('.sh-pane')).toHaveCount(2);
-  await openWindow(page);
-  await expect(page.getByTestId('split-readout')).toHaveText('Split view: on, 596 and 597 pt');
-  await page.keyboard.press('Escape');
-  if (isPhone(page)) await page.getByRole('button', { name: 'Close' }).first().click().catch(() => {});
+  expect(await readout(page)).toBe('Split view: on, 596 and 597 pt');
   await snap(page, `${tag(page)}-ipad-sideways-two-panes`);
   // iPhone: one pane and off.
   await chooseWindow(page, 'iPhone · 402 × 874');
   await expect(previewRoot(page).locator('.sh-pane')).toHaveCount(0);
-  await openWindow(page);
-  await expect(page.getByTestId('split-readout')).toHaveText('Split view: off');
+  expect(await readout(page)).toBe('Split view: off');
 });
 
 test('the Window menu lists every window by size, with the flyout at iPad and the hinge on a Duo', async ({ page }) => {
