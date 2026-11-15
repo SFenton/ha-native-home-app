@@ -50,9 +50,11 @@ export function ChromeGroups({ path }: { path: EditorPath }) {
         {held.flatMap(({ group, at }) => group.items.map((item, index) => <Disclosure key={item.id} label={itemName(item)} path={[...path, at, 'items', index].join('/')}>
           <ItemRows path={[...path, at, 'items', index]} onRemove={() => remove(at, index)}/>
         </Disclosure>))}
+        {held.length > 0 && <Disclosure label="Advanced" path={`${path.join('/')}/${title.toLowerCase()}`}>
+          {held.map(({ group, at }) => <ObjectRows key={group.id} path={[...path, at]} owner="chrome-group" skip={child => child.at(-1) === 'items'}/>)}
+        </Disclosure>}
         <div className="w2-row"><button type="button" disabled={!room || held.some(item => item.group.items.length >= 12)} onClick={() => add(placement)}>Add Button</button></div>
       </section>;
     })}
-    {groups.map((group, at) => <span key={group.id} hidden data-field-path={[...path, at, 'placement'].join('/')}/>)}
   </div>;
 }

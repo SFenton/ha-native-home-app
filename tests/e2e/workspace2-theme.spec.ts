@@ -51,13 +51,23 @@ test('a theme that sets only its primary colour recolours the chrome and keeps e
 
 test('the chrome follows a live theme change in the parent, and the preview does not', async ({ page }) => {
   const frame = await openInHomeAssistant(page, themes.light);
-  // The device itself: the preview's root also holds the stage around it, which follows the chrome.
-  const preview = frame.locator('[data-preview-root] .sh-model').first();
-  const box = (await preview.boundingBox())!;
-  // Inside the device, clear of its rounded corners (which show the stage behind) and of any sheet.
-  const clip = { x: box.x + 16, y: box.y + 40, width: box.width - 32, height: 300 };
-  await page.waitForTimeout(1200); // the house reads in and the first frame settles
-  const lightPreview = await page.screenshot({ clip, animations: 'disabled' });
+  // The device's screen. Its corners are rounded and transparent, and what shows through them is the stage, which follows the
+  // chrome: a clip that reaches a corner differs between a light and a dark chrome by those pixels alone (887 of 108,600 in
+  // the failing runs, all inside the two top corners). So the clip is the screen inset by its own corner radius.
+  const screen = frame.locator('[data-preview-root] .sh-layer').first();
+  const box = (await screen.boundingBox())!;
+  const radius = await screen.evaluate(element => (parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0) * (element.getBoundingClientRect().width / (element as HTMLElement).offsetWidth));
+  const inset = Math.ceil(radius) + 4;
+  const clip = { x: box.x + inset, y: box.y + inset, width: box.width - 2 * inset, height: Math.min(300, box.height - 2 * inset) };
+  expect(clip.width, 'the screen is wide enough to clip').toBeGreaterThan(100);
+  expect(clip.height).toBeGreaterThan(100);
+  // Settled means two captures apart are the same: the house has read in and no frame is still moving.
+  const settled = async () => {
+    let previous = await page.screenshot({ clip, animations: 'disabled' }), image = previous;
+    await expect.poll(async () => { image = await page.screenshot({ clip, animations: 'disabled' }); const same = image.equals(previous); previous = image; return same; }, { timeout: 10_000, intervals: [300] }).toBeTruthy();
+    return image;
+  };
+  const lightPreview = await settled();
   const light = await tokens(page);
   await page.evaluate(style => { document.documentElement.setAttribute('style', style); }, themes.dark);
   await expect.poll(async () => (await tokens(page))['--w2-bg']).not.toBe(light['--w2-bg']);

@@ -62,6 +62,22 @@ async function reachable(panel: Locator): Promise<Set<string>> {
   return paths;
 }
 
+/**
+ * Everything a Project dialog offers: its own rows, and the rows of every page its list rows push (one level; a pushed page that
+ * pushes again is walked too). Each page is left with its Back.
+ */
+async function reachableDeep(panel: Locator): Promise<Set<string>> {
+  const paths = await reachable(panel);
+  const rows = panel.locator('[data-pushes]');
+  const count = await rows.count();
+  for (let at = 0; at < count; at++) {
+    await panel.locator('[data-pushes]').nth(at).click({ timeout: 4000 });
+    for (const found of await reachableDeep(panel)) paths.add(found);
+    await panel.locator('.w2-back').first().click();
+  }
+  return paths;
+}
+
 /** The leaves under `entryPath` that no path in `paths` covers. A field whose schema allows one value is fixed, and the spec hides it. */
 function missing(entryPath: Path, value: unknown, skip: (key: string) => boolean, paths: Set<string>): { checked: number; misses: string[] } {
   const misses: string[] = []; let checked = 0;
@@ -178,7 +194,7 @@ test('acceptance 2: every editable field of the project is reachable from the Pr
   const misses: string[] = []; let checked = 0;
   for (const part of parts) {
     await openFromMenu(part.item);
-    const paths = await reachable(part.scope());
+    const paths = await reachableDeep(part.scope());
     // The name is a plain labelled input, not a generated field, so it carries no field path.
     if (part.item === 'Rename' && await part.scope().getByLabel('Name', { exact: true }).count()) paths.add('name');
     const result = missing(part.path, part.value, part.skip, paths);
