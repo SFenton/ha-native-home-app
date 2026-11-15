@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { contrast, over, parseColor } from '../../src/workspace2/theme';
 import { isPhone, openWorkspace, previewRoot, previewTile, readableText, seed, selectTile, snap, visibleControls } from './workspace2-helpers';
 
 test.beforeEach(async ({ request }) => { await seed(request); });
@@ -281,4 +282,20 @@ test('the Project menu, Pages and the tab panel work at both sizes', async ({ pa
   await page.getByText('Tabs', { exact: true }).first().click();
   await expect(page.getByText('Tab bar · 3 of 5')).toBeVisible();
   await expect(page.getByText('The tab bar holds 5.')).toHaveCount(0);
+});
+
+test('a selected status chip stays readable: the Studio hover never repaints the preview, and its text clears 4.5:1 on any wallpaper', async ({ page }) => {
+  await openWorkspace(page);
+  await page.waitForTimeout(800);
+  await selectTile(page, 'Lights');
+  // The pointer rests on the chip beside it, as it does after a click on the first chip's handle; the Studio's own hover rule must not reach in.
+  const chip = previewRoot(page).locator('[data-type=status-chip] button').nth(2);
+  await chip.hover();
+  for (const button of await previewRoot(page).locator('[data-type=status-chip] button').all()) {
+    const [text, ground] = await button.evaluate(element => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
+    const ink = parseColor(text)!, fill = parseColor(ground)!;
+    // The chip's fill is translucent over the wallpaper: judge it over white, the worst ground.
+    expect(contrast(ink, over(fill, { r: 255, g: 255, b: 255, a: 1 })), `${await button.innerText()}: ${text} on ${ground}`).toBeGreaterThanOrEqual(4.5);
+  }
+  expect(await chip.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgb(242, 241, 252)');
 });

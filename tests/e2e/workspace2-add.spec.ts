@@ -251,3 +251,33 @@ test('the entity list stays smooth with 5,000 entities: frame times while scroll
   await expect(list.getByRole('option').first()).toContainText(/42/);
   console.log(`FILTER ${isPhone(page) ? 'phone' : 'desktop'} ${Date.now() - typed} ms`);
 });
+
+test('the action editor makes a page and a sheet through the one New Page and New Sheet dialogs, and Done keeps both with the action', async ({ page }) => {
+  await openWorkspace(page);
+  await selectTile(page, 'Weather');
+  const panel = page.getByLabel('Properties');
+  await panel.getByRole('button', { name: /When tapped/ }).click();
+  const editor = page.getByTestId('action-editor');
+  await editor.getByRole('button', { name: kindLabel.push, exact: true }).click();
+  await editor.getByRole('button', { name: 'Page', exact: true }).click();
+  await page.getByRole('option', { name: /New Page/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'New Page' });
+  await expect(dialog.getByText('Link from')).toHaveCount(0);
+  await dialog.getByLabel('Name').fill('Garage');
+  await dialog.getByRole('button', { name: 'Create' }).click();
+  await expect(editor.getByRole('button', { name: 'Page', exact: true })).toContainText('Garage');
+  await editor.getByRole('button', { name: kindLabel.present, exact: true }).click();
+  await editor.getByRole('button', { name: 'Sheet', exact: true }).click();
+  await page.getByRole('option', { name: /New Sheet/ }).click();
+  await page.getByRole('dialog', { name: 'New Sheet' }).getByLabel('Name').fill('Quick controls');
+  await page.getByRole('dialog', { name: 'New Sheet' }).getByRole('button', { name: 'Create' }).click();
+  await expect(editor.getByRole('button', { name: 'Sheet', exact: true })).toContainText('Quick controls');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(panel.getByRole('button', { name: /When tapped/ })).toContainText('Quick controls');
+  // The preview stayed on its page, and the sheet is in the document.
+  await page.getByRole('button', { name: 'Pages' }).first().click();
+  await expect(page.locator('.w2-pages').getByRole('button', { name: /^Garage/ })).toBeVisible();
+  await expect(page.locator('.w2-pages').getByRole('button', { name: /^Quick controls/ })).toBeVisible();
+});
+
+const kindLabel = { push: 'Open Page', present: 'Open Sheet' };

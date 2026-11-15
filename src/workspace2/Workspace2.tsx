@@ -8,6 +8,7 @@ import { ModeSegment, ChecksPill } from './TopBar';
 import AddHost, { useAdd } from './add/AddHost';
 import DragLayer from './dnd/DragLayer';
 import { SHEET_SNAP_EVENT } from './editors/EditorRow';
+import { newPageFlow, newSheetFlow } from './navigation';
 import { WorkspaceDataProvider, type CreateFlow } from './pickers/WorkspaceData';
 import TopBar from './TopBar';
 import PropertiesPanel from './PropertiesPanel';
@@ -23,6 +24,8 @@ const snapPoints = [SNAP_PEEK, SNAP_HALF, SNAP_FULL];
 type Snap = typeof snapPoints[number];
 
 /** The pixels of the screen a narrow sheet at `snap` covers. */
+/** Whether a dialog is up over the workspace (New Page… from an editor in the sheet); the sheet keeps its height behind it. */
+const dialogOpen = () => Boolean(document.querySelector('[role=dialog][data-open], [role=alertdialog][data-open]'));
 const coverage = (snap: Snap | null) => snap === SNAP_PEEK ? 88 : snap === SNAP_FULL ? window.innerHeight : window.innerHeight * SNAP_HALF;
 
 /** Why the draft is not there: loading, not signed in, or could not load (spec 9). */
@@ -86,7 +89,7 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
     <ToastHost>
-      <WorkspaceDataProvider document={document} house={ws.houseStates.house} environment={ws.houseStates.environment} onCreatePage={onCreatePage} onCreateSheet={onCreateSheet}>
+      <WorkspaceDataProvider document={document} house={ws.houseStates.house} environment={ws.houseStates.environment} onCreatePage={onCreatePage ?? newPageFlow} onCreateSheet={onCreateSheet ?? newSheetFlow}>
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <DragLayer ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
@@ -99,8 +102,12 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
       </main>
       {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/>{ws.mode === 'edit' && <BottomAdd/>}
         <button type="button" className="w2-bottom-pages" aria-label="Pages" onClick={() => setPagesOpen(true)}><Layers size={16} aria-hidden/>Pages</button></nav>}
-      {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={next => setSnap(next)}
-        onOpenChange={open => { if (!open) close(); }}>
+      {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={next => { if (!dialogOpen()) setSnap(next); }}
+        onOpenChange={(open, details) => {
+          // A dialog opened from inside the sheet (New Page…, New Sheet…) sits outside it; pressing in the dialog is not a press outside the sheet.
+          if (!open && details.reason === 'outside-press' && (details.event.target as Element | null)?.closest?.('[role=dialog], [role=alertdialog]')) return;
+          if (!open) close();
+        }}>
         <Drawer.Portal><Drawer.Viewport className="w2-props-viewport"><Drawer.Popup className="w2-scope w2-sheet w2-props-sheet" aria-label="Properties" style={{ '--w2-sheet-hidden': `${Math.max(0, window.innerHeight - coverage(snap))}px` } as CSSProperties}>
           <div className="w2-grabber" aria-hidden/>
           <Drawer.Content className="w2-sheet-content w2-props-content">{properties}</Drawer.Content>

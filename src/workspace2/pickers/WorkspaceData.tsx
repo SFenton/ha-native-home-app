@@ -4,8 +4,10 @@ import type { House } from '../../preview2/projections';
 import type { Environment } from '../../preview2/evaluate';
 import { rowsFromDocument, rowsFromStates, type EntityRow } from './entities';
 
-/** Starts a creation flow and calls `done` with the id it made. Supplied by the navigation lane; absent, the picker row is hidden. */
-export type CreateFlow = (done: (id: string) => void) => void;
+/** What a creation flow made: its id, and the document as it stands with the new page or sheet in it. */
+export interface Made { id: string; document: CompositionDocument }
+/** Starts a creation flow and calls `done` with what it made (not called when the person cancels). Absent, the picker row is hidden. */
+export type CreateFlow = (done: (made: Made) => void) => void;
 
 /** What the pickers and editors read besides the document: the entities Home Assistant has and the creation flows. */
 export interface WorkspaceData {

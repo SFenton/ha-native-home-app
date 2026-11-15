@@ -16,6 +16,8 @@ export interface CreatePageOptions {
 export interface CreateSheetOptions {
   /** Open the new sheet presented in the preview (default true). */
   open?: boolean;
+  /** Folds one more change into the same undo step as the new sheet (the caller sees the document that holds it). */
+  connect?: (document: CompositionDocument, sheetId: string) => CompositionDocument;
 }
 
 /** A dialog the navigation host can show. `resolve` answers the entry point's promise with the new id, or undefined when cancelled. */

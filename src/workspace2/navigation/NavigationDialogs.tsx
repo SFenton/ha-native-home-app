@@ -83,7 +83,7 @@ function NewSheet({ ws, options, onDone }: { ws: Workspace2; options: CreateShee
     event.preventDefault();
     if (!name.trim()) return;
     const made = addSheet(ws.document!, name, height);
-    ws.studio.apply(made.document);
+    ws.studio.apply(options.connect ? options.connect(made.document, made.id) : made.document);
     if (options.open !== false) { ws.setSurface({ kind: 'modal', id: made.id }); ws.select(undefined); }
     onDone(made.id);
   };

@@ -13,7 +13,7 @@ import ChoiceField from '../pickers/ChoiceField';
 import EntityList from '../pickers/EntityList';
 import { EntityField, PickerRow, ServiceField } from '../pickers/PickerField';
 import { loadServices, sampleServices, type ServiceField as ServiceFieldSpec, type ServiceRow } from '../pickers/services';
-import { useWorkspaceData } from '../pickers/WorkspaceData';
+import { useWorkspaceData, type CreateFlow } from '../pickers/WorkspaceData';
 import { summarize, useRows } from '../rows';
 import { acceptedKinds, dataOf, defaultAction, kindOf, kindWords, operandDepth, operandFor, sourceOf, sourceWords, targetEntities, withDataField, withService, withTargetEntities, type ActionKind, type ValueSource } from './action';
 import { useDraftDocument, type Draft } from './draft';
@@ -172,16 +172,23 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId }: Act
   const disabled = (item: ActionKind) => item === 'present' ? doc.modals.length === 0 && !onCreateSheet : item === 'select-tab' ? doc.navigation.tabs.length === 0 : item === 'set-local' ? !doc.localState?.length : false;
   const present = (schema && JSON.stringify(schema).includes('"replace"')) || false;
   const pages = doc.pages.map(page => ({ id: page.id, label: page.title }));
+  /** Runs a creation flow, then copies what it made into this draft (the document has it already), so Done keeps it. */
+  const adopt = (flow: CreateFlow, list: 'pages' | 'modals') => (done: (id: string) => void) => flow(made => {
+    const have = new Set(draft.get()[list].map(item => item.id));
+    const added = made.document[list].filter(item => !have.has(item.id));
+    draft.set({ ...draft.get(), [list]: [...draft.get()[list], ...added] });
+    done(made.id);
+  });
   const withDraftValue = (patch: Record<string, unknown>) => set({ ...action, ...patch });
   const localField = doc.localState?.find(field => field.id === action?.stateId);
   return <div className="w2-editor-section" data-testid="action-editor">
     <div className="w2-kind-chips" role="group" aria-label="Kind">{kinds.map(item => <button type="button" key={item} className="w2-chip" aria-pressed={item === kind} disabled={disabled(item)}
       onClick={() => item !== kind && set(defaultAction(item, doc, boundSourceId))}>{kindWords[item]}</button>)}</div>
     {kind === 'call-service' && action && <CallBody draft={draft} path={path}/>}
-    {kind === 'push' && action && <ChoiceField label="Page" choices={pages} value={action.pageId} onPick={id => withDraftValue({ pageId: id })} create={onCreatePage ? { label: 'New Page…', run: onCreatePage } : undefined}/>}
-    {kind === 'dismiss-then-push' && action && <ChoiceField label="Page" choices={pages} value={action.destination?.pageId} onPick={id => withDraftValue({ destination: { ...action.destination, pageId: id } })} create={onCreatePage ? { label: 'New Page…', run: onCreatePage } : undefined}/>}
+    {kind === 'push' && action && <ChoiceField label="Page" choices={pages} value={action.pageId} onPick={id => withDraftValue({ pageId: id })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
+    {kind === 'dismiss-then-push' && action && <ChoiceField label="Page" choices={pages} value={action.destination?.pageId} onPick={id => withDraftValue({ destination: { ...action.destination, pageId: id } })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
     {kind === 'present' && action && <>
-      <ChoiceField label="Sheet" choices={doc.modals.map(modal => ({ id: modal.id, label: modal.title }))} value={action.modalId} onPick={id => withDraftValue({ modalId: id })} create={onCreateSheet ? { label: 'New Sheet…', run: onCreateSheet } : undefined}/>
+      <ChoiceField label="Sheet" choices={doc.modals.map(modal => ({ id: modal.id, label: modal.title }))} value={action.modalId} onPick={id => withDraftValue({ modalId: id })} create={onCreateSheet ? { label: 'New Sheet…', run: adopt(onCreateSheet, 'modals') } : undefined}/>
       {present && <div className="w2-field-row"><span className="w2-field-label">If a sheet is already open</span><div className="w2-segment w2-field-control" role="group" aria-label="If a sheet is already open">
         {(['reject', 'replace'] as const).map(value => <button type="button" key={value} aria-pressed={action.ifPresented === value} onClick={() => withDraftValue({ ifPresented: value })}>{value === 'reject' ? 'Do nothing' : 'Replace it'}</button>)}</div></div>}
     </>}
