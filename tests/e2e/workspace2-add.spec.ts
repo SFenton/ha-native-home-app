@@ -200,20 +200,23 @@ test('the rule builder round-trips a rule and keeps the JSON for the rest', asyn
   }
 });
 
+/** Every Studio control on screen, outside the preview, with a side under 44 px. */
+const smallControls = (page: Page) => page.evaluate(() => {
+  const out: string[] = [];
+  for (const element of document.querySelectorAll<HTMLElement>('[data-testid=workspace2] button, [data-testid=workspace2] [role=switch], [data-testid=workspace2] [role=menuitem], [data-testid=workspace2] input:not([type=hidden]), [data-testid=workspace2] select, [role=dialog] button, [role=option], .w2-pages button')) {
+    if (element.closest('[data-preview-root]') || element.closest('[hidden]') || element.closest('[inert]')) continue;
+    const box = element.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) continue;
+    if (box.height < 43.5 || box.width < 43.5) out.push(`${element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 20)} ${Math.round(box.width)}x${Math.round(box.height)}`);
+  }
+  return out;
+});
+
 test('under a coarse pointer no Studio control is under 44 px', async ({ page }) => {
   test.skip(!isPhone(page), 'The measure is the touch family');
   await stubHouse(page);
   await openWorkspace(page);
-  const small = async () => page.evaluate(() => {
-    const out: string[] = [];
-    for (const element of document.querySelectorAll<HTMLElement>('[data-testid=workspace2] button, [data-testid=workspace2] [role=switch], [data-testid=workspace2] [role=menuitem], [data-testid=workspace2] input:not([type=hidden]), [data-testid=workspace2] select, [role=dialog] button, [role=option]')) {
-      if (element.closest('[data-preview-root]') || element.closest('[hidden]') || element.closest('[inert]')) continue;
-      const box = element.getBoundingClientRect();
-      if (box.width === 0 || box.height === 0) continue;
-      if (box.height < 43.5 || box.width < 43.5) out.push(`${element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 20)} ${Math.round(box.width)}x${Math.round(box.height)}`);
-    }
-    return out;
-  });
+  const small = () => smallControls(page);
   expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
   expect(await small()).toEqual([]);
   await previewTile(page, 'Weather').click();
@@ -322,4 +325,41 @@ test('a Toggle offers turn on and turn off, never When tapped, and the draft sta
   await page.getByTestId('status-tag').click();
   await expect(page.getByText('Lamp 0: When tapped is needed.')).toBeVisible();
   await expect(page.getByText('does not work with this kind')).toHaveCount(0);
+});
+
+test('under a coarse pointer the Not Saved tag, the Tabs heading and a target chip remove are 44 px too', async ({ page }) => {
+  test.skip(!isPhone(page), 'The measure is the touch family');
+  await stubHouse(page);
+  await openWorkspace(page);
+  // The Tabs heading in Pages.
+  await page.getByRole('button', { name: 'Pages' }).first().click();
+  await expect(page.getByRole('button', { name: /^Tabs · \d+ of \d+$/ })).toBeVisible();
+  expect(await smallControls(page)).toEqual([]);
+  await page.keyboard.press('Escape');
+  // A target chip's remove, in the action editor.
+  await page.locator('.w2-bottom-add').click();
+  await page.getByTestId('add-picker').getByRole('listitem').filter({ hasText: 'Button' }).first().click();
+  const panel = page.getByLabel('Properties');
+  await panel.getByRole('button', { name: /When tapped/ }).click();
+  const editor = page.getByTestId('action-editor');
+  await editor.getByRole('button', { name: 'Call a Service' }).click();
+  await editor.getByRole('button', { name: 'Service', exact: true }).click();
+  await page.getByRole('option', { name: /Light: Turn on/ }).first().click();
+  await editor.getByRole('button', { name: 'Target', exact: true }).click();
+  await page.getByRole('option', { name: /Lamp 0/ }).first().click();
+  await expect(editor.locator('[data-target="light.demo_0"]')).toBeVisible();
+  expect(await smallControls(page)).toEqual([]);
+  const remove = await editor.locator('.w2-chip-remove').first().boundingBox();
+  expect(remove!.width).toBeGreaterThanOrEqual(43.5);
+  expect(remove!.height).toBeGreaterThanOrEqual(43.5);
+});
+
+test('under a coarse pointer the Not Saved tag is 44 px', async ({ page }) => {
+  test.skip(!isPhone(page), 'The measure is the touch family');
+  await openWorkspace(page);
+  await page.route('**/native/api/draft', route => route.request().method() === 'PUT' ? route.fulfill({ status: 500, json: { error: 'The disk is full.' } }) : route.continue());
+  await selectTile(page, 'Lights');
+  await page.getByLabel('Title', { exact: true }).first().fill('Lamps');
+  await expect(page.getByTestId('status-tag')).toHaveText('Not Saved', { timeout: 8000 });
+  expect(await smallControls(page)).toEqual([]);
 });

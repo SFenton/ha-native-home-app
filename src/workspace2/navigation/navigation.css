@@ -22,5 +22,6 @@
 .w2-links { padding: 0 4px; }
 .w2-links > .w2-row, .w2-links > .w2-empty { padding-inline: 12px; }
 .w2-pages .w2-group-title .w2-group-button { font: inherit; color: inherit; min-height: 0; padding: 0 !important; justify-content: flex-start; background: none; border: 0; }
+@media (pointer: coarse) { .w2-pages .w2-group-title .w2-group-button { min-height: 44px; min-width: 44px; } }
 .w2-wide-label { width: auto !important; flex: 1 !important; }
 .w2-link-row > span:first-child { flex: 1; text-align: start; }
