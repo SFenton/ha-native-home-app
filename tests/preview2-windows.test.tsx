@@ -7,7 +7,7 @@ import { emptyOverlay } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props } from '../src/preview2/Preview2';
 import { withPose } from '../src/preview2';
 import { addPage } from '../src/workspace2/navigation/edit';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 afterEach(cleanup);
 const base = homeDomains.document as unknown as CompositionDocument;

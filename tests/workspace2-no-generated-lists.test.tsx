@@ -6,7 +6,7 @@ import { buildDocumentIndex } from '../src/preview2/model';
 import PropertiesPanel from '../src/workspace2/PropertiesPanel';
 import { DialogBody, type DialogKey } from '../src/workspace2/projectDialogs';
 import { Project } from './support/workspace2-surfaces';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 import firstSlice from './fixtures/composition-first-slice.json';
 
 vi.mock('../src/api', () => ({

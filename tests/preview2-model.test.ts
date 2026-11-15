@@ -5,7 +5,7 @@ import { childSlots, componentLocations, replaceAt, valueAt } from '../src/compo
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { compositionChildren, type CompositionDocument, type CompositionNode } from '../src/shared/composition/schema';
 import { buildDocumentIndex, parseSelectionKey, selectionKey, type SelectionKey } from '../src/preview2/model';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 const corpus = path.resolve(__dirname, '../contract/corpus/accept');
 const corpusDocuments = readdirSync(corpus).filter(name => name.endsWith('.json'))

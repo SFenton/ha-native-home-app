@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { isPhone, openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
 
-const fixture = JSON.parse(readFileSync(new URL('../fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
+const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
 const find = (value: any, id: string): any => { if (!value || typeof value !== 'object') return undefined; if (value.id === id) return value; for (const child of Object.values(value)) { const hit = find(child, id); if (hit) return hit; } };
 /** The fixture with a light tile on the Home page, so the light is one tap away. */
 function withLightOnHome() {

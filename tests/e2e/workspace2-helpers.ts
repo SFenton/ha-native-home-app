@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-const fixture = JSON.parse(readFileSync(new URL('../fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: object };
+const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: object };
 
 /** Optional folder for evidence screenshots (a phase deliverable). */
 const evidence = process.env.STUDIO_EVIDENCE_DIR;

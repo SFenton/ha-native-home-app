@@ -7,7 +7,7 @@ import { moveToSlot, placementOf, spoken, validSlots } from '../src/workspace2/d
 import { endOf } from '../src/workspace2/add/insert';
 import { filterMoveTargets, groupMoveTargets, moveTargets } from '../src/workspace2/nodeActions';
 
-const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
+const fixture = JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 const doc = fixture.document;
 const index = buildDocumentIndex(doc);
 const tile = [...index.entries.values()].find(entry => entry.node?.type === 'action-tile')!;

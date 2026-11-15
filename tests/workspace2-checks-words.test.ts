@@ -22,7 +22,7 @@ function findNested(document: CompositionDocument): { path: (string | number)[];
 
 /** Every row of Checks must say what it is about (by name), which field (by its label), what to change, and go somewhere. */
 const corpus = path.resolve(__dirname, '../contract/corpus/reject');
-const home = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')).document as CompositionDocument;
+const home = JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')).document as CompositionDocument;
 const panels = ['tabs', 'header', 'wallpaper'];
 const allCodes: CompositionIssue['code'][] = ['unsupported_schema', 'unknown_field', 'unknown_variant', 'missing_required', 'invalid_value', 'duplicate_key', 'limit_exceeded', 'duplicate_id', 'invalid_reference', 'binding_type', 'invalid_combination', 'capability_manifest_mismatch', 'unsupported_capability', 'asset_integrity'];
 

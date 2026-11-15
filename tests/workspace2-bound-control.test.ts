@@ -8,7 +8,7 @@ import { runChecks } from '../src/workspace2/checks';
 import { boundControlShows, withBoundControlKind } from '../src/workspace2/editors/boundControl';
 import { boundControlAllows } from '../src/shared/composition/bound-control';
 
-const base = (JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument }).document;
+const base = (JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument }).document;
 const { document: withToggle, key } = insertType(base, endOf(base, 'page:page-home') as Destination, 'bound-control', { entityId: 'light.lamp', name: 'Lamp' });
 const path = buildDocumentIndex(withToggle).get(key)!.path as (string | number)[];
 

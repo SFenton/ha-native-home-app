@@ -6,7 +6,7 @@ import { evaluateOperand, evaluatePredicate, loading, unavailable, value } from 
 import {
   applyCall, applyLocal, createEnvironment, emptyOverlay, houseFrom, localValue, projectSource, resolveCall, shownEntity, type House,
 } from '../src/preview2/projections';
-import fixture from './fixtures/home-domains.json';
+import fixture from '../src/preview2/fixtures/home-domains.json';
 
 const document = compileCompositionDocument(structuredClone(fixture.document)).document;
 const source = (id: string) => document.dataSources.find(item => item.id === id)!;

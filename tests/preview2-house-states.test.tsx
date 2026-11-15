@@ -6,7 +6,7 @@ import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CallService } from '../src/shared/composition/schema';
 import { value } from '../src/preview2/evaluate';
 import { useHouseStates } from '../src/preview2/useHouseStates';
-import fixture from './fixtures/home-domains.json';
+import fixture from '../src/preview2/fixtures/home-domains.json';
 
 vi.mock('../src/api', () => ({ request: vi.fn() }));
 const document = compileCompositionDocument(structuredClone(fixture.document)).document;

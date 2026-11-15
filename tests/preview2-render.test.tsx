@@ -11,7 +11,7 @@ import { drawnTypes } from '../src/preview2/nodes/registry';
 import { renderProbe } from '../src/preview2/probe';
 import { emptyOverlay, houseFrom, type House, type Overlay } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props, type PreviewSurface } from '../src/preview2/Preview2';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 import { compositionChildren } from '../src/shared/composition/schema';
 
 afterEach(() => { cleanup(); renderProbe.onNode = undefined; });

@@ -6,7 +6,7 @@ import { tileTypes, typeForEntity } from '../src/workspace2/add/catalog';
 import { after, canHold, endOf, insertEntity, insertType, type Destination } from '../src/workspace2/add/insert';
 import { buildDocumentIndex } from '../src/preview2/model';
 
-const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
+const fixture = JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 const doc = fixture.document;
 const index = buildDocumentIndex(doc);
 const first = (type: string) => [...index.entries.values()].find(entry => entry.node?.type === type)!;

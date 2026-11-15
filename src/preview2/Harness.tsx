@@ -19,7 +19,7 @@ export default function Harness() {
   const [log, setLog] = useState<string[]>([]);
   const first = query.get('surface')?.split(':');
   const [surface, setSurface] = useState<PreviewSurface | undefined>(first ? { kind: first[0] as 'page' | 'modal', id: first.slice(1).join(':') } : undefined);
-  useEffect(() => { void import('../../tests/fixtures/home-domains.json').then(module => setDocument((module.default as { document: CompositionDocument }).document)); }, []);
+  useEffect(() => { void import('./fixtures/home-domains.json').then(module => setDocument((module.default as { document: CompositionDocument }).document)); }, []);
   const house = useMemo(() => document ? demoHouse(document) : undefined, [document]);
   if (!document || !house) return <p>Loading the fixture…</p>;
   const shown = surface ?? { kind: 'page' as const, id: document.navigation.initialPageId };

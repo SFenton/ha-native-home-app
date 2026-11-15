@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { basePageId, currentSurface, initialNav, isNavAction, navigateTo, presenterOf, reduceNavigation, tabStack, type NavAction, type NavState } from '../src/preview2/navigation';
-import fixture from './fixtures/home-domains.json';
+import fixture from '../src/preview2/fixtures/home-domains.json';
 
 const document: CompositionDocument = compileCompositionDocument(structuredClone(fixture.document)).document;
 const push = (pageId: string) => ({ type: 'push' as const, pageId, arguments: {}, origin: 'sender' as const, duplicate: 'reuse-nearest' as const });

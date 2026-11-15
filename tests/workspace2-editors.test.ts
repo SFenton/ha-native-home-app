@@ -12,7 +12,7 @@ import { filterEntities, rowsFromDocument } from '../src/workspace2/pickers/enti
 import { filterIcons } from '../src/workspace2/pickers/icons';
 import { filterServices, sampleServices, serviceTitle } from '../src/workspace2/pickers/services';
 
-const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
+const fixture = JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 const doc = fixture.document;
 const source = doc.dataSources.find(item => item.kind === 'ha-entity')?.id ?? 'hc-guest-0';
 const samples: Record<string, Predicate> = {

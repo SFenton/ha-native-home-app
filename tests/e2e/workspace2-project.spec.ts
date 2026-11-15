@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { isPhone, openWorkspace, previewRoot, seed, snap } from './workspace2-helpers';
 
-const fixture = JSON.parse(readFileSync(new URL('../fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
+const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
 
 /** The fixture with something in every Project dialog, so each draws rows and not an empty line. */
 const full = () => ({

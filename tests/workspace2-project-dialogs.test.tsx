@@ -10,7 +10,7 @@ import { ToastHost } from '../src/workspace2/toasts';
 import { wallpaperImage } from '../src/preview2/wallpaper';
 import type { HaPublicationSummary } from '../src/ha-publication';
 import { Project } from './support/workspace2-surfaces';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 const api = vi.hoisted(() => ({ request: vi.fn() }));
 vi.mock('../src/api', () => ({ apiUrl: (path: string) => path, request: api.request }));

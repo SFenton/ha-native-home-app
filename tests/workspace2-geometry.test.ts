@@ -5,7 +5,7 @@ import { buildDocumentIndex } from '../src/preview2/model';
 import { cueFor, locateOnCanvas } from '../src/workspace2/dnd/geometry';
 import { endOf } from '../src/workspace2/add/insert';
 
-const doc = (JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument }).document;
+const doc = (JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument }).document;
 const index = buildDocumentIndex(doc);
 const grid = [...index.entries.values()].find(entry => entry.node?.type === 'tile-grid')!;
 const tiles = index.children(grid.key);

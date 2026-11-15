@@ -9,7 +9,7 @@ import { survivingSelection } from '../src/workspace2/selection';
 import { buildOutline, type OutlineRow } from '../src/workspace2/outline';
 import { contrast, deriveTheme, over, parseColor, textPairs, type Rgb } from '../src/workspace2/theme';
 
-const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
+const fixture = JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 const colour = (text: string): Rgb => parseColor(text)!;
 
 describe('theme', () => {

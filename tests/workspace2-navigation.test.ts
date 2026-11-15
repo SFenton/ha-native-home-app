@@ -7,7 +7,7 @@ import { fillTabGroups, groupWithRoom, tabGroups, type TabGroup } from '../src/w
 import { compilerIssues, runChecks } from '../src/workspace2/checks';
 import { addPage, addSheet, addTab, deleteSurface, duplicateSurface, openerCount, renameSurface, tabRoom } from '../src/workspace2/navigation/edit';
 
-const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
+const fixture = JSON.parse(readFileSync(new URL('../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 const base = fixture.document;
 const compiles = (document: CompositionDocument) => expect(compilerIssues(document)).toEqual([]);
 

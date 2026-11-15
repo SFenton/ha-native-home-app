@@ -8,7 +8,7 @@ import { addTab } from '../src/workspace2/navigation/edit';
 import { buildOutline } from '../src/workspace2/outline';
 import PagesPanel from '../src/workspace2/PagesPanel';
 import type { Workspace2 } from '../src/workspace2/useWorkspace2';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 afterEach(cleanup);
 const base = homeDomains.document as unknown as CompositionDocument;

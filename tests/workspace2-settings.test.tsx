@@ -9,7 +9,7 @@ import SurfaceSettings from '../src/workspace2/navigation/PageSettings';
 import { suggestPath } from '../src/workspace2/navigation/Links';
 import { RowsProvider } from '../src/workspace2/rows';
 import type { Workspace2 } from '../src/workspace2/useWorkspace2';
-import homeDomains from './fixtures/home-domains.json';
+import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 afterEach(cleanup);
 const base = homeDomains.document as unknown as CompositionDocument;

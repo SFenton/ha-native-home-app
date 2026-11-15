@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { componentLocations, compositionEditorSchema, fieldVariants, resolveField, nodeDefinition } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { climatePropsSchema } from '../src/shared/composition/climate';
-import fixture from './fixtures/home-domains.json';
+import fixture from '../src/preview2/fixtures/home-domains.json';
 
 const compile = () => compileCompositionDocument(structuredClone(fixture.document));
 

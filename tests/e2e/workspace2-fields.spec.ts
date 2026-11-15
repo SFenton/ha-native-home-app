@@ -5,7 +5,7 @@ import { schemaAt } from '../../src/workspace2/rows';
 import { openWorkspace, seed } from './workspace2-helpers';
 import { readFileSync } from 'node:fs';
 
-const fixture = JSON.parse(readFileSync(new URL('../fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
+const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
 /** The fixture plus the launch text, so the Project > App Launch dialog has fields to walk. */
 const withLaunch = () => ({
   ...fixture.document,
