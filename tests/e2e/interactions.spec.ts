@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return route.continue();
-    expect(url.origin, 'Acceptance must never call HA or external services').toBe('http://127.0.0.1:4801');
+    expect(url.origin, 'Acceptance must never call HA or external services').toBe(`http://127.0.0.1:${process.env.STUDIO_E2E_PORT ?? '4801'}`);
     expect(url.pathname, 'Preview interactions must not send service writes').not.toMatch(/\/(?:services|actions)(?:\/|$)/);
     await route.continue();
   });
@@ -118,7 +118,7 @@ test('endpoint search requires consent, encodes the query, and never shows sampl
   document.dataSources[0] = { ...document.dataSources[0], kind: 'endpoint', endpoint: 'synthetic-search', queryVariable: 'recipeQuery' };
   document.pages[0].search = { id: 'recipe-search', label: 'Search recipes', placeholder: 'Find recipes', mode: 'endpoint', sourceId: 'recipes' };
   const saved = await seed(request, document), queries: string[] = [];
-  await page.route(/^http:\/\/127\.0\.0\.1:4801\/api\/data\/recipes(?:\?|$)/, async route => {
+  await page.route(new RegExp(`^http://127\\.0\\.0\\.1:${process.env.STUDIO_E2E_PORT ?? '4801'}/api/data/recipes(?:\\?|$)`), async route => {
     const query = new URL(route.request().url()).searchParams.get('q');
     expect(query).not.toBeNull();
     queries.push(query!);

@@ -1,6 +1,6 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# Native Home Studio
+# S+H Studio
 
 A Home Assistant app for designing, previewing, and publishing native app
 experiences as versioned JSON or YAML. The editor and publication API live here;
@@ -70,7 +70,7 @@ Uploads are resized, stripped of metadata by JPEG re-encoding, and embedded in
 the saved document and exports. Treat exports containing personal images as
 private.
 
-**Data sources → Initialize from Native Home** reads an authenticated schema-2
+**Data sources → Import house config** reads an authenticated schema-2
 house configuration and offers an undoable, reviewed import of its tabs, chips,
 room pages, and supported content. Applying the import immediately loads current
 entity values; Save persists the layout, not the live readings. Connected saved

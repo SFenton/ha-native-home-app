@@ -89,7 +89,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (['http:', 'https:'].includes(url.protocol)) {
-      expect(url.origin).toBe('http://127.0.0.1:4801');
+      expect(url.origin).toBe(`http://127.0.0.1:${process.env.STUDIO_E2E_PORT ?? '4801'}`);
       expect(url.pathname).not.toMatch(/\/(?:services|actions)(?:\/|$)/);
     }
     await route.continue();

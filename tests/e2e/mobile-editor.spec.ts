@@ -4,7 +4,7 @@ import { chromium, expect, test as base, type APIRequestContext, type BrowserCon
 import { mobileDescendants, mobileEditorDocument, mobileViewports } from '../fixtures/mobile-editor';
 import type { DraftEnvelope, StudioDocument } from '../../src/shared/types';
 
-const origin = 'http://127.0.0.1:4801';
+const origin = `http://127.0.0.1:${process.env.STUDIO_E2E_PORT ?? '4801'}`;
 type Pane = 'Project' | 'Preview' | 'Inspect';
 const project = (page: Page) => page.getByRole('complementary', { name: 'Project navigation and component library', exact: true });
 const inspector = (page: Page) => page.getByRole('complementary', { name: 'Properties inspector', exact: true });

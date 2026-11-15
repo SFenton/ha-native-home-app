@@ -8,7 +8,7 @@ The studio should feel closer to a carefully made layout tool than to a collecti
 
 This specification covers editor UX, component and configuration requirements, synthetic demonstration content, browser preview behavior, and acceptance criteria. Field names below are a **proposed design contract**, not a claim about an existing native-home import format. The integration/schema owners must map these requirements to their supported contract. Installation, authentication transport, HA orchestration, native implementation, and backend architecture are outside this document.
 
-**Fidelity contract:** permanently label the canvas **“Interactive browser preview”**. Device details expose **“Layout approximation; not an iOS emulator.”** Fonts, glass, system chrome, media, sheet physics, Dynamic Island allocation, fold geometry, and 3D surfaces are approximations. A successful browser check does not establish native accessibility, physical-device behavior, ActivityKit delivery, or hardware fidelity.
+**Fidelity contract:** state the disclaimer once, in Help (the preview log's empty state until Help ships): **“The preview approximates iOS.”** The canvas, the area under the device and the footer carry no repeated caption, badge or “nothing was changed” line. Fonts, glass, system chrome, media, sheet physics, Dynamic Island allocation, fold geometry, and 3D surfaces are approximations. A successful browser check does not establish native accessibility, physical-device behavior, ActivityKit delivery, or hardware fidelity.
 
 No native-home code or iOS application is to be changed as part of this design deliverable.
 
