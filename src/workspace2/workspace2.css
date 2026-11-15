@@ -244,3 +244,8 @@
 .w2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .w2-pushed-head .w2-done { justify-self: end; min-width: 64px; }
 .w2-chip-static { display: inline-flex; padding: 2px 8px; border-radius: 10px; background: var(--w2-selected); font-size: 12px; }
+
+/* Move To…: a search field over the places, grouped by page or sheet */
+.w2-move-search { margin: 8px 12px; width: calc(100% - 24px); }
+.w2-move .w2-group-title { padding-inline: 12px; }
+.w2-move .w2-link-row { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding-block: 6px; }

@@ -5,6 +5,7 @@ import { compositionErrors } from '../src/composition-editor';
 import { buildDocumentIndex } from '../src/preview2/model';
 import { moveToSlot, placementOf, spoken, validSlots } from '../src/workspace2/dnd/moves';
 import { endOf } from '../src/workspace2/add/insert';
+import { filterMoveTargets, groupMoveTargets, moveTargets } from '../src/workspace2/nodeActions';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 const doc = fixture.document;
@@ -47,5 +48,37 @@ describe('moves', () => {
     const order = (result.document as unknown as never, buildDocumentIndex(result.document).children(grid.key));
     expect(order[1]).toBe(first);
     expect(placementOf(doc, first, slot).position).toBe(2);
+  });
+});
+
+describe('Move To… targets', () => {
+  const targets = moveTargets(doc, tile.node!.id);
+  it('belong to a page or sheet group and keep document order within it', () => {
+    expect(targets.length).toBeGreaterThan(10);
+    expect(targets.every(target => /· (Page|Sheet)$/.test(target.group))).toBe(true);
+    const groups = groupMoveTargets(targets);
+    expect(groups.flatMap(group => group.targets)).toHaveLength(targets.length);
+    expect(new Set(groups.map(group => group.group)).size).toBe(groups.length);
+    expect(groups.every(group => group.targets[0].parent.kind === 'surface')).toBe(true);
+  });
+  it('tell two containers of the same name apart by page or by the containers around them', () => {
+    const byName = new Map<string, typeof targets>();
+    for (const target of targets) byName.set(target.label, [...byName.get(target.label) ?? [], target]);
+    const clashes = [...byName.values()].filter(list => list.length > 1);
+    expect(clashes.length).toBeGreaterThan(0);
+    for (const list of clashes) {
+      const keys = list.map(target => `${target.group}|${target.trail.join('>')}`);
+      expect(new Set(keys).size, list[0].label).toBe(list.length);
+    }
+  });
+  it('are found by name, page or the containers around them, and an empty search keeps them all', () => {
+    expect(filterMoveTargets(targets, '')).toHaveLength(targets.length);
+    const camera = filterMoveTargets(targets, 'cameras');
+    expect(camera.length).toBeGreaterThan(0);
+    expect(camera.length).toBeLessThan(targets.length);
+    expect(camera.every(target => /cameras/i.test([target.label, target.group, ...target.trail].join(' ')))).toBe(true);
+    const page = targets.find(target => target.trail.length > 0)!;
+    expect(filterMoveTargets(targets, `${page.trail[0]} ${page.label}`.toUpperCase())).toContain(page);
+    expect(filterMoveTargets(targets, 'zzzz-nothing')).toEqual([]);
   });
 });

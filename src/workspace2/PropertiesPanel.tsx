@@ -14,7 +14,7 @@ import { useDeepRows } from './editors/overrides';
 import { after } from './add/insert';
 import IdRow from './IdRow';
 import SurfaceSettings from './navigation/PageSettings';
-import { deleteNode, duplicateNode, moveNodeBy, moveNodeTo, moveTargets } from './nodeActions';
+import { deleteNode, duplicateNode, filterMoveTargets, groupMoveTargets, moveNodeBy, moveNodeTo, moveTargets } from './nodeActions';
 import { typeName } from './util';
 import type { Workspace2 } from './useWorkspace2';
 
@@ -31,10 +31,19 @@ function Header({ icon, title, line, tags, more, onClose, grab }: { icon: string
 /** "Move To…": every page, sheet and container, as a pushed page. */
 function MoveToPage({ id, onDone }: { id: string; onDone: (moved: CompositionDocument) => void }) {
   const { document, onError } = useRows();
-  const targets = moveTargets(document, id);
-  return <ul className="w2-move-list">{targets.map(target => <li key={`${target.parent.kind}:${target.parent.id}:${target.parent.tabId ?? ''}`}>
-    <button type="button" className="w2-link-row" onClick={() => { try { onDone(moveNodeTo(document, id, target.parent)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } }}>
-      <span>{target.label}</span>{target.where && <span className="w2-page-via">{target.where}</span>}</button></li>)}</ul>;
+  const [query, setQuery] = useState('');
+  const targets = useMemo(() => moveTargets(document, id), [document, id]);
+  const groups = groupMoveTargets(filterMoveTargets(targets, query));
+  return <div className="w2-move">
+    <input type="search" className="w2-move-search" aria-label="Search places" placeholder="Search" value={query} onChange={event => setQuery(event.target.value)}/>
+    {groups.length === 0 && <p className="w2-empty">No places match.</p>}
+    {groups.map(({ group, targets: list }) => <section key={group} aria-label={group}>
+      <h3 className="w2-group-title">{group}</h3>
+      <ul className="w2-move-list">{list.map(target => <li key={`${target.parent.kind}:${target.parent.id}:${target.parent.tabId ?? ''}`}>
+        <button type="button" className="w2-link-row" onClick={() => { try { onDone(moveNodeTo(document, id, target.parent)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } }}>
+          <span>{target.label}</span>{target.trail.length > 0 && <span className="w2-page-via">In {target.trail.join(' › ')}</span>}</button></li>)}</ul>
+    </section>)}
+  </div>;
 }
 
 /** A node's own fields; its child nodes are edited by selecting them. */

@@ -368,3 +368,23 @@ test('under a coarse pointer the Not Saved tag is 44 px', async ({ page }) => {
   await expect(page.getByTestId('status-tag')).toHaveText('Not Saved', { timeout: 8000 });
   expect(await smallControls(page)).toEqual([]);
 });
+
+test('Move To… groups the places by page, searches them and moves the tile', async ({ page }) => {
+  await openWorkspace(page);
+  const panel = await selectTile(page, 'Weather');
+  if (isPhone(page)) await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
+  await panel.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('menuitem', { name: 'Move To…' }).click();
+  const search = page.getByRole('searchbox', { name: 'Search places' });
+  await expect(search).toBeVisible();
+  const all = await page.locator('.w2-move .w2-link-row').count();
+  expect(all).toBeGreaterThan(5);
+  expect(await page.locator('.w2-move h3').count()).toBeGreaterThan(1);
+  await search.fill('cameras');
+  const found = await page.locator('.w2-move .w2-link-row').count();
+  expect(found).toBeGreaterThan(0);
+  expect(found).toBeLessThan(all);
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-move-to`);
+  await page.locator('.w2-move .w2-link-row').first().click();
+  await expect(page.locator('.w2-move')).toHaveCount(0);
+});
