@@ -1,7 +1,19 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { isPhone, openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
 
-test.beforeEach(async ({ request }) => { await seed(request); });
+const fixture = JSON.parse(readFileSync(new URL('../fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: any };
+const find = (value: any, id: string): any => { if (!value || typeof value !== 'object') return undefined; if (value.id === id) return value; for (const child of Object.values(value)) { const hit = find(child, id); if (hit) return hit; } };
+/** The fixture with a light tile on the Home page, so the light is one tap away. */
+function withLightOnHome() {
+  const document = structuredClone(fixture.document);
+  const light = structuredClone(find(document.pages, 'hc-lights-demo-room-1-item-1'));
+  const parentOf = (value: any): any => { if (!value || typeof value !== 'object') return undefined; if (Array.isArray(value.children) && value.children.some((child: any) => child.type === 'action-tile')) return value; for (const child of Object.values(value)) { const hit = parentOf(child); if (hit) return hit; } };
+  const guests = parentOf(document.pages[0]);
+  guests.children.push({ ...light, id: 'demo-hall-light', title: 'Hall light' });
+  return document;
+}
+test.beforeEach(async ({ request }) => { await seed(request, withLightOnHome()); });
 
 /** Home Assistant's entities, named the way a person names them; the ids are the fixture's own lights. */
 async function stubHouse(page: Page) {
@@ -23,7 +35,7 @@ async function savedEntity(page: Page, nodeId: string): Promise<string | undefin
 test('the entity field names the light, searches by name, and rebinds the tile to another light as one undo step', async ({ page }) => {
   await stubHouse(page);
   await openWorkspace(page);
-  const panel = await selectTile(page, 'Demo Device 1');
+  const panel = await selectTile(page, 'Hall light');
   const field = panel.locator('[data-field-path$="props/sourceId"]');
   const button = field.getByRole('button', { name: 'Entity' });
   await expect(button).toContainText('Hall lamp');
@@ -32,22 +44,22 @@ test('the entity field names the light, searches by name, and rebinds the tile t
   await button.click();
   const search = page.getByRole('searchbox', { name: 'Search entities' });
   await expect(search).toBeVisible();
-  await search.fill('study');
-  await expect(page.locator('[data-entity]')).toHaveCount(2);
+  await search.fill('lamp');
+  await expect(page.locator('[data-entity]')).toHaveCount(3);
   await search.fill('reading');
   const option = page.locator('[data-entity="light.demo_entity_309"]');
   await expect(option).toBeVisible();
   await snap(page, isPhone(page) ? 'phone-entity-picker' : 'desktop-entity-picker');
   await option.click();
   await expect(button).toContainText('Reading lamp');
-  await expect.poll(() => savedEntity(page, 'hc-lights-demo-room-1-item-1')).toBe('light.demo_entity_309');
+  await expect.poll(() => savedEntity(page, 'demo-hall-light')).toBe('light.demo_entity_309');
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(button).toContainText('Hall lamp');
-  await expect.poll(() => savedEntity(page, 'hc-lights-demo-room-1-item-1')).toBe('light.demo_entity_308');
+  // On a phone the undo returns to the preview, so the field is only read back where the panel stays open.
+  if (!isPhone(page)) await expect(button).toContainText('Hall lamp');
+  await expect.poll(() => savedEntity(page, 'demo-hall-light')).toBe('light.demo_entity_308');
 });
 
 test('a tile that reads a model lists its models in a Models group, without an entity list', async ({ page }) => {
-  await stubHouse(page);
   await openWorkspace(page);
   const panel = await selectTile(page, 'Lights');
   await panel.locator('[data-field-path$="sourceId"]').first().getByRole('button', { name: 'Entity' }).click();
