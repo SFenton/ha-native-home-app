@@ -4,7 +4,8 @@ import { isPhone, openWorkspace, previewRoot, seed, snap } from './workspace2-he
 test.beforeEach(async ({ request }) => { await seed(request); });
 
 const tag = (page: Page) => isPhone(page) ? 'phone' : 'desktop';
-const pagesButton = (page: Page) => page.getByRole('button', { name: 'Pages', exact: true });
+/** The top bar's page button; the narrow bottom bar has a second "Pages" button that opens the same overlay. */
+const pagesButton = (page: Page) => page.getByRole('button', { name: 'Pages', exact: true }).first();
 const openPages = async (page: Page) => { await pagesButton(page).click(); await expect(page.locator('.w2-pages')).toBeVisible(); return page.locator('.w2-pages'); };
 const dialog = (page: Page) => page.getByRole('dialog');
 
