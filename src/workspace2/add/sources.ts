@@ -122,7 +122,7 @@ export function boundEntity(document: CompositionDocument, path: EditorPath): st
 }
 
 /** Domains a node's source model accepts for its one entity; the compiler rejects any other (spec 8.1). */
-const modelDomains = (source: Source): readonly string[] | undefined => {
+export const modelDomains = (source: Source): readonly string[] | undefined => {
   if (source.kind !== 'model') return undefined;
   switch (source.model) {
     case 'power-toggle@1': return ['switch', 'input_boolean'];

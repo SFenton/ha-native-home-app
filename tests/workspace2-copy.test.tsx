@@ -43,17 +43,17 @@ async function check(name: string, root: ParentNode) {
 describe('copy snapshots: the visible text of each surface (spec 10)', () => {
   it('the top bar, wide and narrow, with the Project menu', async () => {
     const wide = Project.workspace(home);
-    const { container, unmount } = render(<ToastHost><TopBar ws={wide} narrow={false} window={previewWindows[0]} onWindow={() => {}} pagesOpen={false} onPagesOpen={() => {}} projectOpen={false} onProjectOpen={() => {}} dialog={undefined} onDialog={() => {}} onPanel={() => {}} onError={() => {}} onChecks={() => {}}/></ToastHost>);
+    const { container, unmount } = render(<ToastHost><TopBar ws={wide} narrow={false} window={previewWindows[0]} onWindow={() => {}} pagesOpen={false} onPagesOpen={() => {}} projectOpen={false} onProjectOpen={() => {}} dialog={undefined} onDialog={() => {}} onPanel={() => {}} onError={() => {}} onChecks={() => {}} onGo={() => {}}/></ToastHost>);
     await check('top-bar-wide', container);
     unmount();
-    const narrow = render(<ToastHost><TopBar ws={wide} narrow window={previewWindows[0]} onWindow={() => {}} pagesOpen={false} onPagesOpen={() => {}} projectOpen={false} onProjectOpen={() => {}} dialog={undefined} onDialog={() => {}} onPanel={() => {}} onError={() => {}} onChecks={() => {}}/></ToastHost>);
+    const narrow = render(<ToastHost><TopBar ws={wide} narrow window={previewWindows[0]} onWindow={() => {}} pagesOpen={false} onPagesOpen={() => {}} projectOpen={false} onProjectOpen={() => {}} dialog={undefined} onDialog={() => {}} onPanel={() => {}} onError={() => {}} onChecks={() => {}} onGo={() => {}}/></ToastHost>);
     await check('top-bar-narrow', narrow.container);
   });
 
   it('the Project menu, wide and as the narrow sheet list', async () => {
     const ws = Project.workspace(home);
     const noop = () => {};
-    const props = { ws, window: previewWindows[0], onWindow: noop, onError: noop, onPanel: noop, open: false, onOpenChange: noop, dialog: undefined, onDialog: noop } as const;
+    const props = { ws, window: previewWindows[0], onWindow: noop, onError: noop, onPanel: noop, onGo: noop, open: false, onOpenChange: noop, dialog: undefined, onDialog: noop } as const;
     const { default: ProjectMenu } = await import('../src/workspace2/ProjectMenu');
     const wide = render(<ProjectMenu {...props} narrow={false}/>);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Project' })); });

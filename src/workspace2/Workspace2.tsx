@@ -5,6 +5,7 @@ import Preview2, { previewWindows, type PreviewWindow } from './preview';
 import { useStudioTheme } from './useStudioTheme';
 import { useWorkspace2, type PanelKind } from './useWorkspace2';
 import { ModeSegment, ChecksPill } from './TopBar';
+import { followCheck, type CheckRow } from './checks';
 import AddHost, { useAdd } from './add/AddHost';
 import DragLayer from './dnd/DragLayer';
 import { SHEET_SNAP_EVENT } from './editors/EditorRow';
@@ -76,6 +77,10 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   useEffect(() => { if (narrow && overlayOpen && target) { ws.select(undefined); } }, [narrow, overlayOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const openPanel = useCallback((panel: PanelKind) => { setProjectOpen(false); ws.select(undefined); ws.setPanel(panel); }, [ws]);
   const close = useCallback(() => { ws.select(undefined); ws.setPanel(undefined); }, [ws]);
+  // Choosing a Checks row goes to what it names: the item in the preview, or the Project panel or dialog that holds it.
+  const goTo = useCallback((row: CheckRow) => followCheck(row, {
+    select: key => ws.selectAnywhere(key), panel: openPanel, dialog: key => { setProjectOpen(false); setDialog(key); },
+  }), [ws, openPanel]);
   const openProjectDialog = useCallback((key: string) => { if (narrow) setProjectOpen(true); else setDialog(key as DialogKey); }, [narrow]);
   const bottomInset = narrow && target ? coverage(snap) : 0;
   const className = `w2 w2-scope ${narrow ? 'w2-narrow' : 'w2-wide'} ${theme.dark ? 'w2-dark' : 'w2-light'}`;
@@ -93,11 +98,11 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <DragLayer ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
-        dialog={dialog} onDialog={setDialog} onPanel={openPanel} onError={showError} onChecks={() => setChecksOpen(true)}/>
+        dialog={dialog} onDialog={setDialog} onPanel={openPanel} onError={showError} onChecks={() => setChecksOpen(true)} onGo={goTo}/>
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
         {loadingState ?? <div className="w2-stage" data-mode={ws.mode} ref={setStageElement}>{stage}</div>}
         {!narrow && <HandleSlot ws={ws} stage={stageElement} onError={showError}/>}
-        {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave || Boolean(ws.flash)}/></div>}
+        {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} onGo={goTo} showPill={!narrow || ws.problemCount > 0 || ws.failedSave || Boolean(ws.flash)}/></div>}
         {!narrow && properties && <aside className="w2-card" aria-label="Properties">{properties}</aside>}
       </main>
       {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/>{ws.mode === 'edit' && <BottomAdd/>}

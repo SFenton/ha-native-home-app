@@ -2,14 +2,16 @@ import type { CompositionDocument } from '../shared/composition/schema';
 import { compileCompositionDocument } from '../shared/composition/compiler';
 import { CompositionValidationError, type CompositionIssue } from '../shared/composition/json';
 import { compositionWarnings } from '../shared/composition/lints';
-import { formatCompositionIssue } from '../shared/composition/workspace';
+import { targetOf, wordsFor, type Destination } from './checkWords';
+import type { DialogKey } from './projectDialogs';
+import type { PanelKind } from './useWorkspace2';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { buildOutline, collectLinks } from './outline';
 import { tabGroups } from './capacity';
 import { labelFor } from './labels';
 
 /** One row of the Checks popover: a sentence, where it is, and what choosing it selects. */
-export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey }
+export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey; /** Where choosing the row goes; every problem has one. */ go?: Destination }
 export interface Checks { problems: CheckRow[]; suggestions: CheckRow[] }
 
 const unescape = (part: string) => part.replace(/~1/g, '/').replace(/~0/g, '~');
@@ -22,27 +24,22 @@ export function pointerPath(pointer: string): (string | number)[] {
 }
 
 /**
- * The place a document path stands for, by name: the deepest node, page or sheet the path passes through, else the
- * part of the project it belongs to.
+ * The place a document path stands for, by name: the deepest node, page, sheet or tab the path passes through, else the part of
+ * the project it belongs to, with where choosing it goes.
  */
-export function placeOf(document: CompositionDocument, path: readonly (string | number)[]): { place: string; select?: SelectionKey; field?: string } {
-  const index = buildDocumentIndex(document);
-  for (let length = path.length; length > 0; length--) {
-    const key = index.keyAt(path.slice(0, length));
-    const entry = key ? index.get(key) : undefined;
-    if (!entry) continue;
-    if (entry.node) {
-      // The field the path ends in, by the label the properties show, when it is one of the node's own rows.
-      const rel = path.slice(entry.path.length);
-      const field = rel.length ? labelFor(entry.node.type, rel)?.label : undefined;
-      return { place: entry.node.title, select: entry.key, field };
-    }
-    if (entry.kind === 'page' || entry.kind === 'modal') return { place: (document[entry.kind === 'page' ? 'pages' : 'modals'][entry.path[1] as number]).title, select: entry.key };
-    if (entry.kind === 'tab') return { place: document.navigation.tabs[entry.path[2] as number]?.label ?? 'Tabs', select: entry.key };
-  }
-  const part = path[0];
-  const names: Record<string, string> = { navigation: 'Tabs', dataSources: 'Data', localState: 'Local State', bootstrap: 'App Launch', extensions: 'Links', liveActivities: 'Live Activities', theme: 'Wallpaper', assets: 'Wallpaper', name: 'Project' };
-  return { place: names[String(part)] ?? 'Project' };
+export function placeOf(document: CompositionDocument, path: readonly (string | number)[]): { place: string; select?: SelectionKey; field?: string; go: Destination } {
+  const { place, select, field, go } = targetOf(document, path);
+  return { place, select, field, go };
+}
+
+/** What choosing a row does in the workspace: select an item, open a Project panel, or open a Project dialog. */
+export interface CheckHandlers { select: (key: SelectionKey) => void; panel: (panel: PanelKind) => void; dialog: (dialog: DialogKey) => void }
+
+/** Takes the person to what a row names (selecting a row goes there). */
+export function followCheck(row: CheckRow, to: CheckHandlers): void {
+  const go = row.go ?? (row.select ? { select: row.select } : undefined);
+  if (!go) return;
+  if ('select' in go) to.select(go.select); else if ('panel' in go) to.panel(go.panel); else to.dialog(go.dialog);
 }
 
 /** The compiler's issues for a document, or none when it compiles. */
@@ -51,34 +48,14 @@ export function compilerIssues(document: CompositionDocument): CompositionIssue[
   catch (error) { if (error instanceof CompositionValidationError) return error.issues; throw error; }
 }
 
-/** What each compiler code means in the Studio's words. Edit as JSON keeps the compiler's own wording and its pointers. */
-const problemWords: Record<CompositionIssue['code'], string> = {
-  unsupported_schema: 'This document is not a version the app reads.',
-  unknown_field: 'This setting is not supported. Remove it.',
-  unknown_variant: 'This choice is not supported.',
-  missing_required: 'A required value is missing.',
-  invalid_value: 'This value is not allowed.',
-  duplicate_key: 'This key appears twice.',
-  limit_exceeded: 'There are more of these than the app allows.',
-  duplicate_id: 'Two items use the same ID.',
-  invalid_reference: 'This points to something that is not there.',
-  binding_type: 'The data does not match what this reads.',
-  invalid_combination: 'These settings do not work together.',
-  capability_manifest_mismatch: 'The capability list is out of date.',
-  unsupported_capability: 'The app does not support this yet.',
-  asset_integrity: 'An image is missing or has changed.',
-};
-
-/** A compiler sentence with its pointer replaced by the place name (spec 5.8). */
-export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey } {
-  const { place, select, field } = placeOf(document, pointerPath(issue.pointer));
-  // A problem in one row names the row, so the person knows which two settings clash and where to look.
-  const named: Partial<Record<CompositionIssue['code'], string>> = field ? {
-    invalid_combination: `${field} does not work with this kind. Remove it, or change the kind.`,
-    missing_required: `${field} is needed.`,
-    invalid_value: `${field} is not allowed.`,
-  } : {};
-  return { sentence: `${place}: ${named[issue.code] ?? problemWords[issue.code] ?? formatCompositionIssue(issue).replace(/^[^:]*:\s*/, '')}`, place, select };
+/**
+ * A compiler issue in the Studio's words (spec 5.8): the thing it concerns by name, the field by its label, a plain sentence
+ * saying what to change, and where choosing the row goes. The pointer never shows.
+ */
+export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey; go: Destination } {
+  const path = pointerPath(issue.pointer);
+  const target = targetOf(document, path);
+  return { sentence: `${target.place}: ${wordsFor(document, issue, target, path)}`, place: target.place, select: target.select, go: target.go };
 }
 
 /** Problems (they block publishing) and Suggestions (lints). */
@@ -116,8 +93,8 @@ export function runChecks(document: CompositionDocument): Checks {
     }
   }
   for (const warning of compositionWarnings(document)) {
-    const { place, select } = placeOf(document, pointerPath(warning.pointer));
-    suggestions.push({ id: `warning-${warning.pointer}`, sentence: `${place}: ${warning.message}`, place, select });
+    const { place, select, go } = placeOf(document, pointerPath(warning.pointer));
+    suggestions.push({ id: `warning-${warning.pointer}`, sentence: `${place}: ${warning.message}`, place, select, go });
   }
   return { problems, suggestions };
 }

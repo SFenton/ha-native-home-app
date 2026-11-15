@@ -64,7 +64,7 @@ describe('Checks name the clashing row and go to the control', () => {
   });
   it('names a missing field too', () => {
     const asButton = withBoundControlKind(withToggle, path, 'button');
-    expect(runChecks(asButton).problems.map(row => row.sentence)).toContain('Lamp: When tapped is needed.');
+    expect(runChecks(asButton).problems.map(row => row.sentence)).toContain('Lamp: When tapped is needed. Add it.');
   });
   it('the shared table is the compiler rule', () => {
     expect(boundControlAllows('toggle', 'node', 'action')).toBe(false);

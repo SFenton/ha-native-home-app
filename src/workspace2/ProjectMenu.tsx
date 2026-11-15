@@ -6,6 +6,7 @@ import { DialogBody, dialogTitles, type DialogKey } from './projectDialogs';
 import { useProjectRows } from './dialogs/parts';
 import { RowsProvider } from './rows';
 import ChecksPanel from './ChecksPanel';
+import type { CheckRow } from './checks';
 import { windowLabel } from '../preview2';
 import { WindowChoices } from './navigation/WindowMenu';
 import type { PreviewWindow } from './preview';
@@ -38,8 +39,8 @@ function sections(ws: Workspace2): Entry[][] {
 export { windowLabel };
 
 /** The narrow Project sheet's rows. Selecting one pushes its page inside the sheet. */
-function SheetList({ ws, narrowOnly, onPanel, onClose, window: current, onWindow, onError }: {
-  ws: Workspace2; narrowOnly: boolean; onPanel: (panel: PanelKind) => void; onClose: () => void; window: PreviewWindow; onWindow: (window: PreviewWindow) => void; onError: (message: string) => void;
+function SheetList({ ws, narrowOnly, onPanel, onGo, onClose, window: current, onWindow, onError }: {
+  ws: Workspace2; narrowOnly: boolean; onPanel: (panel: PanelKind) => void; onGo: (row: CheckRow) => void; onClose: () => void; window: PreviewWindow; onWindow: (window: PreviewWindow) => void; onError: (message: string) => void;
 }) {
   const push = usePush();
   const page = (title: string, body: PushedPage['body']) => push?.push({ title, body });
@@ -56,7 +57,7 @@ function SheetList({ ws, narrowOnly, onPanel, onClose, window: current, onWindow
     {narrowOnly && <ul className="w2-list">
       <li><button type="button" className="w2-list-row" disabled={!ws.studio.canRedo} onClick={ws.studio.redo}>Redo</button></li>
       <li><button type="button" className="w2-list-row" onClick={() => page('Window', <WindowChoices window={current} onWindow={onWindow}/>)}>Window</button></li>
-      <li><button type="button" className="w2-list-row" onClick={() => page('Checks', <ChecksPanel checks={ws.checks} saveFailure={ws.failedSave ? ws.saveReason : undefined} onRetry={() => { ws.retrySave(); ws.saveNow(); }} onPick={row2 => { if (row2.select) ws.selectAnywhere(row2.select); onClose(); }}/>)}>Checks</button></li>
+      <li><button type="button" className="w2-list-row" onClick={() => page('Checks', <ChecksPanel checks={ws.checks} saveFailure={ws.failedSave ? ws.saveReason : undefined} onRetry={() => { ws.retrySave(); ws.saveNow(); }} onPick={row2 => { onGo(row2); onClose(); }}/>)}>Checks</button></li>
     </ul>}
     {sections(ws).map((group, at) => <ul className="w2-list" key={at}>{group.map(row)}</ul>)}
     <p className="w2-caption w2-ha-line">{ws.houseStates.status === 'ready' ? 'Home Assistant: connected' : 'Home Assistant: not connected'}</p>
@@ -67,16 +68,23 @@ function SheetList({ ws, narrowOnly, onPanel, onClose, window: current, onWindow
  * The Project button and everything it opens: a menu with dialogs when wide, a sheet whose rows push pages when narrow.
  * `onPanel` opens Tabs, Header Buttons or Wallpaper in the properties surface.
  */
-export default function ProjectMenu({ ws, narrow, onPanel, window: current, onWindow, onError, open, onOpenChange, dialog, onDialog }: {
-  ws: Workspace2; narrow: boolean; onPanel: (panel: PanelKind) => void; window: PreviewWindow; onWindow: (window: PreviewWindow) => void; onError: (message: string) => void;
+export default function ProjectMenu({ ws, narrow, onPanel, onGo, window: current, onWindow, onError, open, onOpenChange, dialog, onDialog }: {
+  ws: Workspace2; narrow: boolean; onPanel: (panel: PanelKind) => void; onGo: (row: CheckRow) => void; window: PreviewWindow; onWindow: (window: PreviewWindow) => void; onError: (message: string) => void;
   open: boolean; onOpenChange: (open: boolean) => void; dialog: DialogKey | undefined; onDialog: (dialog: DialogKey | undefined) => void;
 }) {
   const trigger = <button type="button" className="w2-icon-button" aria-label="Project"><MoreHorizontal size={18} aria-hidden/></button>;
   const context = useProjectRows(ws, onError);
   // The rows a dialog pushes are drawn by this stack, so the live document is provided above it.
-  if (narrow) return <Overlay narrow open={open} onOpenChange={onOpenChange} trigger={trigger} label="Project" fullHeight>
-    {context ? <RowsProvider value={context}><PushStack rootTitle="Project" root={<SheetList ws={ws} narrowOnly onPanel={onPanel} onClose={() => onOpenChange(false)} window={current} onWindow={onWindow} onError={onError}/>}/></RowsProvider> : null}
-  </Overlay>;
+  // A Checks row can name a dialog (Data, Local State, Links), which opens on its own over the sheet.
+  const named = dialog && <Modal open onOpenChange={next => { if (!next) onDialog(undefined); }} title={dialogTitles[dialog]}>
+    <DialogBody dialog={dialog} ws={ws} close={() => onDialog(undefined)} onError={onError}/>
+  </Modal>;
+  if (narrow) return <>
+    <Overlay narrow open={open} onOpenChange={onOpenChange} trigger={trigger} label="Project" fullHeight>
+      {context ? <RowsProvider value={context}><PushStack rootTitle="Project" root={<SheetList ws={ws} narrowOnly onPanel={onPanel} onGo={onGo} onClose={() => onOpenChange(false)} window={current} onWindow={onWindow} onError={onError}/>}/></RowsProvider> : null}
+    </Overlay>
+    {named}
+  </>;
   const groups = sections(ws);
   return <>
     <Menu.Root open={open} onOpenChange={onOpenChange}>
@@ -91,8 +99,6 @@ export default function ProjectMenu({ ws, narrow, onPanel, window: current, onWi
         <div className="w2-menu-note" role="note">{ws.houseStates.status === 'ready' ? 'Home Assistant: connected' : 'Home Assistant: not connected'}</div>
       </Menu.Popup></Menu.Positioner></Menu.Portal>
     </Menu.Root>
-    {dialog && <Modal open onOpenChange={next => { if (!next) onDialog(undefined); }} title={dialogTitles[dialog]}>
-      <DialogBody dialog={dialog} ws={ws} close={() => onDialog(undefined)} onError={onError}/>
-    </Modal>}
+    {named}
   </>;
 }

@@ -3,6 +3,7 @@ import { Icon } from '../ui';
 import { Overlay, PushStack, Tag } from './kit';
 import PagesPanel from './PagesPanel';
 import ChecksPanel from './ChecksPanel';
+import type { CheckRow } from './checks';
 import ProjectMenu from './ProjectMenu';
 import type { PreviewWindow } from './preview';
 import { NavigationHost } from './navigation/NavigationDialogs';
@@ -18,7 +19,7 @@ export function ModeSegment({ mode, onChange }: { mode: 'edit' | 'use'; onChange
 }
 
 /** The Checks pill (spec 5.8): "No Problems" or "<n> Problem(s)", opening Checks. */
-export function ChecksPill({ ws, narrow, onOpenChange, open, showPill = true }: { ws: Workspace2; narrow: boolean; open: boolean; onOpenChange: (open: boolean) => void; showPill?: boolean }) {
+export function ChecksPill({ ws, narrow, onOpenChange, open, onGo, showPill = true }: { ws: Workspace2; narrow: boolean; open: boolean; onOpenChange: (open: boolean) => void; onGo: (row: CheckRow) => void; showPill?: boolean }) {
   const count = ws.problemCount, failing = ws.failedSave;
   const bad = count > 0 || failing;
   const label = count > 0 ? `${count} Problem${count === 1 ? '' : 's'}` : failing ? 'Not Saved' : 'No Problems';
@@ -32,7 +33,7 @@ export function ChecksPill({ ws, narrow, onOpenChange, open, showPill = true }: 
         // A conflict has no retry: it needs the choice again, so Try Again brings the dialog back.
         if (ws.studio.conflict) { ws.reopenConflict(); onOpenChange(false); return; }
         ws.retrySave(); ws.saveNow();
-      }} onPick={row => { if (row.select) ws.selectAnywhere(row.select); onOpenChange(false); }}/>}/>
+      }} onPick={row => { onGo(row); onOpenChange(false); }}/>}/>
   </Overlay></>;
 }
 
@@ -41,10 +42,12 @@ export interface TopBarProps {
   pagesOpen: boolean; onPagesOpen: (open: boolean) => void; projectOpen: boolean; onProjectOpen: (open: boolean) => void;
   dialog: DialogKey | undefined; onDialog: (dialog: DialogKey | undefined) => void; onPanel: (panel: PanelKind) => void; onError: (message: string) => void;
   onChecks: () => void;
+  /** Goes to what a Checks row names. */
+  onGo: (row: CheckRow) => void;
 }
 
 /** The top bar: wide shows nine controls, narrow four (spec 3). Before the draft loads only the wordmark shows. */
-export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpen, onPagesOpen, projectOpen, onProjectOpen, dialog, onDialog, onPanel, onError, onChecks }: TopBarProps) {
+export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpen, onPagesOpen, projectOpen, onProjectOpen, dialog, onDialog, onPanel, onError, onChecks, onGo }: TopBarProps) {
   const document = ws.document, surface = ws.surface;
   const title = document && surface ? (surface.kind === 'page' ? document.pages : document.modals).find(item => item.id === surface.id) : undefined;
   const blocked = ws.problemCount > 0;
@@ -70,7 +73,7 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
       {!narrow && tag()}
       <button type="button" className="w2-primary" disabled={!narrow && blocked || ws.studio.conflict || ws.studio.busy && ws.phase === 'idle'}
         title={!narrow && blocked ? `Fix ${ws.problemCount} problem${ws.problemCount === 1 ? '' : 's'} to publish.` : undefined} onClick={ws.openPublish}>Publish</button>
-      <ProjectMenu ws={ws} narrow={narrow} onPanel={onPanel} window={current} onWindow={onWindow} onError={onError}
+      <ProjectMenu ws={ws} narrow={narrow} onPanel={onPanel} onGo={onGo} window={current} onWindow={onWindow} onError={onError}
         open={projectOpen} onOpenChange={onProjectOpen} dialog={dialog} onDialog={onDialog}/>
     </div>
     {narrow && tag('w2-status-narrow')}
