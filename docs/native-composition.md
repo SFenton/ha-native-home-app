@@ -658,8 +658,13 @@ what the app does when the device has no such symbol: it draws a fallback symbol
 document. The Studio emits only `"fallback"`. An older or imported document may carry `"reject"`; the validator accepts it as a
 legacy alias and the compiler rewrites it to `"fallback"`, so a compiled document never holds it (`symbol-unavailable.ts`).
 
-The app's three rejection classes, for reference: validation rejects a document, a source that is still pending defers its node, and a
-device gap (an absent symbol, an unsupported capability on a device) degrades to a fallback. `unavailable` belongs to the third.
+The app's rejection classes, copied word for word from the native repo's `.agents/platforms/apple/architecture.md` (Server-driven root):
+
+- **Rejection classes.** Only an invalid document rejects (an unknown capability, a grammar error, a broken reference); the last good layout stays.
+  - A device or runtime gap (a symbol or feature this OS lacks, a missing entity or copy entry) degrades one node and logs a diagnostic.
+  - A launch fact (window geometry, the viewer, an open interaction) defers the candidate and retries.
+
+`unavailable` belongs to the device or runtime gap.
 
 Example `props.alarm`:
 
