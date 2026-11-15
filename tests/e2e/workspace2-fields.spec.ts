@@ -41,7 +41,8 @@ test('acceptance 2: every editable field of every kind of node is reachable from
     if (await tile.count() === 0) continue;
     seen.add(entry.node.type);
     await tile.scrollIntoViewIfNeeded();
-    await page.locator(`[data-preview-root] [data-sel="${entry.key}"]`).first().click();
+    // The click goes to the node itself: its own centre can be an Add slot at the end of a container.
+    await page.locator(`[data-preview-root] [data-sel="${entry.key}"]`).first().dispatchEvent('click');
     const panel = page.getByLabel('Properties');
     await expect(panel).toBeVisible();
     const paths = new Set<string>();

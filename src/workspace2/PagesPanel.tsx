@@ -39,7 +39,7 @@ export default function PagesPanel({ document, current, onPick, ws, onClose }: {
 
 /** The Pages overlay's two views: the outline of every page, and the nodes of the page being shown. */
 function ViewSegment({ view, onChange }: { view: 'pages' | 'this'; onChange: (view: 'pages' | 'this') => void }) {
-  return <div className="w2-segment-pill w2-pages-views" role="group" aria-label="View">
-    {(['pages', 'this'] as const).map(id => <button key={id} type="button" aria-pressed={view === id} onClick={() => onChange(id)}>{id === 'pages' ? 'Pages' : 'This Page'}</button>)}
+  return <div className="w2-segment-pill w2-pages-views" role="radiogroup" aria-label="View">
+    {(['pages', 'this'] as const).map(id => <button key={id} type="button" role="radio" aria-checked={view === id} onClick={() => onChange(id)}>{id === 'pages' ? 'Pages' : 'This Page'}</button>)}
   </div>;
 }

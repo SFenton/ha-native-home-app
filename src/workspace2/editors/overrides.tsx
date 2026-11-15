@@ -22,10 +22,10 @@ export function useDeepRows(path: EditorPath): Record<string, RowOverride> {
     const parent = valueAt(document, at.slice(0, -1)) as Json, parentSchema = selectedVariant(schemaAt(document, at.slice(0, -1)), parent);
     return <ActionRow label={label} path={at} schema={schemaAt(document, at)} optional={!parentSchema.required?.includes(String(at.at(-1)))} boundSourceId={node?.binding?.sourceId} itemName={itemName}/>;
   };
-  const entity: RowOverride = ({ label }) => {
+  const entity: RowOverride = ({ label, path: at }) => {
     const bound = boundEntity(document, path);
     if (!bound) return undefined;
-    return <EntityField label={label} entityId={bound} domains={domainsFor[String(node?.type)]} path={[...path, 'binding', 'sourceId'].join('/')} onPick={row => onChange(bindEntity(document, path, row.entityId))}/>;
+    return <EntityField label={label} entityId={bound} domains={domainsFor[String(node?.type)]} path={at.join('/')} onPick={row => onChange(bindEntity(document, path, row.entityId))}/>;
   };
   return {
     action, onAction: action, offAction: action,

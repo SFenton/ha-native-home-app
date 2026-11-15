@@ -45,7 +45,7 @@
 .w2-trailing { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; }
 .w2-segment-pill { display: inline-flex; padding: 2px; background: var(--w2-field); border-radius: 10px; gap: 2px; }
 .w2-scope .w2-segment-pill button { border: 0; min-height: 28px; border-radius: 8px; padding: 0 14px; }
-.w2-scope .w2-segment-pill button[aria-pressed=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
+.w2-scope .w2-segment-pill button[aria-pressed=true], .w2-scope .w2-segment-pill button[aria-checked=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
 .w2-window-button { font-variant-numeric: tabular-nums; }
 .w2-status-narrow { margin-inline-start: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 0 7px; flex: 0 1 auto; }
 .w2-narrow .w2-page-button { max-width: 36vw; min-width: 0; padding: 0 8px; }
