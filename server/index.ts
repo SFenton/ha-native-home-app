@@ -37,7 +37,7 @@ try {
     server.once('error', reject);
     server.listen(config.port, config.host, () => { server.off('error', reject); resolve(); });
   });
-  console.log(`Native Home Studio listening on ${config.host}:${config.port} (${config.production ? 'production' : 'development'})`);
+  console.log(`S+H Studio listening on ${config.host}:${config.port} (${config.production ? 'production' : 'development'})`);
   let closing = false;
   async function shutdown() {
     if (closing) return;

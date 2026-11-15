@@ -164,7 +164,7 @@ describe('durable storage', () => {
     const ready = new Promise<void>((resolve) => {
       child.stdout.on('data', (chunk) => {
         output += String(chunk);
-        if (output.includes('Native Home Studio listening')) resolve();
+        if (output.includes('S+H Studio listening')) resolve();
       });
     });
     await Promise.race([

@@ -46,7 +46,7 @@ try {
   const page = await fetch(base, { headers });
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /Native Home Studio/);
+  assert.match(html, /S\+H Studio/);
   const asset = html.match(/src="(\.\/assets\/[^"]+\.js)"/)?.[1];
   assert.ok(asset, 'Built HTML must use relative asset paths for Ingress');
   assert.equal((await fetch(new URL(asset, `${base}/`), { headers })).status, 200);

@@ -1,4 +1,4 @@
-# Deploy Native Home Studio
+# Deploy S+H Studio
 
 This repository contains buildable Home Assistant app packaging, not evidence
 that an app has been installed on your Home Assistant. The existing native-home
@@ -39,9 +39,9 @@ Supervisor app store.
    data, and secrets, into a dedicated local app directory such as
    `/addons/native_home_studio` on the HA host. `config.yaml`, `Dockerfile`,
    `package.json`, and source folders must all be in that directory.
-2. Reload the app store's local app list. Select **Native Home Studio**, install
+2. Reload the app store's local app list. Select **S+H Studio**, install
    it (the Supervisor builds locally), and start it.
-3. Use **Open Web UI** / the Native Home Studio sidebar entry. Ingress provides
+3. Use **Open Web UI** / the S+H Studio sidebar entry. Ingress provides
    authenticated HA access. The direct host port is disabled by default.
 
 This checkout is an **individual app build context**, not yet a published app
