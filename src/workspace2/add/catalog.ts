@@ -53,7 +53,7 @@ export const tileTypes: readonly TileType[] = [
     const { source, created } = sourceFor(document, id => ({ id, kind: 'model', model: 'power-toggle@1', inputs: { entityId: literal(entityId) } }),
       item => holdsEntity(item, 'power-toggle@1', entityId), `power-${shortId(entityId)}`);
     const node = { ...base('tile', name ?? entityId), type: 'action-tile' as const, icon: symbol('power'), binding: { sourceId: source.id, projection: 'power-tile@1' as const },
-      props: { family: 'neutral' as const, bodyActionId: 'power' as const, actionOrder: ['power' as const], stateText: 'provider' as const, feedback: 'policy' as const },
+      props: { family: 'neutral' as const, bodyActionId: 'power' as const, actionOrder: ['power'] as ['power'], stateText: 'provider' as const, feedback: 'policy' as const },
       action: { type: 'domain' as const, sourceId: source.id, intent: 'power.toggle' as const, feedback: 'policy' as const, confirmation: { type: 'policy' as const } } };
     return { node, sources: created };
   } },

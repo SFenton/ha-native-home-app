@@ -1,0 +1,139 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import type { CompositionDocument } from '../src/shared/composition/schema';
+import type { Predicate } from '../src/shared/composition/expression';
+import { compositionErrors, replaceAt } from '../src/composition-editor';
+import { buildDocumentIndex } from '../src/preview2/model';
+import { bindEntity, boundEntity } from '../src/workspace2/add/sources';
+import { changeOperator, closeRule, conditionCount, entityCondition, groupDepth, numericCondition, openRule, ruleProblem, ruleSummary, rowKind } from '../src/workspace2/editors/rule';
+import { acceptedKinds, dataOf, defaultAction, operandDepth, operandFor, sourceOf, targetEntities, withDataField, withService, withTargetEntities } from '../src/workspace2/editors/action';
+import { schemaAt } from '../src/workspace2/rows';
+import { filterEntities, rowsFromDocument } from '../src/workspace2/pickers/entities';
+import { filterIcons } from '../src/workspace2/pickers/icons';
+import { filterServices, sampleServices, serviceTitle } from '../src/workspace2/pickers/services';
+
+const fixture = JSON.parse(readFileSync(new URL('./fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
+const doc = fixture.document;
+const source = doc.dataSources.find(item => item.kind === 'ha-entity')?.id ?? 'hc-guest-0';
+const samples: Record<string, Predicate> = {
+  state: { type: 'state', sourceId: source, path: ['state'], in: ['on', 'home'] },
+  notState: { type: 'not', of: { type: 'state', sourceId: source, path: ['state'], in: ['on'] } },
+  above: { type: 'numeric', sourceId: source, path: ['state'], above: { type: 'literal', value: 20 } },
+  below: { type: 'numeric', sourceId: source, path: ['state'], below: { type: 'literal', value: 5 } },
+  between: { type: 'numeric', sourceId: source, path: ['state'], above: { type: 'literal', value: 1 }, below: { type: 'literal', value: 9 } },
+  admin: { type: 'viewer', isAdmin: true },
+  users: { type: 'viewer', userIds: ['abc'] },
+  person: { type: 'viewer-person', in: ['person.a', 'person.b'] },
+  all: { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['person.a'] }] },
+  any: { type: 'any', of: [{ type: 'viewer', isAdmin: false }, { type: 'viewer-person', in: ['person.a'] }] },
+};
+const deep: Predicate = { type: 'all', of: [{ type: 'any', of: [{ type: 'all', of: [{ type: 'viewer', isAdmin: true }] }] }] };
+
+describe('rule builder model', () => {
+  for (const [name, predicate] of Object.entries(samples)) it(`round-trips ${name} unchanged`, () => {
+    expect(closeRule(openRule(predicate))).toEqual(predicate);
+    expect(rowKind(predicate)).toBeTruthy();
+  });
+  it('reads no rule as Always and an emptied group as no rule', () => {
+    expect(ruleSummary(undefined)).toBe('Always');
+    expect(closeRule({ mode: 'all', items: [], wrapped: false })).toBeUndefined();
+    expect(ruleSummary(samples.all)).toBe('2 conditions');
+    expect(conditionCount(samples.notState)).toBe(1);
+  });
+  it('draws a group inside a group as JSON and keeps a deeper rule exactly as it is', () => {
+    expect(groupDepth(deep)).toBe(3);
+    const root = openRule(deep);
+    const group = root.items[0];
+    expect(rowKind(group, 1)).toBe('group');
+    const inner = (group as { of: Predicate[] }).of[0];
+    expect(rowKind(inner, 2)).toBe('json');
+    expect(closeRule(root)).toEqual(deep);
+  });
+  it('builds entity and number conditions through a data source and compiles', () => {
+    const { document, predicate } = entityCondition(doc, 'light.new_lamp', ['on']);
+    const tile = [...buildDocumentIndex(document).entries.values()].find(entry => entry.node?.type === 'action-tile')!;
+    expect(compositionErrors(replaceAt(document, [...tile.path, 'visibleWhen'], predicate))).toEqual([]);
+    const second = numericCondition(document, 'light.new_lamp', 'above', 3);
+    expect(second.document.dataSources.length).toBe(document.dataSources.length);
+    expect(compositionErrors(replaceAt(second.document, [...tile.path, 'visibleWhen'], second.predicate))).toEqual([]);
+  });
+  it('changes a row between its operators without losing the entity', () => {
+    const is = samples.state;
+    expect(changeOperator(is, 'is not')).toEqual({ type: 'not', of: is });
+    expect(changeOperator({ type: 'not', of: is }, 'is')).toEqual(is);
+    expect(changeOperator(is, 'is above')).toMatchObject({ type: 'numeric', sourceId: source, above: { value: 0 } });
+    expect(changeOperator(samples.above, 'is below')).toMatchObject({ below: { value: 20 } });
+  });
+  it('reports a rule over the limits as a problem', () => {
+    let rule: Predicate = { type: 'viewer', isAdmin: true };
+    for (let at = 0; at < 9; at++) rule = { type: 'all', of: [rule] };
+    expect(ruleProblem(rule)).toMatch(/too large/);
+    expect(ruleProblem(samples.all)).toBeUndefined();
+  });
+});
+
+describe('action model', () => {
+  const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'primary-button')
+    ?? [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'row')!;
+  it('offers the kinds a schema accepts, plus Nothing when the field is optional', () => {
+    const row = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'row')!;
+    const kinds = acceptedKinds(schemaAt(doc, [...row.path, 'action']), true);
+    expect(kinds).toContain('call-service'); expect(kinds).toContain('push'); expect(kinds.at(-1)).toBe('none');
+    expect(kinds).not.toContain('domain');
+    void tile;
+  });
+  it('builds a valid default action for each kind', () => {
+    for (const kind of ['call-service', 'push', 'present', 'select-tab', 'back', 'dismiss', 'set-local'] as const) expect(defaultAction(kind, doc), kind).toBeTruthy();
+    expect(defaultAction('none', doc)).toBeUndefined();
+  });
+  it('edits targets and data fields of a call', () => {
+    let call = { type: 'call-service' as const, domain: 'light', service: 'turn_on' };
+    expect(targetEntities(call)).toEqual([]);
+    call = withTargetEntities(call, ['light.a']) as typeof call;
+    expect(call).toMatchObject({ target: { entity_id: { type: 'literal', value: 'light.a' } } });
+    call = withTargetEntities(call, ['light.a', 'light.b']) as typeof call;
+    expect(targetEntities(call)).toEqual(['light.a', 'light.b']);
+    expect(withTargetEntities(call, []).target).toBeUndefined();
+    const withField = withDataField(call, 'brightness', { type: 'literal', value: 120 });
+    expect(dataOf(withField).brightness).toEqual({ type: 'literal', value: 120 });
+    expect(withDataField(withField, 'brightness', undefined).data).toBeUndefined();
+    expect(withService(call, 'switch', 'toggle')).toMatchObject({ domain: 'switch', service: 'toggle', target: call.target });
+  });
+  it('names the source of a value and converts between sources', () => {
+    expect(sourceOf({ type: 'literal', value: 1 })).toBe('fixed');
+    expect(sourceOf(operandFor('control', undefined))).toBe('control');
+    expect(sourceOf(operandFor('viewer', undefined))).toBe('viewer');
+    const formula = operandFor('formula', { type: 'literal', value: 3 });
+    expect(formula.type).toBe('format');
+    expect(operandDepth(formula)).toBe(2);
+  });
+});
+
+describe('entity binding', () => {
+  it('creates or reuses a data source for the entity and rewrites the tile in one document', () => {
+    const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'action-tile')!;
+    const first = bindEntity(doc, tile.path, 'switch.new_plug');
+    expect(boundEntity(first, tile.path)).toBe('switch.new_plug');
+    expect(compositionErrors(first)).toEqual([]);
+    const again = bindEntity(first, tile.path, 'switch.new_plug');
+    expect(again.dataSources.length).toBe(first.dataSources.length);
+  });
+});
+
+describe('picker data', () => {
+  it('searches name, id, area and domain, and filters by domain', () => {
+    const rows = [{ entityId: 'light.sofa', name: 'Sofa lamp', domain: 'light', area: 'Living Room' }, { entityId: 'switch.fan', name: 'Desk fan', domain: 'switch', area: 'Office' }];
+    expect(filterEntities(rows, 'living').map(row => row.entityId)).toEqual(['light.sofa']);
+    expect(filterEntities(rows, 'fan').map(row => row.entityId)).toEqual(['switch.fan']);
+    expect(filterEntities(rows, '', new Set(['light'])).length).toBe(1);
+    expect(filterEntities(rows, 'sofa switch')).toEqual([]);
+    expect(rowsFromDocument(doc).length).toBeGreaterThan(0);
+  });
+  it('searches icons by plain and symbol name, and services by title and id', () => {
+    expect(filterIcons('bulb').some(choice => choice.symbol === 'lightbulb.fill')).toBe(true);
+    expect(filterIcons('lightbulb.fill')[0].name).toContain('Light bulb');
+    const turnOn = filterServices(sampleServices, 'light turn');
+    expect(turnOn.map(row => `${row.domain}.${row.service}`)).toContain('light.turn_on');
+    expect(serviceTitle(sampleServices.find(row => row.service === 'turn_on')!)).toMatch(/: Turn on$/);
+  });
+});
