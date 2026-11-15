@@ -114,7 +114,6 @@ test('Page settings: the split switch turns two panes on at iPad sideways and of
   await panel.getByRole('button', { name: 'Advanced' }).click();
   await expect(panel.getByText('Start with one pane')).toBeVisible();
   await expect(panel.getByText('Start a new column set here')).toBeVisible();
-  await page.getByRole('button', { name: 'Close' }).first().click();
   // iPad sideways: two panes and the read-out says on.
   await chooseWindow(page, 'iPad sideways · 1194 × 834');
   await expect(previewRoot(page).locator('.sh-pane')).toHaveCount(2);
