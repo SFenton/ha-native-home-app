@@ -162,8 +162,9 @@ test('Links: add one from Page settings, edit it, and see it in Project > Links'
   await expect(panel.getByRole('button', { name: '/start' })).toBeVisible();
   // Project > Links lists it.
   await page.getByRole('button', { name: 'Project' }).click();
-  await page.getByText('Links', { exact: true }).first().click();
-  await expect(page.getByRole('button', { name: /\/start/ })).toBeVisible();
+  if (isPhone(page)) await page.getByRole('button', { name: 'Links', exact: true }).last().click();
+  else await page.getByRole('menuitem', { name: 'Links' }).click();
+  await expect(page.getByRole('button', { name: /\/start/ }).last()).toBeVisible();
 });
 
 test('a lint row goes to its place', async ({ page }) => {

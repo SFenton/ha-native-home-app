@@ -70,12 +70,12 @@ export function LinkEditor({ index, onBack, onRemoved }: { index: number; onBack
       {document.navigation.tabs.map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
     </select></Field></div>
     {document.modals.length > 0 && <Disclosure label="Sheets opened first" summary={opened.size ? String(opened.size) : ''} path="sheets-opened-first">
-      {document.modals.map(modal => <label key={modal.id} className="w2-switch-row"><span className="w2-row-label">{modal.title}</span>
+      {document.modals.map(modal => <label key={modal.id} className="w2-switch-row"><span className="w2-row-label w2-wide-label">{modal.title}</span>
         <input type="checkbox" role="switch" checked={opened.has(modal.id)} onChange={event => setSheets(modal.id, event.target.checked)}/></label>)}
     </Disclosure>}
     <div className="w2-row"><WordsField label="Aliases" value={route.aliases ?? []} onWords={list => change({ aliases: list })}/></div>
     <div className="w2-row"><WordsField label="Keywords" value={route.keywords ?? []} onWords={list => change({ keywords: list })}/></div>
-    <div className="w2-row"><label className="w2-switch-row"><span className="w2-row-label">Siri phrase</span>
+    <div className="w2-row"><label className="w2-switch-row"><span className="w2-row-label w2-wide-label">Siri phrase</span>
       <input type="checkbox" role="switch" checked={route.siri ?? false} onChange={event => change({ siri: event.target.checked })}/></label></div>
     <div className="w2-row"><Field label="Who can see it"><select value={who} onChange={event => {
       const next: Record<string, unknown> = { ...route };

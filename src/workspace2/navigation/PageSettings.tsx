@@ -32,7 +32,7 @@ export function OpenedFrom({ document, kind, id, onGo }: { document: Composition
 /** A switch row with an optional caption under it. */
 function SwitchRow({ label, checked, onChange, disabled, caption, path }: { label: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; caption?: string; path?: string }) {
   return <>
-    <label className="w2-switch-row" data-field-path={path}><span className="w2-row-label">{label}</span>
+    <label className="w2-switch-row" data-field-path={path}><span className="w2-row-label w2-wide-label">{label}</span>
       <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)}/></label>
     {caption && <p className="w2-caption">{caption}</p>}
   </>;
@@ -96,7 +96,7 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
     <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']} extra={{ look: navigationRows }}/>
     {kind === 'page' && <section className="w2-group"><button type="button" className="w2-disclosure-head" onClick={() => push?.push({
       title: 'Links', body: <LinksList pageId={surface.id}/>,
-    })}><span className="w2-row-label">Opens from outside the app</span><span className="w2-summary">{routes.length}</span><ChevronRight size={16} aria-hidden/></button></section>}
+    })}><span className="w2-row-label w2-wide-label">Opens from outside the app</span><span className="w2-summary">{routes.length}</span><ChevronRight size={16} aria-hidden/></button></section>}
     <OpenedFrom document={document} kind={kind} id={surface.id} onGo={onGo}/>
     <section className="w2-group"><button type="button" className="w2-disclosure-head w2-advanced-row" onClick={() => push?.push({
       title: 'Advanced', body: <><IdRow id={surface.id} path={[...path, 'id'].join('/')}/><ObjectRows path={path} owner={owner} skip={child => skip(child) || child.at(-1) === 'id'} overrides={overrides} groups={['advanced']} extra={{ advanced: advancedExtra }}/></>,
