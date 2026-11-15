@@ -49,7 +49,7 @@ The package declares `amd64` and `aarch64`, uses a multi-architecture Node 22
 Alpine image, and stores app state in persistent `/data/studio`. `/data` is
 provided by the Supervisor without an extra host configuration mount. The
 container needs neither host networking nor privileged mode nor host filesystem
-access. It requests `homeassistant_api` for live state reads and opt-in service
+access. It requests `homeassistant_api` for live state reads, publishing native compositions to the `fenton_home` integration, and opt-in service
 calls; the resulting Supervisor token is an administrator credential and stays
 server-side.
 

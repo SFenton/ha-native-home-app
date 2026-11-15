@@ -15,7 +15,7 @@ import { createApp } from '../server/app';
 import { loadConfig, type ServerConfig } from '../server/config';
 import { readCameraStream, rewriteCameraManifest } from '../server/camera';
 import { readNativeHouseConfig } from '../server/native-home';
-import { publishCapabilities, StudioStore } from '../server/store';
+import { StudioStore } from '../server/store';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -43,12 +43,24 @@ async function fixture(overrides: Partial<ServerConfig> = {}) {
   return { directory, store, config, application, server, base, request };
 }
 
-function houseConfig(cameraIds = ['camera.synthetic_entry', 'camera.synthetic_side']) {
+function documentAtByteLength(size: number) {
+  const document = validateDocument(createSampleDocument());
+  const sample = Array<string>(1000).fill('');
+  document.dataSources.push({ id: 'large-sample', name: 'Large sample', kind: 'static', refreshSeconds: 60, sample });
+  const remaining = size - Buffer.byteLength(JSON.stringify(document));
+  const perItem = Math.floor(remaining / sample.length);
+  sample.fill('x'.repeat(perItem));
+  sample[0] += 'x'.repeat(remaining % sample.length);
+  expect(Buffer.byteLength(JSON.stringify(document))).toBe(size);
+  return document;
+}
+
+function houseConfig(cameraIds = ['camera.demo_entry', 'camera.demo_side']) {
   return {
     schema: 2, hash: 'a'.repeat(64),
     config: {
-      home: { temperature: 'sensor.outside', cameras: cameraIds.map(entityId => ({ title: 'Synthetic camera', entityId })) }, security: {}, climate: { thermostat: 'climate.hall' },
-      customLights: {}, food: {}, chores: {}, household: {}, media: { speaker: 'media_player.kitchen' },
+      home: { temperature: 'sensor.demo_outside', cameras: cameraIds.map(entityId => ({ title: 'Synthetic camera', entityId })) }, security: {}, climate: { thermostat: 'climate.demo_hall' },
+      customLights: {}, food: {}, chores: {}, household: {}, media: { speaker: 'media_player.demo_kitchen' },
       roomDevices: {}, sprinklers: {}, vacation: {}, vacuums: {}, bedroom: {}, rooms: [],
     },
   };
@@ -73,10 +85,10 @@ async function mockNativeHome(options: {
     if (options.stallStates) return;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(options.states ?? [
-      { entity_id: 'sensor.outside', state: '0', attributes: { friendly_name: 'Outside', unit_of_measurement: 'C', icon: 'mdi:thermometer', device_class: 'temperature', token: 'discard-this-attribute', push_url: 'http://private-relay/', entity_picture: '/api/camera_proxy/camera.front?token=discard-this-attribute' } },
-      { entity_id: 'climate.hall', state: 'off', attributes: { current_temperature: 0, temperature: 0, hvac_action: 'idle' } },
-      { entity_id: 'media_player.kitchen', state: 'off', attributes: { volume_level: 0, is_volume_muted: false } },
-      { entity_id: 'sensor.unreferenced', state: 'private-unrelated-state', attributes: {} },
+      { entity_id: 'sensor.demo_outside', state: '0', attributes: { friendly_name: 'Outside', unit_of_measurement: 'C', icon: 'mdi:thermometer', device_class: 'temperature', token: 'discard-this-attribute', push_url: 'http://private-relay/', entity_picture: '/api/camera_proxy/camera.demo_front?token=discard-this-attribute' } },
+      { entity_id: 'climate.demo_hall', state: 'off', attributes: { current_temperature: 0, temperature: 0, hvac_action: 'idle' } },
+      { entity_id: 'media_player.demo_kitchen', state: 'off', attributes: { volume_level: 0, is_volume_muted: false } },
+      { entity_id: 'sensor.demo_unreferenced', state: 'private-unrelated-state', attributes: {} },
     ]));
   });
   upstream.on('upgrade', (req, socket) => {
@@ -157,11 +169,11 @@ describe('authenticated native camera HLS transport',() => {
   const authToken='synthetic-camera-authoring-token';
   const haToken='synthetic-camera-backend-token';
   const headers={ Authorization: `Bearer ${authToken}` };
-  const entity='camera.synthetic_entry';
+  const entity='camera.demo_entry';
   const start=`/api/cameras/${entity}/stream`;
   const playlist='#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-INDEPENDENT-SEGMENTS\n#EXT-X-MAP:URI="init.mp4"\n#EXT-X-TARGETDURATION:6\n#EXT-X-MEDIA-SEQUENCE:12\n#EXT-X-PART-INF:PART-TARGET=1.000\n#EXT-X-SERVER-CONTROL:CAN-BLOCK-RELOAD=YES,PART-HOLD-BACK=2.000\n#EXT-X-START:TIME-OFFSET=-3.000,PRECISE=YES\n#EXT-X-PART:DURATION=1.000,URI="./segment/12.0.m4s",INDEPENDENT=YES\n#EXTINF:6.000,\n./segment/12.m4s\n#EXT-X-PRELOAD-HINT:TYPE=PART,URI="./segment/13.0.m4s"\n';
 
-  it.each(['camera.synthetic_entry','camera.synthetic_side'])('allows the configured native camera command for %s',async entityId => {
+  it.each(['camera.demo_entry','camera.demo_side'])('allows the configured native camera command for %s',async entityId => {
     const upstream=await mockNativeHome();
     const { request }=await fixture({ authToken,haToken,haUrl: upstream.url });
     expect((await request(`/api/cameras/${entityId}/stream`,'GET',undefined,headers)).status).toBe(200);
@@ -174,7 +186,7 @@ describe('authenticated native camera HLS transport',() => {
     const upstream=await mockNativeHome();
     const { request }=await fixture({ authToken,haToken,haUrl: upstream.url });
     expect((await request(start)).status).toBe(401);
-    expect((await request('/api/cameras/camera.unknown/stream','GET',undefined,headers)).status).toBe(404);
+    expect((await request('/api/cameras/camera.demo_unknown/stream','GET',undefined,headers)).status).toBe(404);
     expect((await request(start,'GET',undefined,{ ...headers,Origin: 'https://other.invalid' })).status).toBe(403);
     expect((await request(`${start}?url=http://other.invalid`,'GET',undefined,headers)).status).toBe(400);
     expect(upstream.paths).toEqual(['/api/websocket']);
@@ -186,13 +198,13 @@ describe('authenticated native camera HLS transport',() => {
     const upstream = await mockNativeHome({ house });
     const { request } = await fixture({ authToken, haToken, haUrl: upstream.url });
     const first = await (await request(start, 'GET', undefined, headers)).json();
-    house.config.home.cameras = [{ title: 'Added camera', entityId: 'camera.newly_configured' }];
-    expect((await request('/api/cameras/camera.newly_configured/stream', 'GET', undefined, headers)).status).toBe(200);
-    expect(upstream.messages.at(-1)).toMatchObject({ type: 'camera/stream', entity_id: 'camera.newly_configured' });
-    expect((await request('/api/cameras/camera.newly_configured/mjpeg', 'GET', undefined, headers)).status).toBe(200);
+    house.config.home.cameras = [{ title: 'Added camera', entityId: 'camera.demo_newly_configured' }];
+    expect((await request('/api/cameras/camera.demo_newly_configured/stream', 'GET', undefined, headers)).status).toBe(200);
+    expect(upstream.messages.at(-1)).toMatchObject({ type: 'camera/stream', entity_id: 'camera.demo_newly_configured' });
+    expect((await request('/api/cameras/camera.demo_newly_configured/mjpeg', 'GET', undefined, headers)).status).toBe(200);
     expect((await request(start, 'GET', undefined, headers)).status).toBe(404);
     expect((await request(`/${first.url}`, 'GET', undefined, headers)).status).toBe(410);
-    expect((await request('/api/cameras/camera.browser_only/mjpeg', 'GET', undefined, headers)).status).toBe(404);
+    expect((await request('/api/cameras/camera.demo_browser_only/mjpeg', 'GET', undefined, headers)).status).toBe(404);
     expect(upstream.paths.every(path => path === '/api/websocket')).toBe(true);
   });
 
@@ -207,10 +219,10 @@ describe('authenticated native camera HLS transport',() => {
   });
 
   it.each([
-    null, 'camera.synthetic_entry', [{}], [{ entityId: 'sensor.synthetic_entry' }],
-    [{ entityId: 'camera.synthetic_entry/../other' }], [{ entityId: 'camera.synthetic_entry?token=private' }],
+    null, 'camera.demo_entry', [{}], [{ entityId: 'sensor.demo_entry' }],
+    [{ entityId: 'camera.demo_entry/../other' }], [{ entityId: 'camera.demo_entry?token=private' }],
     [{ entityId: 'https://other.invalid/camera' }], [{ entityId: `camera.${'x'.repeat(160)}` }],
-    [{ entityId: entity }, { entityId: 'camera.invalid/path' }],
+    [{ entityId: entity }, { entityId: 'camera.demo_invalid/path' }],
   ])('fails closed for malformed camera configuration (%j)', async cameras => {
     const house = houseConfig();
     Object.assign(house.config.home, { cameras });
@@ -226,8 +238,8 @@ describe('authenticated native camera HLS transport',() => {
   });
 
   it.each([
-    { id: 'sensor.synthetic_entry', status: 404 }, { id: 'camera.bad%2fpath', status: 400 },
-    { id: 'camera.bad%3ftoken=private', status: 404 }, { id: `camera.${'x'.repeat(160)}`, status: 404 },
+    { id: 'sensor.demo_entry', status: 404 }, { id: 'camera.demo_bad%2fpath', status: 400 },
+    { id: 'camera.demo_bad%3ftoken=private', status: 404 }, { id: `camera.${'x'.repeat(160)}`, status: 404 },
   ])('rejects unsafe request IDs before reading native configuration ($id)', async ({ id, status }) => {
     const upstream = await mockNativeHome();
     const { request } = await fixture({ authToken, haToken, haUrl: upstream.url });
@@ -346,7 +358,7 @@ describe('authenticated native camera HLS transport',() => {
     'https://other.invalid/stream.m3u8','//other.invalid/stream.m3u8',
     '/api/hls/aaaaaaaaaaaaaaaa/../other/master_playlist.m3u8',
     '/api/hls/aaaaaaaaaaaaaaaa/master_playlist.m3u8?token=private',
-    '/api/camera_proxy_stream/camera.synthetic_entry','rtsp://other.invalid/stream',
+    '/api/camera_proxy_stream/camera.demo_entry','rtsp://other.invalid/stream',
   ])('refuses non-Core or credential-bearing stream references: %s',async url => {
     const upstream=await mockNativeHome({ cameraCommand: send => send({ type: 'result',id: 1,success: true,result: { url } }) });
     const { request }=await fixture({ authToken,haToken,haUrl: upstream.url });
@@ -449,7 +461,7 @@ describe('authenticated native camera HLS transport',() => {
 describe('authenticated MJPEG camera fallback', () => {
   const headers = { Authorization: 'Bearer synthetic-mjpeg-authoring' };
   const config = { authToken: 'synthetic-mjpeg-authoring', haToken: 'synthetic-mjpeg-backend' };
-  const entity = 'camera.synthetic_entry';
+  const entity = 'camera.demo_entry';
   const jpeg = Buffer.from([255, 216, 255, 217]);
   function part(delimiter: string, length = true, frame = jpeg) {
     return Buffer.concat([Buffer.from(`${delimiter}\r\nContent-Type: image/jpeg\r\n${length ? `Content-Length: ${frame.length}\r\n` : ''}X-Private: discard-this-header\r\n\r\n`), frame, Buffer.from('\r\n')]);
@@ -501,7 +513,7 @@ describe('authenticated MJPEG camera fallback', () => {
     } });
     const { request } = await fixture({ ...config, haUrl: upstream.url });
     expect((await request(`/api/cameras/${entity}/mjpeg`)).status).toBe(401);
-    expect((await request('/api/cameras/camera.unknown/mjpeg', 'GET', undefined, headers)).status).toBe(404);
+    expect((await request('/api/cameras/camera.demo_unknown/mjpeg', 'GET', undefined, headers)).status).toBe(404);
     const stream = await (await request(`/api/cameras/${entity}/mjpeg`, 'GET', undefined, headers)).json();
     expect(stream.transport).toBe('mjpeg');
     expect(stream.url).toMatch(/^api\/cameras\/streams\/[a-f0-9]{32}\/live\.mjpeg$/);
@@ -556,7 +568,7 @@ describe('authenticated MJPEG camera fallback', () => {
   });
 });
 
-describe('durable draft and immutable publishing API', () => {
+describe('durable schema-1 draft API', () => {
   it('releases storage on development shutdown with a connected hot-reload client', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'native-home-shutdown-'));
     cleanup.push(() => rm(directory, { recursive: true, force: true }));
@@ -600,10 +612,9 @@ describe('durable draft and immutable publishing API', () => {
     expect(await readdir(directory)).not.toContain('.studio.lock');
     expect(await readFile(path.join(directory, 'draft.json'), 'utf8')).toBe(before);
   }, 10000);
-  it('never publishes automatically, persists saves, and rejects racing stale revisions', async () => {
+  it('persists saves and rejects racing stale revisions', async () => {
     const fixtureData = await fixture();
     const { request, store, directory } = fixtureData;
-    expect((await request('/api/published')).status).toBe(404);
     const initial = await (await request('/api/draft')).json();
     initial.document.name = 'Edited household';
     const responses = await Promise.all([
@@ -612,47 +623,52 @@ describe('durable draft and immutable publishing API', () => {
     ]);
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
     expect(store.getDraft().revision).toBe(2);
-    expect((await request('/api/published')).status).toBe(404);
     await store.close();
     const reloaded = await StudioStore.open(directory);
     cleanup.push(() => reloaded.close());
     expect(reloaded.getDraft().document.name).toBe('Edited household');
     expect(reloaded.getDraft().revision).toBe(2);
   });
-  it('publishes separately, preserves immutable snapshots, and exposes ETags', async () => {
-    const { request, store, directory } = await fixture();
-    const published = await (await request('/api/publish', 'POST', { expectedRevision: 1 })).json();
-    expect(published.revision).toBe(1);
-    expect(published.publishedAt).toBeTruthy();
-    const fetched = await request('/api/published');
-    expect(fetched.headers.get('etag')).toBe('"published-1"');
-    expect((await request('/api/published', 'GET', undefined, { 'If-None-Match': fetched.headers.get('etag')! })).status).toBe(304);
-    const document = store.getDraft().document;
-    document.name = 'Draft only';
-    await request('/api/draft', 'PUT', { document, expectedRevision: 1 });
-    expect((await (await request('/api/published')).json()).document.name).not.toBe('Draft only');
-    expect((await request('/api/publish', 'POST', { expectedRevision: 1 })).status).toBe(409);
-    await request('/api/publish', 'POST', { expectedRevision: 2 });
-    expect(JSON.parse(await readFile(path.join(directory, 'revisions/1.json'), 'utf8'))).toEqual(published);
-    await store.close();
-    const reloaded = await StudioStore.open(directory);
-    cleanup.push(() => reloaded.close());
-    expect(reloaded.getPublished().revision).toBe(2);
+  it('accepts a full-size document with its validate and save request envelopes', async () => {
+    const { request, store } = await fixture();
+    const document = documentAtByteLength(1024 * 1024);
+    expect(validateDocument(document)).toEqual(document);
+    const validation = await request('/api/validate', 'POST', { document });
+    expect(validation.status).toBe(200);
+    expect(await validation.json()).toEqual({ valid: true, errors: [] });
+    const saved = await request('/api/draft', 'PUT', { document, expectedRevision: 1 });
+    expect(saved.status).toBe(200);
+    expect(store.getDraft().document).toEqual(document);
   });
-  it('notifies open SSE streams only when a revision is published and closes streams cleanly', async () => {
-    const { request, application } = await fixture();
-    const stream = await request('/api/events');
-    expect(stream.headers.get('content-type')).toContain('text/event-stream');
-    const reader = stream.body!.getReader();
-    expect(new TextDecoder().decode((await reader.read()).value)).toContain(': connected');
-    await request('/api/publish', 'POST', { expectedRevision: 1 });
-    const event = new TextDecoder().decode((await reader.read()).value);
-    expect(event).toContain('event: published');
-    expect(event).toContain('"revision":1');
-    expect(event).not.toContain('document');
-    application.close();
-    expect((await reader.read()).done).toBe(true);
-    reader.releaseLock();
+  it('rejects a one-byte-oversized document without replacing the draft', async () => {
+    const { request, store } = await fixture();
+    const before = store.getDraft();
+    const document = documentAtByteLength(1024 * 1024 + 1);
+    const validation = await request('/api/validate', 'POST', { document });
+    expect(validation.status).toBe(200);
+    expect(await validation.json()).toEqual({ valid: false, errors: ['document: exceeds the 1 MiB serialized size limit'] });
+    const saved = await request('/api/draft', 'PUT', { document, expectedRevision: 1 });
+    expect(saved.status).toBe(422);
+    expect(store.getDraft()).toEqual(before);
+  });
+  it('has no schema-1 publish, published or event endpoints: the app reads no schema-1 document', async () => {
+    const { request } = await fixture();
+    expect((await request('/api/publish', 'POST', { expectedRevision: 1 })).status).toBe(404);
+    expect((await request('/api/published')).status).toBe(404);
+    expect((await request('/api/events')).status).toBe(404);
+    expect((await (await request('/api/health')).json())).not.toHaveProperty('publishedRevision');
+  });
+  it('leaves a retired schema-1 publication on disk alone and opens beside it', async () => {
+    const { store, directory } = await fixture();
+    const draft = store.getDraft();
+    const retired = `${JSON.stringify({ ...draft, publishedAt: new Date().toISOString(), capabilities: ['document-v1'] })}\n`;
+    await writeFile(path.join(directory, 'published.json'), retired);
+    await writeFile(path.join(directory, 'revisions/1.json'), retired);
+    await store.close();
+    const reopened = await StudioStore.open(directory);
+    cleanup.push(() => reopened.close());
+    expect(reopened.getDraft()).toEqual(draft);
+    expect(await readFile(path.join(directory, 'published.json'), 'utf8')).toBe(retired);
   });
   it('exports plain versioned documents in JSON and YAML that can be imported with expectedRevision', async () => {
     const { request, store } = await fixture();
@@ -666,7 +682,7 @@ describe('durable draft and immutable publishing API', () => {
       expect((await request('/api/draft', 'PUT', { document, expectedRevision: revision })).status).toBe(200);
     }
     expect((await request('/api/export?format=xml')).status).toBe(400);
-    expect((await request('/api/export?format=json&source=published')).status).toBe(404);
+    expect((await request('/api/export?format=json&source=published')).status).toBe(400);
   });
   it('fails loudly on corruption and does not replace existing corrupt files', async () => {
     const { store, directory } = await fixture();
@@ -674,20 +690,6 @@ describe('durable draft and immutable publishing API', () => {
     await writeFile(path.join(directory, 'draft.json'), '{broken');
     await expect(StudioStore.open(directory)).rejects.toThrow('Cannot load Studio storage');
     expect(await readFile(path.join(directory, 'draft.json'), 'utf8')).toBe('{broken');
-  });
-  it('recovers a snapshot written before the active pointer without mutating its bytes', async () => {
-    const { store, directory } = await fixture();
-    const draft = store.getDraft();
-    const orphan = { ...draft, publishedAt: new Date().toISOString(), capabilities: publishCapabilities };
-    const snapshotPath = path.join(directory, 'revisions/1.json');
-    const bytes = `${JSON.stringify(orphan)}\n`;
-    await writeFile(snapshotPath, bytes);
-    await store.close();
-    const recovered = await StudioStore.open(directory);
-    cleanup.push(() => recovered.close());
-    expect(recovered.publishedRevision()).toBe(null);
-    expect(await recovered.publish(1)).toEqual(orphan);
-    expect(await readFile(snapshotPath, 'utf8')).toBe(bytes);
   });
   it('rejects a second writer using the same DATA_DIR', async () => {
     const { directory } = await fixture();
@@ -782,9 +784,9 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       const body = await response.json();
       expect(body).toEqual({
         mode: 'live', houseConfig: houseConfig(), currentUser: { id: 'synthetic-user', name: 'Synthetic user', isOwner: false, isAdmin: true }, states: [
-          { entityId: 'sensor.outside', state: '0', name: 'Outside', unit: 'C', icon: 'mdi:thermometer', deviceClass: 'temperature' },
-          { entityId: 'climate.hall', state: 'off', name: 'climate.hall', currentTemperature: 0, temperature: 0, hvacAction: 'idle' },
-          { entityId: 'media_player.kitchen', state: 'off', name: 'media_player.kitchen', volumeLevel: 0, isVolumeMuted: false },
+          { entityId: 'sensor.demo_outside', state: '0', name: 'Outside', unit: 'C', icon: 'mdi:thermometer', deviceClass: 'temperature' },
+          { entityId: 'climate.demo_hall', state: 'off', name: 'climate.demo_hall', currentTemperature: 0, temperature: 0, hvacAction: 'idle' },
+          { entityId: 'media_player.demo_kitchen', state: 'off', name: 'media_player.demo_kitchen', volumeLevel: 0, isVolumeMuted: false },
         ],
       });
       const serialized = JSON.stringify(body);
@@ -794,7 +796,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       await upstream.connections[0].closed;
       expect(await readFile(path.join(directory, 'draft.json'), 'utf8')).toBe(before);
       expect(store.getDraft().revision).toBe(1);
-      expect(await (await request('/api/actions/execute', 'POST', { action: { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo' }, confirmed: true }, headers)).json()).toEqual({ mode: 'simulated', executed: false });
+      expect(await (await request('/api/actions/execute', 'POST', { action: { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo_unit' }, confirmed: true }, headers)).json()).toEqual({ mode: 'simulated', executed: false });
       expect(upstream.paths).toEqual(['/api/websocket', '/api/states']);
     });
 
@@ -929,7 +931,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     });
 
     it('rejects known credentials in otherwise allowed state fields', async () => {
-      const upstream = await mockNativeHome({ states: [{ entity_id: 'sensor.outside', state: '0', attributes: { friendly_name: authoringToken } }] });
+      const upstream = await mockNativeHome({ states: [{ entity_id: 'sensor.demo_outside', state: '0', attributes: { friendly_name: authoringToken } }] });
       const { request } = await fixture({ authToken: authoringToken, haUrl: upstream.url, haToken });
       const response = await request('/api/native-home', 'GET', undefined, headers);
       expect(response.status).toBe(502);
@@ -942,7 +944,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       const { request } = await fixture({ authToken: authoringToken, haUrl: upstream.url, haToken });
       expect((await request('/api/native-home', 'GET', undefined, headers)).status).toBe(502);
       await upstream.connections[0].closed;
-      const invalidStates = await mockNativeHome({ states: [{ entity_id: 'sensor.outside', state: '0', attributes: { brightness: 999 } }] });
+      const invalidStates = await mockNativeHome({ states: [{ entity_id: 'sensor.demo_outside', state: '0', attributes: { brightness: 999 } }] });
       const invalid = await fixture({ authToken: authoringToken, haUrl: invalidStates.url, haToken });
       expect((await invalid.request('/api/native-home', 'GET', undefined, headers)).status).toBe(502);
       await invalidStates.connections[0].closed;
@@ -960,7 +962,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     });
 
     it('rejects raw HTTP states above 4 MiB even when oversized attributes would be discarded', async () => {
-      const upstream = await mockNativeHome({ states: [{ entity_id: 'sensor.outside', state: '0', attributes: { ignored: 'x'.repeat(4 * 1024 * 1024) } }] });
+      const upstream = await mockNativeHome({ states: [{ entity_id: 'sensor.demo_outside', state: '0', attributes: { ignored: 'x'.repeat(4 * 1024 * 1024) } }] });
       const { request } = await fixture({ authToken: authoringToken, haUrl: upstream.url, haToken });
       const response = await request('/api/native-home', 'GET', undefined, headers);
       expect(response.status).toBe(502);
@@ -1002,8 +1004,8 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     expect(login.headers.get('set-cookie')).toContain('HttpOnly');
     const cookie = login.headers.get('set-cookie')!.split(';')[0];
     expect((await request('/api/draft', 'GET', undefined, { Cookie: cookie })).status).toBe(200);
-    expect((await request('/api/publish', 'POST', { expectedRevision: 1 }, { Cookie: cookie, Origin: 'https://evil.example' })).status).toBe(403);
-    expect((await request('/api/publish', 'POST', { expectedRevision: 1 }, { Authorization: `Bearer ${token}`, Origin: base })).status).toBe(200);
+    expect((await request('/api/validate', 'POST', { document: createSampleDocument() }, { Cookie: cookie, Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await request('/api/validate', 'POST', { document: createSampleDocument() }, { Authorization: `Bearer ${token}`, Origin: base })).status).toBe(200);
   });
   it('never trusts spoofed ingress headers from an unverified peer', async () => {
     const { request } = await fixture({ production: true, ingress: { proxyAddress: '192.0.2.10', path: '/api/hassio_ingress/verified' } });
@@ -1018,27 +1020,32 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     expect((await request('/api/draft', 'GET', undefined, { 'X-Ingress-Path': headers['X-Ingress-Path'] })).status).toBe(401);
     expect((await request('/api/draft', 'GET', undefined, { ...headers, 'X-Remote-User-Groups': 'system-users' })).status).toBe(401);
     expect((await request('/api/draft', 'GET', undefined, headers)).status).toBe(200);
-    expect((await request('/api/publish', 'POST', { expectedRevision: 1 }, { ...headers, Origin: base })).status).toBe(200);
+    expect((await request('/api/validate', 'POST', { document: createSampleDocument() }, { ...headers, Origin: base })).status).toBe(200);
   });
   it('blocks traversal, oversized requests, unsafe HA entity IDs and arbitrary proxy endpoints', async () => {
     const { request } = await fixture();
     expect((await request('/api/data/%2e%2e%2fsecret')).status).toBe(400);
     expect((await request('/api/data/https%3A%2F%2Fexample.com')).status).toBe(400);
     expect((await request('/api/proxy?url=http://169.254.169.254')).status).toBe(404);
-    expect((await request('/api/draft', 'PUT', { document: 'x'.repeat(1024 * 1024 + 1), expectedRevision: 1 })).status).toBe(413);
+    const oversized = await request('/api/draft', 'PUT', { document: 'x'.repeat(1024 * 1024 + 64 * 1024 + 1), expectedRevision: 1 });
+    expect(oversized.status).toBe(413);
+    expect(await oversized.json()).toEqual({ error: 'Request body exceeds 1 MiB plus 64 KiB of envelope space' });
+    const oversizedLogin = await request('/api/auth', 'POST', { token: 'x'.repeat(1024 * 1024 + 1) });
+    expect(oversizedLogin.status).toBe(413);
+    expect(await oversizedLogin.json()).toEqual({ error: 'Request body exceeds 1 MiB' });
     const document = createSampleDocument();
     document.dataSources[1].entityId = '../config';
     expect((await request('/api/draft', 'PUT', { document, expectedRevision: 1 })).status).toBe(422);
     const data: Record<string, unknown> = {};
     let nested = data;
     for (let index = 0; index < 60; index++) { const next = {}; nested.child = next; nested = next; }
-    expect((await request('/api/actions/execute', 'POST', { action: { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo', data } })).status).toBe(422);
+    expect((await request('/api/actions/execute', 'POST', { action: { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo_unit', data } })).status).toBe(422);
   });
   it('labels sample data, rejects unknown IDs, and never actuates by default', async () => {
     const { request } = await fixture();
     expect((await (await request('/api/data/climate')).json()).mode).toBe('sample');
     expect((await request('/api/data/missing')).status).toBe(404);
-    const response = await request('/api/actions/execute', 'POST', { action: { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.living_room' }, confirmed: true });
+    const response = await request('/api/actions/execute', 'POST', { action: { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo_living_room' }, confirmed: true });
     expect(await response.json()).toEqual({ mode: 'simulated', executed: false });
     const health = await (await request('/api/health')).json();
     expect(health.mode).toBe('sample');
@@ -1046,7 +1053,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
   });
   it('requires confirmation even when live services are enabled and rejects service target overrides', async () => {
     const { request } = await fixture({ enableLiveActions: true });
-    const action = { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.living_room' };
+    const action = { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo_living_room' };
     expect((await request('/api/actions/execute', 'POST', { action })).status).toBe(428);
     expect((await request('/api/actions/execute', 'POST', { action, confirmed: true })).status).toBe(503);
     expect((await request('/api/actions/execute', 'POST', { action: { ...action, data: { entity_id: 'all' } }, confirmed: true })).status).toBe(422);
@@ -1065,7 +1072,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       let body = '';
       for await (const chunk of req) body += chunk;
       calls.push({ path: req.url!, method: req.method!, body });
-      if (req.url === '/api/states/sensor.redirect') {
+      if (req.url === '/api/states/sensor.demo_redirect') {
         res.writeHead(302, { Location: 'http://169.254.169.254/' });
         res.end();
         return;
@@ -1085,16 +1092,16 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     expect(state).toEqual({ mode: 'live', data: { entityId: 'sensor.demo_living_room_temperature', state: '22', name: 'Living room', unit: 'C' } });
     const document = store.getDraft().document;
     document.dataSources.push({ id: 'push-config', name: 'Push capabilities', kind: 'native-home', endpoint: 'push-config', refreshSeconds: 30, sample: null });
-    document.dataSources.push({ id: 'redirect', name: 'No redirects', kind: 'ha-state', entityId: 'sensor.redirect', refreshSeconds: 30, sample: null });
+    document.dataSources.push({ id: 'redirect', name: 'No redirects', kind: 'ha-state', entityId: 'sensor.demo_redirect', refreshSeconds: 30, sample: null });
     await store.save(document, 1);
     const bridge = await (await request('/api/data/push-config')).json();
     expect(bridge).toEqual({ mode: 'live', data: { available: true, bundleId: 'example.native-home', criticalAlerts: true } });
     expect((await request('/api/data/redirect')).status).toBe(502);
-    const action = { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.living_room' };
+    const action = { type: 'service', domain: 'light', service: 'turn_on', entityId: 'light.demo_living_room' };
     expect((await request('/api/actions/execute', 'POST', { action })).status).toBe(428);
     expect(calls.some((call) => call.method === 'POST')).toBe(false);
     expect(await (await request('/api/actions/execute', 'POST', { action, confirmed: true })).json()).toEqual({ mode: 'live', executed: true });
-    expect(calls.at(-1)).toEqual({ path: '/api/services/light/turn_on', method: 'POST', body: '{"entity_id":"light.living_room"}' });
+    expect(calls.at(-1)).toEqual({ path: '/api/services/light/turn_on', method: 'POST', body: '{"entity_id":"light.demo_living_room"}' });
     expect((await (await request('/api/health')).json()).haConnected).toBe(true);
     expect(JSON.stringify(state) + JSON.stringify(bridge)).not.toContain('never-forward-me');
   });

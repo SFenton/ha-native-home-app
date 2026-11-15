@@ -6,6 +6,7 @@ import { CameraTransport, nativeCameraIds } from './camera';
 import { nativeHomeAbortError, readNativeHouseConfig, readNativeSnapshot, type NativeHomeSnapshot } from './native-home';
 import { HttpError } from './store';
 import { ReadEndpointRegistry } from './read-endpoints';
+import { HaPublicationClient } from './ha-publication';
 
 export class HomeAssistantClient {
   private readonly base?: string;
@@ -15,11 +16,14 @@ export class HomeAssistantClient {
   private connected = false;
   readonly cameras: CameraTransport;
   readonly readEndpoints: ReadEndpointRegistry;
+  /** Publishes to the `fenton_home` integration with this client's credentials; the token never leaves the server. */
+  readonly publication: HaPublicationClient;
   constructor(private readonly config: ServerConfig) {
     const direct = Boolean(config.haUrl && config.haToken);
     this.base = direct ? config.haUrl : (config.supervisorToken ? 'http://supervisor/core' : undefined);
     this.token = direct ? config.haToken : config.supervisorToken;
     this.websocketUrl = direct ? new URL('/api/websocket', config.haUrl).href.replace(/^http/, 'ws') : (config.supervisorToken ? 'ws://supervisor/core/websocket' : undefined);
+    this.publication = new HaPublicationClient({ base: this.base, token: this.token, websocketUrl: this.websocketUrl });
     this.readEndpoints = new ReadEndpointRegistry({
       base: this.base, token: this.token, endpoints: config.readEndpoints,
       credentials: [config.haToken ?? '', config.supervisorToken ?? '', config.authToken ?? ''],
@@ -32,6 +36,11 @@ export class HomeAssistantClient {
         return nativeCameraIds(await readNativeHouseConfig(this.websocketUrl, this.token, signal));
       },
     });
+  }
+  /** The house configuration the `fenton_home` integration serves, read over this client's own connection. */
+  async houseConfig(signal = AbortSignal.timeout(15000)): Promise<Record<string, unknown>> {
+    if (!this.websocketUrl || !this.token) throw new HttpError(503, 'Home Assistant is not configured');
+    return (await readNativeHouseConfig(this.websocketUrl, this.token, signal)).config;
   }
   get configured() { return Boolean(this.base && this.token); }
   get haConnected() { return this.connected; }
@@ -100,7 +109,7 @@ export class HomeAssistantClient {
       throw error;
     } finally { clearTimeout(timer); }
   }
-  close() { this.shutdown.abort(); this.cameras.close(); this.readEndpoints.close(); }
+  close() { this.shutdown.abort(); this.cameras.close(); this.readEndpoints.close(); this.publication.close(); }
   async wallpaper(): Promise<{ image: Buffer; type: string }> {
     if (!this.configured) throw new HttpError(503, 'Home Assistant is not configured');
     let response: Response;

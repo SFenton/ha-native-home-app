@@ -59,17 +59,12 @@ try {
   });
   assert.equal(savedResponse.status, 200);
   const saved = await savedResponse.json();
-  const publishedResponse = await fetch(`${base}/api/publish`, {
-    method: 'POST', headers, body: JSON.stringify({ expectedRevision: saved.revision }),
-  });
-  assert.equal(publishedResponse.status, 200);
-  const published = await publishedResponse.json();
   docker('restart', container);
   const restartedBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${restartedBindings['4800/tcp'][0].HostPort}`;
   await waitUntilReady(base);
-  const restored = await (await fetch(`${base}/api/published`, { headers })).json();
-  assert.equal(restored.revision, published.revision);
+  const restored = await (await fetch(`${base}/api/draft`, { headers })).json();
+  assert.equal(restored.revision, saved.revision);
   assert.equal(restored.document.name, 'Container persistence check');
 
   const mount = '/api/hassio_ingress/studio-test/';
@@ -108,7 +103,7 @@ try {
   assert.equal(ingressDraft.document.pages[0].title, 'Ingress route check');
   assert.deepEqual(browserErrors, []);
   assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/')), []);
-  console.log('Production container: auth, assets, save/publish, restart persistence, and mounted-path browser routing passed.');
+  console.log('Production container: auth, assets, save, restart persistence, and mounted-path browser routing passed.');
 } finally {
   await browser?.close();
   if (proxy) {

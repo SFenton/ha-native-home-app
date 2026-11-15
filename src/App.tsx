@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, closestCenter, pointerWithin, useSensor, useSensors, type CollisionDetection, type DragEndEvent, type DragStartEvent, type KeyboardCoordinateGetter } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { AlertCircle, ArrowLeft, ArrowUpRight, Check, CheckCircle2, ChevronRight, Cloud, Code2, Download, FileUp, Hand, History, Home, Layers, LoaderCircle, MousePointer2, PanelRight, Play, Plus, Redo2, Save, Send, Smartphone, Undo2, Upload, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronRight, Cloud, Code2, Download, FileUp, Hand, History, Home, Layers, LoaderCircle, MousePointer2, PanelRight, Play, Plus, Redo2, Save, Send, Smartphone, Undo2, X } from 'lucide-react';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { createComponent } from './shared/catalog';
 import { createSampleDocument } from './shared/sample';
@@ -19,8 +19,9 @@ import Inspector from './Inspector';
 import DevicePreview, { initialPreview } from './DevicePreview';
 import { DataPanel, NavigationPanel, VariablesPanel } from './ProjectPanels';
 import { Dialog, EmptyState, Field, Icon, IconButton, SelectField, TextField } from './ui';
+const NativeCompositionWorkspace = lazy(() => import('./NativeCompositionWorkspace'));
 
-type DialogKind = 'source' | 'import' | 'native-import' | 'publish' | 'reset' | 'reload' | 'delete-surface' | 'report-issue' | 'request-feature' | undefined;
+type DialogKind = 'source' | 'import' | 'native-import' | 'reset' | 'reload' | 'delete-surface' | 'report-issue' | 'request-feature' | undefined;
 type ActionLog = { id: string; time: string; message: string; tone: 'info' | 'error' | 'success' };
 const editorKeyboardCoordinates: KeyboardCoordinateGetter = (event, args) => {
   const { active, droppableContainers, droppableRects } = args.context;
@@ -44,6 +45,14 @@ function downloadText(content: string, name: string, mime: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export default function App() {
+  const [native, setNative] = useState(false);
+  const [visitedNative, setVisitedNative] = useState(false);
+  return <>
+    <div hidden={native}><LegacyStudio active={!native} onNative={() => { setVisitedNative(true); setNative(true); }}/></div>
+    {visitedNative && <div hidden={!native}><Suspense fallback={<div className="loading-card" role="status">Loading native composition controls...</div>}><NativeCompositionWorkspace active={native} onLegacy={() => setNative(false)}/></Suspense></div>}
+  </>;
+}
+function LegacyStudio({ active, onNative }: { active: boolean; onNative: () => void }) {
   const studio = useStudio();
   const { document, apply, notify } = studio;
   const [target, setTarget] = useState<Target>({ kind: 'page', id: 'home' });
@@ -68,11 +77,11 @@ export default function App() {
   const [dragging, setDragging] = useState<string>();
   const variables = useMemo(() => ({ ...document?.variables, ...variableOverrides }), [document?.variables, variableOverrides]);
   const activeQuerySourceIds = useMemo(() => {
-    if (!document || editing || settings.threeD || view !== 'design' || dialog || target.kind === 'activity') return [];
+    if (!active || !document || editing || settings.threeD || view !== 'design' || dialog || target.kind === 'activity') return [];
     const surface = previewModal ? document.modals.find(modal => modal.id === previewModal)
       : document.pages.find(page => page.id === previewPage) ?? document.pages.find(page => page.id === document.navigation.initialPageId);
     return surface?.search?.mode === 'endpoint' ? [surface.search.sourceId] : [];
-  }, [document, editing, settings.threeD, view, dialog, target.kind, previewModal, previewPage]);
+  }, [active, document, editing, settings.threeD, view, dialog, target.kind, previewModal, previewPage]);
   const { liveEnabled, queryLiveEnabled, changeLive, enableQueryReads, dataResults, dataModes, dataErrors, fetchData } = usePreviewData(document, studio.savedDataSources, studio.serverMode, notify, variables, activeQuerySourceIds);
   const [nativeImport, setNativeImport] = useState<ReturnType<typeof importNativeHome>>();
   const variableKey = JSON.stringify(document?.variables ?? {});
@@ -199,6 +208,7 @@ export default function App() {
   }
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
+      if (!active) return;
       if (globalThis.document.querySelector('dialog[open]')) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void studio.save(); }
       if ((event.target as HTMLElement).closest('input,textarea,select,[contenteditable=true]')) return;
@@ -253,10 +263,11 @@ export default function App() {
   return <div className={`studio ${showInspector && view === 'design' ? 'with-inspector' : 'without-inspector'}`}>
     <header className="studio-header">
       <a className="brand" href="./" onClick={event => { if (studio.dirty) { event.preventDefault(); openDialog('reload'); } }}><span className="brand-symbol"><Home size={21}/></span><span>native home <b>STUDIO</b></span></a>
+      <button onClick={onNative}>Native composition</button>
       <div className="project-name">{document?.name ?? 'Your native experience'} <span className="badge">DRAFT</span></div>
       <span className={`save-status ${studio.dirty ? 'unsaved' : ''}`}><Cloud size={15}/>{studio.busy ? 'Saving changes…' : studio.dirty ? 'Unsaved changes' : document ? 'All changes saved' : 'Connecting'}</span>
       <IconButton label="Undo (Ctrl+Z)" disabled={!studio.canUndo || studio.busy} onClick={studio.undo}><Undo2 size={17}/></IconButton><IconButton label="Redo (Ctrl+Shift+Z)" disabled={!studio.canRedo || studio.busy} onClick={studio.redo}><Redo2 size={17}/></IconButton>
-      <span className="header-separator"/><button className="save-button" disabled={!document || !studio.dirty || studio.busy} onClick={() => void studio.save()}><Save size={14}/> Save</button><button className="primary publish-button" disabled={!document || studio.busy} onClick={() => openDialog('publish')}><Upload size={14}/> Publish<ArrowUpRight size={13}/></button>
+      <span className="header-separator"/><button className="save-button" disabled={!document || !studio.dirty || studio.busy} onClick={() => void studio.save()}><Save size={14}/> Save</button>
     </header>
     <DndContext sensors={sensors} collisionDetection={editorCollision} accessibility={mobileDragAccessibility} cancelDrop={mobileDrag.cancelDrop} onDragStart={(event: DragStartEvent) => { mobileDrag.begin(); setDragging(String(event.active.data.current?.title ?? event.active.data.current?.type ?? event.active.id)); if (event.active.data.current?.componentId) setSelection(String(event.active.data.current.componentId)); }} onDragEnd={event => { try { onDragEnd(event); } finally { mobileDrag.finish(); } }} onDragCancel={() => { mobileDrag.finish(); setDragging(undefined); }}>
       {document && previewDocument ? <MobileWorkspace ref={mobileWorkspace}
@@ -278,7 +289,7 @@ export default function App() {
         inspector={<Inspector document={document} target={target} selection={selection} apply={apply} duplicate={duplicateSelected} remove={() => selection && remove(selection)} move={offset => selection && move(selection, offset)} onClose={() => mobileWorkspace.current?.closeInspector()}/>}
         insert={<ComponentLibrary selection={selection} onAdd={type => addComponent(type)} onAddInside={selected && containers.has(selected.type) ? type => addComponent(type, selection, true) : undefined}/>}
         activity={showLog && <div className="action-log"><div><strong><History size={14}/> Preview activity</strong><span>Session only · no devices changed</span><button onClick={() => setLogs([])}>Clear</button><IconButton label="Close activity log" onClick={() => setShowLog(false)}><X size={14}/></IconButton></div>{logs.length ? <ol>{logs.map(log => <li className={log.tone} key={log.id}><time>{log.time}</time><span>{log.message}</span></li>)}</ol> : <p>Interact with a tile, toggle, or navigation action to see what happened here.</p>}</div>}
-        status={<footer className="editor-statusbar"><span><span className="status-dot enabled"/> {Object.values(dataModes).includes('error') ? 'Preview data error' : Object.values(dataModes).includes('live') ? 'Live data received' : liveEnabled ? 'Preview fetching enabled' : 'Sample preview'}<span className="statusbar-dot">·</span>Service actions simulated</span><button aria-pressed={liveEnabled} onClick={() => changeLive(!liveEnabled)}>Live data: {liveEnabled ? 'on' : 'off'}</button><button onClick={() => setShowLog(!showLog)}><History size={12}/> Activity{logs.length > 0 && <b>{logs.length}</b>}</button><span className="revision-label">Draft r{studio.revision}{studio.publishedRevision !== undefined && ` · Published r${studio.publishedRevision}`}</span></footer>}
+        status={<footer className="editor-statusbar"><span><span className="status-dot enabled"/> {Object.values(dataModes).includes('error') ? 'Preview data error' : Object.values(dataModes).includes('live') ? 'Live data received' : liveEnabled ? 'Preview fetching enabled' : 'Sample preview'}<span className="statusbar-dot">·</span>Service actions simulated</span><button aria-pressed={liveEnabled} onClick={() => changeLive(!liveEnabled)}>Live data: {liveEnabled ? 'on' : 'off'}</button><button onClick={() => setShowLog(!showLog)}><History size={12}/> Activity{logs.length > 0 && <b>{logs.length}</b>}</button><span className="revision-label">Draft r{studio.revision}</span></footer>}
       /> : <div className="startup-state"><div className="startup-logo"><Home size={38}/></div><span className="eyebrow">WELCOME TO NATIVE HOME STUDIO</span><h1>{studio.error ? 'Your project is out of reach.' : 'Make home feel like you.'}</h1><p>{studio.error || 'Opening your saved project and a fresh perspective on home.'}</p>{studio.error ? <button className="primary" onClick={() => void studio.reload()}>Retry connection</button> : <LoaderCircle className="spin" size={24}/>}</div>}
       <DragOverlay dropAnimation={reduceEditorMotion ? null : undefined} style={{ pointerEvents: 'none' }}>{dragging && <div className="drag-footprint"><div className="drag-preview"><Layers size={17}/>{dragging.replaceAll('-', ' ')}</div></div>}</DragOverlay>
     </DndContext>
@@ -299,7 +310,6 @@ export default function App() {
       }}>Replace editor with native reference</button></div>
     </Dialog>}
     {(dialog === 'source' || dialog === 'import') && <Dialog title={dialog === 'source' ? 'Your experience, in code' : 'Bring your project home'} wide onClose={() => !dialogBusy && setDialog(undefined)}><p className="dialog-description">{dialog === 'source' ? 'The current editor document, including unsaved edits. Apply changes only after server validation.' : 'Import a Native Home Studio JSON or YAML document. Your current document is preserved if validation fails.'}</p>{dialog === 'source' && <div className="source-toolbar"><div className="mode-switch">{(['json', 'yaml'] as const).map(value => <button key={value} className={format === value ? 'active' : ''} onClick={() => { try { const parsed = parseYaml(sourceText, { maxAliasCount: 30 }); setSourceText(value === 'json' ? JSON.stringify(parsed, null, 2) : stringifyYaml(parsed)); setFormat(value); setDialogError(''); } catch (reason) { setDialogError(String(reason)); } }}>{value.toUpperCase()}</button>)}</div><span className="small-muted">{studio.dirty ? 'Unsaved editor document' : `Saved revision ${studio.revision}`}</span></div>}{dialog === 'import' && <div className="import-file"><input ref={fileInput} type="file" accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml" aria-label="Choose JSON or YAML document" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 2_000_000) { setDialogError('Choose a document smaller than 2 MB.'); return; } try { setSourceText(await file.text()); } catch (reason) { setDialogError(String(reason)); } }}/><span>or paste your document below</span></div>}<textarea aria-label={dialog === 'source' ? 'Document source' : 'Import document source'} spellCheck={false} className="source-editor" placeholder="Paste JSON or YAML here..." value={sourceText} onChange={event => setSourceText(event.target.value)}/>{dialogError && <pre role="alert" className="validation-errors">{dialogError}</pre>}<div className="dialog-actions"><button onClick={() => setDialog(undefined)} disabled={dialogBusy}>Cancel</button><button className="primary" disabled={dialogBusy || !sourceText.trim()} onClick={() => void importText(sourceText)}>{dialogBusy ? <LoaderCircle size={14} className="spin"/> : <Check size={14}/>} Validate & {dialog === 'source' ? 'apply' : 'import'}</button></div></Dialog>}
-    {dialog === 'publish' && <Dialog title="Ready for the next version?" onClose={() => setDialog(undefined)}><div className="publish-illustration"><Upload size={28}/></div><p className="dialog-description">Publish an immutable snapshot of your project to the server. {studio.dirty ? 'Your unsaved changes will be saved first, then that exact revision will be published.' : `Saved draft revision ${studio.revision} is ready to publish.`}</p><div className="safety-note"><strong>Native integration is not connected yet.</strong><br/>This publishes a server-driven configuration, not an installed app, Apple simulator, or APNs update.</div><div className="dialog-actions"><button onClick={() => setDialog(undefined)}>Keep editing</button><button className="primary" disabled={studio.busy} onClick={() => { setDialog(undefined); void studio.publish(); }}><Upload size={14}/> Publish configuration</button></div></Dialog>}
     {(dialog === 'reload' || dialog === 'reset' || dialog === 'delete-surface') && <Dialog title={dialog === 'reload' ? 'Reload the server draft?' : dialog === 'reset' ? 'Start from the example?' : `Delete ${surfaceName}?`} onClose={() => setDialog(undefined)}><p className="dialog-description">{dialog === 'reload' ? 'This replaces local edits with the latest saved server version. Export or copy your source first if you need to keep both.' : dialog === 'reset' ? 'Replace the editor document with the complete household example. Your server draft is unchanged until you save; undo restores your current work.' : `This removes the ${target.kind} and its content. References from navigation and actions are cleared. You can undo this change.`}</p><div className="dialog-actions"><button onClick={() => setDialog(undefined)}>Cancel</button><button className={dialog === 'delete-surface' ? 'danger-button' : 'primary'} onClick={() => {
       if (dialog === 'reload') { void studio.reload(); setVariableOverrides({}); }
       if (dialog === 'reset') { void studio.importDocument(createSampleDocument()).catch(reason => notify(String(reason), 'error')); setVariableOverrides({}); changeLive(false); }

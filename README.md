@@ -90,10 +90,13 @@ Snapshot and Record
 remain explicitly simulated. Turning live data off, hiding a camera, or leaving
 the browser tab stops its media requests. This is not the native WebRTC player.
 
-**Save** persists a draft. **Publish** makes a validated revision available to
-clients, separately from later draft changes. The publication endpoint and
-revision event stream are a contract for a future native renderer; publishing
-here does not make the unchanged iOS app understand this format.
+**Save** persists a draft. In the native composition workspace, **Publish to
+Home Assistant** is the only way a composition reaches the app: it uploads the referenced images and
+publishes the composition into the `fenton_home` integration (1.4.0 or newer),
+which the native app follows live; the *Home Assistant* section shows the
+revision history and offers rollback. The app uses the app's own Supervisor
+token, or `HA_URL`/`HA_TOKEN` in development. See
+[Publishing to Home Assistant](docs/native-composition.md#publishing-to-home-assistant).
 
 Device frames and 3D/folding controls are browser previews, not iOS emulators.
 The device dock's **Device theme** selector overrides the preview with Light,
@@ -116,6 +119,33 @@ New native imports include source-informed thermostat descriptions, explicit
 Guests setters, finite remote command branches, and mounted vacuum sheet tabs.
 See [native fidelity and unsupported data](docs/native-fidelity.md). Existing
 user documents are not silently reimported or published.
+
+Schema-2 configured remotes accept the native `speakerdevice` argument as an
+array of at most 16 entity IDs. Its use, including in a conditional command,
+requires `sh.remote-speaker-targets@1`. Existing `sonosdevice` calls retain their
+original capability requirements; unknown argument fields are still rejected.
+The read-only `wake-summary` bedroom atom exposes canonical modal status copy,
+typography and alerts through `sh.wake-summary@1`; it requires a wake-light provider.
+`wake-hold.showsExplanation` opts into the integration-aware hold footnote through
+`sh.wake-hold-explanation@1`. Text supports secondary-ink Dynamic Type subheadline
+and footnote styles through `sh.supporting-text-styles@1`; original styles remain unchanged.
+`section-title` text uses the native sheet's bold title3 font and accessibility
+heading trait through `sh.section-title@1`, without changing existing page headers.
+`wake-stop.episode` adds the canonical active-episode card through `sh.wake-episode@1`,
+with editable heading, detail and pending label. Omission keeps the original button.
+Alarm name/type fields expose optional `showsHeading` through
+`sh.bedroom-field-headings@1`; weekday choices can pair abbreviated visible labels
+with `accessibilityLabel` through `sh.weekday-accessibility-labels@1`.
+Surface `titleSourceId` (`sh.surface-title-source@1`) must name an alarm draft
+used on that surface. The native title stays tied to the opened alarm until reload.
+`alarm-feedback` offers shared native `error` and `problems` slots through
+`sh.alarm-feedback@1`; place the error slot at the top level to avoid repeating
+provider feedback under individual fields. Draft state controls Reload, Delete,
+creation-only bed targets and guarded Back without authoring a second save flow.
+Wake `alarm-delete` questions offer `messageFormat: "wake-alarm"` through
+`sh.wake-alarm-confirmation@1`. Edit the message normally, using `{time}` and
+`{schedule}` for the opened alarm's details. Other placeholders, malformed braces
+and non-wake draft sources are rejected. Omit the format for literal copy.
 
 ## Home Assistant installation
 
@@ -149,7 +179,20 @@ node scripts/smoke-container.mjs
 ```
 
 The smoke check starts its own loopback-only container, verifies authentication
-and save/publish persistence across a restart, and removes it afterward.
+and draft persistence across a restart, and removes it afterward.
+
+### House data stays out of the repository
+
+This repository is public, so no entity id, room name, script name or card key of a real house is written in source, tests,
+fixtures or the shared corpus; those use synthetic `demo_` ids. A maintenance script that must act on the real house
+(`scripts/restore-theater-actions.ts`) reads its house-specific values at run time from a git-ignored local file:
+
+- The file is `.local/<script name>.json` at the repository root (`.local/` is in `.gitignore`), or in the folder the
+  `STUDIO_LOCAL_DIR` environment variable names.
+- `scripts/examples/<script name>.example.json` is the shape with synthetic values. Copy it to the local folder and replace
+  the values with your own: `mkdir -p .local && cp scripts/examples/restore-theater-actions.example.json .local/restore-theater-actions.json`.
+- A missing file stops the script with a message that names the file and the example; no value is ever printed.
+- `scripts/import-house-config.ts` carries no house values: the Studio server reads the live house configuration itself.
 
 The shared TypeScript contract is in `src/shared/types.ts`. Keep the schema,
 browser renderer, server validation, and consumer documentation consistent when

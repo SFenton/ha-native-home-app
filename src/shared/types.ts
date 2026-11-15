@@ -152,7 +152,3 @@ export interface DraftEnvelope {
   updatedAt: string;
 }
 
-export interface PublishedEnvelope extends DraftEnvelope {
-  publishedAt: string;
-  capabilities: string[];
-}

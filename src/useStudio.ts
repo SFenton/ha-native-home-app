@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, apiUrl, loadDraft, publishDraft, request, saveDraft, validateDocument } from './api';
+import { ApiError, loadDraft, request, saveDraft, validateDocument } from './api';
 import type { DataSource, DraftEnvelope, StudioDocument } from './shared/types';
 import type { Edit } from './editor';
 
@@ -18,7 +18,6 @@ export function useStudio() {
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [publishedRevision, setPublishedRevision] = useState<number>();
   const [updatedAt, setUpdatedAt] = useState('');
   const [serverMode, setServerMode] = useState('sample');
   const [savedDataSources, setSavedDataSources] = useState<DataSource[]>([]);
@@ -49,27 +48,9 @@ export function useStudio() {
   }, [install, notify]);
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => {
-    request<{ mode?: string; live?: boolean; publishedRevision?: number | null }>('/api/health').then(health => {
+    request<{ mode?: string; live?: boolean }>('/api/health').then(health => {
       setServerMode(health.mode ?? (health.live ? 'live' : 'sample'));
-      if (typeof health.publishedRevision === 'number') setPublishedRevision(health.publishedRevision);
     }).catch(reason => notify(`Server health unavailable: ${String(reason)}`, 'error'));
-    const stream = new EventSource(apiUrl('/api/events'));
-    let disconnected = false;
-    stream.addEventListener('open', () => {
-      if (disconnected) notify('Publication notifications reconnected.', 'success');
-      disconnected = false;
-    });
-    stream.addEventListener('error', () => {
-      if (!disconnected) notify('Publication notifications disconnected. Reconnecting; saved drafts are unaffected.', 'error');
-      disconnected = true;
-    });
-    stream.addEventListener('published', event => {
-      try {
-        const published = JSON.parse((event as MessageEvent<string>).data) as { revision?: number };
-        if (typeof published.revision === 'number') setPublishedRevision(published.revision);
-      } catch { notify('A publish event could not be read. Reload to check the latest release.', 'error'); }
-    });
-    return () => stream.close();
   }, [notify]);
   const apply = useCallback((edit: Edit) => {
     if (!current.current) return;
@@ -117,19 +98,6 @@ export function useStudio() {
       return false;
     } finally { busyRef.current = false; setBusy(false); }
   }, [persist, notify]);
-  const publish = useCallback(async () => {
-    if (busyRef.current || !current.current) return;
-    busyRef.current = true; setBusy(true);
-    try {
-      const envelope = JSON.stringify(current.current) === saved.current ? { revision: revision.current } : await persist();
-      const result = await publishDraft(envelope.revision);
-      setPublishedRevision(result.revision);
-      notify(`Published revision ${result.revision}. Native client integration is pending; this publishes the server document, not an App Store build.`, 'success');
-    } catch (reason) {
-      if (reason instanceof ApiError && reason.status === 409) setConflict(true);
-      notify(reason instanceof Error ? reason.message : String(reason), 'error');
-    } finally { busyRef.current = false; setBusy(false); }
-  }, [persist, notify]);
   const importDocument = useCallback(async (value: unknown) => {
     const validation = await validateDocument(value);
     if (!validation.valid) throw new Error(validation.errors.join('\n'));
@@ -154,5 +122,5 @@ export function useStudio() {
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [dirty]);
   void historyVersion;
-  return { document, revision: revision.current, publishedRevision, updatedAt, loading, busy, error, conflict, notices, serverMode, savedDataSources, dirty, canUndo: past.current.length > 0, canRedo: future.current.length > 0, apply, undo, redo, save, publish, reload, keepLocal, importDocument, notify, dismissNotice: (id: number) => setNotices(previous => previous.filter(notice => notice.id !== id)) };
+  return { document, revision: revision.current, updatedAt, loading, busy, error, conflict, notices, serverMode, savedDataSources, dirty, canUndo: past.current.length > 0, canRedo: future.current.length > 0, apply, undo, redo, save, reload, keepLocal, importDocument, notify, dismissNotice: (id: number) => setNotices(previous => previous.filter(notice => notice.id !== id)) };
 }

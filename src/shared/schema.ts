@@ -8,10 +8,11 @@ import { collectionKeys, interactionComponents, isTodoList, safeRecordPath } fro
 import { readBindingPath } from './runtime';
 export { isSafeUrl } from './urls';
 
+export const MAX_DOCUMENT_BYTES = 1024 * 1024;
 const unsafeKeys = new Set(['__proto__', 'prototype', 'constructor']);
 export const identifierSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$/, 'Use 1-80 letters, numbers, dots, underscores or hyphens')
   .refine((value) => !unsafeKeys.has(value), 'Reserved key');
-export const entityIdSchema = z.string().max(160).regex(/^[a-z][a-z0-9_]*\.[a-z0-9_]+$/, 'Expected an entity ID such as light.living_room');
+export const entityIdSchema = z.string().max(160).regex(/^[a-z][a-z0-9_]*\.[a-z0-9_]+$/, 'Expected an entity ID such as light.demo_living_room');
 const label = z.string().max(240);
 const primitive = z.union([z.string().max(16384), z.number().finite(), z.boolean(), z.null()]);
 const safeKey = z.string().max(160).refine((value) => !unsafeKeys.has(value), 'Reserved key');
@@ -533,6 +534,6 @@ export function validateDocument(input: unknown): StudioDocument {
   assertJsonBounds(input);
   const result = studioDocumentSchema.safeParse(input);
   if (!result.success) throw new DocumentValidationError(result.error.issues.map((issue) => `${issue.path.join('.') || 'document'}: ${issue.message}`));
-  if (new TextEncoder().encode(JSON.stringify(result.data)).byteLength > 1024 * 1024) throw new DocumentValidationError(['document: exceeds the 1 MiB serialized size limit']);
+  if (new TextEncoder().encode(JSON.stringify(result.data)).byteLength > MAX_DOCUMENT_BYTES) throw new DocumentValidationError(['document: exceeds the 1 MiB serialized size limit']);
   return result.data;
 }
