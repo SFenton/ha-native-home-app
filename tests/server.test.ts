@@ -1143,3 +1143,37 @@ describe('authentication, origin checks, and safe HA boundary', () => {
     expect(JSON.stringify(state) + JSON.stringify(bridge)).not.toContain('never-forward-me');
   });
 });
+
+describe('Home Assistant services (read only)', () => {
+  async function upstream(body: unknown) {
+    const seen: { method?: string; url?: string; auth?: string }[] = [];
+    const server = http.createServer((req, res) => { seen.push({ method: req.method, url: req.url, auth: req.headers.authorization }); res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    cleanup.push(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+    return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, seen };
+  }
+  const authToken = 'synthetic-services-authoring-token', haToken = 'synthetic-services-backend-token';
+  it('serves the reduced list with GET only, no credentials, and needs authentication', async () => {
+    const source = await upstream([{ domain: 'light', services: { turn_on: { name: 'Turn on', description: 'Turn on a light.', target: {}, fields: {
+      brightness: { name: 'Brightness', description: 'How bright.', example: '120', selector: { number: { min: 0, max: 255, unit_of_measurement: 'lm' } } },
+      effect: { selector: { select: { options: ['rainbow', { value: 'pulse', label: 'Pulse' }] } } }, bad_key: { selector: { text: null } }, 'Bad Key': {} } } } },
+      { domain: 'Bad Domain', services: {} }]);
+    const { request } = await fixture({ authToken, haToken, haUrl: source.url });
+    expect((await request('/native/api/ha/services')).status).toBe(401);
+    const response = await request('/native/api/ha/services', 'GET', undefined, { Authorization: `Bearer ${authToken}` });
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).not.toContain(haToken); expect(text).not.toContain('example');
+    const body = JSON.parse(text) as { domain: string; services: { service: string; fields: Record<string, { kind: string; options?: string[] }> }[] }[];
+    expect(body.map(item => item.domain)).toEqual(['light']);
+    expect(body[0].services[0].fields.brightness).toMatchObject({ kind: 'number', min: 0, max: 255, unit: 'lm' });
+    expect(body[0].services[0].fields.effect).toMatchObject({ kind: 'choice', options: ['rainbow', 'pulse'] });
+    expect(Object.keys(body[0].services[0].fields)).not.toContain('Bad Key');
+    expect(source.seen).toEqual([{ method: 'GET', url: '/api/services', auth: `Bearer ${haToken}` }]);
+    expect((await request('/native/api/ha/services', 'POST', {}, { Authorization: `Bearer ${authToken}` })).status).toBeGreaterThanOrEqual(400);
+  });
+  it('answers 503 without a Home Assistant connection', async () => {
+    const { request } = await fixture({ authToken });
+    expect((await request('/native/api/ha/services', 'GET', undefined, { Authorization: `Bearer ${authToken}` })).status).toBe(503);
+  });
+});

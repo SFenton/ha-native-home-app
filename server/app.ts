@@ -151,6 +151,12 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   // Publish to Home Assistant (`fenton_home` integration): the production delivery path. The Studio's own
   // /native/api/published stays only as the DEBUG publication preview; nothing authenticates a native reader to it.
   app.get('/native/api/ha/publication', async (_req, res) => { res.json(await ha.publication.get()); });
+  // The services Home Assistant offers, for the Studio's service picker. Read only, reduced server-side (no credentials, no examples).
+  app.get('/native/api/ha/services', async (req, res) => {
+    const cancelled = new AbortController();
+    res.once('close', () => { if (!res.writableEnded) cancelled.abort(); });
+    res.json(await ha.services(cancelled.signal));
+  });
   app.post('/native/api/ha/publish', async (req, res) => {
     const { expectedRevision } = publishSchema.parse(req.body);
     const published = await store.native.publish(expectedRevision);

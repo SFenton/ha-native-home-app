@@ -109,6 +109,15 @@ export class HomeAssistantClient {
       throw error;
     } finally { clearTimeout(timer); }
   }
+  /**
+   * The services Home Assistant offers, reduced to what the Studio's service picker shows: domain, service name, a one-line
+   * description and each field's name, description, kind and range. A read only (`GET /api/services`); no credentials, long
+   * examples or selectors beyond the field kind leave the server.
+   */
+  async services(signal?: AbortSignal): Promise<HaServiceDomain[]> {
+    const raw = await this.request('/api/services', 'GET', undefined, signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : undefined, 4 * 1024 * 1024);
+    return reduceServices(raw);
+  }
   close() { this.shutdown.abort(); this.cameras.close(); this.readEndpoints.close(); this.publication.close(); }
   async wallpaper(): Promise<{ image: Buffer; type: string }> {
     if (!this.configured) throw new HttpError(503, 'Home Assistant is not configured');
@@ -186,4 +195,43 @@ export class HomeAssistantClient {
     await this.request(`/api/services/${action.domain}/${action.service}`, 'POST', { ...action.data, entity_id: action.entityId });
     return { mode: 'live' as const, executed: true };
   }
+}
+
+/** One field of a Home Assistant service, as the picker shows it. */
+export interface HaServiceField { name: string; description?: string; required?: boolean; kind: 'number' | 'boolean' | 'choice' | 'text'; unit?: string; min?: number; max?: number; step?: number; options?: string[] }
+/** One service of a domain. */
+export interface HaService { service: string; name?: string; description?: string; fields: Record<string, HaServiceField>; target: boolean }
+/** A domain and its services. */
+export interface HaServiceDomain { domain: string; services: HaService[] }
+
+const clip = (value: unknown, max = 240) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+/** Reduces Home Assistant's `/api/services` body: bounded, typed and free of everything the picker does not draw. */
+export function reduceServices(raw: unknown): HaServiceDomain[] {
+  if (!Array.isArray(raw)) return [];
+  const domains: HaServiceDomain[] = [];
+  for (const item of raw.slice(0, 500)) {
+    const entry = record(item), domain = clip(entry.domain, 64);
+    if (!domain || !/^[a-z][a-z0-9_]*$/.test(domain)) continue;
+    const services: HaService[] = [];
+    for (const [service, value] of Object.entries(record(entry.services)).slice(0, 500)) {
+      if (!/^[a-z][a-z0-9_]*$/.test(service)) continue;
+      const body = record(value), fields: Record<string, HaServiceField> = {};
+      for (const [key, field] of Object.entries(record(body.fields)).slice(0, 64)) {
+        if (!/^[a-z][a-zA-Z0-9_]*$/.test(key)) continue;
+        const detail = record(field), selector = record(detail.selector), [kind = 'text'] = Object.keys(selector);
+        const number = record(selector.number), select = record(selector.select);
+        const options = Array.isArray(select.options) ? select.options.map(option => typeof option === 'string' ? option : clip(record(option).value, 80)).filter((option): option is string => Boolean(option)).slice(0, 64) : undefined;
+        const finite = (input: unknown) => typeof input === 'number' && Number.isFinite(input) ? input : undefined;
+        fields[key] = {
+          name: clip(detail.name, 80) ?? key, description: clip(detail.description), required: detail.required === true ? true : undefined,
+          kind: kind === 'number' ? 'number' : kind === 'boolean' ? 'boolean' : kind === 'select' && options?.length ? 'choice' : 'text',
+          unit: clip(number.unit_of_measurement, 16), min: finite(number.min), max: finite(number.max), step: finite(number.step), options: kind === 'select' ? options : undefined,
+        };
+      }
+      services.push({ service, name: clip(body.name, 120), description: clip(body.description), fields, target: body.target !== undefined });
+    }
+    domains.push({ domain, services });
+  }
+  return domains;
 }
