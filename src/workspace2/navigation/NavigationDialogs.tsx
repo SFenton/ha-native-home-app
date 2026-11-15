@@ -116,7 +116,7 @@ function Delete({ ws, surface, onDone }: { ws: Workspace2; surface: SurfaceRef; 
   const current = (surface.kind === 'page' ? document.pages : document.modals).find(item => item.id === surface.id);
   const count = openerCount(document, surface);
   return <Modal open onOpenChange={open => { if (!open) onDone(); }} size="s" title={`Delete “${current?.title ?? ''}”?`}
-    description={count > 0 ? `${count} tile${count === 1 ? '' : 's'} open this ${surface.kind === 'page' ? 'page' : 'sheet'}. Their action is removed.` : undefined}
+    description={count > 0 ? `${count} ${count === 1 ? 'tile opens' : 'tiles open'} this ${surface.kind === 'page' ? 'page' : 'sheet'}. ${count === 1 ? 'Its' : 'Their'} action is removed.` : undefined}
     footer={<><button type="button" onClick={onDone}>Cancel</button><button type="button" className="w2-danger" onClick={() => {
       try { ws.studio.apply(deleteSurface(document, surface).document); ws.select(undefined); }
       catch (error) { ws.studio.setError(error instanceof Error ? error.message : String(error)); }

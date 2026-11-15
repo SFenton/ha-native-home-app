@@ -16,3 +16,5 @@
 .w2-window-choices .w2-segment { margin: 0 16px; }
 .w2-window-choices .w2-window-readout { padding-inline: 16px; }
 .w2-window-choices [aria-pressed=true] { font-weight: 600; background: var(--w2-selected); }
+.w2-bottombar { gap: 12px; }
+.w2-bottom-pages { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
