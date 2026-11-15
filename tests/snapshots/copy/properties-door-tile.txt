@@ -1,9 +1,10 @@
 Demo Lock 1
 Door tile · Security › Doors
 Title
+Icon
+Lock
 Entity
 lock.demo_entity_406
-Name
 Text
 Loading text
 Unavailable text

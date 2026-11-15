@@ -3,9 +3,10 @@ Alarm panel · Security System
 Title
 Title
 Subtitle
+Icon
+Shield
 Entity
 alarm_control_panel.demo_entity_125
-Name
 Text
 Since prefix
 Loading text

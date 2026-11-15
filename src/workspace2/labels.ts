@@ -147,8 +147,12 @@ export const mapPath = (path: readonly (string | number)[]) => path.filter(part 
 
 /** The entry for a field, if one is authored. */
 export function labelFor(owner: string, path: readonly (string | number)[]): FieldLabel | undefined {
-  const dotted = mapPath(path), last = String(path.filter(part => typeof part === 'string').at(-1) ?? '');
-  return labelMap[`${owner}.${dotted}`] ?? labelMap[`*.${dotted}`] ?? labelMap[`*.${last}`];
+  const keys = path.filter(part => typeof part === 'string');
+  const dotted = mapPath(path), last = String(keys.at(-1) ?? '');
+  // A nested field (`props.fallback.icon.name`) is the same field as a shallower one (`icon.name`): try each shorter suffix of two or more keys, longest first.
+  let suffix: FieldLabel | undefined;
+  for (let from = 1; from <= keys.length - 2 && !suffix; from += 1) suffix = labelMap[`*.${keys.slice(from).join('.')}`];
+  return labelMap[`${owner}.${dotted}`] ?? labelMap[`*.${dotted}`] ?? suffix ?? labelMap[`*.${last}`];
 }
 
 /** What a field is called, authored or mechanical. */

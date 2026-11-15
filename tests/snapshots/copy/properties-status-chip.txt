@@ -1,6 +1,8 @@
 Lights
 Status chip · Home › Status
 Title
+Icon
+Light bulb
 Entity
 Choose a source
 Alarm · source-security-panel
@@ -85,7 +87,6 @@ binary_sensor.demo_entity_77 · hc-entity-binary-sensor-demo-entity-77
 binary_sensor.demo_entity_78 · hc-entity-binary-sensor-demo-entity-78
 input_boolean.demo_entity_87 · hc-entity-input-boolean-demo-entity-87
 Home status · contacts · hc-climate-contacts
-Name
 Width
 By state
 1

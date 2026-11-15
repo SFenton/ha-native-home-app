@@ -171,3 +171,14 @@ describe('copy snapshots: the visible text of each surface (spec 10)', () => {
     expect(surfaces.filter(surface => /Native Home|1\.0 Editor|Open 1\.0/.test(surface.text))).toEqual([]);
   });
 });
+
+describe('deeper icon fields', () => {
+  it('read "Icon" in every node kind that nests one, never a free "Name" field', async () => {
+    const { readFileSync } = await import('node:fs');
+    for (const name of ['status-chip', 'alarm-panel', 'door-tile', 'room-overview-tile']) {
+      const lines = readFileSync(`tests/snapshots/copy/properties-${name}.txt`, 'utf8').split('\n');
+      expect(lines, name).toContain('Icon');
+      expect(lines, name).not.toContain('Name');
+    }
+  });
+});

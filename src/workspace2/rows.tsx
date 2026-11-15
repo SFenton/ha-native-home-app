@@ -6,6 +6,7 @@ import type { Json } from '../shared/types';
 import CompositionFields, { type FieldOptions } from '../CompositionFields';
 import { compositionEditorSchema, defaultField, fieldVariants, replaceAt, resolveField, selectedVariant, valueAt, type EditorPath, type SchemaField } from '../composition-editor';
 import { groupOrder, groupTitles, labelFor, mapPath, mechanicalLabel, valueWords, type FieldGroup } from './labels';
+import { IconField } from './pickers/PickerField';
 
 export { RowsProvider, useRows, type RowsContext } from './rowsContext';
 export { Disclosure } from './Disclosure';
@@ -100,9 +101,12 @@ export function summarize(document: CompositionDocument, name: string, value: Js
 
 /** Hooks the label map into the field generator. `base` is the path of the object the rows belong to. */
 export function fieldOptions(owner: string, base: EditorPath, skip?: (path: EditorPath) => boolean): FieldOptions {
+  /** An icon name at any depth (`props.fallback.icon.name`) is picked, not typed. */
+  const control: FieldOptions['control'] = (path, value, label, set) =>
+    path.at(-1) === 'name' && path.at(-2) === 'icon' ? <IconField label={label} symbol={value} path={path.join('/')} onPick={set}/> : undefined;
   const below = (path: EditorPath) => path.slice(base.length);
   return {
-    rows: true, fieldPath: true, skip,
+    rows: true, fieldPath: true, skip, control,
     label: (path, key) => labelFor(owner, below(path))?.label ?? mechanicalLabel(key),
     valueLabel: (path, value) => labelFor(owner, below(path))?.options?.[value] ?? valueWords(value),
     variantLabel: (_path, name) => variantWords[name] ?? valueWords(name),

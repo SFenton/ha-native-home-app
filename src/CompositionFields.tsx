@@ -24,6 +24,8 @@ export type FieldOptions = {
   fieldPath?: boolean;
   /** The words on an array's add button, when it is not "Add <label>". */
   addLabel?: (path: EditorPath) => string | undefined;
+  /** A custom control for a text field the generator would draw as a plain input (an icon name gets the icon picker). */
+  control?: (path: EditorPath, value: string, label: string, set: (next: string) => void) => ReactElement | undefined;
   /** A part that is edited elsewhere (child nodes). */
   skip?: (path: EditorPath) => boolean;
 };
@@ -198,6 +200,8 @@ export default function CompositionFields(props: Props) {
   if (schema.type === 'null') return options?.rows ? null : <p className="field-note">{label}: none</p>;
   if (key === 'id' || key === 'schemaVersion') return leaf(<TextField label={label} value={String(value)} readOnly onChange={() => {}} title="IDs cannot be changed."/>);
   if (schema.maxLength && schema.maxLength > 1000) return leaf(<Field label={label}><textarea value={String(value ?? '')} maxLength={schema.maxLength} onChange={event => set(event.target.value)}/></Field>);
+  const custom = typeof value === 'string' ? options?.control?.(path, value, label, set) : undefined;
+  if (custom) return leaf(custom);
   return leaf(<TextField label={label} value={String(value ?? '')} maxLength={schema.maxLength} onChange={set}/>);
 }
 

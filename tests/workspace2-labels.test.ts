@@ -36,3 +36,12 @@ describe('label coverage', () => {
   });
   it('keeps the map itself free of empty labels', () => { for (const [key, value] of Object.entries(labelMap)) expect(value.label.trim(), key).not.toBe(''); });
 });
+
+describe('nested field labels', () => {
+  it('names a deeper icon field "Icon" like the top-level one, whatever the owner', () => {
+    for (const path of [['icon', 'name'], ['props', 'fallback', 'icon', 'name'], ['props', 'states', 0, 'appearance', 'icon', 'name']]) {
+      expect(labelFor('status-chip', path)?.label).toBe('Icon');
+    }
+    expect(labelFor('status-chip', ['props', 'fallback', 'name'])?.label).not.toBe('Icon');
+  });
+});
