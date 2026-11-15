@@ -25,7 +25,7 @@ type Snap = typeof snapPoints[number];
 
 /** The pixels of the screen a narrow sheet at `snap` covers. */
 /** Whether a dialog is up over the workspace (New Page… from an editor in the sheet); the sheet keeps its height behind it. */
-const dialogOpen = () => Boolean(document.querySelector('[role=dialog][data-open], [role=alertdialog][data-open]'));
+const dialogOpen = () => Boolean(document.querySelector('[role=dialog][data-open]:not(.w2-props-sheet), [role=alertdialog][data-open]'));
 const coverage = (snap: Snap | null) => snap === SNAP_PEEK ? 88 : snap === SNAP_FULL ? window.innerHeight : window.innerHeight * SNAP_HALF;
 
 /** Why the draft is not there: loading, not signed in, or could not load (spec 9). */

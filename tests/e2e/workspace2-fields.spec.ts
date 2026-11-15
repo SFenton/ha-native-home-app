@@ -83,7 +83,7 @@ async function showSurface(page: Page, surfaceKey: string): Promise<void> {
   const current = page.locator(kind === 'page' ? `.sh-page[data-current][data-sel="${surfaceKey}"]` : `[data-preview-root] .sh-sheet[data-sel="${surfaceKey}"]`);
   if (await current.count()) return;
   await page.getByRole('button', { name: 'Pages' }).click();
-  await page.locator('.w2-pages').locator(kind === 'page' ? 'section:not([aria-label="Sheets"]) .w2-page-row, section[aria-label="Sheets"] ul ul .w2-page-row' : 'section[aria-label="Sheets"] > ul > li > .w2-page-row').filter({ has: page.locator('.w2-page-title', { hasText: new RegExp(`^${holder.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) }).first().click();
+  await page.locator('.w2-pages').locator(kind === 'page' ? 'section:not([aria-label="Sheets"]) .w2-page-row, section[aria-label="Sheets"] ul ul .w2-page-row' : 'section[aria-label="Sheets"] > ul > li > .w2-page-item > .w2-page-row').filter({ has: page.locator('.w2-page-title', { hasText: new RegExp(`^${holder.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) }).first().click();
   await page.keyboard.press('Escape');
   void index;
 }

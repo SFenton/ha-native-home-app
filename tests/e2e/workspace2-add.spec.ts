@@ -153,7 +153,7 @@ test('Move Up and Move Down each make one undo step', async ({ page }) => {
 
 test('This Page lists the page in order, selects a row on the canvas, and reorders by keyboard', async ({ page }) => {
   await openWorkspace(page);
-  await page.getByRole('button', { name: 'Pages' }).click();
+  await page.locator('.w2-page-button').click();
   await page.getByRole('radio', { name: 'This Page' }).click();
   const list = page.getByTestId('this-page');
   await expect(list).toBeVisible();
