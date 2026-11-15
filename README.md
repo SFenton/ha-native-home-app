@@ -108,11 +108,11 @@ effect. Data an earlier Studio wrote (`draft.json`, `published.json`, `revisions
 `feedback/`) stays on disk, unread. The composition (2.0) draft, publication and
 Home Assistant routes are unchanged.
 
-The 1.0 Styles section went with it. State styles remain in the composition contract and the 2.0 preview draws state tiles, but
-their 2.0 editor has not landed, so a tile's style and overrides are edited only as raw rows under Advanced. Not yet ported: the
+The 1.0 Styles section went with it. State styles remain in the composition contract, the corpus, validation and the shared resolver, but
+the 2.0 preview draws a state tile as a placeholder and their 2.0 editor has not landed, so a tile's style and overrides are edited only as raw rows under Advanced. Not yet ported: the
 style library editor (Duplicate, Rename, Delete, state-map rules, Save as New Style, request-phase settings); the entity picker
 that fills a state map from live states (its `/native/api/ha/*` routes stay, unused); the side-by-side iPhone, Duo and iPad
-style preview; the per-tile override editor; and the Add picker entry for a state tile. See `docs/native-composition.md`.
+style preview and a drawn state tile in the 2.0 preview; the per-tile override editor; and the Add picker entry for a state tile. See `docs/native-composition.md`.
 
 ### House data stays out of the repository
 

@@ -41,7 +41,7 @@ const GENERIC = new Set(["id", "name", "values", "keys", "items", "count", "firs
   "ts", "tsx", "js", "css", "map", "length", "icon", "type", "domain", "style", "entity", "entities", "attributes",
   // SF Symbol names and prose members, not entity ids (`lock.fill`, `lock.open`, `button.action`):
   "fill", "open", "trianglebadge", "crop", "walk", "stop", "2", "max", "action", "children", "items", "label", "source", "error", "props", "click", "focus", "color",
-  "group", "field", "shield", "summary", "assigned", "binding", "slice", "components", "document", "mode", "data", "tasks", "viewer"]);
+  "group", "field", "summary", "assigned", "binding", "slice", "components", "document", "mode", "data", "tasks", "viewer"]);
 const SERVICES = new Set(["turn_on", "turn_off", "toggle", "add_item", "remove_item", "update_item", "install", "reload",
   "volume_up", "volume_down", "volume_set", "send_command", "set_percentage", "mobile_app", "set_value", "open_cover", "close_cover", "lock", "unlock", "press", "select_option", "set_temperature", "set_hvac_mode"]);
 const ALLOWED_WORDS = ["test", "example", "fixture", "sample", "placeholder", "demo"];
@@ -93,6 +93,24 @@ function entityZones(line: string, suffix: string): string[] {
   return zones;
 }
 
+/** The line with string literals and the line comment blanked, so what remains is code. */
+function maskLiterals(line: string): string {
+  const blank = (x: string) => " ".repeat(x.length);
+  const noStrings = line.replace(STRING, blank);
+  const mark = noStrings.search(/(?<!:)\/\/|(?<![\w$])#/);
+  return mark >= 0 ? noStrings.slice(0, mark) + blank(noStrings.slice(mark)) : noStrings;
+}
+
+/** A `.local` match that is a JS or TS property access, not a host: outside strings and comments, a bare identifier (no `-`),
+ * followed by punctuation that ends an expression (a property read of the overlay, in a spread, an argument or an index). Shell,
+ * CSS, JSX text and prose never qualify, and a hyphenated host never does. */
+function isPropertyAccess(m: RegExpMatchArray, masked: string, suffix: string): boolean {
+  if (![".ts", ".tsx", ".js", ".mjs", ".cjs"].includes(suffix) || m[1].includes("-")) return false;
+  const start = m.index ?? 0;
+  if (masked.slice(start, start + m[0].length) !== m[0]) return false;
+  return /^(?:[\]),;:}?]|$)/.test(masked.slice(start + m[0].length)) || masked[start + m[0].length] === ".";
+}
+
 function lineRules(line: string, suffix: string, wholeLine: boolean, allow: Allowlist, path: string): string[] {
   const rules: string[] = [];
   for (const zone of wholeLine ? [line] : entityZones(line, suffix)) {
@@ -101,8 +119,14 @@ function lineRules(line: string, suffix: string, wholeLine: boolean, allow: Allo
       if (m[2] === CSS_CLASS_PREFIX && zone[(m.index ?? 0) + m[0].length] === "-") continue; // a selector such as `button.w2-card`
       if (!entityIsAllowed(m[2])) rules.push("entity");
     }
-    if (!zone.toLowerCase().includes(".local")) continue;
-    for (const m of zone.matchAll(LOCAL_HOST)) if (`${m[1]}.local`.toLowerCase() !== "example.local") rules.push("localhost");
+  }
+  if (line.toLowerCase().includes(".local")) {
+    const masked = wholeLine || !CODE_SUFFIXES.has(suffix) ? line : maskLiterals(line);
+    for (const m of line.matchAll(LOCAL_HOST)) {
+      if (`${m[1]}.local`.toLowerCase() === "example.local") continue;
+      if (!wholeLine && isPropertyAccess(m, masked, suffix)) continue;
+      rules.push("localhost");
+    }
   }
   for (const m of line.matchAll(PRIVATE_IP)) if (!allow.addresses.includes(m[0])) rules.push("ipv4");
   for (const _ of line.matchAll(IPV6_ULA)) rules.push("ipv6");

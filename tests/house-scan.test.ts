@@ -38,13 +38,23 @@ describe('house-data scan', () => {
     expect(rules('a.md', 'the overlay.local[x] map')).toEqual([]);
     expect(rules('a.ts', "const k = { 'chrome-group.placement': 1 };")).toEqual([]);
     expect(rules('a.md', 'the chrome-group.horizontal field')).toEqual([]);
-    expect(rules('a.ts', "const s = 'lock.shield';")).toEqual([]);
+    expect(rules('a.ts', `const o = { ...overlay.${'local'}, a: 1 };`)).toEqual([]);
     expect(rules('a.ts', "const q = 'button.w2-card';")).toEqual([]);
     expect(rules('a.md', 'selector button.w2-card:hover')).toEqual([]);
   });
   it('still fails real house-looking values next to those shapes', () => {
     expect(rules('a.ts', `const h = 'kitchen-hub.${'local'}';`)).toEqual(['localhost']);
     expect(rules('a.ts', `const h = 'kitchen-hub.${'local'}[0]';`)).toEqual([]);
+    expect(rules('a.sh', `curl http://hub-x.${'local'}:8123/api`)).toEqual(['localhost']);
+    expect(rules('a.sh', `HOST=hub-x.${'local'}`)).toEqual(['localhost']);
+    expect(rules('a.sh', `HOST=kitchen.${'local'}`)).toEqual(['localhost']);
+    expect(rules('a.tsx', `<p>Open hub-x.${'local'} now</p>`)).toEqual(['localhost']);
+    expect(rules('a.tsx', `<p>Open kitchen.${'local'} now</p>`)).toEqual(['localhost']);
+    expect(rules('a.ts', `const t = \`\n  http://hub-x.${'local'}/api\n\`;`)).toEqual(['localhost']);
+    expect(rules('a.ts', `  http://hub-x.${'local'}/api`)).toEqual(['localhost']);
+    expect(rules('a.css', `.a { background: url(http://hub-x.${'local'}/i.png); }`)).toEqual(['localhost']);
+    expect(rules('a.ts', `const x = kitchen-hub.${'local'};`)).toEqual(['localhost']);
+    expect(rules('a.md', `the ${'media_player'}.${'shield'} box`)).toEqual(['entity']);
     expect(rules('a.ts', `// ping kitchen-hub.${'local'}`)).toEqual(['localhost']);
     expect(rules('a.md', `ping kitchen-hub.${'local'})`)).toEqual(['localhost']);
     expect(rules('a.ts', `const a = '${'lock'}.front_door';`)).toEqual(['entity']);

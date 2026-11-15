@@ -622,14 +622,14 @@ A tile applies a style by id:
   without the capability keeps the built-in style; a state no rule names resolves to `fallback`.
 - **An unavailable or unknown entity** takes the style's first rule of the `unknown` class, whatever the authored `fallback` says.
   A style with none gets one made for it, as the app does: the node's own icon, the words "Unavailable", unlit, and an untappable
-  copy of the style's first action. The preview (`ruleFor`, `unknownRuleFor`) draws the same.
+  copy of the style's first action. The shared resolver (`ruleFor`, `unknownRuleFor` in `state-style-preview.ts`) resolves the same; the 2.0 preview does not yet draw it.
 - **Built-in styles** (`garage-door`, `lock`, `blind`, `alarm`, `robot`, `detector`, `notice`, `switch`) are data in
   `state-styles.ts` and in `contract/corpus/state-styles/built-in.json`. The app decodes that file and tests it equal to its own
   `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Regenerate with `scripts/generate-state-style-corpus.ts`.
 
 **Authoring.** The 1.0 Styles section is gone with the 1.0 workspace, and the 2.0 editor for state styles has not landed. What
-exists now: the contract and the corpus above (a style library, per-state rules, per-tile overrides), validation, and the 2.0
-preview, which resolves a state the way the app does (`ruleFor`, `unknownRuleFor`) and draws a state tile. A state tile's style
+exists now: the contract and the corpus above (a style library, per-state rules, per-tile overrides), validation, and the shared
+resolver (`state-styles.ts`, `state-style-preview.ts`). The 2.0 preview draws a state tile as a placeholder. A state tile's style
 and overrides are therefore edited only as raw rows under Advanced. Not ported to 2.0 yet:
 
 1. The style library editor: built-ins listed read-only, Duplicate, Rename, Delete (blocked while a tile uses the style), the
@@ -642,6 +642,7 @@ and overrides are therefore edited only as raw rows under Advanced. Not ported t
    VoiceOver value.
 4. The per-tile override editor (icon, text, indicator and colour layers, each with reset).
 5. An Add picker entry that creates a state tile with the built-in style its device class suggests.
+6. A drawn state tile in the 2.0 preview, resolving a state with `ruleFor` and `unknownRuleFor`.
 
 The picker reads Home Assistant through three read-only endpoints (`GET /native/api/ha/entities?domain=`,
 `/native/api/ha/entity-states?entityId=`, `/native/api/ha/exists?id=`) in `server/ha-entities.ts`: the entity list, a domain's states
