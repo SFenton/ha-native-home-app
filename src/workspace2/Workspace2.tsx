@@ -5,6 +5,7 @@ import { useStudioTheme } from './useStudioTheme';
 import { useWorkspace2, type PanelKind } from './useWorkspace2';
 import { ModeSegment, ChecksPill } from './TopBar';
 import AddHost, { useAdd } from './add/AddHost';
+import DragLayer from './dnd/DragLayer';
 import { SHEET_SNAP_EVENT } from './editors/EditorRow';
 import { WorkspaceDataProvider, type CreateFlow } from './pickers/WorkspaceData';
 import TopBar from './TopBar';
@@ -62,7 +63,7 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
   useEffect(() => { if (target) setSnap(SNAP_HALF); }, [target?.kind, ws.selection, ws.panel]);
   // An editor pushed inside the properties sheet takes it to full height, and gives it back to half (spec 5.5).
   useEffect(() => {
-    const listener = (event: Event) => setSnap((event as CustomEvent<'full' | 'half'>).detail === 'full' ? SNAP_FULL : SNAP_HALF);
+    const listener = (event: Event) => { const to = (event as CustomEvent<'full' | 'half' | 'peek'>).detail; setSnap(to === 'full' ? SNAP_FULL : to === 'peek' ? SNAP_PEEK : SNAP_HALF); };
     window.addEventListener(SHEET_SNAP_EVENT, listener);
     return () => window.removeEventListener(SHEET_SNAP_EVENT, listener);
   }, []);
@@ -86,6 +87,7 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
     <ToastHost>
       <WorkspaceDataProvider document={document} house={ws.houseStates.house} environment={ws.houseStates.environment} onCreatePage={onCreatePage} onCreateSheet={onCreateSheet}>
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
+      <DragLayer ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
         dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError} onChecks={() => setChecksOpen(true)}/>
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
@@ -104,6 +106,7 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
       </Drawer.Root>}
       {document && <PublishDialog ws={ws}/>}
       {document && <ConflictDialog ws={ws}/>}
+      </DragLayer>
       </AddHost>
       </WorkspaceDataProvider>
     </ToastHost>
