@@ -5,7 +5,7 @@ import { replaceAt } from '../../composition-editor';
 import { uid } from '../../editor';
 import { updateRoute, usedPaths, words, type AuthoredRoute } from '../../routes-editor';
 import { Field, TextField } from '../../ui';
-import { useRows } from '../rows';
+import { Disclosure, useRows } from '../rows';
 
 /** A path the route list does not use yet, from a page's name: lowercase words joined by dashes, starting with a letter. */
 export function suggestPath(title: string, taken: ReadonlySet<string>): string {
@@ -60,31 +60,31 @@ export function LinkEditor({ index, onBack, onRemoved }: { index: number; onBack
   };
   return <div className="w2-link-editor">
     <button type="button" className="w2-back" onClick={onBack}><ChevronLeft size={16} aria-hidden/>Links</button>
-    <Field label="Path" hint={!validPath ? 'Lowercase letters, numbers and dashes.' : clashes ? `Two links use the path ${route.path}.` : undefined}>
-      <input value={route.path} aria-invalid={!validPath || clashes || undefined} onChange={event => change({ path: event.target.value })}/></Field>
-    <Field label="Tab"><select value={route.tabId ?? ''} onChange={event => {
+    <div className="w2-row"><Field label="Path" hint={!validPath ? 'Lowercase letters, numbers and dashes.' : clashes ? `Two links use the path ${route.path}.` : undefined}>
+      <input value={route.path} aria-invalid={!validPath || clashes || undefined} onChange={event => change({ path: event.target.value })}/></Field></div>
+    <div className="w2-row"><Field label="Tab"><select value={route.tabId ?? ''} onChange={event => {
       const next: Record<string, unknown> = { ...route }; if (event.target.value) next.tabId = event.target.value; else delete next.tabId;
       onChange({ ...document, extensions: { ...extensions, routes: extensions.routes.map((item, at) => at === index ? next as AuthoredRoute : item) } });
     }}>
       <option value="">None</option>
       {document.navigation.tabs.map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
-    </select></Field>
-    {document.modals.length > 0 && <fieldset className="w2-fieldset"><legend>Sheets opened first</legend>
+    </select></Field></div>
+    {document.modals.length > 0 && <Disclosure label="Sheets opened first" summary={opened.size ? String(opened.size) : ''} path="sheets-opened-first">
       {document.modals.map(modal => <label key={modal.id} className="w2-switch-row"><span className="w2-row-label">{modal.title}</span>
         <input type="checkbox" role="switch" checked={opened.has(modal.id)} onChange={event => setSheets(modal.id, event.target.checked)}/></label>)}
-    </fieldset>}
-    <WordsField label="Aliases" value={route.aliases ?? []} onWords={list => change({ aliases: list })}/>
-    <WordsField label="Keywords" value={route.keywords ?? []} onWords={list => change({ keywords: list })}/>
-    <label className="w2-switch-row"><span className="w2-row-label">Siri phrase</span>
-      <input type="checkbox" role="switch" checked={route.siri ?? false} onChange={event => change({ siri: event.target.checked })}/></label>
-    <Field label="Who can see it"><select value={who} onChange={event => {
+    </Disclosure>}
+    <div className="w2-row"><WordsField label="Aliases" value={route.aliases ?? []} onWords={list => change({ aliases: list })}/></div>
+    <div className="w2-row"><WordsField label="Keywords" value={route.keywords ?? []} onWords={list => change({ keywords: list })}/></div>
+    <div className="w2-row"><label className="w2-switch-row"><span className="w2-row-label">Siri phrase</span>
+      <input type="checkbox" role="switch" checked={route.siri ?? false} onChange={event => change({ siri: event.target.checked })}/></label></div>
+    <div className="w2-row"><Field label="Who can see it"><select value={who} onChange={event => {
       const next: Record<string, unknown> = { ...route };
       if (event.target.value === 'admin') next.visibleWhen = { type: 'viewer', isAdmin: true }; else delete next.visibleWhen;
       onChange({ ...document, extensions: { ...extensions, routes: extensions.routes.map((item, at) => at === index ? next as AuthoredRoute : item) } });
     }}>
       <option value="everyone">Everyone</option><option value="admin">An admin</option>
       {who === 'custom' && <option value="custom" disabled>A rule set in the JSON</option>}
-    </select></Field>
+    </select></Field></div>
     <div className="w2-row"><button type="button" className="w2-danger" onClick={() => {
       onChange(replaceAt(document, ['extensions', 'routes'], extensions.routes.filter((_, at) => at !== index)));
       onRemoved();

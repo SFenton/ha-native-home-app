@@ -159,7 +159,6 @@ test('Links: add one from Page settings, edit it, and see it in Project > Links'
   await panel.getByRole('button', { name: 'Links', exact: true }).click();
   await expect(panel.getByRole('button', { name: '/start' })).toBeVisible();
   // Project > Links lists it.
-  await page.getByRole('button', { name: 'Close' }).first().click();
   await page.getByRole('button', { name: 'Project' }).click();
   await page.getByText('Links', { exact: true }).first().click();
   await expect(page.getByRole('button', { name: /\/start/ })).toBeVisible();

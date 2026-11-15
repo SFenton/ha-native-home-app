@@ -125,8 +125,8 @@ describe('windows and the split rule', () => {
     expect(splitGeometry(ipadSideways)).toMatchObject({ hinge: false, band: 1 });
   });
 
-  it('shows the flyout at regular width with no hinge, and the tab bar otherwise', () => {
-    expect(previewWindows.map(win => usesFlyout(win))).toEqual([false, false, false, true, true, true]);
+  it('shows the flyout at regular width with no hinge and no rail (the iPad), and the tab bar or its rail otherwise', () => {
+    expect(previewWindows.map(win => usesFlyout(win))).toEqual([false, false, false, false, true, true]);
     expect(usesFlyout(withPose(duoSideways, 'book'))).toBe(false);
   });
 

@@ -78,7 +78,7 @@ export default function PagesPanel({ document, current, onPick, actions = {} }: 
     {row.children.length > 0 && <ul>{row.children.map(child => render(child, depth + 1, needle))}</ul>}
   </li>;
   const heading = (group: OutlineGroup) => group.id === 'tabs' && actions.onTabs
-    ? <h3 className="w2-group-title"><button type="button" className="w2-group-button w2-group-title" onClick={() => { actions.onTabs?.(); actions.onDismiss?.(); }}>{group.title}</button></h3>
+    ? <h3 className="w2-group-title"><button type="button" className="w2-group-button" onClick={() => { actions.onTabs?.(); actions.onDismiss?.(); }}>{group.title}</button></h3>
     : <h3 className="w2-group-title">{group.title}</h3>;
   const views: PagesView[] = [{
     id: 'pages', title: 'Pages', render: text => {

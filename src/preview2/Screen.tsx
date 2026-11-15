@@ -64,7 +64,7 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
     </div>;
   const hinge = win.hinge;
   return <RenderCtx.Provider value={ctx}><div className="sh-screen" data-sel={`page:${pageId}`} data-covered={nav.sheets.length ? '' : undefined}
-    data-rail={win.rail ? '' : undefined} data-flyout={hasFlyout ? '' : undefined}
+    data-rail={win.rail ? '' : undefined} data-short-bar={win.safeTop < 50 ? '' : undefined} data-flyout={hasFlyout ? '' : undefined}
     style={{ '--sh-safe-top': `${win.safeTop}px`, '--sh-safe-bottom': `${win.safeBottom}px`, '--sh-rail': `${win.rail ?? 0}px` } as React.CSSProperties}>
     <div className="sh-wall" data-background={background.type} aria-hidden="true"/>
     {content}

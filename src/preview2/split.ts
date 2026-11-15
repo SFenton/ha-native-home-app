@@ -41,8 +41,11 @@ export function splitGeometry(win: PreviewWindow): SplitGeometry | undefined {
   return { leading, band: MIDPOINT_BAND, trailing: size.width - MIDPOINT_BAND - leading, hinge: false };
 }
 
-/** Whether the window shows a flyout instead of the tab bar: regular width with no hinge crossing it (`ShellChrome`). */
-export const usesFlyout = (win: PreviewWindow) => isRegularWidth(win.width) && !win.hinge;
+/**
+ * Whether the window shows a flyout instead of the tab bar: regular width with no hinge crossing it (`ShellChrome`). A short
+ * window that turns the tab bar into a rail (the Duo) keeps the rail.
+ */
+export const usesFlyout = (win: PreviewWindow) => isRegularWidth(win.width) && !win.hinge && !win.rail;
 
 /** The Window menu's read-out line: "Split view: off" or "Split view: on, 433 and 434 pt". */
 export function splitReadout(win: PreviewWindow): string {

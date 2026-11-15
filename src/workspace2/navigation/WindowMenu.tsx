@@ -13,13 +13,13 @@ export function WindowMenu({ window: current, onWindow }: { window: PreviewWindo
     <Menu.Trigger className="w2-window-button" aria-label="Window">{windowLabel(current)}<ChevronDown size={14} aria-hidden/></Menu.Trigger>
     <Menu.Portal><Menu.Positioner sideOffset={8} className="w2-positioner"><Menu.Popup className="w2-scope w2-menu w2-window-menu">
       <Menu.RadioGroup value={current.name} onValueChange={name => { const next = previewWindows.find(item => item.name === name); if (next) onWindow(next); }}>
-        {previewWindows.map(item => <Menu.RadioItem key={item.name} value={item.name} className="w2-menu-item">{windowLabel(item)}</Menu.RadioItem>)}
+        {previewWindows.map(item => <Menu.RadioItem key={item.name} value={item.name} className="w2-menu-item" closeOnClick>{windowLabel(item)}</Menu.RadioItem>)}
       </Menu.RadioGroup>
       {canBook(current) && <>
         <Menu.Separator className="w2-menu-sep"/>
         <Menu.RadioGroup value={isBook(current) ? 'book' : 'flat'} onValueChange={pose => onWindow(withPose(current, pose as 'flat' | 'book'))}>
-          <Menu.RadioItem value="flat" className="w2-menu-item">Flat</Menu.RadioItem>
-          <Menu.RadioItem value="book" className="w2-menu-item">Book</Menu.RadioItem>
+          <Menu.RadioItem value="flat" className="w2-menu-item" closeOnClick>Flat</Menu.RadioItem>
+          <Menu.RadioItem value="book" className="w2-menu-item" closeOnClick>Book</Menu.RadioItem>
         </Menu.RadioGroup>
       </>}
       <Menu.Separator className="w2-menu-sep"/>

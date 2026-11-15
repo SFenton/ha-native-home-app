@@ -21,7 +21,7 @@ export function OpenedFrom({ document, kind, id, onGo }: { document: Composition
   const via = document.navigation.tabs.filter(tab => kind === 'page' && tab.pageId === id);
   return <section className="w2-group" aria-label="Opened from"><h3 className="w2-group-title">Opened from</h3>
     {links.length + via.length === 0 ? <p className="w2-caption">{kind === 'page' ? 'Nothing opens this page.' : 'Nothing opens this sheet.'}</p>
-      : <ul>
+      : <ul className="w2-move-list">
         {via.map(tab => <li key={tab.id}><button type="button" className="w2-link-row" onClick={() => onGo(`page:${id}`)}><span>{tab.label}</span><span className="w2-page-via">Tab</span><ChevronRight size={16} aria-hidden/></button></li>)}
         {links.map((link, at) => <li key={at}><button type="button" className="w2-link-row" onClick={() => onGo(link.holder ? `node:${link.holder.id}` : `${link.from.kind}:${link.from.id}`)}>
           <span>{link.holder?.title ?? surfaces.find(item => item.id === link.from.id)?.title}</span><span className="w2-page-via">{surfaces.find(item => item.id === link.from.id)?.title}</span><ChevronRight size={16} aria-hidden/></button></li>)}
@@ -48,19 +48,13 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
   const push = usePush();
   const surface = valueAt(document, path) as Page & Modal;
   const owner = kind === 'page' ? 'page' : 'sheet';
-  const skip = (at: EditorPath) => at.at(-1) === 'components';
+  const skip = (at: EditorPath) => at.at(-1) === 'components' || (kind === 'page' && at.at(-1) === 'navigation');
   const set = (at: EditorPath, value: Json) => onChange(replaceAt(document, at, value));
   const options = fieldOptions(owner, path);
   const columns = kind === 'page' && surface.navigation.type === 'navigation-columns';
   const presentation = kind === 'modal' ? surface.presentation : undefined;
   const setPresentation = (patch: Record<string, Json>) => set([...path, 'presentation'], { ...presentation, ...patch } as unknown as Json);
   const overrides: Record<string, RowOverride> = kind === 'page' ? {
-    navigation: ({ path: at }) => <>
-      <SwitchRow label="Open pages beside this one" path={`${at.join('/')}/type`} checked={columns} caption="Used when the window is wide enough for two."
-        onChange={on => set(at, on ? { type: 'navigation-columns', placeholder: 'Select an item', standalone: false } : { type: 'stack' })}/>
-      {columns && <CompositionFields schema={{ type: 'string', maxLength: 240 }} value={(surface.navigation as { placeholder: string }).placeholder} path={[...at, 'placeholder']}
-        label="Empty side text" document={document} onChange={onChange} onError={ws.studio.setError} options={options}/>}
-    </>,
     toolbar: ({ path: at }) => {
       const custom = surface.toolbar.type === 'replace';
       return <>
@@ -86,6 +80,12 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
     'presentation.fullScreen': ({ path: at }) => <SwitchRow label="Full screen" path={at.join('/')} checked={Boolean(presentation?.fullScreen)}
       onChange={on => setPresentation(on ? { fullScreen: true, adaptive: false, height: { type: 'full' } } : { fullScreen: false })}/>,
   };
+  const navigationRows = kind === 'page' ? <>
+    <SwitchRow label="Open pages beside this one" path={[...path, 'navigation', 'type'].join('/')} checked={columns} caption="Used when the window is wide enough for two."
+      onChange={on => set([...path, 'navigation'], on ? { type: 'navigation-columns', placeholder: 'Select an item', standalone: false } : { type: 'stack' })}/>
+    {columns && <CompositionFields schema={{ type: 'string', maxLength: 240 }} value={(surface.navigation as { placeholder: string }).placeholder} path={[...path, 'navigation', 'placeholder']}
+      label="Empty side text" document={document} onChange={onChange} onError={ws.studio.setError} options={options}/>}
+  </> : undefined;
   const routes = (document.extensions?.routes ?? []).filter(route => route.pageId === surface.id);
   const advancedExtra = columns ? <>
     {(['onDemand', 'standalone'] as const).map(name => <div className="w2-row" key={name}><CompositionFields schema={{ type: 'boolean' }} value={Boolean((surface.navigation as unknown as Record<string, Json>)[name])}
@@ -93,7 +93,7 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
   </> : kind === 'modal' && surface.presentation.height.type === 'fitted' ? <div className="w2-row"><CompositionFields schema={{ enum: ['root', 'top-page'] }} value={surface.presentation.height.follows}
     path={[...path, 'presentation', 'height', 'follows']} label="Fit to" document={document} onChange={onChange} onError={ws.studio.setError} options={fieldOptions('sheet', path)}/></div> : undefined;
   return <>
-    <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']}/>
+    <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']} extra={{ look: navigationRows }}/>
     {kind === 'page' && <section className="w2-group"><button type="button" className="w2-disclosure-head" onClick={() => push?.push({
       title: 'Links', body: <LinksList pageId={surface.id}/>,
     })}><span className="w2-row-label">Opens from outside the app</span><span className="w2-summary">{routes.length}</span><ChevronRight size={16} aria-hidden/></button></section>}
