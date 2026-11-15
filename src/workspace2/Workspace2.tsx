@@ -4,6 +4,8 @@ import Preview2, { previewWindows, type PreviewWindow } from './preview';
 import { useStudioTheme } from './useStudioTheme';
 import { useWorkspace2, type PanelKind } from './useWorkspace2';
 import { ModeSegment, ChecksPill } from './TopBar';
+import AddHost, { useAdd } from './add/AddHost';
+import { WorkspaceDataProvider, type CreateFlow } from './pickers/WorkspaceData';
 import TopBar from './TopBar';
 import PropertiesPanel from './PropertiesPanel';
 import HandleSlot from './HandleSlot';
@@ -33,11 +35,17 @@ function CanvasState({ loading, error, onRetry }: { loading: boolean; error: str
   return <div className="w2-state" role="alert"><h2>Couldn’t load the draft.</h2><p className="w2-state-reason">{error}</p><button type="button" onClick={onRetry}>Try Again</button></div>;
 }
 
+/** The narrow bottom bar's Add: after the selection, else at the end of the page being shown (spec 5.4). */
+function BottomAdd() {
+  const add = useAdd();
+  return <button type="button" className="w2-bottom-add" onClick={event => add?.openDefault(event.currentTarget)}>Add</button>;
+}
+
 /**
  * The 2.0 workspace, direction A "Preview first" (spec `studio-ux`): the preview is the workspace, and everything else is
  * asked for. `onLegacy` switches to the 1.0 editor.
  */
-export default function Workspace2({ active, onLegacy }: { active: boolean; onLegacy: () => void }) {
+export default function Workspace2({ active, onLegacy, onCreatePage, onCreateSheet }: { active: boolean; onLegacy: () => void; /** Start the page or sheet creation flow from a picker's "New Page…" or "New Sheet…" row; the row is hidden when absent. */ onCreatePage?: CreateFlow; onCreateSheet?: CreateFlow }) {
   const theme = useStudioTheme(active);
   const ws = useWorkspace2(active);
   const narrow = useNarrow();
@@ -69,6 +77,8 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
     <ToastHost>
+      <WorkspaceDataProvider document={document} house={ws.houseStates.house} onCreatePage={onCreatePage} onCreateSheet={onCreateSheet}>
+      <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
         dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError} onChecks={() => setChecksOpen(true)}/>
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
@@ -77,7 +87,7 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
         {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave}/></div>}
         {!narrow && properties && <aside className="w2-card" aria-label="Properties">{properties}</aside>}
       </main>
-      {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/></nav>}
+      {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/>{ws.mode === 'edit' && <BottomAdd/>}</nav>}
       {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={next => setSnap(next)}
         onOpenChange={open => { if (!open) close(); }}>
         <Drawer.Portal><Drawer.Viewport className="w2-props-viewport"><Drawer.Popup className="w2-scope w2-sheet w2-props-sheet" aria-label="Properties">
@@ -87,6 +97,8 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
       </Drawer.Root>}
       {document && <PublishDialog ws={ws}/>}
       {document && <ConflictDialog ws={ws}/>}
+      </AddHost>
+      </WorkspaceDataProvider>
     </ToastHost>
   </div>;
 }

@@ -93,11 +93,11 @@ describe('action model', () => {
     expect(call).toMatchObject({ target: { entity_id: { type: 'literal', value: 'light.a' } } });
     call = withTargetEntities(call, ['light.a', 'light.b']) as typeof call;
     expect(targetEntities(call)).toEqual(['light.a', 'light.b']);
-    expect(withTargetEntities(call, []).target).toBeUndefined();
+    expect((withTargetEntities(call, []) as { target?: unknown }).target).toBeUndefined();
     const withField = withDataField(call, 'brightness', { type: 'literal', value: 120 });
     expect(dataOf(withField).brightness).toEqual({ type: 'literal', value: 120 });
     expect(withDataField(withField, 'brightness', undefined).data).toBeUndefined();
-    expect(withService(call, 'switch', 'toggle')).toMatchObject({ domain: 'switch', service: 'toggle', target: call.target });
+    expect(withService(call, 'switch', 'toggle')).toMatchObject({ domain: 'switch', service: 'toggle', target: { entity_id: { value: ['light.a', 'light.b'] } } });
   });
   it('names the source of a value and converts between sources', () => {
     expect(sourceOf({ type: 'literal', value: 1 })).toBe('fixed');

@@ -3,6 +3,7 @@ import type { CompositionDocument, CompositionGroups } from '../shared/compositi
 import { HeaderBar } from './Chrome';
 import { Children } from './nodes/Children';
 import { points, useSourceText } from './nodes/shared';
+import { useRender } from './render-context';
 
 type Surface = CompositionDocument['pages'][number] | CompositionDocument['modals'][number];
 
@@ -26,6 +27,7 @@ export interface PageBodyProps {
 /** The scroller of a page or sheet: the title, then the surface's nodes in its column layout. */
 export function PageBody({ surface, largeTitle, scrollToTop = 0 }: PageBodyProps) {
   const scroller = useRef<HTMLDivElement>(null);
+  const { mode } = useRender();
   const title = useSourceText(surface.titleSourceId, surface.title);
   useEffect(() => {
     if (scrollToTop > 0) scroller.current?.scrollTo({ top: 0, behavior: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -39,7 +41,7 @@ export function PageBody({ surface, largeTitle, scrollToTop = 0 }: PageBodyProps
   return <div ref={scroller} className="sh-scroll" onScroll={event => { const page = event.currentTarget.closest<HTMLElement>('.sh-page, .sh-sheet'); if (page) setProgress(page, event.currentTarget.scrollTop); }}>
     <div className="sh-column" style={column}>
       {largeTitle && <h1 className="sh-large-title">{title.state === 'ready' && title.text ? title.text : surface.title}</h1>}
-      {surface.components.length ? <Children nodes={surface.components}/> : <p className="sh-empty">Nothing on this page yet.</p>}
+      {surface.components.length ? <Children nodes={surface.components} owner={`${'presentation' in surface ? 'modal' : 'page'}:${surface.id}`}/> : <><p className="sh-empty">Nothing on this page yet.</p>{mode === 'edit' && <div className="sh-add-slot" data-add-for={`${'presentation' in surface ? 'modal' : 'page'}:${surface.id}`}/>}</>}
     </div>
   </div>;
 }

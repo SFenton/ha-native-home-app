@@ -1,6 +1,8 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Plus } from 'lucide-react';
+import { useAdd } from './add/AddHost';
+import { after } from './add/insert';
 import { NodeMenu } from './PropertiesPanel';
 import { moveNodeBy } from './nodeActions';
 import type { Workspace2 } from './useWorkspace2';
@@ -30,6 +32,7 @@ function useSlot(stage: HTMLElement | null, key: string | undefined): HTMLElemen
 export default function HandleSlot({ ws, stage, onError }: { ws: Workspace2; stage: HTMLElement | null; onError: (message: string) => void }) {
   const key = ws.mode === 'edit' && ws.target?.kind === 'node' ? ws.target.key : undefined;
   const slot = useSlot(stage, key);
+  const add = useAdd();
   const entry = key ? ws.index?.get(key) : undefined;
   if (!slot || !key || !entry?.node || !ws.document) return null;
   const move = (event: KeyboardEvent) => {
@@ -39,6 +42,7 @@ export default function HandleSlot({ ws, stage, onError }: { ws: Workspace2; sta
   };
   return createPortal(<div className="w2-handle" data-testid="node-handle">
     <button type="button" className="w2-handle-grip" aria-label="Move" title="Move" onKeyDown={move}><GripVertical size={16} aria-hidden/></button>
+    <button type="button" className="w2-handle-add" aria-label={`Add after ${entry.node.title}`} title="Add" onClick={event => { const destination = after(ws.document!, key); if (destination) add?.open(destination, event.currentTarget); }}><Plus size={16} aria-hidden/></button>
     <NodeMenu ws={ws} path={entry.path} selectionKey={key} onError={onError} className="w2-handle-more"/>
   </div>, slot);
 }

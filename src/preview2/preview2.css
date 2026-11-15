@@ -72,6 +72,8 @@
   [data-selected] { position: relative; }
   [data-selected]::after { content: ''; position: absolute; inset: -6px; border: 3px solid var(--sel); border-radius: var(--ring-r, 24px); box-shadow: 0 0 0 1px #fff; pointer-events: none; z-index: 6; }
   .sh-sheet[data-selected]::after { inset: 0; border-radius: 38px 38px 0 0; }
+  .sh-add-slot { grid-column: 1 / -1; min-width: 0; display: flex; justify-content: center; }
+  .sh-add-slot:empty { display: none; }
   .sh-handle-slot { position: absolute; top: -20px; right: -6px; min-width: 88px; height: 32px; z-index: 7; display: flex; justify-content: flex-end; align-items: center; }
   .sh-handle-slot:empty { pointer-events: none; }
   .sh-node[data-hidden] { outline: 1.5px dashed rgba(255, 255, 255, .55); outline-offset: 2px; border-radius: 22px; }

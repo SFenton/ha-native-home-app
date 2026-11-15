@@ -10,6 +10,8 @@ import { fieldOptions, ObjectRows, RowsProvider, useRows, type RowOverride } fro
 import { PushStack, Tag, usePush } from './kit';
 import { HeaderPanel, TabsPanel, WallpaperPanel } from './panels';
 import { collectLinks } from './outline';
+import { useAdd } from './add/AddHost';
+import { after } from './add/insert';
 import { deleteNode, duplicateNode, moveNodeBy, moveNodeTo, moveTargets } from './nodeActions';
 import { copyText, typeName } from './util';
 import { toastManager } from './toasts';
@@ -140,9 +142,11 @@ export function NodeMenu({ ws, path, selectionKey, onError, onMoveTo, className 
   const index = ws.index!;
   const position = Number(path.at(-1)), siblings = (valueAt(document, path.slice(0, -1)) as unknown[]).length;
   const run = (operation: () => void) => { try { operation(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
+  const add = useAdd();
   return <Menu.Root open={open} onOpenChange={setOpen}>
     <Menu.Trigger className={className} aria-label="More"><MoreHorizontal size={18} aria-hidden/></Menu.Trigger>
     <Menu.Portal><Menu.Positioner sideOffset={6} align="end" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu">
+      {add && <Menu.Item className="w2-menu-item" onClick={() => { const destination = after(document, selectionKey); if (destination) add.open(destination); }}>Add After…</Menu.Item>}
       <Menu.Item className="w2-menu-item" onClick={() => run(() => {
         const copy = duplicateNode(document, path); ws.studio.apply(copy.document);
         const key = buildDocumentIndex(copy.document).keyAt(copy.path); if (key) ws.select(key);
