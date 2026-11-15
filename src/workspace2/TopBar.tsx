@@ -1,11 +1,12 @@
-import { Menu } from '@base-ui/react/menu';
 import { AlertTriangle, CheckCircle2, ChevronDown, Redo2, Undo2 } from 'lucide-react';
 import { Icon } from '../ui';
 import { Overlay, PushStack, Tag } from './kit';
 import PagesPanel from './PagesPanel';
 import ChecksPanel from './ChecksPanel';
-import ProjectMenu, { windowLabel } from './ProjectMenu';
-import { previewWindows, type PreviewWindow } from './preview';
+import ProjectMenu from './ProjectMenu';
+import type { PreviewWindow } from './preview';
+import { NavigationHost } from './navigation/NavigationDialogs';
+import { WindowMenu } from './navigation/WindowMenu';
 import type { DialogKey } from './projectDialogs';
 import type { PanelKind, Workspace2 } from './useWorkspace2';
 
@@ -52,18 +53,12 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
     {!narrow && <span className="w2-wordmark">S+H Studio</span>}
     <Overlay narrow={narrow} open={pagesOpen} onOpenChange={onPagesOpen} trigger={pageTrigger} label="Pages" popupWidth={320} fullHeight className="w2-pages-pop">
       <PushStack rootTitle="Pages" rootHeader={narrow ? <div className="w2-sheet-bar"><h2 className="w2-sheet-title">Pages</h2><button type="button" onClick={() => onPagesOpen(false)}>Done</button></div> : undefined}
-        root={<PagesPanel document={document} current={surface} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}/>}/>
+        root={<PagesPanel document={document} current={surface} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}
+          actions={{ onDismiss: () => onPagesOpen(false), onSettings: next => ws.selectAnywhere(`${next.kind}:${next.id}`), onTabs: () => onPanel('tabs'), onChange: ws.studio.apply, onShow: next => { ws.setSurface(next); ws.select(undefined); } }}/>}/>
     </Overlay>
     {!narrow && <div className="w2-center">
       <ModeSegment mode={ws.mode} onChange={ws.setMode}/>
-      <Menu.Root>
-        <Menu.Trigger className="w2-window-button" aria-label="Window">{windowLabel(current)}<ChevronDown size={14} aria-hidden/></Menu.Trigger>
-        <Menu.Portal><Menu.Positioner sideOffset={8} className="w2-positioner"><Menu.Popup className="w2-scope w2-menu">
-          <Menu.RadioGroup value={current.name} onValueChange={name => { const next = previewWindows.find(item => item.name === name); if (next) onWindow(next); }}>
-            {previewWindows.map(item => <Menu.RadioItem key={item.name} value={item.name} className="w2-menu-item">{windowLabel(item)}</Menu.RadioItem>)}
-          </Menu.RadioGroup>
-        </Menu.Popup></Menu.Positioner></Menu.Portal>
-      </Menu.Root>
+      <WindowMenu window={current} onWindow={onWindow}/>
     </div>}
     <div className="w2-trailing">
       <button type="button" className="w2-icon-button" aria-label="Undo" disabled={!ws.studio.canUndo} onClick={ws.studio.undo}><Undo2 size={18} aria-hidden/></button>
@@ -75,5 +70,6 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
         open={projectOpen} onOpenChange={onProjectOpen} dialog={dialog} onDialog={onDialog}/>
     </div>
     {narrow && tag('w2-status-narrow')}
+    <NavigationHost ws={ws}/>
   </header>;
 }

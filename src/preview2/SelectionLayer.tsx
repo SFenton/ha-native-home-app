@@ -39,7 +39,7 @@ export interface SelectionLayerProps {
 export function SelectionLayer({ mode, index, selection, onSelect, onTab, children }: SelectionLayerProps) {
   const root = useRef<HTMLDivElement>(null);
   const click = (event: MouseEvent) => {
-    if (mode !== 'edit' || (event.target instanceof Element && event.target.closest('.sh-handle-slot'))) return;
+    if (mode !== 'edit' || (event.target instanceof Element && event.target.closest('.sh-handle-slot, [data-passthrough]'))) return;
     event.preventDefault();
     event.stopPropagation();
     const key = selectionKeyAt(event.target);

@@ -21,6 +21,8 @@ export interface RenderContext {
   store: SelectionStore;
   /** The last answer of each node's rule, so `keep` repeats it while the data is unknown. */
   previous: Map<string, boolean>;
+  /** Set when the window shows the iPad flyout instead of the tab bar; the header's menu button toggles it. */
+  flyout?: { open: boolean; toggle(): void };
 }
 
 export const RenderCtx = createContext<RenderContext | undefined>(undefined);

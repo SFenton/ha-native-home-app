@@ -1,4 +1,4 @@
-import { ChevronLeft, X } from 'lucide-react';
+import { ChevronLeft, Menu, X } from 'lucide-react';
 import type { CompositionAction, CompositionDocument, CompositionGroups } from '../shared/composition/schema';
 import { isShown, type VisibilityRule } from './evaluate';
 import type { SelectionKey } from './model';
@@ -19,7 +19,8 @@ function Circle({ selKey, label, icon, action, className = '' }: { selKey?: Sele
 
 /** The two buttons of the app's `shell-header` item: Quick Links, then Profile. */
 function ItemView({ item, root }: { item: Item; root: boolean }) {
-  if (item.type === 'shell-menu') return root ? <Circle selKey={`chrome-item:${item.id}`} label={item.label} icon={item.icon.name}/> : null;
+  const ctx = useRender();
+  if (item.type === 'shell-menu') return root && !ctx.flyout ? <Circle selKey={`chrome-item:${item.id}`} label={item.label} icon={item.icon.name}/> : null;
   if (item.visibility === 'root-only' && !root) return null;
   if (item.type === 'button') return <Circle selKey={`chrome-item:${item.id}`} label={item.label} icon={item.icon.name} action={item.action}/>;
   return <>
@@ -37,17 +38,21 @@ export interface HeaderBarProps {
   onBack?: () => void;
   /** The inline title that fades in as the large title scrolls away. */
   title: string;
+  /** The detail pane of a split: no back button, no flyout button. */
+  detail?: boolean;
 }
 /**
  * The page header: transparent over the wallpaper, leading and trailing glass buttons from the chrome groups, a back button
  * on a pushed page, and the inline title that replaces the large one once the page scrolls (`--sh-progress`).
  */
-export function HeaderBar({ groups, root, onBack, title }: HeaderBarProps) {
+export function HeaderBar({ groups, root, onBack, title, detail }: HeaderBarProps) {
   const ctx = useRender();
   const render = (placement: 'leading' | 'trailing') => groups.filter(group => group.placement === placement).map(group =>
     <div key={group.id} className={`sh-group ${group.horizontal === 'shared@1' ? 'sh-shared' : 'sh-separate'}`}>{group.items.map(item => <ItemView key={item.id} item={item} root={root}/>)}</div>);
   return <header className="sh-header">
-    <div className="sh-bar-side">{!root && <button type="button" className="sh-circle" aria-label="Back" title="Back" onClick={() => { if (ctx.mode === 'use') onBack?.(); }}><ChevronLeft size={22}/></button>}{render('leading')}</div>
+    <div className="sh-bar-side">
+      {root && !detail && ctx.flyout && <button type="button" className="sh-circle" aria-label="Menu" title="Menu" data-passthrough="" aria-expanded={ctx.flyout.open} onClick={ctx.flyout.toggle}><Menu size={20}/></button>}
+      {!root && !detail && <button type="button" className="sh-circle" aria-label="Back" title="Back" onClick={() => { if (ctx.mode === 'use') onBack?.(); }}><ChevronLeft size={22}/></button>}{render('leading')}</div>
     <h2 className="sh-inline-title" aria-hidden="true">{title}</h2>
     <div className="sh-bar-side sh-trailing">{render('trailing')}</div>
   </header>;
@@ -62,7 +67,21 @@ export function TabBar({ document, tabId }: { document: CompositionDocument; tab
     {tabs.map(tab => <TabButton key={tab.id} tab={tab} selected={tab.id === tabId} ctx={ctx}/>)}
   </nav>;
 }
-function TabButton({ tab, selected, ctx }: { tab: CompositionDocument['navigation']['tabs'][number]; selected: boolean; ctx: ReturnType<typeof useRender> }) {
+/**
+ * The iPad flyout (regular width with no hinge): the tabs as a 300 pt glass panel from the leading edge, opened by the
+ * header's menu button, in place of the tab bar. Its rows are the same tabs, so Edit still selects them.
+ */
+export function Flyout({ document, tabId, open, onClose }: { document: CompositionDocument; tabId?: string; open: boolean; onClose: () => void }) {
+  const ctx = useRender();
+  const tabs = document.navigation.tabs;
+  return <div className="sh-flyout-layer" data-open={open ? '' : undefined} inert={!open || undefined}>
+    <div className="sh-flyout-scrim" data-passthrough="" onClick={onClose}/>
+    <nav className="sh-flyout" aria-label="Tabs">
+      {tabs.map(tab => <TabButton key={tab.id} tab={tab} selected={tab.id === tabId} ctx={ctx} onPicked={onClose}/>)}
+    </nav>
+  </div>;
+}
+function TabButton({ tab, selected, ctx, onPicked }: { tab: CompositionDocument['navigation']['tabs'][number]; selected: boolean; ctx: ReturnType<typeof useRender>; onPicked?: () => void }) {
   const key: SelectionKey = `tab:${tab.id}`;
   const picked = useIsSelected(ctx.store, key);
   const visible = isShown(tab as VisibilityRule, ctx.env, ctx.previous.get(key));
@@ -70,7 +89,7 @@ function TabButton({ tab, selected, ctx }: { tab: CompositionDocument['navigatio
   if (!visible && ctx.mode === 'use') return null;
   return <button type="button" className="sh-tab" aria-current={selected ? 'page' : undefined} data-sel={key} data-active={selected ? '' : undefined}
     data-selected={picked && ctx.mode === 'edit' ? '' : undefined} data-hidden={!visible ? '' : undefined}
-    onClick={() => { if (ctx.mode === 'use') ctx.run({ type: 'select-tab', tabId: tab.id }); }}>
+    onClick={() => { if (ctx.mode === 'use') ctx.run({ type: 'select-tab', tabId: tab.id }); onPicked?.(); }}>
     <GlyphByName name={tab.icon.name} size={22}/><span>{tab.label}</span>
   </button>;
 }

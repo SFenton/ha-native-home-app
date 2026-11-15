@@ -230,7 +230,7 @@ test('every surface speaks the new vocabulary and nothing from the cut list', as
   await page.getByRole('button', { name: 'Advanced' }).click(); await check('page advanced');
   await page.locator('.w2-back').click();
   await page.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Pages' }).click(); await check('pages');
+  await page.getByRole('button', { name: 'Pages' }).first().click(); await check('pages');
   await page.keyboard.press('Escape');
   await page.getByTestId('checks-pill').click(); await check('checks');
   await page.keyboard.press('Escape');
@@ -268,14 +268,14 @@ test('the Project menu, Pages and the tab panel work at both sizes', async ({ pa
   await stubPublication(page);
   await openWorkspace(page);
   const tag = isPhone(page) ? 'phone' : 'desktop';
-  await page.getByRole('button', { name: 'Pages' }).click();
+  await page.getByRole('button', { name: 'Pages' }).first().click();
   const pages = page.locator('.w2-pages');
   await expect(pages.getByRole('button', { name: 'Security' }).first()).toBeVisible();
   await snap(page, `${tag}-pages`);
   await page.getByRole('searchbox', { name: 'Find a page' }).fill('climate');
   await expect(page.getByText('No pages match.')).toHaveCount(0);
   await pages.getByRole('button', { name: 'Climate' }).first().click();
-  await expect(page.getByRole('button', { name: 'Pages' })).toContainText('Climate');
+  await expect(page.getByRole('button', { name: 'Pages' }).first()).toContainText('Climate');
   await page.getByRole('button', { name: 'Project' }).click();
   await snap(page, `${tag}-project`);
   await page.getByText('Tabs', { exact: true }).first().click();

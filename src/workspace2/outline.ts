@@ -1,4 +1,5 @@
 import type { CompositionDocument } from '../shared/composition/schema';
+import { tabGroups } from './capacity';
 import { buildDocumentIndex, selectionKey, type DocumentIndex, type SelectionKey } from '../preview2/model';
 
 /** A page or sheet. */
@@ -80,7 +81,7 @@ export function buildOutline(document: CompositionDocument): Outline {
     if (built) tabRows.push(built);
   });
   const groups: OutlineGroup[] = [];
-  if (tabRows.length) groups.push({ id: 'tabs', title: `Tabs · ${document.navigation.tabs.length} of 5`, rows: tabRows });
+  if (tabRows.length) groups.push({ id: 'tabs', title: `Tabs · ${document.navigation.tabs.length} of ${tabGroups[0].capacity ?? 5}`, rows: tabRows });
   else {
     const start = row(document.navigation.initialPageId, 'start');
     if (start) groups.push({ id: 'start', title: 'Start', rows: [start] });

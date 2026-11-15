@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
+import { Layers } from 'lucide-react';
 import Preview2, { previewWindows, type PreviewWindow } from './preview';
 import { useStudioTheme } from './useStudioTheme';
 import { useWorkspace2, type PanelKind } from './useWorkspace2';
@@ -77,7 +78,8 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
         {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave}/></div>}
         {!narrow && properties && <aside className="w2-card" aria-label="Properties">{properties}</aside>}
       </main>
-      {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/></nav>}
+      {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/>
+        <button type="button" className="w2-bottom-pages" aria-label="Pages" onClick={() => setPagesOpen(true)}><Layers size={16} aria-hidden/>Pages</button></nav>}
       {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={next => setSnap(next)}
         onOpenChange={open => { if (!open) close(); }}>
         <Drawer.Portal><Drawer.Viewport className="w2-props-viewport"><Drawer.Popup className="w2-scope w2-sheet w2-props-sheet" aria-label="Properties" style={{ '--w2-sheet-hidden': `${Math.max(0, window.innerHeight - coverage(snap))}px` } as CSSProperties}>
