@@ -483,6 +483,59 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       expect(isLoopbackHost('10.0.0.1')).toBe(false);
     });
   });
+  describe('DNS rebinding guard', () => {
+    /** Sends a raw request so the Host header is exactly what a rebound page would carry. */
+    function withHost(base: string, host: string, endpoint: string, method = 'GET', body?: unknown, headers: Record<string, string> = {}) {
+      return new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const payload = body === undefined ? undefined : JSON.stringify(body);
+        const url = new URL(endpoint, base);
+        const req = http.request({ host: url.hostname, port: url.port, path: url.pathname, method, headers: { Host: host, ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}), ...headers } }, (res) => {
+          let text = '';
+          res.on('data', (chunk) => { text += chunk; });
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, body: text }));
+        });
+        req.on('error', reject);
+        req.end(payload);
+      });
+    }
+    for (const credentials of [false, true]) {
+      it(`refuses a foreign Host on every route in local development ${credentials ? 'with' : 'without'} HA credentials`, async () => {
+        const { base, store } = await fixture(credentials ? { haUrl: 'http://127.0.0.1:9', haToken: 'test-backend-only-credential' } : {});
+        const draft = store.native.getDraft();
+        for (const host of ['evil.example', 'evil.example:4800', 'localhost.evil.example', 'x.ts.net.evil.example']) {
+          for (const [endpoint, method, body] of [
+            ['/native/api/draft', 'GET', undefined], ['/api/native-home', 'GET', undefined], ['/native/api/ha/services', 'GET', undefined],
+            ['/native/api/draft', 'PUT', { document: draft.document, expectedRevision: draft.revision }],
+            ['/native/api/ha/publish', 'POST', { expectedRevision: draft.revision }], ['/native/api/ha/rollback', 'POST', { revision: 1 }],
+          ] as const) {
+            const response = await withHost(base, host, endpoint, method, body, method === 'GET' ? {} : { Origin: `http://${host}` });
+            expect([host, endpoint, response.status]).toEqual([host, endpoint, 403]);
+            expect(response.body).toBe('');
+          }
+        }
+        expect((await withHost(base, 'evil.example', '/native/api/draft')).status).toBe(403);
+        expect(store.native.getDraft().revision).toBe(draft.revision);
+      });
+    }
+    it('lets loopback names, IP literals, Tailscale names and STUDIO_ALLOWED_HOSTS entries through', async () => {
+      const previous = process.env.STUDIO_ALLOWED_HOSTS;
+      process.env.STUDIO_ALLOWED_HOSTS = 'studio.lan';
+      cleanup.push(async () => { if (previous === undefined) delete process.env.STUDIO_ALLOWED_HOSTS; else process.env.STUDIO_ALLOWED_HOSTS = previous; });
+      const { base } = await fixture();
+      for (const host of ['localhost', 'localhost:4800', '127.0.0.1:4800', '[::1]:4800', '192.168.1.20:4800', 'mac.tail1234.ts.net', 'mac.tail1234.ts.net:4800', 'studio.lan:4800']) {
+        expect([host, (await withHost(base, host, '/native/api/draft')).status]).toEqual([host, 200]);
+      }
+    });
+    it('keeps a verified Ingress proxy and token-protected production working with a forwarded Host', async () => {
+      const ingress = { 'X-Ingress-Path': '/api/hassio_ingress/native-test', 'X-Remote-User-Id': 'test-admin', 'X-Remote-User-Groups': 'system-admin' };
+      const viaIngress = await fixture({ production: true, ingress: { proxyAddress: '127.0.0.1', path: '/api/hassio_ingress/native-test' } });
+      expect((await withHost(viaIngress.base, 'ha.example.org', '/native/api/draft', 'GET', undefined, { ...ingress, 'X-Forwarded-Host': 'ha.example.org' })).status).toBe(200);
+      expect((await withHost(viaIngress.base, 'ha.example.org', '/native/api/draft')).status).toBe(401);
+      const token = 'a-long-test-token-not-a-real-secret';
+      const tokened = await fixture({ authToken: token });
+      expect((await withHost(tokened.base, 'studio.example.org', '/native/api/draft', 'GET', undefined, { Authorization: `Bearer ${token}` })).status).toBe(200);
+    });
+  });
   it('protects reads and writes with a token, supports HttpOnly authoring sessions, and does not leak the token', async () => {
     const token = 'a-long-test-token-not-a-real-secret';
     const { request, base } = await fixture({ production: true, authToken: token });

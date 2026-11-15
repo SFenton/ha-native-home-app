@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod/v4';
+import { buildAllowedHosts, isAllowedHostHeader } from './allowed-hosts';
 import { isLoopbackHost, localDevelopment, type ServerConfig } from './config';
 import { HomeAssistantClient } from './ha';
 import { HttpError, StudioStore } from './store';
@@ -56,8 +57,15 @@ export function createApp(store: StudioStore, config: ServerConfig) {
       (cookie && (sessions.get(cookie) ?? 0) > Date.now()) || validIngress(req, config));
   };
   let stopping = false;
+  const allowedHosts = buildAllowedHosts();
   app.disable('x-powered-by');
   app.set('trust proxy', false);
+  // Local development has no sign-in, so a rebound hostname (DNS rebinding) must not reach any route. A verified Ingress
+  // proxy peer is exempt (its Host is the Home Assistant frontend); every other mode authenticates instead.
+  app.use((req, res, next) => {
+    if (localDev && !validIngress(req, config) && !isAllowedHostHeader(req.get('host'), allowedHosts)) { res.status(403).end(); return; }
+    next();
+  });
   app.use((req, res, next) => {
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
     if (stopping) { res.status(503).json({ error: 'Server is shutting down' }); return; }
