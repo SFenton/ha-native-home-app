@@ -1,0 +1,39 @@
+Lights
+Status chip · Home › Status
+Title
+Icon
+Light bulb
+Entity
+Home status · lights
+Width
+By state
+1
+Fill
+Standard
+Announce changes
+None
+Value change
+Behaviour
+When tapped
+Opens Lights
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Lights
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Glyph
+Add
+
+[names]
+Add While the state is unknown
+Add Glyph

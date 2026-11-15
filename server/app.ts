@@ -1,13 +1,10 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { once } from 'node:events';
-import { stringify } from 'yaml';
 import { z } from 'zod/v4';
-import { actionSchema, assertJsonBounds, DocumentValidationError, MAX_DOCUMENT_BYTES, studioDocumentSchema, validateDocument } from '../src/shared/schema';
-import type { ServerConfig } from './config';
+import { buildAllowedHosts, isAllowedHostHeader } from './allowed-hosts';
+import { isLoopbackHost, localDevelopment, type ServerConfig } from './config';
 import { HomeAssistantClient } from './ha';
 import { HttpError, StudioStore } from './store';
-import { readEndpointQuery } from './read-endpoints';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { validateCompositionPublication } from './composition';
 import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON } from '../src/shared/composition/json';
@@ -17,14 +14,8 @@ import { importHouseLayout } from '../src/shared/composition/house-import';
 import { formatCompositionIssue } from '../src/shared/composition/workspace';
 
 const revision = z.number().int().positive();
-const documentRequestLimit = MAX_DOCUMENT_BYTES + 64 * 1024;
 const writeSchema = z.object({ document: z.unknown(), expectedRevision: revision }).strict();
 const publishSchema = z.object({ expectedRevision: revision }).strict();
-const feedbackSchema = z.object({
-  kind: z.enum(['report-issue', 'request-feature']),
-  title: z.string().trim().min(1).max(240),
-  description: z.string().trim().min(1).max(10000),
-}).strict();
 function equalSecret(actual: string, expected: string) {
   const left = Buffer.from(actual), right = Buffer.from(expected);
   return left.length === right.length && timingSafeEqual(left, right);
@@ -49,7 +40,11 @@ function sameOrigin(req: Request, config: ServerConfig) {
 }
 
 export function createApp(store: StudioStore, config: ServerConfig) {
-  if ((config.production || config.haToken || config.supervisorToken || config.readEndpoints?.length) && !config.authToken && !config.ingress) throw new Error('Production, credentialed HA connections and registered read endpoints require STUDIO_AUTH_TOKEN or verified Supervisor Ingress');
+  const localDev = localDevelopment(config);
+  const credentialed = Boolean(config.haToken);
+  if ((config.production || config.supervisorToken || (credentialed && !localDev)) && !config.authToken && !config.ingress) throw new Error('Production and credentialed HA connections require STUDIO_AUTH_TOKEN or verified Supervisor Ingress');
+  // Local development has no sign-in, so a server holding credentials must not be reachable from the network.
+  if (localDev && credentialed && !isLoopbackHost(config.host)) throw new Error('Local development without STUDIO_AUTH_TOKEN with HA credentials must bind to a loopback HOST (for example 127.0.0.1), or set STUDIO_AUTH_TOKEN');
   const app = express();
   const ha = new HomeAssistantClient(config);
   const sessions = new Map<string, number>();
@@ -58,12 +53,19 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const header = req.get('authorization');
     const bearer = header?.startsWith('Bearer ') ? header.slice(7) : '';
     const cookie = req.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith('studio_session='))?.slice('studio_session='.length);
-    return Boolean((config.authToken && bearer && equalSecret(bearer, config.authToken)) ||
+    return localDev || Boolean((config.authToken && bearer && equalSecret(bearer, config.authToken)) ||
       (cookie && (sessions.get(cookie) ?? 0) > Date.now()) || validIngress(req, config));
   };
   let stopping = false;
+  const allowedHosts = buildAllowedHosts();
   app.disable('x-powered-by');
   app.set('trust proxy', false);
+  // Local development has no sign-in, so a rebound hostname (DNS rebinding) must not reach any route. A verified Ingress
+  // proxy peer is exempt (its Host is the Home Assistant frontend); every other mode authenticates instead.
+  app.use((req, res, next) => {
+    if (localDev && !validIngress(req, config) && !isAllowedHostHeader(req.get('host'), allowedHosts)) { res.status(403).end(); return; }
+    next();
+  });
   app.use((req, res, next) => {
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
     if (stopping) { res.status(503).json({ error: 'Server is shutting down' }); return; }
@@ -92,7 +94,6 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   });
   app.use('/native/api/assets', express.raw({ type: ['image/png', 'image/jpeg'], limit: MAX_COMPOSITION_ASSET_BYTES }));
   app.use('/native/api', express.raw({ type: 'application/json', limit: MAX_COMPOSITION_ENVELOPE_BYTES }));
-  app.use(['/api/draft', '/api/validate'], express.json({ limit: documentRequestLimit, strict: true }));
   app.use(express.json({ limit: '1mb', strict: true }));
   app.post(['/api/auth', '/native/api/auth'], (req, res) => {
     if (Buffer.isBuffer(req.body)) req.body = parseCompositionJSON(req.body);
@@ -107,11 +108,11 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     res.json({ authenticated: true });
   });
   app.use((req, res, next) => {
-    if (authenticated(req) || (!config.production && !config.authToken && !config.ingress)) { next(); return; }
+    if (authenticated(req)) { next(); return; }
     if (req.method === 'GET' && req.accepts('html') && !req.path.startsWith('/api/') && !req.path.startsWith('/native/api/')) {
       const nonce = randomBytes(16).toString('base64');
       res.set('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`);
-      res.status(401).type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Native Home Studio - Sign in</title><style>body{font:16px system-ui;max-width:28rem;margin:15vh auto;padding:24px}input,button{box-sizing:border-box;font:inherit;padding:12px;width:100%;margin:8px 0}</style><h1>Native Home Studio</h1><p>Enter the authoring token configured by your administrator.</p><form><label for="token">Authoring token</label><input id="token" type="password" autocomplete="current-password" required><button>Sign in</button><p id="error" role="alert"></p></form><script nonce="${nonce}">document.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();try{const r=await fetch('./api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:document.querySelector('input').value})});if(!r.ok)throw Error('Sign-in failed');location.reload()}catch(e){document.querySelector('#error').textContent=e.message}})</script></html>`);
+      res.status(401).type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>S+H Studio - Sign in</title><style>body{font:16px system-ui;max-width:28rem;margin:15vh auto;padding:24px}input,button{box-sizing:border-box;font:inherit;padding:12px;width:100%;margin:8px 0}</style><h1>S+H Studio</h1><p>Enter the authoring token configured by your administrator.</p><form><label for="token">Authoring token</label><input id="token" type="password" autocomplete="current-password" required><button>Sign in</button><p id="error" role="alert"></p></form><script nonce="${nonce}">document.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();try{const r=await fetch('./api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:document.querySelector('input').value})});if(!r.ok)throw Error('Sign-in failed');location.reload()}catch(e){document.querySelector('#error').textContent=e.message}})</script></html>`);
       return;
     }
     res.status(401).json({ error: 'Authentication required' });
@@ -146,7 +147,13 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   });
   // Publish to Home Assistant (`fenton_home` integration): the production delivery path. The Studio's own
   // /native/api/published stays only as the DEBUG publication preview; nothing authenticates a native reader to it.
-  app.get('/native/api/ha/publication', async (_req, res) => { res.json(await ha.publication.get()); });
+  app.get('/native/api/ha/publication', async (_req, res) => { res.json(await ha.publication.get(store.native.getDraft())); });
+  // The services Home Assistant offers, for the Studio's service picker. Read only, reduced server-side (no credentials, no examples).
+  app.get('/native/api/ha/services', async (req, res) => {
+    const cancelled = new AbortController();
+    res.once('close', () => { if (!res.writableEnded) cancelled.abort(); });
+    res.json(await ha.services(cancelled.signal));
+  });
   app.post('/native/api/ha/publish', async (req, res) => {
     const { expectedRevision } = publishSchema.parse(req.body);
     const published = await store.native.publish(expectedRevision);
@@ -199,31 +206,8 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     res.type(asset.mimeType).send(bytes);
   });
   app.use('/native/api', (_req, res) => { res.status(404).json({ error: 'Unknown native API endpoint' }); });
-  app.get('/api/draft', (_req, res) => { res.json(store.getDraft()); });
-  app.put('/api/draft', async (req, res) => {
-    const body = writeSchema.parse(req.body);
-    res.json(await store.save(validateDocument(body.document), body.expectedRevision));
-  });
-  app.post('/api/validate', (req, res) => {
-    const body = z.object({ document: z.unknown() }).strict().parse(req.body);
-    try { validateDocument(body.document); res.json({ valid: true, errors: [] }); }
-    catch (error) {
-      if (!(error instanceof DocumentValidationError)) throw error;
-      res.json({ valid: false, errors: error.errors });
-    }
-  });
-  // The schema-1 workspace is a design-only preview now: the app reads no schema-1 document, so nothing here publishes one.
-  app.get('/api/export', (req, res) => {
-    const query = z.object({ format: z.enum(['json', 'yaml']).default('json'), source: z.literal('draft').default('draft') }).strict().parse(req.query);
-    const envelope = store.getDraft();
-    res.set('Content-Disposition', `attachment; filename="native-home-${query.source}.${query.format === 'yaml' ? 'yaml' : 'json'}"`);
-    res.type(query.format === 'yaml' ? 'application/yaml' : 'application/json').send(query.format === 'yaml' ? stringify(envelope.document) : `${JSON.stringify(envelope.document, null, 2)}\n`);
-  });
   app.get('/api/health', async (_req, res) => {
-    res.json({ status: 'ok', mode: ha.configured ? 'live' : 'sample', haConnected: await ha.probe(), draftRevision: store.getDraft().revision, liveActionsEnabled: config.enableLiveActions, feedbackMode: 'local-queue', schemaVersion: '1.0' });
-  });
-  app.get('/api/schema', (_req, res) => {
-    res.json({ ...z.toJSONSchema(studioDocumentSchema, { target: 'draft-7' }), 'x-semantic-validation': 'POST api/validate additionally checks references, uniqueness, safe URLs and bounded nesting.' });
+    res.json({ status: 'ok', mode: ha.configured ? 'live' : 'sample', haConnected: await ha.probe(), draftRevision: store.native.getDraft().revision });
   });
   app.get('/api/native-home', async (req, res) => {
     if (!authenticated(req)) throw new HttpError(401, 'Authentication required');
@@ -233,93 +217,6 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     try { res.json(await ha.nativeHome(cancelled.signal)); }
     finally { res.removeListener('close', close); }
   });
-  app.get('/api/native-wallpaper', async (req, res) => {
-    if (!authenticated(req)) throw new HttpError(401, 'Authentication required');
-    const { image, type } = await ha.wallpaper();
-    res.type(type).send(image);
-  });
-  app.use('/api/cameras', (req, _res, next) => {
-    if (!authenticated(req)) throw new HttpError(401, 'Authentication required');
-    const release = req.method === 'DELETE' && /^\/streams\/[a-f0-9]{32}$/.test(req.path);
-    if (req.method !== 'GET' && !release) throw new HttpError(405, 'Camera reads require GET; leases may be released with DELETE');
-    if (!sameOrigin(req, config)) throw new HttpError(403, 'Cross-origin camera reads are not allowed');
-    if (Object.keys(req.query).length || req.get('range')) throw new HttpError(400, 'Camera reads do not accept query parameters or ranges');
-    next();
-  });
-  const readWithCancellation = async (res: Response, read: (signal: AbortSignal) => Promise<void>) => {
-    const cancelled = new AbortController();
-    const close = () => { if (!res.writableEnded) cancelled.abort(); };
-    res.once('close', close);
-    try { await read(cancelled.signal); }
-    finally { res.removeListener('close', close); }
-  };
-  app.get('/api/cameras/:entityId/stream', async (req, res) => {
-    await readWithCancellation(res, async signal => { res.json(await ha.cameras.open(req.params.entityId, signal)); });
-  });
-  app.get('/api/cameras/:entityId/mjpeg', async (req, res) => {
-    await readWithCancellation(res, async signal => { res.json(await ha.cameras.open(req.params.entityId, signal, 'mjpeg')); });
-  });
-  app.delete('/api/cameras/streams/:streamId', (req, res) => {
-    z.object({}).strict().parse(req.body);
-    res.json({ released: ha.cameras.release(req.params.streamId) });
-  });
-  app.get('/api/cameras/streams/:streamId/live.mjpeg', async (req, res) => {
-    await readWithCancellation(res, async signal => {
-      for await (const part of ha.cameras.mjpeg(req.params.streamId, signal)) {
-        if (!res.headersSent) res.set({
-          'Content-Type': 'multipart/x-mixed-replace; boundary=studio-camera',
-          'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no',
-        });
-        if (!res.write(part)) await once(res, 'drain', { signal: AbortSignal.any([signal, ha.cameras.signal, AbortSignal.timeout(20_000)]) });
-      }
-      res.end();
-    });
-  });
-  const cameraMedia = async (req: Request, res: Response, segment = false) => {
-    await readWithCancellation(res, async signal => {
-      const file = `${segment ? 'segment/' : ''}${req.params.file}`;
-      const media = await ha.cameras.read(String(req.params.streamId), file, signal);
-      res.set('Cache-Control', 'private, no-store').type(media.type).send(media.body);
-    });
-  };
-  app.get('/api/cameras/streams/:streamId/:file', (req, res) => cameraMedia(req, res));
-  app.get('/api/cameras/streams/:streamId/segment/:file', (req, res) => cameraMedia(req, res, true));
-  app.get('/api/data/:id', async (req, res) => {
-    const query = readEndpointQuery(req.query);
-    const source = store.getDraft().document.dataSources.find((item) => item.id === req.params.id);
-    if (!source) throw new HttpError(404, 'Unknown data source');
-    if (source.kind === 'endpoint' && req.method !== 'GET') throw new HttpError(405, 'Read endpoints require GET');
-    if ((source.kind === 'endpoint' || ['house-states', 'house-profile'].includes(source.endpoint ?? '')) && !authenticated(req)) throw new HttpError(401, 'Authentication required');
-    await readWithCancellation(res, async signal => { res.json(await ha.data(source, query, signal)); });
-  });
-  app.all('/api/data/:id', (req, _res, next) => {
-    const source = store.getDraft().document.dataSources.find(item => item.id === req.params.id);
-    if (source?.kind === 'endpoint') {
-      if (!authenticated(req)) throw new HttpError(401, 'Authentication required');
-      throw new HttpError(405, 'Read endpoints require GET');
-    }
-    next();
-  });
-  app.use('/api/read-endpoints', (req, _res, next) => {
-    if (!authenticated(req)) throw new HttpError(401, 'Authentication required');
-    if (req.method !== 'GET') throw new HttpError(405, 'Read endpoint discovery requires GET');
-    if (Object.keys(req.query).length) throw new HttpError(400, 'Read endpoint discovery does not accept query parameters');
-    next();
-  });
-  app.get('/api/read-endpoints', (_req, res) => { res.json(ha.readEndpoints.metadata()); });
-  app.post('/api/actions/execute', async (req, res) => {
-    assertJsonBounds(req.body);
-    const body = z.object({ action: actionSchema, confirmed: z.boolean().optional() }).strict().parse(req.body);
-    const document = store.getDraft().document;
-    // Reuse document semantics to check references and service targets for ad-hoc preview actions.
-    document.pages[0].toolbar = [{ id: `execute-${randomBytes(8).toString('hex')}`, label: 'Execute', icon: 'Play', placement: 'trailing', action: body.action }];
-    validateDocument(document);
-    if (body.action.type === 'service') { res.json(await ha.execute(body.action, body.confirmed === true)); return; }
-    res.json({ mode: 'simulated', executed: false, actionType: body.action.type });
-  });
-  app.post('/api/feedback', async (req, res) => {
-    res.status(201).json(await store.queueFeedback(feedbackSchema.parse(req.body)));
-  });
   app.use('/api', (_req, res) => { res.status(404).json({ error: 'Unknown API endpoint' }); });
 
   const errorHandler = (error: unknown, _req: Request, res: Response, _next: NextFunction) => {
@@ -328,13 +225,11 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     if (error instanceof CompositionValidationError) {
       res.status(422).json({ error: error.message, issues: error.issues, errors: error.issues.map(formatCompositionIssue) }); return;
     }
-    if (error instanceof DocumentValidationError) { res.status(422).json({ error: error.message, errors: error.errors }); return; }
     if (error instanceof z.ZodError) { res.status(400).json({ error: 'Invalid request', errors: error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`) }); return; }
     if (error instanceof HttpError) { res.status(error.status).json({ error: error.message, ...(error.details && typeof error.details === 'object' ? error.details : {}) }); return; }
     if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.too.large') {
       const limit = 'limit' in error && error.limit === MAX_COMPOSITION_ASSET_BYTES ? '8 MiB'
-        : 'limit' in error && error.limit === MAX_COMPOSITION_ENVELOPE_BYTES ? '2 MiB plus 64 KiB of envelope space'
-        : 'limit' in error && error.limit === documentRequestLimit ? '1 MiB plus 64 KiB of envelope space' : '1 MiB';
+        : 'limit' in error && error.limit === MAX_COMPOSITION_ENVELOPE_BYTES ? '2 MiB plus 64 KiB of envelope space' : '1 MiB';
       res.status(413).json({ error: `Request body exceeds ${limit}` }); return;
     }
     if (error instanceof SyntaxError && 'body' in error) { res.status(400).json({ error: 'Malformed JSON request' }); return; }

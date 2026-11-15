@@ -1,0 +1,37 @@
+Guests
+Tile grid · Home › Guests Staying Over
+Title
+Width
+Smallest tile
+Tile
+Tile dynamic type
+Section wide
+Columns
+Equal row heights
+Short row
+Share
+Leading
+Fold
+Page
+Container
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Guests
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Spacing
+Token
+
+[names]
+Add While the state is unknown

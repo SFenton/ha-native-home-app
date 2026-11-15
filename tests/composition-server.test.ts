@@ -50,7 +50,7 @@ async function fixture(authenticated = true, overrides: Partial<ServerConfig> = 
   const store = await StudioStore.open(directory);
   cleanup.push(() => store.close());
   const application = createApp(store, {
-    production: false, port: 0, host: '127.0.0.1', dataDir: directory, enableLiveActions: false,
+    production: false, port: 0, host: '127.0.0.1', dataDir: directory,
     ...(authenticated ? { authToken: token } : {}), ...overrides,
   });
   application.app.use(application.errorHandler);
@@ -89,9 +89,11 @@ describe('separate authenticated native composition pipeline', () => {
     expect((await f.request('/native/api/draft', 'GET', undefined, reader)).status).toBe(401);
   });
 
-  it('retains schema-1 draft bytes, durable identities, exact publication closure and immutable revisions across restart', async () => {
+  it('retains legacy schema-1 draft bytes, durable identities, exact publication closure and immutable revisions across restart', async () => {
     const f = await fixture();
-    const legacyDraftBytes = await readFile(path.join(f.directory, 'draft.json'));
+    // A schema-1 draft an earlier Studio left behind: never read, never rewritten.
+    const legacyDraftBytes = Buffer.from('{"schemaVersion":"1.0"}\n');
+    await writeFile(path.join(f.directory, 'draft.json'), legacyDraftBytes);
     const first = await f.draft();
     expect(first.document.schemaVersion).toBe('2.0');
     expect((await f.request('/native/api/published')).status).toBe(404);
@@ -190,10 +192,17 @@ describe('separate authenticated native composition pipeline', () => {
     expect(await readFile(path.join(f.directory, 'native-v2/revisions/2.json'))).toEqual(snapshot);
   });
 
-  it('requires real auth even in development, shares session login, and retains origin and JSON write restrictions', async () => {
+  it('works without sign-in in local development, and keeps its write restrictions', async () => {
     const dev = await fixture(false);
-    for (const endpoint of ['/native/api/draft', '/native/api/published', '/native/api/assets', `/native/api/assets/${'a'.repeat(64)}.png`])
-      expect((await dev.request(endpoint, 'GET', undefined, {})).status).toBe(401);
+    expect((await dev.request('/native/api/draft', 'GET', undefined, {})).status).toBe(200);
+    for (const endpoint of ['/native/api/published', '/native/api/assets', `/native/api/assets/${'a'.repeat(64)}.png`])
+      expect((await dev.request(endpoint, 'GET', undefined, {})).status).not.toBe(401);
+    expect((await dev.request('/native/api/draft', 'GET', undefined, { Cookie: 'studio_session=forged' })).status).toBe(200);
+    expect((await dev.request('/native/api/publish', 'POST', { expectedRevision: 1 }, { Origin: 'https://other.invalid' })).status).toBe(403);
+    expect((await dev.raw('/native/api/publish', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' })).status).toBe(415);
+  });
+
+  it('requires real auth when a token is set, shares session login, and retains origin and JSON write restrictions', async () => {
     const f = await fixture();
     expect((await f.request('/native/api/draft', 'GET', undefined, {})).status).toBe(401);
     expect((await f.request('/native/api/publish', 'POST', { expectedRevision: 1 }, { ...auth, Origin: 'https://other.invalid' })).status).toBe(403);
@@ -301,7 +310,7 @@ describe('separate authenticated native composition pipeline', () => {
   });
 });
 
-describe('Publish to Home Assistant', () => {
+describe('Publish', () => {
   const haToken = 'synthetic-ha-token-that-must-never-leave-the-server';
   async function home(options: Partial<FakeHaOptions> = {}) {
     const fake = await fakeHomeAssistant({ token: haToken, ...options });
@@ -390,11 +399,15 @@ describe('Publish to Home Assistant', () => {
     expect(JSON.stringify(summary)).not.toContain('envelope"');
     expect(summary.current).not.toHaveProperty('envelope');
     expect(summary.history[0]).not.toHaveProperty('envelope');
+    // The draft is the document the app serves now, so the status tag can say "Published · 2" after a reload.
+    expect(summary.draftIsLive).toBe(true);
 
     const rolled = await f.request('/native/api/ha/rollback', 'POST', { revision: 1 });
     expect(rolled.status).toBe(200);
     expect(await rolled.json()).toMatchObject({ epoch: 'epoch-1', revision: 3 });
     expect(fake.state.current?.revision).toBe(3);
+    // After a roll back the app serves the first layout, not the draft.
+    expect((await (await f.request('/native/api/ha/publication')).json()).draftIsLive).toBe(false);
     const missing = await f.request('/native/api/ha/rollback', 'POST', { revision: 99 });
     expect(missing.status).toBe(404);
     expect((await missing.json()).error).toContain('no longer in the Home Assistant history');
@@ -502,7 +515,7 @@ describe('Publish to Home Assistant', () => {
     vi.stubGlobal('WebSocket', class { constructor(url: string) { urls.push(url); throw new Error('stub'); } });
     try {
       const client = new HomeAssistantClient({
-        production: false, port: 0, host: '127.0.0.1', dataDir: '.', enableLiveActions: false, supervisorToken: 'synthetic-supervisor-token',
+        production: false, port: 0, host: '127.0.0.1', dataDir: '.', supervisorToken: 'synthetic-supervisor-token',
       });
       expect(client.publication.configured).toBe(true);
       await expect(client.publication.get()).rejects.toMatchObject({ status: 502 });

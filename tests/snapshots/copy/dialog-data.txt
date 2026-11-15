@@ -1,0 +1,262 @@
+Search data
+Entities
+switch.demo_entity_98
+Used by
+4
+select.demo_entity_81
+Used by
+2
+switch.demo_entity_90
+Used by
+1
+binary_sensor.demo_entity_77
+Used by
+2
+binary_sensor.demo_entity_78
+Used by
+2
+input_boolean.demo_entity_87
+Used by
+1
+Models
+Alarm
+Used by
+3
+Home status · lights
+Used by
+1
+Home status · lights
+Used by
+2
+Light
+Used by
+2
+Light
+Used by
+1
+Light
+Used by
+1
+Light
+Used by
+1
+Light
+Used by
+1
+Home status · lights
+Used by
+2
+Light
+Used by
+2
+Light
+Used by
+1
+Light
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+2
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+2
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · occupancy
+Used by
+1
+Home status · contacts
+Used by
+2
+Home status · contacts
+Used by
+2
+Home status · contacts
+Used by
+1
+Home status · contacts
+Used by
+2
+Home status · contacts
+Used by
+1
+Home status · contacts
+Used by
+1
+Home status · air quality
+Used by
+1
+Home status · air quality
+Used by
+1
+Home status · air quality
+Used by
+1
+Home status · entity
+Used by
+2
+Weather
+Used by
+6
+Camera
+Used by
+3
+Home status · occupancy
+Used by
+2
+Power switch
+Used by
+4
+Power switch
+Used by
+4
+Door
+Used by
+1
+Door
+Used by
+1
+Door
+Used by
+1
+Climate
+Used by
+2
+Climate
+Used by
+1
+Climate
+Used by
+3
+Home status · climate
+Used by
+1
+Home status · climate
+Used by
+1
+Climate
+Used by
+3
+Home status · climate
+Used by
+1
+Climate
+Used by
+4
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+2
+Climate
+Used by
+2
+Climate
+Used by
+10
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Climate
+Used by
+1
+Home status · contacts
+Used by
+1
+Add Source
+Remove Unused
+
+[first row]
+Data
+switch.demo_entity_98
+Entity
+Fixed value
+Advanced
+ID
+
+[names]
+IDs cannot be changed.

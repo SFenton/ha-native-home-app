@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Activity, AirVent, AlignLeft, ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Bell, Bolt, BookOpen, Bug, CalendarDays, Camera, Carrot, Check, ChevronRight, Circle, CircleCheck, CircleGauge, Cloud, Code2, Coffee, CookingPot, Database, DoorOpen, Download, Ellipsis, Eye, Fan, FileText, Film, Flame, Folder, GalleryHorizontal, Grid2X2, Heart, HelpCircle, Home, Image, Info, Lamp, Layers, Leaf, Lightbulb, List, Lock, Mail, MessageSquare, Milk, Moon, Music, Play, Plus, Radio, Search, Settings, Shield, ShieldCheck, ShoppingBasket, SlidersHorizontal, Smartphone, Snowflake, Space, Sparkles, Sun, Thermometer, ToggleLeft, Trash2, Tv, Type, User, Users, Video, Volume2, WashingMachine, Wifi, Wrench, X, type LucideIcon } from 'lucide-react';
-import type { Json, Primitive } from './shared/types';
 import { Apple, Bath, Bed, Car, CloudSun, Computer, DoorClosed, Droplets, Dumbbell, Gamepad2, Guitar, Heater, ListChecks, Microwave, PanelTop, Projector, Server, ShieldOff, ShowerHead, Sofa, SprayCan, Sunrise, Utensils, Vault, Wind } from 'lucide-react';
 import { Armchair, Brush, ChevronDown, ChevronLeft, ChevronUp, createLucideIcon, DropletOff, Keyboard, Laptop, Paintbrush, Pause, Percent, Plane, PlugZap, Power, Radar, Refrigerator, Shirt, Volume1, VolumeX } from 'lucide-react';
 
@@ -49,9 +48,6 @@ export function Icon({ name = 'grid', size = 18, className }: { name?: string; s
   const Glyph = icons[name.toLowerCase()] ?? icons[name.toLowerCase().replace(/\.fill$/, '')] ?? HelpCircle;
   return <Glyph size={size} strokeWidth={1.8} className={className} data-icon={name} data-icon-missing={known ? undefined : true} aria-hidden="true"/>;
 }
-export function IconButton({ label, children, ...props }: { label: string; children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" className="icon-button" title={label} aria-label={label} {...props}>{children}</button>;
-}
 export function Field({ label, children, hint, hintId }: { label: string; children: ReactNode; hint?: string; hintId?: string }) {
   return <label className="field"><span>{label}</span>{children}{hint && <small id={hintId}>{hint}</small>}</label>;
 }
@@ -80,60 +76,5 @@ export function SelectField({ label, value, options, onChange }: { label: string
 }
 export function IconField({ value, onChange, label = 'Icon' }: { value?: string; onChange: (value: string) => void; label?: string }) {
   const listId = useId();
-  return <Field label={label} hint={value && !hasIcon(value) ? 'No matching icon. Choose a supported icon; the preview uses a question mark.' : undefined}><div className="icon-field"><Icon name={value}/><input aria-label={label} list={listId} value={value ?? ''} onChange={event => onChange(event.target.value)}/></div><datalist id={listId}>{iconNames.map(name => <option key={name} value={name}/>)}</datalist></Field>;
-}
-export function JsonField({ label, value, onChange, primitive = false, shape }: { label: string; value: Json; onChange: (value: Json) => void; primitive?: boolean; shape?: 'object' | 'primitive-record' }) {
-  const hintId = useId();
-  const serialized = JSON.stringify(value, null, 2);
-  const [text, setText] = useState(serialized);
-  const [error, setError] = useState('');
-  const focused = useRef(false);
-  useEffect(() => { if (!focused.current) setText(serialized); }, [serialized]);
-  return <Field label={label} hintId={hintId} hint={error || (primitive ? 'JSON string, number, boolean, or null.' : 'Valid JSON. Changes apply when you leave this field.')}><textarea className="code-input" value={text} aria-invalid={Boolean(error)} aria-describedby={hintId} onFocus={() => { focused.current = true; }} onChange={event => setText(event.target.value)} onBlur={() => {
-    focused.current = false;
-    try {
-      const parsed = JSON.parse(text) as Json;
-      if (primitive && parsed !== null && typeof parsed === 'object') throw new Error('Enter a primitive value, not an object or array.');
-      if (shape && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) throw new Error('Enter a JSON object with named keys.');
-      if (shape === 'primitive-record' && typeof parsed === 'object' && parsed && Object.values(parsed).some(item => item !== null && typeof item === 'object')) throw new Error('Attribute values must be strings, numbers, booleans, or null.');
-      onChange(parsed); setError('');
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
-  }}/></Field>;
-}
-export function PrimitiveField({ label, value, onChange }: { label: string; value: Primitive; onChange: (value: Primitive) => void }) {
-  return <JsonField label={label} value={value} primitive onChange={value => onChange(value as Primitive)}/>;
-}
-export function EmptyState({ icon = 'layers', title, children }: { icon?: string; title: string; children: ReactNode }) {
-  return <div className="empty-state"><span><Icon name={icon} size={25}/></span><strong>{title}</strong><p>{children}</p></div>;
-}
-export function Dialog({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
-  const titleId = useId();
-  const ref = useRef<HTMLDialogElement>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const invoker = useRef<HTMLElement | undefined>(undefined);
-  const active = useRef(false);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!invoker.current && document.activeElement instanceof HTMLElement) invoker.current = document.activeElement;
-    const origin = invoker.current;
-    active.current = true;
-    dialog?.showModal();
-    heading.current?.focus({ preventScroll: true });
-    return () => {
-      active.current = false;
-      dialog?.close();
-      queueMicrotask(() => {
-        if (document.querySelector('dialog[open]')) return;
-        const destination = origin?.isConnected && !origin.closest('[hidden], [inert]') && !origin.matches(':disabled')
-          ? origin : document.querySelector<HTMLElement>('[data-editor-focus-fallback]');
-        destination?.focus({ preventScroll: true });
-      });
-    };
-  }, []);
-  // Strict Mode can reopen the dialog before a queued cleanup close is delivered.
-  return <dialog ref={ref} aria-labelledby={titleId} className={`studio-dialog ${wide ? 'wide' : ''}`} onClose={event => { if (active.current && !event.currentTarget.open) onClose(); }} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }} onKeyDown={event => { if (event.key === 'Escape') event.stopPropagation(); }} onClick={event => {
-    if (event.target !== event.currentTarget) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
-  }}><div className="dialog-heading"><div><span className="eyebrow">NATIVE HOME STUDIO</span><h2 ref={heading} tabIndex={-1} id={titleId}>{title}</h2></div><IconButton label="Close dialog" onClick={onClose}><X size={18}/></IconButton></div><div className="dialog-content">{children}</div></dialog>;
+  return <Field label={label} hint={value && !hasIcon(value) ? 'No such icon. The preview shows ?.' : undefined}><div className="icon-field"><Icon name={value}/><input aria-label={label} list={listId} value={value ?? ''} onChange={event => onChange(event.target.value)}/></div><datalist id={listId}>{iconNames.map(name => <option key={name} value={name}/>)}</datalist></Field>;
 }

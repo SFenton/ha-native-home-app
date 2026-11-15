@@ -1,0 +1,160 @@
+Demo Window
+Room card · Climate › Contacts
+Title
+Icon
+window.vertical.open
+Entity
+binary_sensor.demo_entity_77
+Entity
+Choose a source
+Alarm · source-security-panel
+Home status · lights · hc-status-lights
+Home status · lights · hc-lights-demo-room-1-source
+Light · hc-light-light-demo-entity-307
+Light · hc-light-light-demo-entity-308
+Light · hc-light-light-demo-entity-309
+Light · hc-light-light-demo-entity-310
+Light · hc-light-light-demo-entity-311
+Home status · lights · hc-lights-demo-room-2-source
+Light · hc-light-light-demo-entity-312
+Light · hc-light-light-demo-entity-313
+Light · hc-light-light-demo-entity-314
+Home status · climate · hc-status-climate
+Home status · climate · hc-climate-demo-room-1-source
+Home status · climate · hc-reading-sensor-demo-entity-274
+Home status · climate · hc-reading-sensor-demo-entity-276
+Home status · climate · hc-reading-sensor-demo-entity-278
+Home status · climate · hc-reading-sensor-demo-entity-280
+Home status · climate · hc-reading-cover-demo-entity-281
+Home status · climate · hc-climate-demo-room-2-source
+Home status · climate · hc-reading-sensor-demo-entity-285
+Home status · climate · hc-reading-sensor-demo-entity-287
+Home status · climate · hc-reading-cover-demo-entity-288
+Home status · occupancy · hc-status-occupancy
+Home status · occupancy · hc-occupancy-demo-room-1-source
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-315
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-316
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-317
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-318
+Home status · occupancy · hc-occupancy-demo-room-1-detail-source
+Home status · occupancy · hc-occupancy-demo-room-2-source
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-319
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-320
+Home status · occupancy · hc-reading-binary-sensor-demo-entity-321
+Home status · occupancy · hc-occupancy-demo-room-2-detail-source
+Home status · contacts · hc-status-contacts
+Home status · contacts · hc-contacts-demo-room-1-source
+Home status · contacts · hc-reading-binary-sensor-demo-entity-77
+Home status · contacts · hc-contacts-demo-room-2-source
+Home status · contacts · hc-reading-binary-sensor-demo-entity-78
+Home status · contacts · hc-reading-binary-sensor-demo-entity-289
+Home status · air quality · hc-air-0
+Home status · air quality · hc-air-1
+Home status · air quality · hc-status-air
+Home status · entity · hc-status-security
+Weather · home-weather
+Camera · hc-camera-0
+Home status · occupancy · hc-guests-status
+Power switch · hc-guest-0
+Power switch · hc-guest-1
+Door · hc-door-1
+Door · hc-door-2
+Door · hc-door-3
+Climate · hc-climate-whole
+Climate · hc-climate-hub
+Climate · hc-climate-room-demo-room-1-source
+Home status · climate · hc-climate-room-demo-room-1-vent-source-0
+Home status · climate · hc-climate-room-demo-room-1-vent-source-1
+Climate · hc-climate-room-demo-room-2-source
+Home status · climate · hc-climate-room-demo-room-2-vent-source-0
+Climate · hc-tracking
+Climate · hc-track-selected-0-source
+Climate · hc-track-selected-1-source
+switch.demo_entity_98 · hc-entity-switch-demo-entity-98
+Climate · hc-track-critical-0-source
+Climate · hc-track-critical-1-source
+select.demo_entity_81 · hc-entity-select-demo-entity-81
+Climate · hc-track-occupied-0-source
+Climate · hc-track-occupied-1-source
+Climate · hc-eco-critical
+Climate · hc-eco-away
+Climate · hc-predictive
+Climate · hc-auto-adjust-source
+Climate · hc-mode-changes-source
+Climate · hc-allow-away-source
+Climate · hc-integration-source
+Climate · hc-eco-toggle-source
+switch.demo_entity_90 · hc-entity-switch-demo-entity-90
+binary_sensor.demo_entity_77 · hc-entity-binary-sensor-demo-entity-77
+binary_sensor.demo_entity_78 · hc-entity-binary-sensor-demo-entity-78
+input_boolean.demo_entity_87 · hc-entity-input-boolean-demo-entity-87
+Home status · contacts · hc-climate-contacts
+Width
+Kind
+Air
+Appliance
+Climate
+Contact
+Fan
+Grill
+Humidifier
+Laundry
+Light
+Media
+Occupancy
+Power
+Vacuum
+Vent
+Wake light
+Show state
+Words by state
+0
+By state
+2
+Colours by state
+Add
+Tint by mode
+Add
+Behaviour
+When tapped
+Nothing
+Add
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+Add Colours by state
+Add Tint by mode
+Add When tapped
+
+[advanced]
+Demo Window
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Subtitle from
+0
+Active states
+2
+Disabled states
+0
+Power
+Add
+Alternate
+Add
+Chip sources
+Add
+Personalization
+Add
+
+[names]
+Add While the state is unknown
+Add Power
+Add Alternate
+Add Chip sources
+Add Personalization

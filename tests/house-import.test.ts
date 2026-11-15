@@ -196,7 +196,7 @@ describe('POST /native/api/import-house-config', () => {
     cleanup.push(() => rm(directory, { recursive: true, force: true }));
     const store = await StudioStore.open(directory);
     cleanup.push(() => store.close());
-    const application = createApp(store, { production: false, port: 0, host: '127.0.0.1', dataDir: directory, enableLiveActions: false,
+    const application = createApp(store, { production: false, port: 0, host: '127.0.0.1', dataDir: directory,
       authToken: token, haUrl: fake.url, haToken });
     application.app.use(application.errorHandler);
     const server = http.createServer(application.app);

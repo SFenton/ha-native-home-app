@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { identifierSchema as id } from '../schema';
+import { identifierSchema as id } from '../validation';
 
 const object = z.strictObject;
 const text = (max: number, blank = false) => z.string().max(max).refine(value => blank || Boolean(value.trim()));

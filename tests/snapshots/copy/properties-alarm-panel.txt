@@ -1,0 +1,50 @@
+Security System
+Alarm panel · Security System
+Title
+Title
+Subtitle
+Icon
+Shield
+Entity
+alarm_control_panel.demo_entity_125
+Text
+Since prefix
+Loading text
+Unavailable text
+Hidden text
+Error text
+Pending text
+Message
+Doors and motion stop triggering the alarm.
+Confirm button label
+Width
+Modes
+4
+By state
+8
+Red
+Green
+Blue
+Separator
+Red
+Green
+Blue
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Security System
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

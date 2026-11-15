@@ -1,0 +1,38 @@
+Guests Staying Over
+Section · Home › Conditional content
+Title
+Header
+Footer
+Guest mode skips some away automations. Review security, climate, and auto-clean controls before leaving.
+Width
+Style
+Plain
+Module list
+Density
+Thin
+Dense
+Show icons
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Guests Staying Over
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Spacing
+Token
+Presented by
+Add
+
+[names]
+Add While the state is unknown
+Add Presented by

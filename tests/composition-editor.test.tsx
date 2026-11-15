@@ -9,8 +9,7 @@ import {
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES } from '../src/shared/composition/json';
 import { createCompositionDocument, createCompositionPage, type CompositionDraft, type UploadedCompositionAsset } from '../src/shared/composition/workspace';
-import NativeCompositionWorkspace from '../src/NativeCompositionWorkspace';
-import { useCompositionStudio } from '../src/useCompositionStudio';
+import { textEditPath, UNDO_COALESCE_MS, useCompositionStudio } from '../src/useCompositionStudio';
 import type { CompositionNode } from '../src/shared/composition/schema';
 
 vi.mock('../src/api', async importOriginal => ({
@@ -135,178 +134,55 @@ describe('composition authoring model', () => {
   });
 });
 
-describe('native composition structured controls', () => {
-  it('edits configured todo counter fields without raw JSON', async () => {
-    const draft = envelope();
-    draft.document.dataSources.push({
-      id: 'todo-counts', kind: 'model', model: 'todo-counts@1',
-      inputs: { lists: [{ entityId: { type: 'literal', value: 'todo.example' }, overdue: true }] },
-      labels: { openSuffix: 'open', overdueSuffix: 'late', separator: ' / ', zeroText: 'Clear',
-        loadingText: 'Loading', unavailableText: 'Unavailable' },
-    });
-    draft.capabilities = compileCompositionDocument(draft.document).capabilities;
-    vi.mocked(request).mockResolvedValue(draft);
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Data sources' }));
-    fireEvent.change(screen.getByLabelText('Open Suffix'), { target: { value: 'remaining' } });
-    fireEvent.click(screen.getByLabelText('Overdue'));
-    vi.mocked(request).mockImplementationOnce(async (_path, init) => ({
-      ...draft, revision: 2, document: JSON.parse(String(init?.body)).document,
-    }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/draft', expect.objectContaining({ method: 'PUT' })));
-    const body = JSON.parse(String(vi.mocked(request).mock.calls.at(-1)?.[1]?.body));
-    expect(body.document.dataSources[0]).toMatchObject({
-      inputs: { lists: [{ overdue: false, entityId: { value: 'todo.example' } }] },
-      labels: { openSuffix: 'remaining' },
-    });
+describe('undo coalescing', () => {
+  afterEach(() => { vi.useRealTimers(); });
+  async function studio() {
+    vi.useFakeTimers({ toFake: ['Date'], now: 1_000_000 });
+    const hook = renderHook(useCompositionStudio);
+    await waitFor(() => expect(hook.result.current.document).toBeDefined());
+    const type = (name: string, elapsed = 100) => { vi.setSystemTime(Date.now() + elapsed); act(() => hook.result.current.apply({ ...hook.result.current.document!, name })); };
+    const undoAll = () => { let steps = 0; while (hook.result.current.canUndo) { act(() => hook.result.current.undo()); steps += 1; } return steps; };
+    return { ...hook, type, undoAll };
+  }
+  it('reads the one changed string from a document edit and ignores everything else', () => {
+    const a = { x: { y: 'a', z: 1 }, list: ['p', 'q'] };
+    expect(textEditPath(a, { ...a, x: { ...a.x, y: 'ab' } })).toBe('/x/y');
+    expect(textEditPath(a, { ...a, list: ['p', 'qq'] })).toBe('/list/1');
+    expect(textEditPath(a, { ...a, x: { ...a.x, z: 2 } })).toBeUndefined();
+    expect(textEditPath(a, { ...a, list: ['p'] })).toBeUndefined();
+    expect(textEditPath(a, { x: { y: 'b', z: 1 }, list: ['pp', 'q'] })).toBeUndefined();
+    expect(textEditPath(a, a)).toBeUndefined();
   });
-  it('authors an exact engine job attachment and native target delivery', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Live Activities' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add live activities item' }));
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Cleaning' } });
-    fireEvent.change(screen.getByLabelText('Glyph'), { target: { value: 'vacuum' } });
-    fireEvent.change(screen.getByLabelText('Job Id'), { target: { value: 'vacuum.demo_unit' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Routes' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add native extension delivery' }));
-    expect(screen.getByRole('button', { name: 'Import legacy aliases' })).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Publish native' }) as HTMLButtonElement).disabled).toBe(false);
-    expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(false);
+  it('folds keystrokes into one field, one step, and keeps older steps', async () => {
+    const { result, type, undoAll } = await studio();
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...result.current.document!.pages[0], title: 'Home base' }, ...result.current.document!.pages.slice(1)] }));
+    const base = result.current.document!.name;
+    for (const text of ['H', 'Ho', 'Hom', 'Home']) type(text);
+    expect(undoAll()).toBe(2);
+    expect(result.current.document!.name).toBe(base);
   });
-
-  it('authors ordered tab destinations through labels and selectors, and exports stable identity as read-only', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Tabs' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add tabs item' }));
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Authored tab' } });
-    expect(screen.getByLabelText('Page Id').tagName).toBe('SELECT');
-    const id = (screen.getByLabelText('Id') as HTMLInputElement);
-    expect(id.readOnly).toBe(true);
-    fireEvent.change(screen.getByLabelText('Initial tab'), { target: { value: id.value } });
-    const next = { ...envelope(), revision: 2 };
-    vi.mocked(request).mockResolvedValueOnce(next);
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/draft', expect.objectContaining({ method: 'PUT' })));
-    const body = JSON.parse(String(vi.mocked(request).mock.calls.at(-1)?.[1]?.body));
-    expect(body.document.navigation.tabs[0]).toMatchObject({ id: id.value, label: 'Authored tab', pageId: 'page-home' });
-    expect(body.document.navigation.initialTabId).toBe(id.value);
-    expect(body.document.id).toBe('synthetic-document');
+  it('starts a new step after a pause, on another field, after a structural edit, and after blur', async () => {
+    const { result, type, undoAll } = await studio();
+    type('a'); type('ab');
+    type('abc', UNDO_COALESCE_MS + 1);
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...result.current.document!.pages[0], title: 'Other' }, ...result.current.document!.pages.slice(1)] }));
+    type('abcd');
+    act(() => { window.dispatchEvent(new Event('focusout')); });
+    type('abcde');
+    act(() => result.current.apply({ ...result.current.document!, pages: [] }));
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...createCompositionPage('p2') }] }));
+    // [a, ab] | [abc] | page title | [abcd] | [abcde] | pages emptied | pages replaced
+    expect(undoAll()).toBe(7);
   });
-
-  it('exposes component variants, policies and reparent controls without whole-screen feature types', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Pages' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add components item' }));
-    const type = screen.getByLabelText('New item type');
-    const choices = within(type).getAllByRole('option');
-    expect(choices.map(option => option.textContent)).toEqual(expect.arrayContaining([
-      'text', 'navigation-tile', 'action-tile', 'tile-grid', 'section', 'local-tabs',
-      'alarm-panel', 'door-tile', 'climate-control', 'room-device-control', 'camera-viewer',
-    ]));
-    fireEvent.change(type, { target: { value: within(type).getByRole<HTMLOptionElement>('option', { name: 'settings-link' }).value } });
-    expect(screen.getByLabelText('Subtitle').tagName).toBe('TEXTAREA');
-    expect((screen.getByLabelText('Shows Chevron') as HTMLInputElement).checked).toBe(true);
-    fireEvent.change(type, { target: { value: within(type).getByRole<HTMLOptionElement>('option', { name: 'tile-grid' }).value } });
-    expect(screen.getByLabelText('Max Columns').tagName).toBe('INPUT');
-    expect(screen.getByLabelText('Short Row').tagName).toBe('SELECT');
-    expect(screen.getByLabelText('New parent').tagName).toBe('SELECT');
-    expect(screen.getByLabelText('Component to move').tagName).toBe('SELECT');
-  });
-
-  it('authors an account header and private provider using generated fields', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Data sources' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add data sources item' }));
-    const sourceType = screen.getAllByRole('combobox').find(select =>
-      within(select).queryByRole('option', { name: 'profile-account@1' }));
-    expect(sourceType).toBeDefined();
-    const account = within(sourceType!).getAllByRole('option').find(option => option.textContent === 'profile-account@1');
-    expect(account).toBeDefined();
-    fireEvent.change(sourceType!, { target: { value: account!.getAttribute('value') } });
-    expect(screen.queryByLabelText('Entity Id')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Pages' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add components item' }));
-    const componentType = screen.getByLabelText('New item type');
-    fireEvent.change(componentType, { target: { value: within(componentType).getByRole<HTMLOptionElement>('option', { name: 'account-header' }).value } });
-    expect(screen.getByLabelText('Source Id').tagName).toBe('SELECT');
-    fireEvent.change(screen.getByLabelText('Fallback Name'), { target: { value: 'Account' } });
-    fireEvent.change(screen.getByLabelText('Loading Text'), { target: { value: 'Retrieving account' } });
-    expect(screen.getByLabelText('Unavailable Text')).toBeDefined();
-  });
-
-  it('uses the immutable asset library and raw upload contract for wallpaper, without embedding bytes in the document', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    const asset: UploadedCompositionAsset = {
-      sha256: 'b'.repeat(64), source: { type: 'publisher', path: `/api/assets/${'b'.repeat(64)}.png` },
-      mimeType: 'image/png', byteLength: 100, pixelWidth: 2, pixelHeight: 2,
-    };
-    vi.mocked(request).mockResolvedValueOnce([asset]);
-    fireEvent.click(screen.getByRole('button', { name: 'Wallpaper' }));
-    await waitFor(() => expect(within(screen.getByLabelText('Uploaded immutable asset')).getAllByRole('option')).toHaveLength(2));
-    fireEvent.change(screen.getByLabelText('Uploaded immutable asset'), { target: { value: asset.sha256 } });
-    expect(screen.getByRole('link', { name: 'View authenticated image' }).getAttribute('href')).toBe(`./native${asset.source.path}`);
-    const file = new File(['synthetic'], 'synthetic.png', { type: 'image/png' });
-    vi.mocked(request).mockResolvedValueOnce(asset);
-    fireEvent.change(screen.getByLabelText('Upload wallpaper (PNG/JPEG, at most 8 MiB)'), { target: { files: [file] } });
-    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/assets', { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: file }));
-    fireEvent.click(screen.getByRole('button', { name: 'Use solid native background' }));
-    expect(screen.queryByRole('link', { name: 'View authenticated image' })).toBeNull();
-  });
-
-  it('authors optional native tile presentation with structured controls and removes it without a null field', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Pages' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add components item' }));
-    const componentType = screen.getByLabelText('New item type');
-    const navigationTile = within(componentType).getByRole<HTMLOptionElement>('option', { name: 'navigation-tile' });
-    fireEvent.change(componentType, { target: { value: navigationTile.value } });
-    expect(screen.queryByLabelText('Title Lines')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Include Presentation'));
-    fireEvent.change(screen.getByLabelText('Layout'), { target: { value: 'anchored-bottom' } });
-    fireEvent.change(screen.getByLabelText('Title Lines'), { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText('Selected'), { target: { value: 'none' } });
-    fireEvent.change(screen.getByLabelText('Fill type'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Red'), { target: { value: '42' } });
-    fireEvent.change(screen.getByLabelText('Blue'), { target: { value: '255' } });
-    fireEvent.click(screen.getByLabelText('Include Body Hint'));
-    fireEvent.change(screen.getByLabelText('Body Hint'), { target: { value: 'Opens the authored page' } });
-    vi.mocked(request).mockImplementationOnce(async (_path, init) => ({
-      ...envelope(), revision: 2, document: JSON.parse(String(init?.body)).document,
-    }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/draft', expect.objectContaining({ method: 'PUT' })));
-    const body = JSON.parse(String(vi.mocked(request).mock.calls.at(-1)?.[1]?.body));
-    expect(body.document.pages[0].components[0].props.presentation).toEqual({
-      layout: 'anchored-bottom', titleLines: 2, fill: { type: 'solid-rgb', red: 42, green: 0, blue: 255 },
-      bodyHint: 'Opens the authored page',
-    });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' }).hasAttribute('disabled')).toBe(true));
-    fireEvent.click(screen.getByLabelText('Include Presentation'));
-    expect(screen.queryByLabelText('Title Lines')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(request).toHaveBeenCalledTimes(3));
-    const without = JSON.parse(String(vi.mocked(request).mock.calls.at(-1)?.[1]?.body));
-    expect(without.document.pages[0].components[0].props).not.toHaveProperty('presentation');
-  });
-
-  it('keeps structured local work when advanced JSON/import validation fails', async () => {
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    const name = await screen.findByDisplayValue('Native composition');
-    fireEvent.change(name, { target: { value: 'Local work survives failed import' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Import JSON...' }));
-    fireEvent.change(screen.getByLabelText('Composition JSON'), { target: { value: '{"schemaVersion":"2.0","schemaVersion":"2.0"}' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Validate and apply locally' }));
-    expect(screen.getByRole('alert').textContent).toContain('duplicate_key');
-    expect(screen.getByDisplayValue('Local work survives failed import')).toBeDefined();
-    expect(request).toHaveBeenCalledTimes(1);
+  it('treats a redo as a fresh step and a typing after undo as new work', async () => {
+    const { result, type } = await studio();
+    type('a'); type('ab');
+    act(() => result.current.undo());
+    expect(result.current.canRedo).toBe(true);
+    type('ac');
+    expect(result.current.canRedo).toBe(false);
+    act(() => result.current.undo());
+    expect(result.current.document!.name).not.toBe('ac');
   });
 });
 
@@ -366,50 +242,3 @@ describe('native composition persistence controls', () => {
   });
 });
 
-describe('Publish to Home Assistant', () => {
-  const entry = (revision: number, publishedBy: string | null = 'supervisor-user-id') => ({
-    revision, publishedAt: '2026-11-14T12:00:00+00:00', publishedBy, envelopeSha256: 'b'.repeat(64), capabilities: [],
-  });
-  it('publishes the saved draft, shows the revision, lists history and rolls back after confirmation', async () => {
-    const summary = (current: number, history: number[]) => ({ epoch: 'e', current: entry(current), history: history.map(revision => entry(revision, null)), storedAssets: 0 });
-    let published = false;
-    vi.mocked(request).mockImplementation(async (path, init) => {
-      if (path === '/native/api/ha/publish') { published = true; return { epoch: 'e', revision: 2, envelopeSha256: 'b'.repeat(64), uploadedAssets: 1, skippedAssets: 2 }; }
-      if (path === '/native/api/ha/rollback') { expect(JSON.parse(String(init?.body))).toEqual({ revision: 1 }); published = false; return { epoch: 'e', revision: 3, envelopeSha256: 'b'.repeat(64) }; }
-      if (path === '/native/api/ha/publication') return published ? summary(2, [1]) : summary(3, [2, 1]);
-      return envelope();
-    });
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.click(screen.getByRole('button', { name: 'Publish to Home Assistant' }));
-    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/ha/publish', expect.objectContaining({ method: 'POST', body: JSON.stringify({ expectedRevision: 1 }) })));
-    expect((await screen.findByRole('status')).textContent).toContain('Published to Home Assistant as revision 2');
-    fireEvent.click(screen.getByRole('button', { name: 'Home Assistant' }));
-    expect(await screen.findByText('1 image uploaded, 2 already stored', { exact: false })).toBeTruthy();
-    const rows = await screen.findAllByRole('row');
-    expect(rows.map(row => within(row).queryByRole('rowheader')?.textContent)).toEqual([undefined, 'r2current', 'r1']);
-    expect(within(rows[2]).getByText('unknown')).toBeTruthy();
-    expect(within(rows[1]).queryByRole('button')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll back to revision 1' }));
-    expect(request).not.toHaveBeenCalledWith('/native/api/ha/rollback', expect.anything());
-    fireEvent.click(await screen.findByRole('button', { name: 'Roll back' }));
-    await waitFor(() => expect(request).toHaveBeenCalledWith('/native/api/ha/rollback', expect.objectContaining({ method: 'POST' })));
-    expect((await screen.findByRole('status')).textContent).toContain('Home Assistant now serves revision 3');
-  });
-
-  it('shows Home Assistant errors and keeps local edits', async () => {
-    vi.mocked(request).mockImplementation(async path => {
-      if (path === '/native/api/ha/publish') throw new ApiError('Home Assistant refused the request: publishing needs an administrator.', 502);
-      if (path === '/native/api/ha/publication') throw new ApiError('Home Assistant is not configured', 503);
-      return envelope();
-    });
-    render(<NativeCompositionWorkspace active onLegacy={() => {}}/>);
-    await screen.findByDisplayValue('Native composition');
-    fireEvent.change(screen.getByDisplayValue('Native composition'), { target: { value: 'Edited' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Publish to Home Assistant' }));
-    expect((await screen.findByRole('alert')).textContent).toContain('needs an administrator');
-    expect(screen.getByText('Unsaved local changes')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Home Assistant' }));
-    await waitFor(() => expect(screen.getAllByRole('alert').map(item => item.textContent).join()).toContain('not configured'));
-  });
-});

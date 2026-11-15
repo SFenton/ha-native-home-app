@@ -1,0 +1,19 @@
+Add to
+Home
+Cancel
+Tiles
+Entities
+Action tile
+Toggle
+Navigation tile
+Section
+Tile grid
+Status rail
+Row
+Button
+Text
+Settings link
+
+[names]
+Search tiles and entities
+Kind

@@ -15,15 +15,11 @@
     "check:release": "tsx scripts/release.ts check"
   },
   "dependencies": {
+    "@base-ui/react": "1.9.0",
     "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "devices.css": "^0.2.0",
+    "@tanstack/react-virtual": "3.14.24",
     "express": "^5.1.0",
-    "hls.js": "^1.7.4",
     "lucide-react": "^0.468.0",
-    "modern-screenshot": "4.7.0",
-    "motion": "14.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsx": "^4.20.0",

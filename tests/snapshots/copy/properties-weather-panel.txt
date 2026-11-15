@@ -1,0 +1,49 @@
+Weather
+Weather · Home
+Title
+Entity
+Weather
+Loading text
+Empty message
+Stale text
+Error text
+Open text
+Width
+Panel
+Summary
+Hero
+Briefing
+Hourly
+Daily
+Highlights
+Modes
+3
+Starts with
+Condition
+Precipitation
+Wind
+Highlights
+0
+Hours, compact
+Hours, regular
+Behaviour
+When tapped
+Opens Weather
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Weather
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

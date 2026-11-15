@@ -1,0 +1,32 @@
+Kept on this device while a page is open. Not saved to Home Assistant.
+hc-climate-tab
+Choice · Rooms
+Add State
+
+[first row]
+Local State
+hc-climate-tab
+Name
+Kind
+Choice
+On-off
+Number
+Text
+Options
+Option 1
+Remove
+Option 2
+Remove
+Option 3
+Remove
+Add Option
+Starting value
+Rooms
+Automation
+Tracking
+Remove State
+
+[names]
+Remove Rooms
+Remove Automation
+Remove Tracking

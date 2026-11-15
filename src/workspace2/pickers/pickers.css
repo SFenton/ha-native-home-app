@@ -1,0 +1,57 @@
+/* Pickers, the add picker, the editors and drag and drop (studio-ux phase 2). Colours come from the --w2-* tokens only. */
+.w2-picker-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 48px; }
+.w2-picker-row[data-stacked] { grid-template-columns: minmax(0, 1fr); }
+.w2-scope button.w2-picker-button { justify-content: space-between; width: 100%; min-height: 40px; height: auto; padding: 4px 10px; text-align: start; background: var(--w2-field); border-color: transparent; }
+.w2-picker-face { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.w2-picker-glyph, .w2-entity-icon { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--w2-field); color: var(--w2-ink-card); }
+.w2-picker-text { display: flex; flex-direction: column; min-width: 0; }
+.w2-picker-primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-picker-secondary { color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.w2-placeholder { color: var(--w2-muted); }
+.w2-scope .w2-picker-pop { width: 360px; max-width: calc(100vw - 24px); padding: 8px; }
+.w2-picker-page { padding: 8px 12px 12px; }
+.w2-vlist { overflow-y: auto; border-radius: 8px; contain: strict; }
+.w2-vlist-empty { contain: none; display: flex; align-items: center; justify-content: center; min-height: 96px; }
+.w2-entity-list, .w2-icon-list, .w2-service-list { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.w2-scope button.w2-entity-row, .w2-scope button.w2-icon-row { width: 100%; height: 100%; justify-content: flex-start; gap: 10px; padding: 4px 8px; border-color: transparent; text-align: start; border-radius: 8px; }
+.w2-scope button.w2-icon-row { height: 48px; }
+.w2-entity-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.w2-entity-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-entity-id { color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.w2-entity-meta, .w2-entity-state { flex: none; color: var(--w2-muted); font-size: 12px; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-icon-scroll { overflow-y: auto; max-height: 360px; }
+.w2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.w2-scope button.w2-chip { min-height: 28px; padding: 0 10px; border-radius: 14px; font-size: 12px; }
+.w2-scope button.w2-chip[aria-pressed=true] { background: var(--w2-primary-fill); border-color: var(--w2-primary-fill); color: var(--w2-on-primary); }
+.w2-chip-remove { margin-inline-start: 2px; }
+@media (pointer: coarse) { .w2-scope button.w2-chip { min-height: 44px; } .w2-scope button.w2-picker-button { min-height: 44px; } }
+
+/* Editors (spec 5.5) */
+.w2-editor-head { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; padding-inline: 8px 16px; }
+.w2-editor-head h2 { text-align: center; }
+.w2-editor-item { color: var(--w2-muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-editor-body { padding: 0; min-height: 280px; }
+.w2-editor-body .w2-pushed-body, .w2-editor-page { padding: 8px 16px 16px; }
+.w2-editor-foot { justify-content: flex-end; }
+.w2-scope button.w2-editor-remove { margin-inline-end: auto; color: var(--w2-error, #d32f2f); border-color: transparent; }
+.w2-scope button.w2-editor-remove-narrow { margin-top: 16px; width: 100%; }
+.w2-scope button.w2-danger-button { background: var(--w2-error, #d32f2f); border-color: var(--w2-error, #d32f2f); color: #fff; }
+.w2-editor-section { display: flex; flex-direction: column; gap: 4px; padding-block: 4px; }
+.w2-kind-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-block: 8px; }
+.w2-field-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 48px; }
+.w2-field-label { display: flex; flex-direction: column; min-width: 0; color: var(--w2-muted); font-size: 13px; }
+.w2-field-label code { color: var(--w2-muted); font-size: 11px; }
+.w2-target-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.w2-scope .w2-chip-remove { min-height: 20px; width: 20px; padding: 0; border: 0; border-radius: 10px; }
+.w2-json { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.w2-rule-sentence { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--w2-line); }
+.w2-rule-parts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.w2-rule-group { margin: 6px 0 6px 12px; padding-inline-start: 10px; border-inline-start: 2px solid var(--w2-line); }
+.w2-rule-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 0; }
+.w2-rule-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 8px; }
+.w2-rule-actions > .w2-picker-row { flex: 1 1 11rem; min-height: 0; }
+@media (max-width: 420px) { .w2-field-row { grid-template-columns: minmax(0, 1fr) auto; } .w2-field-row .w2-field-control { grid-column: 1 / -1; grid-row: 2; } }
+.w2-choice-list { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow-y: auto; }
+.w2-scope button.w2-choice { justify-content: flex-start; width: 100%; min-height: 48px; border-color: transparent; text-align: start; padding: 4px 10px; }
+.w2-scope button.w2-choice[aria-selected=true] { background: var(--w2-selected); }
+.w2-scope button.w2-choice-create { color: var(--w2-primary); font-weight: 600; }

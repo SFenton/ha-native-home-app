@@ -1,0 +1,39 @@
+Summary
+Row · Demo Room 1 Lights
+Title
+Icon
+Add
+Title
+From an entity
+Subtitle
+Fixed value
+Value
+Fixed value
+Loading text
+Unavailable text
+Width
+Accessory
+None
+Disclosure
+Behaviour
+When tapped
+Nothing
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+Add Icon
+
+[advanced]
+Summary
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

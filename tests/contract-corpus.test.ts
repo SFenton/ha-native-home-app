@@ -72,9 +72,9 @@ describe('shared contract corpus', () => {
     expect(rejected('collection-pull-to-refresh-not-boolean')?.code).toBe('invalid_value');
   });
 
-  it('keeps the shared fixtures identical to the Studio test fixtures', () => {
+  it('keeps the shared fixtures identical to the Studio fixtures', () => {
     for (const name of ['composition-first-slice', 'device-providers', 'home-domains', 'home-primitives', 'remote-composition']) {
-      expect(read(`accept/fixture-${name}.json`).equals(readFileSync(path.resolve(__dirname, `fixtures/${name}.json`)))).toBe(true);
+      expect(read(`accept/fixture-${name}.json`).equals(readFileSync(path.resolve(__dirname, name === 'home-domains' ? '../src/preview2/fixtures/home-domains.json' : `fixtures/${name}.json`)))).toBe(true);
     }
   });
 });

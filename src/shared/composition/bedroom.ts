@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { identifierSchema } from '../schema';
+import { identifierSchema } from '../validation';
 import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;

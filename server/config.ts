@@ -1,6 +1,5 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { loadReadEndpoints, type RegisteredReadEndpoint } from './read-endpoints';
 
 export interface ServerConfig {
   production: boolean;
@@ -11,9 +10,21 @@ export interface ServerConfig {
   haUrl?: string;
   haToken?: string;
   supervisorToken?: string;
-  enableLiveActions: boolean;
   ingress?: { proxyAddress: string; path: string };
-  readEndpoints?: readonly RegisteredReadEndpoint[];
+}
+
+/**
+ * Local development: not production, no Supervisor Ingress, no Supervisor credential and no `STUDIO_AUTH_TOKEN`.
+ * Every route works without signing in; setting a token (or running behind Ingress or in production) turns protection on.
+ */
+export function localDevelopment(config: Pick<ServerConfig, 'production' | 'ingress' | 'authToken' | 'supervisorToken'>) {
+  return !config.production && !config.ingress && !config.authToken && !config.supervisorToken;
+}
+
+/** True for a loopback bind address (`localhost`, `127.0.0.0/8`, `::1`, or the IPv4-mapped form). */
+export function isLoopbackHost(host: string) {
+  const bare = host.replace(/^\[|\]$/g, '').replace(/^::ffff:/i, '').toLowerCase();
+  return bare === 'localhost' || bare === '::1' || /^127(?:\.\d{1,3}){3}$/.test(bare);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -35,8 +46,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     authToken: env.STUDIO_AUTH_TOKEN || undefined,
     haUrl, haToken: env.HA_TOKEN,
     supervisorToken: env.SUPERVISOR_TOKEN,
-    enableLiveActions: env.ENABLE_LIVE_ACTIONS === 'true',
-    readEndpoints: loadReadEndpoints(env.STUDIO_READ_ENDPOINTS_FILE, env, [env.HA_TOKEN ?? '', env.SUPERVISOR_TOKEN ?? '', env.STUDIO_AUTH_TOKEN ?? '']),
   };
 }
 

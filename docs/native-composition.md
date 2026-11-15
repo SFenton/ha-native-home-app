@@ -156,12 +156,12 @@ and Typography (Dynamic Type), and Motion (the existing reduced-motion branch).
 The module-list, primary-button, segmented-choice and page-section-header atlas
 entries remain the design references; no device/visual certification is implied.
 
-## Separate workspace and durable storage
+## Workspace and durable storage
 
-The header's **Native composition** button opens a separate 2.0 authoring
-workspace. The 1.0 workspace and `/api/*` APIs remain available, including
-unsaved local edits when switching between workspaces. There is no automatic
-conversion or import of schema-1 documents.
+The Studio has one workspace, the 2.0 workspace. Files an earlier Studio left
+beside the composition namespace (`draft.json`, `published.json`, `revisions/`
+and `feedback/` from the retired schema-1 workspace) are never read, validated,
+migrated or removed, and a new data directory does not create them.
 
 `StudioStore` holds the existing exclusive `DATA_DIR` lock and opens a
 `native-v2/` namespace beneath that same directory:
@@ -293,14 +293,21 @@ Conflicts retain local edits, offer confirmed reload/discard, or explicit
 keep-local replacement against a newly read revision. Undo/redo, failed import
 and delayed save responses retain local work.
 
-This slice supports up to five native tabs, grouped chrome, column pages,
-canonical fitted/full-height local-stack sheets, text/grids/navigation/power tiles, typed HA-entity,
+This slice supports up to five native tabs, grouped chrome, column pages
+(`navigation-columns`, with `onDemand` and `standalone`), canonical fitted or
+full-height local-stack sheets, sheets that open beside their list when there is
+room (`adaptive`), full-screen sheets (which cannot also be adaptive), routes
+with aliases, keywords, Siri suggestions and viewer rules,
+text/grids/navigation/power tiles, typed HA-entity,
 power/alarm/lock/garage/camera models, inventory and todo summaries, configured vacuum controls,
 and same-publisher PNG/JPEG backdrops. Power toggles are
-limited to `switch` and `input_boolean`. Content-image assets/nodes, forms/local
-variables, route arguments, extended tabs, arbitrary styling/fonts, other service
-models, external asset URLs and full-screen modals are
-not supported. It adds no product-specific feature dispatcher.
+limited to `switch` and `input_boolean`. Content-image assets/nodes, forms,
+arbitrary styling/fonts, other service
+models and external asset URLs are
+not supported. Navigation that is not supported yet: route arguments, assigning a
+page to a pane (`content-panes`), per-section Duo sides (`section-sides`), more
+than five tabs or flyout items (`sh.extended-tabs@1`) and a custom back target.
+It adds no product-specific feature dispatcher.
 
 ## Publishing to Home Assistant
 
@@ -403,7 +410,7 @@ This is **not** a pixel-perfect browser/native preview or full production parity
 The parent must deploy matching server and client artifacts together, configure
 the authenticated `/native` endpoint, extend typed native primitives for further
 curations, and perform native preparation/device comparison. The production
-server, live `dist/`, existing saved 1.0 data and `ENABLE_LIVE_ACTIONS` must not be
+server, live `dist/` and existing saved data must not be
 changed by validation.
 
 ## Contract with the app
@@ -445,7 +452,34 @@ Rules the corpus pins down:
   `stateStyles: { type: "state-styles@1", styles: [...] }` (at most 32) and a page may carry `state-tile` nodes. The capability is
   required when either is present. See [State styles](#state-styles-shstate-style1) below.
 
-The schema-1 workspace is a design-only preview: it publishes to no reader, and its publish endpoints were retired.
+## Additional capability notes
+
+Schema-2 configured remotes accept the native `speakerdevice` argument as an
+array of at most 16 entity IDs. Its use, including in a conditional command,
+requires `sh.remote-speaker-targets@1`. Existing `sonosdevice` calls retain their
+original capability requirements; unknown argument fields are still rejected.
+The read-only `wake-summary` bedroom atom exposes canonical modal status copy,
+typography and alerts through `sh.wake-summary@1`; it requires a wake-light provider.
+`wake-hold.showsExplanation` opts into the integration-aware hold footnote through
+`sh.wake-hold-explanation@1`. Text supports secondary-ink Dynamic Type subheadline
+and footnote styles through `sh.supporting-text-styles@1`; original styles remain unchanged.
+`section-title` text uses the native sheet's bold title3 font and accessibility
+heading trait through `sh.section-title@1`, without changing existing page headers.
+`wake-stop.episode` adds the canonical active-episode card through `sh.wake-episode@1`,
+with editable heading, detail and pending label. Omission keeps the original button.
+Alarm name/type fields expose optional `showsHeading` through
+`sh.bedroom-field-headings@1`; weekday choices can pair abbreviated visible labels
+with `accessibilityLabel` through `sh.weekday-accessibility-labels@1`.
+Surface `titleSourceId` (`sh.surface-title-source@1`) must name an alarm draft
+used on that surface. The native title stays tied to the opened alarm until reload.
+`alarm-feedback` offers shared native `error` and `problems` slots through
+`sh.alarm-feedback@1`; place the error slot at the top level to avoid repeating
+provider feedback under individual fields. Draft state controls Reload, Delete,
+creation-only bed targets and guarded Back without authoring a second save flow.
+Wake `alarm-delete` questions offer `messageFormat: "wake-alarm"` through
+`sh.wake-alarm-confirmation@1`. Edit the message normally, using `{time}` and
+`{schedule}` for the opened alarm's details. Other placeholders, malformed braces
+and non-wake draft sources are rejected. Omit the format for literal copy.
 
 ## Configured live adapters
 
@@ -588,19 +622,27 @@ A tile applies a style by id:
   without the capability keeps the built-in style; a state no rule names resolves to `fallback`.
 - **An unavailable or unknown entity** takes the style's first rule of the `unknown` class, whatever the authored `fallback` says.
   A style with none gets one made for it, as the app does: the node's own icon, the words "Unavailable", unlit, and an untappable
-  copy of the style's first action. The preview (`ruleFor`, `unknownRuleFor`) draws the same.
+  copy of the style's first action. The shared resolver (`ruleFor`, `unknownRuleFor` in `state-styles.ts`) resolves the same; the 2.0 preview does not yet draw it.
 - **Built-in styles** (`garage-door`, `lock`, `blind`, `alarm`, `robot`, `detector`, `notice`, `switch`) are data in
   `state-styles.ts` and in `contract/corpus/state-styles/built-in.json`. The app decodes that file and tests it equal to its own
   `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Regenerate with `scripts/generate-state-style-corpus.ts`.
 
-**Authoring** (the Styles section, `src/StateStyles.tsx`). The library lists the built-ins read-only; Duplicate makes a saved
-style, Rename and Delete apply to saved styles, and Delete is blocked while a tile uses the style ("Used by N tiles"; editing a
-used style warns how many tiles change). The state-map editor offers the arc spinner only for a state with no action ("No arc while
-this state has an action") and names the iOS 17 fallbacks beside Breathe (Pulse) and Wiggle (Bounce). A tile's per-state overrides
-are one layer each, with reset, and Save as New Style folds them into a saved style. The picker lists live entities and fills a
-state map from Home Assistant's own states and translated names; states seen only in history are listed as unclassified, and the
-map always ends in a fallback. The preview (`state-style-preview.ts`) resolves a state the way the app does and draws it at iPhone,
-Duo and iPad widths, with the 0.2 s disc and arc cross-fade and the VoiceOver value ("dimmed" while the arc shows).
+**Authoring.** The 1.0 Styles section is gone with the 1.0 workspace, and the 2.0 editor for state styles has not landed. What
+exists now: the contract and the corpus above (a style library, per-state rules, per-tile overrides), validation, and the shared
+resolver (`state-styles.ts`). The 2.0 preview draws a state tile as a placeholder. A state tile's style
+and overrides are therefore edited only as raw rows under Advanced. Not ported to 2.0 yet:
+
+1. The style library editor: built-ins listed read-only, Duplicate, Rename, Delete (blocked while a tile uses the style), the
+   ordered state-map rules (class, icon, text, indicator and colour menus, "Colour follows the class", the arc only for a state
+   with no action, the iOS 17 fallbacks), Save as New Style, the "used by" line, and the request-phase settings with a warning
+   when a script or timer does not exist.
+2. An entity picker that fills a state map from live states and translated names, flagging states seen only in history. Its
+   server routes stay (below); nothing in 2.0 calls them.
+3. The side-by-side style preview at iPhone, Duo and iPad tile widths, with the arc in the disc's place and the dimmed
+   VoiceOver value.
+4. The per-tile override editor (icon, text, indicator and colour layers, each with reset).
+5. An Add picker entry that creates a state tile with the built-in style its device class suggests.
+6. A drawn state tile in the 2.0 preview, resolving a state with `ruleFor` and `unknownRuleFor`.
 
 The picker reads Home Assistant through three read-only endpoints (`GET /native/api/ha/entities?domain=`,
 `/native/api/ha/entity-states?entityId=`, `/native/api/ha/exists?id=`) in `server/ha-entities.ts`: the entity list, a domain's states

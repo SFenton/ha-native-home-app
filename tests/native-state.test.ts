@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HomeAssistantClient } from '../server/ha';
 import { nativeHomeSnapshot, readNativeSnapshot, type NativeHouseConfig } from '../server/native-home';
 
 const credentials = ['fixture-ha-private-token', 'fixture-studio-private-token'];
@@ -440,30 +439,5 @@ describe('native authenticated identity and bounded forecast reads', () => {
     expect(snapshot.states[0].temperature).toBe(0);
     expect(snapshot.warnings).toHaveLength(2);
     expect(fixture.sockets[0].closed).toBe(true);
-  });
-
-  it('uses the verified profile adapter and leaves no-HA sample behavior unchanged', async () => {
-    const fixture = transport();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(fixture.states)));
-    vi.stubGlobal('fetch', fetchMock);
-    const source = { id: 'profile', name: 'Profile', kind: 'native-home' as const, endpoint: 'house-profile', sample: { name: 'Editable sample' }, refreshSeconds: 30 };
-    const config = { production: false, port: 4800, host: '127.0.0.1', dataDir: 'unused', enableLiveActions: false };
-    const sample = new HomeAssistantClient(config);
-    const live = new HomeAssistantClient({ ...config, haUrl: 'http://fixture.invalid', haToken: credentials[0], authToken: credentials[1] });
-    try {
-      expect(await sample.data(source)).toEqual({ mode: 'sample', data: source.sample });
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect((await live.data(source)).data).toEqual({ id: identity.id, name: identity.name, isOwner: false, isAdmin: true, personEntityId: 'person.linked' });
-      expect(fetchMock).toHaveBeenCalledExactlyOnceWith('http://fixture.invalid/api/states', expect.objectContaining({ method: 'GET', redirect: 'error' }));
-    } finally { sample.close(); live.close(); }
-  });
-
-  it('fails the profile adapter explicitly when HA cannot identify its authenticated user', async () => {
-    const fixture = transport({ user: { ...identity, name: null } });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(fixture.states))));
-    const client = new HomeAssistantClient({ production: false, port: 4800, host: '127.0.0.1', dataDir: 'unused', enableLiveActions: false, haUrl: 'http://fixture.invalid', haToken: credentials[0] });
-    try {
-      await expect(client.data({ id: 'profile', name: 'Profile', kind: 'native-home', endpoint: 'house-profile', sample: {}, refreshSeconds: 30 })).rejects.toMatchObject({ status: 502 });
-    } finally { client.close(); }
   });
 });

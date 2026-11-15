@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { identifierSchema as id } from '../schema';
+import { identifierSchema as id } from '../validation';
 import { visibilityFields } from './expression';
 import { symbolUnavailable } from './symbol-unavailable';
 

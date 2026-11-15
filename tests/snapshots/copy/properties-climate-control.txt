@@ -1,0 +1,26 @@
+Demo Room 1
+Climate · Demo Room 1
+Title
+Width
+Behaviour
+When tapped
+Nothing
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Demo Room 1
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Settings
+
+[names]
+Add While the state is unknown

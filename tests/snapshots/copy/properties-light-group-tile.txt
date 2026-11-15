@@ -1,0 +1,25 @@
+Demo Room 1 Lights
+Light group tile · Demo Room 1 Lights › Lights
+Title
+Entity
+light.demo_entity_307
+Width
+Behaviour
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Demo Room 1 Lights
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+
+[names]
+Add While the state is unknown

@@ -1,0 +1,25 @@
+Tabs
+Tab bar
+Tab bar
+· 3 of 5
+Home
+Home
+Opens First
+Security
+Security
+Climate
+Climate
+Add Tab
+iPad shows these in its sidebar.
+
+[names]
+Close
+Home, Home
+Move Home up
+Move Home down
+Security, Security
+Move Security up
+Move Security down
+Climate, Climate
+Move Climate up
+Move Climate down

@@ -1,0 +1,22 @@
+Home
+Page settings
+Title
+Icon
+House
+Title from
+Add
+Header buttons
+Same as app
+Custom
+Open pages beside this one
+Used when the window is wide enough for two.
+Opens from outside the app
+0
+Opened from
+Home
+Tab
+Advanced
+
+[names]
+Close
+Add Title from

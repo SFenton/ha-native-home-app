@@ -1,0 +1,37 @@
+Demo Guests 1
+Action tile · Home › Guests
+Title
+Icon
+Power
+Entity
+input_boolean.demo_entity_122
+On text
+Off text
+Width
+Colour
+Neutral
+Lights
+Occupancy
+Behaviour
+When tapped
+Toggle Power
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Demo Guests 1
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Action order
+1
+
+[names]
+Add While the state is unknown

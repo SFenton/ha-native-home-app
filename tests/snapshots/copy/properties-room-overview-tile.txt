@@ -1,0 +1,43 @@
+Demo Device 1
+Room overview tile · Demo Room 1 Climate › Temperature Sensors
+Title
+Icon
+Thermometer
+Entity
+Home status · climate
+Width
+By state
+0
+Fill
+Standard
+Announce changes
+None
+Value change
+Hide contact subtitle
+Behaviour
+When tapped
+Nothing
+Visible when
+Always
+Advanced
+
+[names]
+More
+Close
+
+[advanced]
+Demo Device 1
+Advanced
+ID
+Copy
+While the state is unknown
+Add
+Glyph
+Add
+Power
+Add
+
+[names]
+Add While the state is unknown
+Add Glyph
+Add Power

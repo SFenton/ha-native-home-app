@@ -1,0 +1,38 @@
+Security System
+Sheet settings
+Title
+Icon
+House
+Title from
+Add
+Height
+Fitted
+Full
+Width on iPad
+Form
+Page
+Appearance
+System
+Dark
+Open beside the list when there is room
+Full screen
+Close button
+First page only
+Every page
+Header buttons
+Same as app
+Custom
+Leading
+Add Button
+Trailing
+Add Button
+Opened from
+Security
+Home
+Security
+Security
+Advanced
+
+[names]
+Close
+Add Title from
