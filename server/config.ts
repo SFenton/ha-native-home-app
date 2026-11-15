@@ -1,6 +1,5 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { loadReadEndpoints, type RegisteredReadEndpoint } from './read-endpoints';
 
 export interface ServerConfig {
   production: boolean;
@@ -11,9 +10,7 @@ export interface ServerConfig {
   haUrl?: string;
   haToken?: string;
   supervisorToken?: string;
-  enableLiveActions: boolean;
   ingress?: { proxyAddress: string; path: string };
-  readEndpoints?: readonly RegisteredReadEndpoint[];
 }
 
 /**
@@ -49,8 +46,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     authToken: env.STUDIO_AUTH_TOKEN || undefined,
     haUrl, haToken: env.HA_TOKEN,
     supervisorToken: env.SUPERVISOR_TOKEN,
-    enableLiveActions: env.ENABLE_LIVE_ACTIONS === 'true',
-    readEndpoints: loadReadEndpoints(env.STUDIO_READ_ENDPOINTS_FILE, env, [env.HA_TOKEN ?? '', env.SUPERVISOR_TOKEN ?? '', env.STUDIO_AUTH_TOKEN ?? '']),
   };
 }
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { replaceAt } from '../../composition-editor';
-import { uid } from '../../editor';
+import { createId as uid } from '../../shared/ids';
 import { updateRoute, usedPaths, words, type AuthoredRoute } from '../../routes-editor';
 import { Field, TextField } from '../../ui';
 import { Disclosure, useRows } from '../rows';

@@ -1,5 +1,5 @@
 import type { CompositionDocument, CompositionNode } from '../../shared/composition/schema';
-import { uid } from '../../editor';
+import { createId as uid } from '../../shared/ids';
 
 /** An SF Symbol reference as the document stores it. */
 export const symbol = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'reject' as const });

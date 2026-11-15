@@ -1,5 +1,5 @@
 import type { CompositionDocument, CompositionNode } from '../../shared/composition/schema';
-import { uid } from '../../editor';
+import { createId as uid } from '../../shared/ids';
 import { compositionEditorSchema, removeCompositionItem, replaceAt, selectedVariant, type EditorPath } from '../../composition-editor';
 import { compilerIssues } from '../checks';
 import { collectLinks, type SurfaceRef } from '../outline';

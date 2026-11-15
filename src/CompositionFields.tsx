@@ -6,8 +6,8 @@ import { useState, type ReactElement } from 'react';
 import { CallServiceEditor, OperandEditor, PredicateBuilder } from './GrammarEditors';
 
 /**
- * Opt-in behaviour for the 2.0 workspace. Without it the form renders exactly as the 1.0 workspace expects: generated
- * labels, "Include" checkboxes and fixed values listed.
+ * Opt-in behaviour for the workspace. Without it the form renders its plain default: generated labels, "Include"
+ * checkboxes and fixed values listed.
  */
 export type FieldOptions = {
   /** The authored label for a field, or undefined for the mechanical one. */

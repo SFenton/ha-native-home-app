@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from './shared/composition/schema';
 import { compileCompositionDocument } from './shared/composition/compiler';
 import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON } from './shared/composition/json';
-import { uid } from './editor';
+import { createId as uid } from './shared/ids';
 import type { Json } from './shared/types';
 import { formatCompositionIssue } from './shared/composition/workspace';
 

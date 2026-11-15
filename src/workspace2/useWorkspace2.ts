@@ -5,7 +5,7 @@ import { useHouseStates } from '../preview2/useHouseStates';
 import { buildDocumentIndex, parseSelectionKey, selectionKey, type DocumentIndex, type SelectionKey } from '../preview2/model';
 import { canonicalCompositionJSON } from '../shared/composition/json';
 import type { CompositionDocument } from '../shared/composition/schema';
-import type { HaPublicationSummary } from '../HomeAssistantPublication';
+import type { HaPublicationSummary } from '../ha-publication';
 import { runChecks, type Checks } from './checks';
 import type { PreviewSurface } from './preview';
 
@@ -35,7 +35,7 @@ const firstSurface = (document: CompositionDocument): PreviewSurface => {
 
 /**
  * The 2.0 workspace's state: the composition studio plus autosave, the status tag, Publish, Checks, the selection and
- * what the properties surface shows. It wraps `useCompositionStudio` (shared with the 1.0 workspace) and changes nothing in it.
+ * what the properties surface shows. It wraps `useCompositionStudio`.
  */
 export function useWorkspace2(active: boolean) {
   const studio = useCompositionStudio();

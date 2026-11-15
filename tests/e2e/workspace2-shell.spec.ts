@@ -29,7 +29,7 @@ test('the workspace opens on the preview with few controls, and a selection adds
   expect(selected.length, selected.join(', ')).toBeLessThanOrEqual(30);
   await snap(page, 'desktop-tile');
   // The old chrome is gone.
-  for (const gone of ['Save draft', 'Publish native', 'Validation', '2.0 workspace']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
+  for (const gone of ['Save draft', 'Publish native', 'Validation', '2.0 workspace', 'Open 1.0 Editor']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: 'Sections' })).toHaveCount(0);
 });
 
@@ -251,18 +251,6 @@ test('every surface speaks the new vocabulary and nothing from the cut list', as
   await page.getByRole('button', { name: 'Close', exact: true }).last().click();
   for (const item of ['Tabs', 'Header Buttons', 'Wallpaper']) { await project(item); await page.getByRole('button', { name: 'Close', exact: true }).click(); }
   await page.getByRole('button', { name: 'Publish' }).click(); await check('publish'); await page.keyboard.press('Escape');
-});
-
-test('Project > Open 1.0 Editor opens the 1.0 editor, and the 2.0 workspace comes back from it', async ({ page }) => {
-  test.skip(isPhone(page), 'Covered at the wide size');
-  await openWorkspace(page);
-  await page.getByRole('button', { name: 'Project' }).click();
-  await page.getByRole('menuitem', { name: 'Open 1.0 Editor' }).click();
-  await expect(page.getByRole('button', { name: '2.0 workspace' })).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('button', { name: '2.0 workspace' })).toBeVisible();
-  await page.getByRole('button', { name: '2.0 workspace' }).click();
-  await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible();
 });
 
 test('the Project menu, Pages and the tab panel work at both sizes', async ({ page }) => {

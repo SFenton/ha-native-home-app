@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { MobileTouchSensor } from '../../mobile-drag';
+import { MobileTouchSensor } from './mobile-drag';
 import type { SelectionKey } from '../../preview2/model';
 import type { Destination } from '../add/insert';
 import type { Workspace2 } from '../useWorkspace2';

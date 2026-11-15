@@ -50,7 +50,7 @@ async function fixture(authenticated = true, overrides: Partial<ServerConfig> = 
   const store = await StudioStore.open(directory);
   cleanup.push(() => store.close());
   const application = createApp(store, {
-    production: false, port: 0, host: '127.0.0.1', dataDir: directory, enableLiveActions: false,
+    production: false, port: 0, host: '127.0.0.1', dataDir: directory,
     ...(authenticated ? { authToken: token } : {}), ...overrides,
   });
   application.app.use(application.errorHandler);
@@ -89,9 +89,11 @@ describe('separate authenticated native composition pipeline', () => {
     expect((await f.request('/native/api/draft', 'GET', undefined, reader)).status).toBe(401);
   });
 
-  it('retains schema-1 draft bytes, durable identities, exact publication closure and immutable revisions across restart', async () => {
+  it('retains legacy schema-1 draft bytes, durable identities, exact publication closure and immutable revisions across restart', async () => {
     const f = await fixture();
-    const legacyDraftBytes = await readFile(path.join(f.directory, 'draft.json'));
+    // A schema-1 draft an earlier Studio left behind: never read, never rewritten.
+    const legacyDraftBytes = Buffer.from('{"schemaVersion":"1.0"}\n');
+    await writeFile(path.join(f.directory, 'draft.json'), legacyDraftBytes);
     const first = await f.draft();
     expect(first.document.schemaVersion).toBe('2.0');
     expect((await f.request('/native/api/published')).status).toBe(404);
@@ -499,7 +501,7 @@ describe('Publish', () => {
     vi.stubGlobal('WebSocket', class { constructor(url: string) { urls.push(url); throw new Error('stub'); } });
     try {
       const client = new HomeAssistantClient({
-        production: false, port: 0, host: '127.0.0.1', dataDir: '.', enableLiveActions: false, supervisorToken: 'synthetic-supervisor-token',
+        production: false, port: 0, host: '127.0.0.1', dataDir: '.', supervisorToken: 'synthetic-supervisor-token',
       });
       expect(client.publication.configured).toBe(true);
       await expect(client.publication.get()).rejects.toMatchObject({ status: 502 });

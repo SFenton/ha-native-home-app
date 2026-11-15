@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { assertJsonBounds, DocumentValidationError, entityIdSchema, jsonSchema } from '../src/shared/schema';
+import { assertJsonBounds, DocumentValidationError, entityIdSchema, jsonSchema } from '../src/shared/validation';
 import { nativeClimateRoomEntities } from '../src/shared/native-entities';
 import { nativeTodoItemSchema, nativeTodoReadSchema, choreRecord, choreRecords } from '../src/shared/native-chores';
 import type { NativeCurrentUser, NativeForecast, NativeSnapshot, NativeState } from '../src/shared/native-state';

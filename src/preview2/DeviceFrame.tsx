@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
-import { usePreviewPointer } from '../preview-pointer';
+import { usePreviewPointer } from './preview-pointer';
 
 /** Room the stage keeps around the model, in px at zoom 1. */
 export const STAGE_PADDING = { x: 40, y: 36 } as const;
@@ -38,7 +38,7 @@ export interface DeviceFrameProps {
   zoom: number;
   /** While true a mouse press-and-drag pans the scroller under the pointer, like a finger. */
   pan: boolean;
-  /** Extra transform appended after the scale (the 1.0 3D view). */
+  /** Extra transform appended after the scale (a 3D view). */
   transform?: string;
   stageClassName?: string;
   stageProps?: HTMLAttributes<HTMLDivElement>;
@@ -55,7 +55,7 @@ export interface DeviceFrameProps {
 }
 
 /**
- * The device frame, shared by the 1.0 preview and Preview2: a stage sized to the scaled model, the model itself scaled from
+ * The device frame: a stage sized to the scaled model, the model itself scaled from
  * its centre, and the scroll host behaviour (wheel and touch stay inside, a mouse pans in Interact mode; see
  * `attachPreviewPointer`). It draws nothing inside: callers pass the screen as children and the look as classes.
  */

@@ -3,7 +3,7 @@ import { ApiError, request } from './api';
 import { compileCompositionDocument } from './shared/composition/compiler';
 import { canonicalCompositionJSON, CompositionValidationError } from './shared/composition/json';
 import type { CompositionDocument, CompositionPublication } from './shared/composition/schema';
-import type { HaPublishResult } from './HomeAssistantPublication';
+import type { HaPublishResult } from './ha-publication';
 import { formatCompositionIssue, type CompositionDraft } from './shared/composition/workspace';
 
 /** What the server's import of house-config layout did: what it added, what the draft already authored, what it could not express. */

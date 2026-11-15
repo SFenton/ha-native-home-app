@@ -1,6 +1,6 @@
 import { z } from 'zod/v4';
 import { settingsKinds } from './settings';
-import { identifierSchema } from '../schema';
+import { identifierSchema } from '../validation';
 import { localFieldSchema, localValueSchema } from './shell';
 import { climatePropsSchema, climateSourceSchema } from './climate';
 import { roomDeviceControlSchema, roomDeviceSourceSchema } from './room-devices';

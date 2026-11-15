@@ -1,5 +1,5 @@
 /* The 2.0 workspace chrome. Every colour comes from the --w2-* tokens set by useStudioTheme from Home Assistant's theme
-   (spec section 11); nothing here is a hex palette. Selectors start with .w2-scope so they beat the 1.0 global element rules. */
+   (spec section 11); nothing here is a hex palette. Selectors start with .w2-scope so they beat the global element rules in styles.css. */
 .w2 { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--w2-bg); overflow: hidden; }
 .w2[hidden] { display: none; }
 .w2-scope { font-family: var(--w2-font, system-ui, sans-serif); font-size: 13px; font-weight: 400; line-height: 1.4; color: var(--w2-ink-card, inherit); }
@@ -8,7 +8,7 @@
 .w2-scope :focus-visible { outline: 2px solid var(--w2-primary); outline-offset: 2px; }
 .w2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* Controls: undo the 1.0 global button and input styling inside the new workspace. */
+/* Controls: undo the global button and input styling inside the new workspace. */
 .w2-scope button:where(:not(.w2-stage *)) { font: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--w2-line); border-radius: 8px; background: transparent; color: var(--w2-ink-card); cursor: pointer; }
 .w2-scope button:where(:not(.w2-stage *)):hover:not(:disabled) { background: var(--w2-hover); border-color: var(--w2-line); }
 .w2-scope button:where(:not(.w2-stage *)):disabled { opacity: .5; cursor: not-allowed; }

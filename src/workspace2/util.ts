@@ -1,5 +1,5 @@
 import type { CompositionNode } from '../shared/composition/schema';
-import { uid } from '../editor';
+import { createId as uid } from '../shared/ids';
 
 /** Copies text. The Clipboard API needs a secure context, which LAN HTTP is not, so fall back to a hidden textarea. */
 export async function copyText(text: string): Promise<boolean> {

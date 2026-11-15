@@ -29,7 +29,7 @@ export interface HouseStates {
 
 /**
  * The house states for the 2.0 preview: one read of `/api/native-home` and then a poll, plus an overlay of simulated
- * changes. A simulated service call writes the overlay and never a device. The 1.0 `usePreviewData` is untouched.
+ * changes. A simulated service call writes the overlay and never a device.
  * The overlay survives a poll, so a simulated change stays until reset; a reconnect keeps the last good house.
  */
 export function useHouseStates(document: Pick<CompositionDocument, 'dataSources'> | undefined, options: { enabled?: boolean; refreshSeconds?: number } = {}): HouseStates {

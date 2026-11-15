@@ -49,9 +49,9 @@ function BottomAdd() {
 
 /**
  * The 2.0 workspace, direction A "Preview first" (spec `studio-ux`): the preview is the workspace, and everything else is
- * asked for. `onLegacy` switches to the 1.0 editor.
+ * asked for.
  */
-export default function Workspace2({ active, onLegacy, onCreatePage, onCreateSheet }: { active: boolean; onLegacy: () => void; /** Start the page or sheet creation flow from a picker's "New Page…" or "New Sheet…" row; the row is hidden when absent. */ onCreatePage?: CreateFlow; onCreateSheet?: CreateFlow }) {
+export default function Workspace2({ active, onCreatePage, onCreateSheet }: { active: boolean; /** Start the page or sheet creation flow from a picker's "New Page…" or "New Sheet…" row; the row is hidden when absent. */ onCreatePage?: CreateFlow; onCreateSheet?: CreateFlow }) {
   const theme = useStudioTheme(active);
   const ws = useWorkspace2(active);
   const narrow = useNarrow();
@@ -93,7 +93,7 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <DragLayer ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
-        dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError} onChecks={() => setChecksOpen(true)}/>
+        dialog={dialog} onDialog={setDialog} onPanel={openPanel} onError={showError} onChecks={() => setChecksOpen(true)}/>
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
         {loadingState ?? <div className="w2-stage" data-mode={ws.mode} ref={setStageElement}>{stage}</div>}
         {!narrow && <HandleSlot ws={ws} stage={stageElement} onError={showError}/>}

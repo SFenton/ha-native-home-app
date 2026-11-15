@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { identifierSchema } from '../schema';
+import { identifierSchema } from '../validation';
 import type { CompositionIssue } from './json';
 
 const object = z.strictObject;

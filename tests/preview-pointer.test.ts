@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { attachPreviewPointer, PAN_THRESHOLD } from '../src/preview-pointer';
+import { attachPreviewPointer, PAN_THRESHOLD } from '../src/preview2/preview-pointer';
 
 let root: HTMLElement, scroller: HTMLElement, tile: HTMLButtonElement, slider: HTMLInputElement, row: HTMLElement;
 let detach: () => void;

@@ -39,7 +39,7 @@ try {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   await waitUntilReady(base);
 
-  assert.equal((await fetch(`${base}/api/draft`)).status, 401, 'Direct API access must require authentication');
+  assert.equal((await fetch(`${base}/native/api/draft`)).status, 401, 'Direct API access must require authentication');
   const signIn = await fetch(base);
   assert.equal(signIn.status, 401);
   assert.match(await signIn.text(), /Sign in/i);
@@ -51,9 +51,9 @@ try {
   assert.ok(asset, 'Built HTML must use relative asset paths for Ingress');
   assert.equal((await fetch(new URL(asset, `${base}/`), { headers })).status, 200);
 
-  const draft = await (await fetch(`${base}/api/draft`, { headers })).json();
+  const draft = await (await fetch(`${base}/native/api/draft`, { headers })).json();
   draft.document.name = 'Container persistence check';
-  const savedResponse = await fetch(`${base}/api/draft`, {
+  const savedResponse = await fetch(`${base}/native/api/draft`, {
     method: 'PUT', headers,
     body: JSON.stringify({ document: draft.document, expectedRevision: draft.revision }),
   });
@@ -63,7 +63,7 @@ try {
   const restartedBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${restartedBindings['4800/tcp'][0].HostPort}`;
   await waitUntilReady(base);
-  const restored = await (await fetch(`${base}/api/draft`, { headers })).json();
+  const restored = await (await fetch(`${base}/native/api/draft`, { headers })).json();
   assert.equal(restored.revision, saved.revision);
   assert.equal(restored.document.name, 'Container persistence check');
 
@@ -94,16 +94,11 @@ try {
   const browserErrors = [];
   tab.on('pageerror', error => browserErrors.push(error.message));
   await tab.goto(`http://127.0.0.1:${address.port}${mount}`);
-  await tab.getByLabel('Page title', { exact: true }).waitFor();
-  assert.equal(await tab.getByLabel('Page title', { exact: true }).inputValue(), restored.document.pages[0].title);
-  await tab.getByLabel('Page title', { exact: true }).fill('Ingress route check');
-  await tab.getByRole('button', { name: /^Save/ }).click();
-  await tab.getByText(/Draft saved/).first().waitFor();
-  const ingressDraft = await (await fetch(`${base}/api/draft`, { headers })).json();
-  assert.equal(ingressDraft.document.pages[0].title, 'Ingress route check');
+  await tab.getByRole('button', { name: 'Publish' }).waitFor();
+  await tab.locator('[data-preview-root]').first().waitFor();
   assert.deepEqual(browserErrors, []);
   assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/')), []);
-  console.log('Production container: auth, assets, save, restart persistence, and mounted-path browser routing passed.');
+  console.log('Production container: auth, assets, draft save, restart persistence, and mounted-path workspace load passed.');
 } finally {
   await browser?.close();
   if (proxy) {

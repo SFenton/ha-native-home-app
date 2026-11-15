@@ -24,7 +24,7 @@ function readTheme(): DerivedTheme {
 
 /**
  * Applies the chrome theme to the document root while `active`, follows the parent's theme changes and the system
- * scheme, and removes everything on cleanup so the 1.0 editor keeps its own look.
+ * scheme, and removes everything on cleanup.
  */
 export function useStudioTheme(active: boolean): DerivedTheme {
   const [theme, setTheme] = useState<DerivedTheme>(readTheme);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import { apiUrl, request } from '../api';
-import { uid } from '../editor';
+import { createId as uid } from '../shared/ids';
 import { removeCompositionItem, reorderCompositionItem } from '../composition-editor';
 import type { Json } from '../shared/types';
 import type { UploadedCompositionAsset } from '../shared/composition/workspace';

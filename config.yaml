@@ -17,15 +17,13 @@ panel_icon: mdi:cellphone-cog
 panel_title: S+H Studio
 panel_admin: true
 homeassistant_api: true
-environment:
-  STUDIO_READ_ENDPOINTS_FILE: ""
 ports:
   4800/tcp: null
 ports_description:
   4800/tcp: Optional direct authoring port; configure auth_token before enabling.
 options:
   auth_token: ""
-  enable_live_actions: false
+  enable_live_actions: false # retired with the 1.0 workspace; ignored, kept so saved options still validate
 schema:
   auth_token: password?
   enable_live_actions: bool

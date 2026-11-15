@@ -1,6 +1,5 @@
-import { useCallback, useLayoutEffect, useRef, type ComponentProps } from 'react';
-import { TouchSensor, type DndContext, type SensorProps } from '@dnd-kit/core';
-import { componentCatalog } from './shared/catalog';
+import { useCallback, useLayoutEffect, useRef } from 'react';
+import { TouchSensor, type SensorProps } from '@dnd-kit/core';
 
 type MobileTouchOptions = { activationConstraint: { delay: number; tolerance: number } };
 
@@ -116,19 +115,3 @@ export function useMobileDragGuard(context: string): MobileDragGuard {
   }, []);
   return { begin, finish, invalidate, cancelDrop };
 }
-
-const itemName = (data: Record<string, unknown> | undefined) => {
-  if (typeof data?.title === 'string' && data.title.trim()) return data.title;
-  return componentCatalog.find(entry => entry.type === data?.type)?.label ?? 'component';
-};
-export const mobileDragAccessibility = {
-  screenReaderInstructions: {
-    draggable: 'To pick up a component, press Space or Enter on its drag handle. Use the arrow keys to choose a position. Press Space or Enter to drop, or Escape to cancel. Use Project layer Actions, then Move to, for placement without dragging.',
-  },
-  announcements: {
-    onDragStart: ({ active }) => `Picked up ${itemName(active.data.current)}.`,
-    onDragOver: ({ active, over }) => over ? `Moving ${itemName(active.data.current)} over ${itemName(over.data.current)}.` : 'No drop target. Release to cancel.',
-    onDragEnd: ({ active, over }) => over ? `Dropped ${itemName(active.data.current)}.` : `Move of ${itemName(active.data.current)} canceled.`,
-    onDragCancel: ({ active }) => `Move of ${itemName(active.data.current)} canceled.`,
-  },
-} satisfies NonNullable<ComponentProps<typeof DndContext>['accessibility']>;

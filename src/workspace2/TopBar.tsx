@@ -35,12 +35,12 @@ export function ChecksPill({ ws, narrow, onOpenChange, open, showPill = true }: 
 export interface TopBarProps {
   ws: Workspace2; narrow: boolean; window: PreviewWindow; onWindow: (window: PreviewWindow) => void;
   pagesOpen: boolean; onPagesOpen: (open: boolean) => void; projectOpen: boolean; onProjectOpen: (open: boolean) => void;
-  dialog: DialogKey | undefined; onDialog: (dialog: DialogKey | undefined) => void; onPanel: (panel: PanelKind) => void; onOpen1: () => void; onError: (message: string) => void;
+  dialog: DialogKey | undefined; onDialog: (dialog: DialogKey | undefined) => void; onPanel: (panel: PanelKind) => void; onError: (message: string) => void;
   onChecks: () => void;
 }
 
 /** The top bar: wide shows nine controls, narrow four (spec 3). Before the draft loads only the wordmark shows. */
-export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpen, onPagesOpen, projectOpen, onProjectOpen, dialog, onDialog, onPanel, onOpen1, onError, onChecks }: TopBarProps) {
+export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpen, onPagesOpen, projectOpen, onProjectOpen, dialog, onDialog, onPanel, onError, onChecks }: TopBarProps) {
   const document = ws.document, surface = ws.surface;
   const title = document && surface ? (surface.kind === 'page' ? document.pages : document.modals).find(item => item.id === surface.id) : undefined;
   const blocked = ws.problemCount > 0;
@@ -66,7 +66,7 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
       {!narrow && tag()}
       <button type="button" className="w2-primary" disabled={!narrow && blocked || ws.studio.conflict || ws.studio.busy && ws.phase === 'idle'}
         title={!narrow && blocked ? `Fix ${ws.problemCount} problem${ws.problemCount === 1 ? '' : 's'} to publish.` : undefined} onClick={ws.openPublish}>Publish</button>
-      <ProjectMenu ws={ws} narrow={narrow} onPanel={onPanel} onOpen1={onOpen1} window={current} onWindow={onWindow} onError={onError}
+      <ProjectMenu ws={ws} narrow={narrow} onPanel={onPanel} window={current} onWindow={onWindow} onError={onError}
         open={projectOpen} onOpenChange={onProjectOpen} dialog={dialog} onDialog={onDialog}/>
     </div>
     {narrow && tag('w2-status-narrow')}

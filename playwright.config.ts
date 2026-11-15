@@ -1,31 +1,28 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/** Port and data directory are overridable so parallel runs never collide; the defaults are the shared test studio. */
-const port = process.env.STUDIO_E2E_PORT ?? '4801';
+/**
+ * The Studio's browser tests. The native API always authenticates, so they run their own server with a test token on
+ * their own port and data directory. Both are overridable so parallel runs never collide.
+ */
+const port = process.env.STUDIO_E2E_PORT ?? '4815';
 const dataDir = process.env.STUDIO_E2E_DATA_DIR ?? './test-results/studio-data';
+const token = 'e2e-token-for-workspace2-tests-0001';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  // The 2.0 workspace has its own server and test token, so its specs run from the workspace2 config.
-  testIgnore: /workspace2-.*\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: 'list',
-  use: {
-    baseURL: `http://127.0.0.1:${port}`,
-    // The 1.0 specs drive the 1.0 editor, which is no longer the default workspace.
-    storageState: { cookies: [], origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: 'studio.workspace', value: '1.0' }] }] },
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-  },
+  timeout: 60_000,
+  use: { baseURL: `http://127.0.0.1:${port}`, trace: 'retain-on-failure', screenshot: 'only-on-failure', extraHTTPHeaders: { Authorization: `Bearer ${token}` } },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    // Phone-sized touch run of the preview-edge checks only.
-    { name: 'phone', testMatch: /preview-edge\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, hasTouch: true } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    // The workspace specs also run at phone size with touch; the preview story page is a desktop study.
+    { name: 'phone', testMatch: /workspace2-.*\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 } },
   ],
   webServer: {
-    command: `PORT=${port} DATA_DIR=${dataDir} npm run dev`,
+    command: `STUDIO_AUTH_TOKEN=${token} PORT=${port} DATA_DIR=${dataDir} npm run dev`,
     url: `http://127.0.0.1:${port}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,
