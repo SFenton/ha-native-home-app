@@ -7,6 +7,7 @@ the applicable notices. This inventory does not replace those license texts.
 | Library | Purpose | License |
 | --- | --- | --- |
 | React / React DOM | Declarative editor and preview renderer | MIT |
+| Base UI 1.9.0 (`@base-ui/react`) | Accessible dialog, drawer, popover, menu and toast behaviour for the 2.0 workspace | MIT |
 | dnd-kit core / sortable / utilities | Pointer and keyboard drag-and-drop | MIT |
 | Lucide React | Studio and configurable preview icons | ISC |
 | Devices.css | Available device-frame primitives | MIT |

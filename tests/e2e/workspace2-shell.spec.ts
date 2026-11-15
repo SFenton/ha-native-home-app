@@ -1,0 +1,237 @@
+import { expect, test, type Page } from '@playwright/test';
+import { isPhone, openWorkspace, previewRoot, previewTile, readableText, seed, selectTile, snap, visibleControls } from './workspace2-helpers';
+
+test.beforeEach(async ({ request }) => { await seed(request); });
+
+const publication = (revision: number) => ({ epoch: 'e2e', current: { revision, publishedAt: '2026-11-14T10:00:00Z', publishedBy: null, envelopeSha256: 'a'.repeat(64), capabilities: [] }, history: [], storedAssets: 0 });
+
+/** Stubs the Home Assistant publication endpoints; the Studio never publishes to a real house in a test. */
+async function stubPublication(page: Page, options: { revision?: number; fail?: string } = {}) {
+  let live = options.revision ?? 12;
+  await page.route('**/native/api/ha/publication', route => route.fulfill({ json: publication(live) }));
+  await page.route('**/native/api/ha/publish', route => {
+    if (options.fail) return route.fulfill({ status: 502, json: { error: options.fail } });
+    live += 1;
+    return route.fulfill({ json: { epoch: 'e2e', revision: live, envelopeSha256: 'b'.repeat(64) } });
+  });
+}
+
+test('the workspace opens on the preview with few controls, and a selection adds only its own', async ({ page }) => {
+  test.skip(isPhone(page), 'The control budget is for the wide layout');
+  await openWorkspace(page);
+  const rest = await visibleControls(page);
+  expect(rest.length, rest.join(', ')).toBeLessThanOrEqual(10);
+  await expect(page.getByText('S+H Studio', { exact: true })).toBeVisible();
+  await snap(page, 'desktop-rest');
+  await selectTile(page, 'Lights');
+  const selected = await visibleControls(page);
+  expect(selected.length, selected.join(', ')).toBeLessThanOrEqual(30);
+  await snap(page, 'desktop-tile');
+  // The old chrome is gone.
+  for (const gone of ['Save draft', 'Publish native', 'Validation', '2.0 workspace']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toHaveCount(0);
+});
+
+test('selecting a tile on a phone shows its properties without hiding the tile', async ({ page }) => {
+  test.skip(!isPhone(page), 'The sheet is the narrow layout');
+  await openWorkspace(page);
+  await snap(page, 'phone-rest');
+  const tile = previewTile(page, 'Lights');
+  await tile.click();
+  const sheet = page.getByLabel('Properties');
+  await expect(sheet.getByRole('heading', { name: 'Lights', exact: true })).toBeVisible();
+  await expect(sheet.getByLabel('Title')).toBeVisible();
+  await page.waitForTimeout(700);
+  const box = await tile.boundingBox(), sheetBox = await sheet.boundingBox();
+  expect(box && sheetBox && box.y + box.height <= sheetBox.y + 1, `tile ${JSON.stringify(box)} sits above sheet ${JSON.stringify(sheetBox)}`).toBeTruthy();
+  await snap(page, 'phone-tile');
+  expect((await visibleControls(page)).length).toBeLessThanOrEqual(30);
+});
+
+test('the phone sheet opens at half, snaps to its header, and a swipe down from there closes it', async ({ page }) => {
+  test.skip(!isPhone(page), 'The sheet is the narrow layout');
+  await openWorkspace(page);
+  await previewTile(page, 'Lights').click();
+  const sheet = page.getByLabel('Properties');
+  await expect(sheet.getByLabel('Title')).toBeVisible();
+  await page.waitForTimeout(700);
+  const visibleHeight = async () => { const box = await sheet.boundingBox(); return box ? Math.round(844 - box.y) : 0; };
+  const half = await visibleHeight();
+  expect(half).toBeGreaterThan(330); expect(half).toBeLessThan(500);
+  const cdp = await page.context().newCDPSession(page);
+  const drag = async (from: number, to: number, steps: number, pause: number) => {
+    const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', y?: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: y === undefined ? [] : [{ x: 195, y, id: 1 }] });
+    await send('touchStart', from);
+    for (let step = 1; step <= steps; step++) { await send('touchMove', from + (to - from) * step / steps); await page.waitForTimeout(pause); }
+    await send('touchEnd'); await page.waitForTimeout(800);
+  };
+  // A slow drag of the grabber down to the header-only point, then a quick swipe down from there closes the sheet.
+  await drag(844 - half + 10, 844 - 88 + 10, 40, 25);
+  expect(await visibleHeight()).toBeLessThan(140);
+  expect(await visibleHeight()).toBeGreaterThan(60);
+  await drag(844 - 70, 844, 10, 12);
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByLabel('Properties')).toHaveCount(0);
+});
+
+test('editing a title in properties changes the preview and autosaves', async ({ page }) => {
+  await openWorkspace(page);
+  await selectTile(page, 'Lights');
+  const title = page.getByLabel('Title', { exact: true }).first();
+  await title.fill('Lamps');
+  // The preview follows on the next frame, with no reload.
+  await expect(previewTile(page, 'Lamps')).toBeVisible({ timeout: 1000 });
+  await expect(previewTile(page, 'Lights')).toHaveCount(0);
+  if (!isPhone(page)) {
+    await expect(page.getByTestId('status-tag')).toHaveText('Saving…');
+    await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+  } else await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+  const saved = await (await page.request.get('/native/api/draft')).json();
+  expect(JSON.stringify(saved.document)).toContain('Lamps');
+  await page.reload();
+  await expect(previewTile(page, 'Lamps')).toBeVisible();
+});
+
+test('Publish confirms, publishes through a stubbed Home Assistant and updates the tag', async ({ page }) => {
+  await stubPublication(page, { revision: 12 });
+  await openWorkspace(page);
+  await page.getByRole('button', { name: 'Publish' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Publish to the App?' });
+  await expect(dialog.getByText('Revision 13 replaces revision 12. The app updates right away.')).toBeVisible();
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-publish`);
+  await dialog.getByRole('button', { name: 'Publish' }).click();
+  await expect(page.getByText('Published', { exact: true })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  if (!isPhone(page)) await expect(page.getByTestId('status-tag')).toHaveText('Published · 13', { timeout: 8000 });
+});
+
+test('a publish that fails keeps the dialog open with the reason and Try Again', async ({ page }) => {
+  await stubPublication(page, { fail: 'Home Assistant did not answer.' });
+  await openWorkspace(page);
+  await page.getByRole('button', { name: 'Publish' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Publish' }).click();
+  await expect(dialog.getByText('Home Assistant did not answer.')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Try Again' })).toBeVisible();
+});
+
+test('a save that fails shows Not Saved, the reason under Checks, and recovers with Try Again', async ({ page }) => {
+  await openWorkspace(page);
+  let failing = true;
+  await page.route('**/native/api/draft', route => route.request().method() === 'PUT' && failing ? route.fulfill({ status: 500, json: { error: 'The disk is full.' } }) : route.continue());
+  await selectTile(page, 'Lights');
+  await page.getByLabel('Title', { exact: true }).first().fill('Lamps');
+  await expect(page.getByTestId('status-tag')).toHaveText('Not Saved', { timeout: 8000 });
+  // Wide: the pill. Narrow: a properties sheet hides the pill, so the Not Saved tag opens Checks.
+  await (isPhone(page) ? page.getByTestId('status-tag') : page.getByTestId('checks-pill')).click();
+  await expect(page.getByText('The disk is full.')).toBeVisible();
+  failing = false;
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-not-saved`);
+  await page.getByRole('button', { name: 'Try Again' }).click();
+  await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+});
+
+test('a conflict asks which version to keep, and Decide Later leaves Not Saved with Publish off', async ({ page }) => {
+  test.skip(isPhone(page), 'The disabled Publish is the wide layout');
+  await openWorkspace(page);
+  await page.route('**/native/api/draft', route => route.request().method() === 'PUT' ? route.fulfill({ status: 409, json: { error: 'The draft changed' } }) : route.continue());
+  await selectTile(page, 'Lights');
+  await page.getByLabel('Title', { exact: true }).first().fill('Lamps');
+  const dialog = page.getByRole('dialog', { name: 'This Draft Changed Somewhere Else' });
+  await expect(dialog.getByText('Choose which version to keep.')).toBeVisible({ timeout: 8000 });
+  await expect(dialog.getByRole('button', { name: 'Keep Mine' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Use the Server Version' })).toBeVisible();
+  await snap(page, 'desktop-conflict');
+  await dialog.getByRole('button', { name: 'Decide Later' }).click();
+  await expect(page.getByTestId('status-tag')).toHaveText('Not Saved');
+  await expect(page.getByRole('button', { name: 'Publish' })).toBeDisabled();
+});
+
+test('not signed in, and a draft that will not load, each say so with a way forward', async ({ page }) => {
+  await page.route('**/native/api/draft', route => route.fulfill({ status: 401, json: { error: 'Authentication required for native composition' } }));
+  await page.goto('/');
+  await expect(page.getByText('Not signed in.')).toBeVisible();
+  await expect(page.getByText('Start the Studio with a token. See the README.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-not-signed-in`);
+  await page.unroute('**/native/api/draft');
+  await page.route('**/native/api/draft', route => route.fulfill({ status: 500, json: { error: 'The store is unavailable.' } }));
+  await page.reload();
+  await expect(page.getByText('Couldn’t load the draft.')).toBeVisible();
+  await expect(page.getByText('The store is unavailable.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try Again' })).toBeVisible();
+});
+
+test('every surface speaks the new vocabulary and nothing from the cut list', async ({ page }) => {
+  test.skip(isPhone(page), 'Wide menus and dialogs; the phone sheets share the same bodies');
+  await stubPublication(page);
+  await openWorkspace(page);
+  const forbidden = /First-slice native contract|Stable IDs are read-only|Native policies|Validation|\bschema\b|composition|Native Home|S\+H Native|Studio 2\.0/i;
+  const aboutOnly = /manifest|publisher/i;
+  const check = async (surface: string, allowAbout = false) => {
+    // Capability identifiers (sh.composition@1) are data, listed in About.
+    const text = (await readableText(page)).replace(/sh\.[a-z.-]+@\d+/g, '');
+    expect(text, `${surface} shows a cut word`).not.toMatch(forbidden);
+    if (!allowAbout) expect(text, `${surface} shows a word reserved for About`).not.toMatch(aboutOnly);
+  };
+  await check('rest');
+  await selectTile(page, 'Lights'); await check('tile properties');
+  await page.getByRole('button', { name: 'Advanced' }).click(); await check('advanced');
+  await page.locator('.w2-back').click();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await previewTile(page, 'Home').click(); await expect(page.getByText('Page settings')).toBeVisible(); await check('page settings');
+  await page.getByRole('button', { name: 'Advanced' }).click(); await check('page advanced');
+  await page.locator('.w2-back').click();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Pages' }).click(); await check('pages');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('checks-pill').click(); await check('checks');
+  await page.keyboard.press('Escape');
+  const project = async (item: string, allowAbout = false) => {
+    await page.getByRole('button', { name: 'Project' }).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await page.getByRole('menuitem', { name: item, exact: true }).click();
+    await page.waitForTimeout(300);
+    await check(item, allowAbout);
+  };
+  await page.getByRole('button', { name: 'Project' }).click(); await expect(page.getByRole('menu')).toBeVisible(); await check('project menu'); await page.keyboard.press('Escape'); await expect(page.getByRole('menu')).toHaveCount(0);
+  for (const item of ['Data', 'Local State', 'Links', 'App Launch', 'Live Activities', 'Publish History', 'Import…', 'Edit as JSON…', 'Activity', 'Help']) {
+    await project(item);
+    await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+  }
+  await project('About', true);
+  await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+  for (const item of ['Tabs', 'Header Buttons', 'Wallpaper']) { await project(item); await page.getByRole('button', { name: 'Close', exact: true }).click(); }
+  await page.getByRole('button', { name: 'Publish' }).click(); await check('publish'); await page.keyboard.press('Escape');
+});
+
+test('Project > Open 1.0 Editor opens the 1.0 editor, and the 2.0 workspace comes back from it', async ({ page }) => {
+  test.skip(isPhone(page), 'Covered at the wide size');
+  await openWorkspace(page);
+  await page.getByRole('button', { name: 'Project' }).click();
+  await page.getByRole('menuitem', { name: 'Open 1.0 Editor' }).click();
+  await expect(page.getByRole('button', { name: '2.0 workspace' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '2.0 workspace' })).toBeVisible();
+  await page.getByRole('button', { name: '2.0 workspace' }).click();
+  await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible();
+});
+
+test('the Project menu, Pages and the tab panel work at both sizes', async ({ page }) => {
+  await stubPublication(page);
+  await openWorkspace(page);
+  const tag = isPhone(page) ? 'phone' : 'desktop';
+  await page.getByRole('button', { name: 'Pages' }).click();
+  const pages = page.locator('.w2-pages');
+  await expect(pages.getByRole('button', { name: 'Security' }).first()).toBeVisible();
+  await snap(page, `${tag}-pages`);
+  await page.getByRole('searchbox', { name: 'Find a page' }).fill('climate');
+  await expect(page.getByText('No pages match.')).toHaveCount(0);
+  await pages.getByRole('button', { name: 'Climate' }).first().click();
+  await expect(page.getByRole('button', { name: 'Pages' })).toContainText('Climate');
+  await page.getByRole('button', { name: 'Project' }).click();
+  await snap(page, `${tag}-project`);
+  await page.getByText('Tabs', { exact: true }).first().click();
+  await expect(page.getByText('Tab bar · 3 of 5')).toBeVisible();
+  await expect(page.getByText('The tab bar holds 5.')).toHaveCount(0);
+});

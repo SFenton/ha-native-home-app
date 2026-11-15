@@ -604,3 +604,15 @@ The explicit lists above are the audit record; incidental desktop/HomeKit/game/T
 [mock-fold]: https://github.com/SFenton/native-home/blob/b6a02f0d13806b694ee4b34691b1db524f5e7e7b/.agents/design/mockups/proposals/duo-ipad-fold-layout/duo-ipad-fold-layout.html
 [shot-large]: https://github.com/SFenton/native-home/blob/b6a02f0d13806b694ee4b34691b1db524f5e7e7b/.agents/design/mockups/proposals/weather-card-header/shipped/iPhone-header-large-long.png
 [shot-ax2]: https://github.com/SFenton/native-home/blob/b6a02f0d13806b694ee4b34691b1db524f5e7e7b/.agents/design/mockups/proposals/weather-card-header/shipped/iPhone-header-ax2-long.png
+
+## 15. The 2.0 workspace (phase 1)
+
+The 2.0 workspace is the default. The spec is `build/design/studio-ux/spec.md`; the rules that outlast it:
+
+- **Preview first.** The canvas is the page. Properties appear for the selection only: a 376 px card wide, a bottom sheet narrow (snap points 88 px, half, full; opens at half; a swipe down from the header alone closes it).
+- **Narrow rule.** `(max-width: 870px), (max-height: 500px)`. Targets are 44 px on coarse pointers. One sheet at a time; deeper pages push inside it.
+- **Control budget.** Wide: 9 controls on the top bar. Narrow: 4 on the top bar and Edit/Use below. Add arrives in phase 2.
+- **Fields.** Properties reuse the field generator with a label map (`src/workspace2/labels.ts`); fixed single-value fields are hidden; unmapped fields go to Advanced with a mechanical label.
+- **Words.** Title Case for buttons and menu commands, sentence case elsewhere; the only product name is "S+H Studio".
+- **Theme.** The chrome reads Home Assistant's variables from the parent frame when it is same-origin, follows `prefers-color-scheme` otherwise, corrects derived text colours to 4.5:1, and gives the preview `--studio-selection`. The preview never takes chrome colours.
+- **Saving.** Autosave after 1.5 s with a visible status tag. One Publish; a conflict asks which version to keep.

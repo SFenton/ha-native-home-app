@@ -813,6 +813,8 @@ test('M4 actual Chromium tab zoom at 200 and 400 percent reflows independently f
       hasTouch: false, reducedMotion: 'reduce',
       args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     });
+    // This context is not the config's, so it must ask for the 1.0 editor itself.
+    await zoomContext.addInitScript(() => localStorage.setItem('studio.workspace', '1.0'));
     const forbidden = await guardRequests(zoomContext);
     const worker = zoomContext.serviceWorkers()[0] ?? await zoomContext.waitForEvent('serviceworker', { timeout: 15_000 });
     const zoomPage = zoomContext.pages()[0] ?? await zoomContext.newPage();

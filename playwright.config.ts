@@ -6,12 +6,16 @@ const dataDir = process.env.STUDIO_E2E_DATA_DIR ?? './test-results/studio-data';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // The 2.0 workspace has its own server and test token, so its specs run from the workspace2 config.
+  testIgnore: /workspace2-.*\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: 'list',
   use: {
     baseURL: `http://127.0.0.1:${port}`,
+    // The 1.0 specs drive the 1.0 editor, which is no longer the default workspace.
+    storageState: { cookies: [], origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: 'studio.workspace', value: '1.0' }] }] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

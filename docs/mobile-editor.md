@@ -172,3 +172,7 @@ no user data directory was mounted and no live Studio process was stopped or
 restarted. This image predates the subsequent modal Edit-continuity and Chores
 short-title fixes and the expanded interaction work; it is not their acceptance.
 This is local container evidence, not an installation on Home Assistant.
+
+## The 2.0 workspace on a phone
+
+The narrow layout is the phone layout: the preview fills the screen, the Properties sheet sits over its lower half and never hides the selected tile (the preview scrolls it into view above the sheet through `bottomInset`), Pages and Project open as sheets, and Checks opens from the status tag when a save fails. The 1.0 editor stays reachable from Project > Open 1.0 Editor and its mobile rules above are unchanged.
