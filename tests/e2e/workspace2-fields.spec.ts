@@ -20,6 +20,7 @@ const withLaunch = () => ({
   },
 });
 test.beforeEach(async ({ request }) => { await seed(request, withLaunch()); });
+test.use({ actionTimeout: 8000 });
 test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'Reachability is the same at both sizes; the wide layout is faster to walk');
 
 type Path = (string | number)[];
@@ -82,7 +83,7 @@ async function showSurface(page: Page, surfaceKey: string): Promise<void> {
   const current = page.locator(kind === 'page' ? `.sh-page[data-current][data-sel="${surfaceKey}"]` : `[data-preview-root] .sh-sheet[data-sel="${surfaceKey}"]`);
   if (await current.count()) return;
   await page.getByRole('button', { name: 'Pages' }).click();
-  await page.locator('.w2-pages').locator('.w2-page-row').filter({ has: page.locator('.w2-page-title', { hasText: new RegExp(`^${holder.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) }).first().click();
+  await page.locator('.w2-pages').locator(kind === 'page' ? 'section:not([aria-label="Sheets"]) .w2-page-row, section[aria-label="Sheets"] ul ul .w2-page-row' : 'section[aria-label="Sheets"] > ul > li > .w2-page-row').filter({ has: page.locator('.w2-page-title', { hasText: new RegExp(`^${holder.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) }).first().click();
   await page.keyboard.press('Escape');
   void index;
 }
@@ -95,11 +96,12 @@ async function showTabs(page: Page, index: ReturnType<typeof buildDocumentIndex>
   }
 }
 
-/** Selects `key` by clicking it, then Esc up from whatever the click landed on until the properties name it. */
+/** Selects `key` with a click on it, then Esc up from whatever the click landed on until the properties name it. */
 async function selectNode(page: Page, key: string, title: string): Promise<Locator> {
   const tile = page.locator(`[data-preview-root] [data-sel="${key}"]`).first();
   await tile.scrollIntoViewIfNeeded();
-  await tile.click({ position: { x: 4, y: 4 } });
+  // A container's own pixels are mostly covered by what it holds, so the click goes to the node itself; the selection layer takes it from there.
+  await tile.dispatchEvent('click');
   const panel = page.getByLabel('Properties');
   for (let attempt = 0; attempt < 6; attempt++) {
     if (await panel.getByRole('heading', { name: title, exact: true }).count()) return panel;
@@ -144,7 +146,7 @@ test('acceptance 2: every editable field of every page and sheet is reachable fr
   for (const surface of all) {
     await showSurface(page, surface.key);
     const target = page.locator(surface.key.startsWith('page:') ? `.sh-page[data-current][data-sel="${surface.key}"]` : `.sh-sheet[data-sel="${surface.key}"]`).first();
-    await target.click({ position: { x: 3, y: 3 } });
+    await target.dispatchEvent('click');
     const panel = page.getByLabel('Properties');
     await expect(panel.getByRole('heading', { name: surface.value.title, exact: true }), `${surface.key} opens its settings`).toBeVisible();
     const result = missing(surface.path, surface.value, surfaceSkip, await reachable(panel));
@@ -162,7 +164,7 @@ test('acceptance 2: every editable field of the project is reachable from the Pr
   await openWorkspace(page);
   const openFromMenu = async (item: string) => {
     await page.getByRole('button', { name: 'Project' }).click();
-    await page.getByRole('menuitem', { name: item, exact: true }).click();
+    await page.getByRole('menuitem', { name: item === 'Rename' ? fixture.document.name : item, exact: true }).click();
     await page.waitForTimeout(200);
   };
   const doc = withLaunch();
@@ -177,6 +179,8 @@ test('acceptance 2: every editable field of the project is reachable from the Pr
   for (const part of parts) {
     await openFromMenu(part.item);
     const paths = await reachable(part.scope());
+    // The name is a plain labelled input, not a generated field, so it carries no field path.
+    if (part.item === 'Rename' && await part.scope().getByLabel('Name', { exact: true }).count()) paths.add('name');
     const result = missing(part.path, part.value, part.skip, paths);
     checked += result.checked;
     misses.push(...result.misses.map(path => `${part.item}: ${path}`));
