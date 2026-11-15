@@ -20,8 +20,9 @@ export function ModeSegment({ mode, onChange }: { mode: 'edit' | 'use'; onChange
 
 /** The Checks pill (spec 5.8): "No Problems" or "<n> Problem(s)", opening Checks. */
 export function ChecksPill({ ws, narrow, onOpenChange, open, onGo, showPill = true }: { ws: Workspace2; narrow: boolean; open: boolean; onOpenChange: (open: boolean) => void; onGo: (row: CheckRow) => void; showPill?: boolean }) {
+  // Narrow, problems and a failed save live in the bar's status tag; the pill keeps only the note a simulated tap leaves.
   const count = ws.problemCount, failing = ws.failedSave;
-  const bad = count > 0 || failing;
+  const bad = !narrow && (count > 0 || failing);
   const label = count > 0 ? `${count} Problem${count === 1 ? '' : 's'}` : failing ? 'Not Saved' : 'No Problems';
   const simulated = ws.flash || undefined;
   const pill = <button type="button" className={`w2-pill ${bad ? 'w2-pill-error' : simulated ? 'w2-pill-note' : ''}`} data-testid="checks-pill" hidden={!showPill} onClick={narrow ? () => onOpenChange(true) : undefined}>
@@ -56,10 +57,12 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
   const pageTrigger = <button type="button" className="w2-page-button" aria-label="Pages"><Icon name={title?.icon.name ?? 'grid'} size={18}/><span>{title?.title ?? ''}</span><ChevronDown size={14} aria-hidden/></button>;
   if (!document) return <header className="w2-topbar"><span className="w2-wordmark">S+H Studio</span></header>;
   // Narrow, "Draft · " gives way so the page name keeps its room: the tag reads "Saved".
-  const words = narrow ? ws.status.text.replace(DRAFT, '') : ws.status.text;
-  const tag = (className?: string) => ws.status.tone === 'error'
+  // With problems and nothing unsaved the tag is what says so, and it opens Checks like the wide pill does.
+  const status = narrow && ws.problemCount > 0 && ws.status.tone !== 'error' ? { text: `${ws.problemCount} Problem${ws.problemCount === 1 ? '' : 's'}`, tone: 'error' as const } : ws.status;
+  const words = narrow ? status.text.replace(DRAFT, '') : status.text;
+  const tag = (className?: string) => status.tone === 'error'
     ? <button type="button" className={`w2-tag w2-tag-error w2-tag-button ${className ?? ''}`} data-testid="status-tag" onClick={ws.studio.conflict ? ws.reopenConflict : onChecks}>{words}</button>
-    : <Tag tone={ws.status.tone} role="status" data-testid="status-tag" className={className}>{words}</Tag>;
+    : <Tag tone={status.tone} role="status" data-testid="status-tag" className={className}>{words}</Tag>;
   return <header className="w2-topbar">
     {!narrow && <span className="w2-wordmark">S+H Studio</span>}
     <Overlay narrow={narrow} open={pagesOpen} onOpenChange={onPagesOpen} trigger={pageTrigger} label="Pages" popupWidth={320} fullHeight className="w2-pages-pop">

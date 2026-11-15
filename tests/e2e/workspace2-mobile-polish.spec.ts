@@ -22,19 +22,17 @@ test('the page name has room at 390 px: Security is not cut to "Secu…", and th
   await snap(page, 'phone-top-bar-security');
 });
 
-test('the Problems pill sits below the preview\'s safe area, clear of the Dynamic Island', async ({ page }) => {
+test('the note a Use tap leaves clears the status bar and the Dynamic Island', async ({ page }) => {
   await openWorkspace(page);
-  const panel = await selectTile(page, 'Weather');
-  const title = panel.getByLabel('Title', { exact: true });
-  await title.fill('');
-  await title.blur();
-  await panel.getByRole('button', { name: 'Close', exact: true }).click();
-  const pill = page.getByTestId('checks-pill');
-  await expect(pill).toHaveText('1 Problem');
-  const [pillBox, stageBox] = await Promise.all([pill.boundingBox(), page.locator('.w2-stage').boundingBox()]);
+  await page.getByRole('button', { name: 'Use', exact: true }).click();
+  await page.locator('[data-preview-root] .sh-tab', { hasText: 'Security' }).click();
+  await page.locator('[data-preview-root] .sh-page[data-current] .sh-node[data-type="action-tile"]').first().click();
+  const note = page.getByTestId('checks-pill');
+  await expect(note).toBeVisible();
+  const [noteBox, stageBox] = await Promise.all([note.boundingBox(), page.locator('.w2-stage').boundingBox()]);
   // The iPhone window's safe area is 62 px tall (scaled to the 390 px stage).
-  expect(pillBox!.y - stageBox!.y).toBeGreaterThanOrEqual(60);
-  await snap(page, 'phone-problem-pill');
+  expect(noteBox!.y - stageBox!.y).toBeGreaterThanOrEqual(60);
+  await snap(page, 'phone-use-note-below-island');
 });
 
 test('Undo keeps the properties sheet at the snap point it had', async ({ page }) => {
