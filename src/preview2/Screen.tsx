@@ -54,7 +54,7 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
       <div className="sh-band" data-hinge={geometry.hinge ? '' : undefined} style={{ width: geometry.band }} aria-hidden="true"/>
       <div className="sh-pane" style={{ width: geometry.trailing }} data-pane="detail">
         {detailPage ? <PageView key={`detail:${detailPage.id}`} document={document} page={detailPage} root={false} detail current/>
-          : <p className="sh-placeholder">{panes.placeholder}</p>}
+          : <p className="sh-empty-pane">{panes.placeholder}</p>}
       </div>
     </div>
     : <div className="sh-deck">
