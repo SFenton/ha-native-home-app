@@ -80,10 +80,12 @@ const WHITE: Rgb = { r: 255, g: 255, b: 255, a: 1 }, BLACK: Rgb = { r: 0, g: 0, 
  */
 export function ensureContrast(color: Rgb, ground: Rgb, target: Rgb, minimum = 4.5): Rgb {
   const start = { ...color, a: 1 };
-  if (contrast(start, ground) >= minimum) return start;
+  // A small margin, because the colour is rounded to whole channels when it is written out.
+  const needed = minimum + 0.05;
+  if (contrast(start, ground) >= needed) return start;
   for (let step = 1; step <= 40; step++) {
     const next = mix(start, target, step / 40);
-    if (contrast(next, ground) >= minimum) return next;
+    if (contrast(next, ground) >= needed) return next;
   }
   const opposite = luminance(ground) > 0.179 ? BLACK : WHITE;
   return mix(start, opposite, 1);
@@ -145,7 +147,7 @@ export function deriveTheme(read: HaVariables, preferDark: boolean): DerivedThem
   // The filled button's ground: the primary colour, darkened (or lightened) just far enough for its text to reach 4.5:1.
   const fillStart = { ...primary, a: 1 }, away = onPrimary.r + onPrimary.g + onPrimary.b > 382 ? BLACK : WHITE;
   let primaryFill = fillStart;
-  for (let step = 1; step <= 40 && contrast(onPrimary, primaryFill) < 4.5; step++) primaryFill = mix(fillStart, away, step / 40);
+  for (let step = 1; step <= 40 && contrast(onPrimary, primaryFill) < 4.55; step++) primaryFill = mix(fillStart, away, step / 40);
   const withAlpha = (source: Rgb, alpha: number): Rgb => ({ ...source, a: alpha });
   const fill = (source: Rgb, alpha: number) => toCss(over(withAlpha(source, alpha), card));
   const pick = (name: HaVariable) => read[name]?.trim() || base[name];
