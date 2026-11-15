@@ -4,7 +4,9 @@ import { compositionSourceText } from '../composition-editor';
 import { Modal, Overlay, PushStack, usePush, type PushedPage } from './kit';
 import { DialogBody, dialogTitles, type DialogKey } from './projectDialogs';
 import ChecksPanel from './ChecksPanel';
-import { previewWindows, type PreviewWindow } from './preview';
+import { windowLabel } from '../preview2';
+import { WindowChoices } from './navigation/WindowMenu';
+import type { PreviewWindow } from './preview';
 import type { PanelKind, Workspace2 } from './useWorkspace2';
 
 type Entry =
@@ -31,11 +33,7 @@ function sections(ws: Workspace2, open1: () => void): Entry[][] {
   ];
 }
 
-/** The window list, one entry in phase 1 (the iPhone). */
-function WindowList({ current, onPick }: { current: PreviewWindow; onPick: (window: PreviewWindow) => void }) {
-  return <ul className="w2-menu-list">{previewWindows.map(item => <li key={item.name}><button type="button" aria-pressed={item.name === current.name} onClick={() => onPick(item)}>{windowLabel(item)}</button></li>)}</ul>;
-}
-export const windowLabel = (item: PreviewWindow) => `${item.name} · ${item.width} × ${item.height}`;
+export { windowLabel };
 
 /** The narrow Project sheet's rows. Selecting one pushes its page inside the sheet. */
 function SheetList({ ws, narrowOnly, onPanel, onClose, open1, window: current, onWindow, onError }: {
@@ -55,7 +53,7 @@ function SheetList({ ws, narrowOnly, onPanel, onClose, open1, window: current, o
     </ul>
     {narrowOnly && <ul className="w2-list">
       <li><button type="button" className="w2-list-row" disabled={!ws.studio.canRedo} onClick={ws.studio.redo}>Redo</button></li>
-      <li><button type="button" className="w2-list-row" onClick={() => page('Window', <WindowList current={current} onPick={onWindow}/>)}>Window</button></li>
+      <li><button type="button" className="w2-list-row" onClick={() => page('Window', <WindowChoices window={current} onWindow={onWindow}/>)}>Window</button></li>
       <li><button type="button" className="w2-list-row" onClick={() => page('Checks', <ChecksPanel checks={ws.checks} saveFailure={ws.failedSave ? ws.saveReason : undefined} onRetry={() => { ws.retrySave(); ws.saveNow(); }} onPick={row2 => { if (row2.select) ws.selectAnywhere(row2.select); onClose(); }}/>)}>Checks</button></li>
     </ul>}
     {sections(ws, open1).map((group, at) => <ul className="w2-list" key={at}>{group.map(row)}</ul>)}

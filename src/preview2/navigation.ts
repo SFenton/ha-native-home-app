@@ -142,3 +142,33 @@ export function navigateTo(document: CompositionDocument, state: NavState, surfa
   const base = presenter ? navigateTo(document, state, { kind: 'page', id: presenter }) : { ...state, sheets: [] };
   return { ...base, sheets: [{ modalId: surface.id, pages: [] }], motion: 'none', emptyBase: !presenter };
 }
+
+/** The first page a page opens by a `push` (or `dismiss-then-push`) action, in document order: what a columns page draws beside itself. */
+export function firstChildPage(document: CompositionDocument, pageId: string): string | undefined {
+  const page = document.pages.find(item => item.id === pageId);
+  let found: string | undefined;
+  const visit = (value: unknown): void => {
+    if (found || !value || typeof value !== 'object') return;
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    const record = value as Record<string, unknown>;
+    if (record.type === 'push' && typeof record.pageId === 'string' && hasPage(document, record.pageId) && record.pageId !== pageId) { found = record.pageId; return; }
+    Object.values(record).forEach(visit);
+  };
+  visit(page?.components);
+  return found;
+}
+
+/**
+ * The panes a columns page draws when the window may split: the first columns page of the stack hosts, the page on top of the
+ * stack (else the host's first child, else the empty-side text) is the detail. `onDemand` hosts stay one pane until something opens.
+ * Undefined when the base page does not split.
+ */
+export function columnPanes(document: CompositionDocument, stack: readonly string[]): { host: string; hostIndex: number; detail?: string; placeholder: string } | undefined {
+  const hostIndex = stack.findIndex(id => document.pages.find(page => page.id === id)?.navigation.type === 'navigation-columns');
+  if (hostIndex < 0) return undefined;
+  const host = document.pages.find(page => page.id === stack[hostIndex])!;
+  if (host.navigation.type !== 'navigation-columns') return undefined;
+  const opened = stack.length > hostIndex + 1 ? stack.at(-1) : undefined;
+  if (!opened && host.navigation.onDemand) return undefined;
+  return { host: host.id, hostIndex, detail: opened ?? firstChildPage(document, host.id), placeholder: host.navigation.placeholder };
+}

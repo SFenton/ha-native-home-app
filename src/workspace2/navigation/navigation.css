@@ -1,0 +1,18 @@
+/* Navigation authoring: creation dialogs, the Pages overlay's footer and menus, links, the Window menu. */
+.w2-new { display: flex; flex-direction: column; gap: 8px; }
+.w2-new .w2-segment { margin-top: 4px; }
+.w2-new-reason { margin: 0; color: var(--w2-err-text); }
+.w2-pages-foot { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--w2-line); }
+.w2-pages-foot button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 36px; }
+.w2-page-item { display: flex; align-items: center; }
+.w2-page-item > .w2-page-row { flex: 1; min-width: 0; }
+.w2-page-item > .w2-icon-button { flex: none; }
+.w2-group-button { display: flex; align-items: center; width: 100%; border: 0 !important; background: none !important; padding: 0; text-align: start; cursor: pointer; }
+.w2-pages-views { margin: 0 12px 8px; display: flex; }
+.w2-pages-views button { flex: 1; }
+.w2-pages-foot { position: sticky; bottom: 0; background: var(--w2-card); }
+.w2-window-readout { margin: 0; padding: 6px 10px 8px; font-size: 12px; color: var(--w2-muted); }
+.w2-window-choices { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; }
+.w2-window-choices .w2-segment { margin: 0 16px; }
+.w2-window-choices .w2-window-readout { padding-inline: 16px; }
+.w2-window-choices [aria-pressed=true] { font-weight: 600; background: var(--w2-selected); }
