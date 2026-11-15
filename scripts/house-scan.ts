@@ -41,17 +41,19 @@ const GENERIC = new Set(["id", "name", "values", "keys", "items", "count", "firs
   "ts", "tsx", "js", "css", "map", "length", "icon", "type", "domain", "style", "entity", "entities", "attributes",
   // SF Symbol names and prose members, not entity ids (`lock.fill`, `lock.open`, `button.action`):
   "fill", "open", "trianglebadge", "crop", "walk", "stop", "2", "max", "action", "children", "items", "label", "source", "error", "props", "click", "focus", "color",
-  "group", "field", "summary", "assigned", "binding", "slice", "components", "document", "mode", "data", "tasks", "viewer"]);
+  "group", "field", "shield", "summary", "assigned", "binding", "slice", "components", "document", "mode", "data", "tasks", "viewer"]);
 const SERVICES = new Set(["turn_on", "turn_off", "toggle", "add_item", "remove_item", "update_item", "install", "reload",
   "volume_up", "volume_down", "volume_set", "send_command", "set_percentage", "mobile_app", "set_value", "open_cover", "close_cover", "lock", "unlock", "press", "select_option", "set_temperature", "set_hvac_mode"]);
 const ALLOWED_WORDS = ["test", "example", "fixture", "sample", "placeholder", "demo"];
 
 const ENTITY = new RegExp(
-  `(?<![\\w.])(${[...DOMAINS].sort((a, b) => b.length - a.length).join("|")})\\.([a-z0-9][a-z0-9_]*)\\b(?!\\.(?:md|json|swift|py|sh|yml|yaml|txt|png|html|ts|tsx|js|css)\\b)`, "g");
+  `(?<![\\w.-])(${[...DOMAINS].sort((a, b) => b.length - a.length).join("|")})\\.([a-z0-9][a-z0-9_]*)\\b(?!\\.(?:md|json|swift|py|sh|yml|yaml|txt|png|html|ts|tsx|js|css)\\b)`, "g");
+/** A CSS class prefix (`button.w2-card`): the selector names a class, never an entity. */
+const CSS_CLASS_PREFIX = "w2";
 const PRIVATE_IP = /(?<![\w.])(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})(?![\w.]*\w)/g;
 const IPV6_ULA = /(?<![\w:])f[cd][0-9a-f]{2}(?::[0-9a-f]{0,4}){2,}/gi;
 const TAILNET = /(?<![\w.-])[\w-]+(?:\.[\w-]+)*\.ts\.net\b/gi;
-const LOCAL_HOST = /(?<![\w.-])((?:[A-Za-z0-9][A-Za-z0-9-]*\.)*[A-Za-z0-9][A-Za-z0-9-]*)\.local(?![\w(-]|\.\w)/gi;
+const LOCAL_HOST = /(?<![\w.-])((?:[A-Za-z0-9][A-Za-z0-9-]*\.)*[A-Za-z0-9][A-Za-z0-9-]*)\.local(?![\w(\[-]|\.\w)/gi;
 const VIN = /(?<![0-9A-Za-z])[A-HJ-NPR-Z0-9]{17}(?![0-9A-Za-z])/gi;
 const HEX = /(?<![0-9A-Za-z@])(?:[0-9a-f]{40}|[0-9a-f]{32})(?![0-9A-Za-z])/gi;
 const ESCAPES = /\\u\{([0-9a-fA-F]{1,8})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|&#[xX]([0-9a-fA-F]{1,6});|&#(\d{1,7});/g;
@@ -96,16 +98,16 @@ function lineRules(line: string, suffix: string, wholeLine: boolean, allow: Allo
   for (const zone of wholeLine ? [line] : entityZones(line, suffix)) {
     for (const m of zone.matchAll(ENTITY)) {
       if (zone[(m.index ?? 0) + m[0].length] === "(") continue; // a method call such as `counter.values()`
+      if (m[2] === CSS_CLASS_PREFIX && zone[(m.index ?? 0) + m[0].length] === "-") continue; // a selector such as `button.w2-card`
       if (!entityIsAllowed(m[2])) rules.push("entity");
     }
+    if (!zone.toLowerCase().includes(".local")) continue;
+    for (const m of zone.matchAll(LOCAL_HOST)) if (`${m[1]}.local`.toLowerCase() !== "example.local") rules.push("localhost");
   }
   for (const m of line.matchAll(PRIVATE_IP)) if (!allow.addresses.includes(m[0])) rules.push("ipv4");
   for (const _ of line.matchAll(IPV6_ULA)) rules.push("ipv6");
   const lowered = line.toLowerCase();
   if (lowered.includes(".ts.net")) for (const _ of line.matchAll(TAILNET)) rules.push("tailnet");
-  if (lowered.includes(".local")) {
-    for (const m of line.matchAll(LOCAL_HOST)) if (`${m[1]}.local`.toLowerCase() !== "example.local") rules.push("localhost");
-  }
   for (const m of line.matchAll(VIN)) {
     const token = m[0];
     if (token !== token.toUpperCase() && token !== token.toLowerCase()) continue; // mixed case is base64 or a hash

@@ -32,6 +32,26 @@ describe('house-data scan', () => {
     expect(rules('a.md', `token ${'0123456789abcdef'.repeat(2)}`)).toEqual(['hex']);
     expect(rules('a.md', `token ${'a'.repeat(40)}`)).toEqual([]);
   });
+  it('passes the scanner false positives: property access, field keys, symbol names and CSS selectors', () => {
+    expect(rules('a.ts', 'return overlay.local[stateId] ?? undefined;')).toEqual([]);
+    expect(rules('a.ts', `expect(emptyOverlay.${'local'}).toEqual({});`)).toEqual([]);
+    expect(rules('a.md', 'the overlay.local[x] map')).toEqual([]);
+    expect(rules('a.ts', "const k = { 'chrome-group.placement': 1 };")).toEqual([]);
+    expect(rules('a.md', 'the chrome-group.horizontal field')).toEqual([]);
+    expect(rules('a.ts', "const s = 'lock.shield';")).toEqual([]);
+    expect(rules('a.ts', "const q = 'button.w2-card';")).toEqual([]);
+    expect(rules('a.md', 'selector button.w2-card:hover')).toEqual([]);
+  });
+  it('still fails real house-looking values next to those shapes', () => {
+    expect(rules('a.ts', `const h = 'kitchen-hub.${'local'}';`)).toEqual(['localhost']);
+    expect(rules('a.ts', `const h = 'kitchen-hub.${'local'}[0]';`)).toEqual([]);
+    expect(rules('a.ts', `// ping kitchen-hub.${'local'}`)).toEqual(['localhost']);
+    expect(rules('a.md', `ping kitchen-hub.${'local'})`)).toEqual(['localhost']);
+    expect(rules('a.ts', `const a = '${'lock'}.front_door';`)).toEqual(['entity']);
+    expect(rules('a.ts', `const a = '${'button'}.doorbell';`)).toEqual(['entity']);
+    expect(rules('a.md', `use chrome-group.x and ${'lock'}.front_door`)).toEqual(['entity']);
+    expect(rules('a.md', `the (${domain}.kitchen) light`)).toEqual(['entity']);
+  });
   it('reads an escaped dot as a dot', () => {
     expect(decodeEscapes('a\\u002eb &#46; c')).toBe('a.b . c');
     expect(rules('a.json', `"${domain}\\u002ekitchen"`)).toEqual(['entity']);
