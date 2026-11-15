@@ -11,6 +11,33 @@ export interface HouseImportReport {
   revision: number; added: string[]; kept: string[]; dropped: { path: string; reason: string }[];
 }
 
+/** Typing within this long of the last keystroke into the same field stays one undo step. */
+export const UNDO_COALESCE_MS = 1000;
+/** Most undo steps kept. */
+const UNDO_DEPTH = 60;
+
+/**
+ * The path of the one string that differs between two documents, or `undefined` when the edit is anything else
+ * (several values, a structural change, a non-text value). Shared structure makes the walk cheap: unchanged branches are the same object.
+ */
+export function textEditPath(before: unknown, after: unknown, path = ''): string | undefined {
+  if (before === after) return undefined;
+  if (typeof before === 'string' && typeof after === 'string') return path;
+  if (!before || !after || typeof before !== 'object' || typeof after !== 'object' || Array.isArray(before) !== Array.isArray(after)) return undefined;
+  const left = before as Record<string, unknown>, right = after as Record<string, unknown>;
+  const keys = Object.keys(left);
+  if (keys.length !== Object.keys(right).length) return undefined;
+  let found: string | undefined;
+  for (const key of keys) {
+    if (!(key in right)) return undefined;
+    if (left[key] === right[key]) continue;
+    if (found !== undefined) return undefined;
+    found = textEditPath(left[key], right[key], `${path}/${key}`);
+    if (found === undefined) return undefined;
+  }
+  return found;
+}
+
 export function useCompositionStudio() {
   const [document, setDocument] = useState<CompositionDocument>();
   const current = useRef<CompositionDocument | undefined>(undefined);
@@ -18,6 +45,8 @@ export function useCompositionStudio() {
   const metadata = useRef<CompositionDraft | undefined>(undefined);
   const saved = useRef('');
   const past = useRef<CompositionDocument[]>([]);
+  /** The text field the last edit typed into, and when; a further keystroke in it joins that undo step. */
+  const typing = useRef<{ path: string; at: number } | undefined>(undefined);
   const future = useRef<CompositionDocument[]>([]);
   const [busy, setBusy] = useState(false), locked = useRef(false);
   const [error, setError] = useState(''), [status, setStatus] = useState(''), [conflict, setConflict] = useState(false);
@@ -47,7 +76,10 @@ export function useCompositionStudio() {
   useEffect(() => { void reload(); }, [reload]);
   const apply = useCallback((next: CompositionDocument) => {
     if (!current.current || canonicalCompositionJSON(next) === canonicalCompositionJSON(current.current)) return;
-    past.current = [...past.current.slice(-59), current.current]; future.current = [];
+    const path = textEditPath(current.current, next), at = Date.now();
+    const joins = path !== undefined && typing.current?.path === path && at - typing.current.at < UNDO_COALESCE_MS && past.current.length > 0;
+    if (!joins) past.current = [...past.current.slice(-(UNDO_DEPTH - 1)), current.current];
+    future.current = []; typing.current = path === undefined ? undefined : { path, at };
     current.current = next; setDocument(next); setStatus('');
   }, []);
   const persist = useCallback(async (expected: number) => {
@@ -94,11 +126,19 @@ export function useCompositionStudio() {
     } catch (reason) { report(reason); return false; }
     finally { locked.current = false; setBusy(false); }
   }, [report]);
+  // Leaving a field ends its undo step.
+  useEffect(() => {
+    const blurred = () => { typing.current = undefined; };
+    window.addEventListener('focusout', blurred);
+    return () => window.removeEventListener('focusout', blurred);
+  }, []);
   const undo = () => {
+    typing.current = undefined;
     const next = past.current.pop();
     if (next && current.current) { future.current.push(current.current); current.current = next; setDocument(next); }
   };
   const redo = () => {
+    typing.current = undefined;
     const next = future.current.pop();
     if (next && current.current) { past.current.push(current.current); current.current = next; setDocument(next); }
   };

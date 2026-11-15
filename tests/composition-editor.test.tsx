@@ -9,7 +9,7 @@ import {
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES } from '../src/shared/composition/json';
 import { createCompositionDocument, createCompositionPage, type CompositionDraft, type UploadedCompositionAsset } from '../src/shared/composition/workspace';
-import { useCompositionStudio } from '../src/useCompositionStudio';
+import { textEditPath, UNDO_COALESCE_MS, useCompositionStudio } from '../src/useCompositionStudio';
 import type { CompositionNode } from '../src/shared/composition/schema';
 
 vi.mock('../src/api', async importOriginal => ({
@@ -131,6 +131,58 @@ describe('composition authoring model', () => {
     const exported = compositionSourceText(document);
     expect(importCompositionText(exported, document.id)).toEqual(document);
     expect(importCompositionText(compositionSourceText(document, true), document.id)).toEqual(document);
+  });
+});
+
+describe('undo coalescing', () => {
+  afterEach(() => { vi.useRealTimers(); });
+  async function studio() {
+    vi.useFakeTimers({ toFake: ['Date'], now: 1_000_000 });
+    const hook = renderHook(useCompositionStudio);
+    await waitFor(() => expect(hook.result.current.document).toBeDefined());
+    const type = (name: string, elapsed = 100) => { vi.setSystemTime(Date.now() + elapsed); act(() => hook.result.current.apply({ ...hook.result.current.document!, name })); };
+    const undoAll = () => { let steps = 0; while (hook.result.current.canUndo) { act(() => hook.result.current.undo()); steps += 1; } return steps; };
+    return { ...hook, type, undoAll };
+  }
+  it('reads the one changed string from a document edit and ignores everything else', () => {
+    const a = { x: { y: 'a', z: 1 }, list: ['p', 'q'] };
+    expect(textEditPath(a, { ...a, x: { ...a.x, y: 'ab' } })).toBe('/x/y');
+    expect(textEditPath(a, { ...a, list: ['p', 'qq'] })).toBe('/list/1');
+    expect(textEditPath(a, { ...a, x: { ...a.x, z: 2 } })).toBeUndefined();
+    expect(textEditPath(a, { ...a, list: ['p'] })).toBeUndefined();
+    expect(textEditPath(a, { x: { y: 'b', z: 1 }, list: ['pp', 'q'] })).toBeUndefined();
+    expect(textEditPath(a, a)).toBeUndefined();
+  });
+  it('folds keystrokes into one field, one step, and keeps older steps', async () => {
+    const { result, type, undoAll } = await studio();
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...result.current.document!.pages[0], title: 'Home base' }, ...result.current.document!.pages.slice(1)] }));
+    const base = result.current.document!.name;
+    for (const text of ['H', 'Ho', 'Hom', 'Home']) type(text);
+    expect(undoAll()).toBe(2);
+    expect(result.current.document!.name).toBe(base);
+  });
+  it('starts a new step after a pause, on another field, after a structural edit, and after blur', async () => {
+    const { result, type, undoAll } = await studio();
+    type('a'); type('ab');
+    type('abc', UNDO_COALESCE_MS + 1);
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...result.current.document!.pages[0], title: 'Other' }, ...result.current.document!.pages.slice(1)] }));
+    type('abcd');
+    act(() => { window.dispatchEvent(new Event('focusout')); });
+    type('abcde');
+    act(() => result.current.apply({ ...result.current.document!, pages: [] }));
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...createCompositionPage('p2') }] }));
+    // [a, ab] | [abc] | page title | [abcd] | [abcde] | pages emptied | pages replaced
+    expect(undoAll()).toBe(7);
+  });
+  it('treats a redo as a fresh step and a typing after undo as new work', async () => {
+    const { result, type } = await studio();
+    type('a'); type('ab');
+    act(() => result.current.undo());
+    expect(result.current.canRedo).toBe(true);
+    type('ac');
+    expect(result.current.canRedo).toBe(false);
+    act(() => result.current.undo());
+    expect(result.current.document!.name).not.toBe('ac');
   });
 });
 
