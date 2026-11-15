@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { GripVertical, Plus } from 'lucide-react';
 import { useAdd } from './add/AddHost';
+import { useDrag } from './dnd/DragLayer';
 import { after } from './add/insert';
 import { NodeMenu } from './PropertiesPanel';
 import { moveNodeBy } from './nodeActions';
@@ -26,16 +27,18 @@ function useSlot(stage: HTMLElement | null, key: string | undefined): HTMLElemen
 
 /**
  * The selected tile's handle (spec 5.1, wide only): a drag grip and More on its top trailing corner, drawn into the slot the
- * preview leaves on the selected node. The grip moves the tile with Option-Up and Option-Down, or Up and Down, until drag
- * and drop lands in phase 2; More holds Duplicate, Move Up, Move Down and Delete.
+ * preview leaves on the selected node. Space on the grip picks the tile up and the arrows step it through every slot it may
+ * land in; Option-Up and Option-Down still nudge it a place; More holds Duplicate, Move Up, Move Down and Delete.
  */
 export default function HandleSlot({ ws, stage, onError }: { ws: Workspace2; stage: HTMLElement | null; onError: (message: string) => void }) {
   const key = ws.mode === 'edit' && ws.target?.kind === 'node' ? ws.target.key : undefined;
   const slot = useSlot(stage, key);
   const add = useAdd();
+  const drag = useDrag();
   const entry = key ? ws.index?.get(key) : undefined;
   if (!slot || !key || !entry?.node || !ws.document) return null;
   const move = (event: KeyboardEvent) => {
+    if ((event.key === ' ' || event.key === 'Enter') && drag && !drag.active) { event.preventDefault(); event.stopPropagation(); drag.startKeyboard(key as never); return; }
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
     try { ws.studio.apply(moveNodeBy(ws.document!, entry.path, event.key === 'ArrowUp' ? -1 : 1)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }

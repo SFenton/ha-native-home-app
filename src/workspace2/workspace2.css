@@ -27,6 +27,7 @@
 @media (pointer: coarse) {
   .w2-scope button:where(:not(.w2-stage *)), .w2-scope input:not([type=checkbox]):not([type=radio]):where(:not(.w2-stage *)), .w2-scope select:where(:not(.w2-stage *)) { min-height: 44px; }
   .w2-scope .w2-icon-button { width: 44px; }
+  .w2-scope .w2-segment-pill button, .w2-scope .w2-segment button { min-height: 44px !important; }
   .w2-scope input[type=checkbox][role=switch] { min-height: 0; height: 28px; width: 48px; }
   .w2-scope input[type=checkbox][role=switch]::after { width: 22px; height: 22px; }
   .w2-scope input[type=checkbox][role=switch]:checked::after { transform: translateX(20px); }
@@ -220,3 +221,14 @@
 .w2-handle button:hover, .w2-handle button[aria-expanded=true] { background: rgba(0,0,0,.1); }
 .w2-handle button:focus-visible { outline: 2px solid var(--studio-selection, #03a9f4); outline-offset: 1px; }
 .w2-handle-grip { cursor: grab !important; }
+
+/* This Page (spec 5.3) */
+.w2-pages-views { margin: 0 12px 8px; }
+.w2-this-page-list { list-style: none; margin: 0; padding: 0; overflow: auto; }
+.w2-this-row { display: flex; align-items: center; min-height: 44px; border-radius: 8px; }
+.w2-this-row[data-current] { background: var(--w2-selected); }
+.w2-this-grip { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: none; color: inherit; touch-action: none; cursor: grab; }
+.w2-this-main { flex: 1; display: flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: none; color: inherit; text-align: start; padding: 0 8px; }
+.w2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.w2-pushed-head .w2-done { justify-self: end; min-width: 64px; }
+.w2-chip-static { display: inline-flex; padding: 2px 8px; border-radius: 10px; background: var(--w2-selected); font-size: 12px; }

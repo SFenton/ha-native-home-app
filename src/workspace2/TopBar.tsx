@@ -52,7 +52,7 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
     {!narrow && <span className="w2-wordmark">S+H Studio</span>}
     <Overlay narrow={narrow} open={pagesOpen} onOpenChange={onPagesOpen} trigger={pageTrigger} label="Pages" popupWidth={320} fullHeight className="w2-pages-pop">
       <PushStack rootTitle="Pages" rootHeader={narrow ? <div className="w2-sheet-bar"><h2 className="w2-sheet-title">Pages</h2><button type="button" onClick={() => onPagesOpen(false)}>Done</button></div> : undefined}
-        root={<PagesPanel document={document} current={surface} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}/>}/>
+        root={<PagesPanel ws={ws} onClose={() => onPagesOpen(false)} document={document} current={surface} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}/>}/>
     </Overlay>
     {!narrow && <div className="w2-center">
       <ModeSegment mode={ws.mode} onChange={ws.setMode}/>

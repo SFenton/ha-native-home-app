@@ -112,7 +112,7 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
     locator.current = args.locate;
     const ghost = args.ghostOf ? makeGhost(args.ghostOf) : undefined;
     const rect = args.ghostOf?.getBoundingClientRect();
-    if (latest.current.ws.selection !== args.key) latest.current.ws.select(args.key);
+    // Selecting here would open the properties card and move the canvas under the pointer; the drop selects.
     snapSheet('peek');
     update({ key: args.key, mode: args.mode, point: args.point, hit: args.locate(args.point.x, args.point.y), ghost: ghost?.element, scale: ghost?.scale ?? 1,
       box: { width: ghost?.width ?? 0, height: ghost?.height ?? 0, dx: rect ? args.point.x - rect.left : 0, dy: rect ? args.point.y - rect.top : 0 } });
