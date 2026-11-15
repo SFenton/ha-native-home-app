@@ -128,7 +128,7 @@ test('acceptance 2: every editable field of every kind of node is reachable from
     await expect(panel.getByRole('heading', { name: entry.node.title, exact: true }), `${entry.key} opens its own properties`).toBeVisible();
     const result = missing(entry.path, entry.node, nodeSkip, await reachable(panel));
     checked += result.checked; if (hidden) inTabs++;
-    misses.push(...result.misses.map(path => `${entry.node.type} ${entry.id}: ${path}`));
+    misses.push(...result.misses.map(path => `${entry.node?.type} ${entry.id}: ${path}`));
   }
   console.log(`node fields: ${seen.size} kinds, ${checked} fields, ${inTabs} nodes in local tabs`);
   expect(seen.size).toBeGreaterThan(5);
