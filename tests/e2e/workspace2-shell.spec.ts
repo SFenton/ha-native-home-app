@@ -161,6 +161,10 @@ test('a publish that fails keeps the dialog open with the reason and Try Again',
   await dialog.getByRole('button', { name: 'Publish' }).click();
   await expect(dialog.getByText('Home Assistant did not answer.')).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Try Again' })).toBeVisible();
+  // The draft saved; only the publish failed, so the tag never says Not Saved.
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('status-tag')).not.toHaveText('Not Saved');
+  await expect(page.getByTestId('status-tag')).toHaveText(/Not Published|Draft · Saved/);
 });
 
 test('a save that fails shows Not Saved, the reason under Checks, and recovers with Try Again', async ({ page }) => {

@@ -148,6 +148,8 @@ export function useCompositionStudio() {
     const next = future.current.pop();
     if (next && current.current) { past.current.push(current.current); current.current = next; setDocument(next); }
   };
+  /** Whether the draft on the server is what is on screen: true after a save that went through, even if the publish after it failed. */
+  const isSaved = useCallback(() => !current.current || canonicalCompositionJSON(current.current) === saved.current, []);
   const dirty = Boolean(document && canonicalCompositionJSON(document) !== saved.current);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
@@ -157,6 +159,6 @@ export function useCompositionStudio() {
   return {
     document, envelope, publishedRevision, homeAssistant, houseImport, importHouse, setStatus, busy, error, status, conflict, dirty,
     canUndo: past.current.length > 0, canRedo: future.current.length > 0,
-    apply, save, reload, undo, redo, setError, report, whenIdle, latestDocument,
+    apply, save, reload, undo, redo, setError, report, whenIdle, latestDocument, isSaved,
   };
 }

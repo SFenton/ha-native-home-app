@@ -70,4 +70,30 @@ describe('publishing while an autosave is in flight', () => {
     expect(result.current.phase).toBe('failed');
     expect(result.current.publishError).toBe('The disk is full.');
   });
+  it('keeps Not Saved for the draft: a publish that fails after the draft saved is a failed publish', async () => {
+    const { result } = await loaded();
+    act(() => result.current.studio.apply({ ...result.current.document!, name: 'Edited' }));
+    vi.mocked(request).mockImplementation((async (url: string, init?: RequestInit) => {
+      if (url === '/native/api/draft' && init?.method === 'PUT') return envelope(2, 'Edited');
+      if (url === '/native/api/ha/publish') throw new ApiError('Home Assistant did not answer.', 502);
+      return {};
+    }) as typeof request);
+    await act(async () => { expect(await result.current.publish()).toBe(false); });
+    expect(result.current.phase).toBe('failed');
+    expect(result.current.publishError).toBe('Home Assistant did not answer.');
+    expect(result.current.studio.dirty).toBe(false);
+    expect(result.current.failedSave).toBe(false);
+    expect(result.current.status.text).not.toBe('Not Saved');
+  });
+  it('still says Not Saved when the draft itself fails to save during a publish', async () => {
+    const { result } = await loaded();
+    act(() => result.current.studio.apply({ ...result.current.document!, name: 'Edited' }));
+    vi.mocked(request).mockImplementation((async (url: string, init?: RequestInit) => {
+      if (url === '/native/api/draft' && init?.method === 'PUT') throw new ApiError('The disk is full.', 500);
+      return {};
+    }) as typeof request);
+    await act(async () => { expect(await result.current.publish()).toBe(false); });
+    expect(result.current.failedSave).toBe(true);
+    expect(result.current.status.text).toBe('Not Saved');
+  });
 });

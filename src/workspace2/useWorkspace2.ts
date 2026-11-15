@@ -78,16 +78,18 @@ export function useWorkspace2(active: boolean) {
   const [savedAt, setSavedAt] = useState(0);
   const [now, setNow] = useState(0);
   const [saveReason, setSaveReason] = useState('');
-  const { save: saveDraft, whenIdle, latestDocument, dirty, busy, conflict } = studio;
+  const { save: saveDraft, whenIdle, latestDocument, isSaved, dirty, busy, conflict } = studio;
   const persist = useCallback(async (publish: boolean | 'home-assistant' = false, keepLocal = false) => {
     // A save already under way is not this call's failure: wait for it, then save (or publish) what is newest.
     await whenIdle();
     const sent = latestDocument() ?? studio.document;
     const ok = await saveDraft(publish, keepLocal);
     if (ok) { setFailedFor(undefined); setSaveReason(''); setSavedAt(Date.now()); }
+    // A publish that fails after the draft saved is a failed publish, not a failed save: "Not Saved" is only for the draft.
+    else if (publish && isSaved()) { setFailedFor(undefined); setSavedAt(Date.now()); }
     else setFailedFor(sent);
     return ok;
-  }, [saveDraft, whenIdle, latestDocument, studio.document]);
+  }, [saveDraft, whenIdle, latestDocument, isSaved, studio.document]);
   const latest = useRef({ persist, dirty, busy, conflict, problemCount, document });
   latest.current = { persist, dirty, busy, conflict, problemCount, document };
   useEffect(() => {
@@ -109,7 +111,7 @@ export function useWorkspace2(active: boolean) {
     const timer = setTimeout(() => setNow(Date.now()), SAVED_TAG_MS + 50);
     return () => clearTimeout(timer);
   }, [savedAt]);
-  useEffect(() => { if (studio.error && !saveReason) setSaveReason(studio.error); }, [studio.error, saveReason]);
+  useEffect(() => { if (studio.error && !saveReason && failedFor !== undefined) setSaveReason(studio.error); }, [studio.error, saveReason, failedFor]);
 
   // --- Publication state --------------------------------------------------------------------------------------
   const [publication, setPublication] = useState<HaPublicationSummary>();
