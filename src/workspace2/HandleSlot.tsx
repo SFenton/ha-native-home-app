@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { GripVertical, Plus } from 'lucide-react';
 import { useAdd } from './add/AddHost';
@@ -26,6 +26,16 @@ function useSlot(stage: HTMLElement | null, key: string | undefined): HTMLElemen
 }
 
 /**
+ * The factor that undoes the preview's own scale at `slot`, so the handle keeps its size whatever the zoom: the model's laid
+ * out width over its drawn width. 1 when the slot is not inside a scaled model.
+ */
+function counterScale(slot: HTMLElement): number {
+  const model = slot.closest<HTMLElement>('.device-model');
+  const drawn = model?.getBoundingClientRect().width ?? 0;
+  return model && drawn > 0 && model.offsetWidth > 0 ? model.offsetWidth / drawn : 1;
+}
+
+/**
  * The selected tile's handle (spec 5.1, wide only): a drag grip and More on its top trailing corner, drawn into the slot the
  * preview leaves on the selected node. Space on the grip picks the tile up and the arrows step it through every slot it may
  * land in; Option-Up and Option-Down still nudge it a place; More holds Duplicate, Move Up, Move Down and Delete.
@@ -43,7 +53,7 @@ export default function HandleSlot({ ws, stage, onError }: { ws: Workspace2; sta
     event.preventDefault();
     try { ws.studio.apply(moveNodeBy(ws.document!, entry.path, event.key === 'ArrowUp' ? -1 : 1)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   };
-  return createPortal(<div className="w2-handle" data-testid="node-handle">
+  return createPortal(<div className="w2-handle" data-testid="node-handle" style={{ '--w2-handle-scale': counterScale(slot) } as CSSProperties}>
     <button type="button" className="w2-handle-grip" aria-label="Move" title="Move" onKeyDown={move}><GripVertical size={16} aria-hidden/></button>
     <button type="button" className="w2-handle-add" aria-label={`Add after ${entry.node.title}`} title="Add" onClick={event => { const destination = after(ws.document!, key); if (destination) add?.open(destination, event.currentTarget); }}><Plus size={16} aria-hidden/></button>
     <NodeMenu ws={ws} path={entry.path} selectionKey={key} onError={onError} className="w2-handle-more"/>

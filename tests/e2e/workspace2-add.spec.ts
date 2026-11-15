@@ -285,3 +285,19 @@ test('the action editor makes a page and a sheet through the one New Page and Ne
 });
 
 const kindLabel = { push: 'Open Page', present: 'Open Sheet' };
+
+test.describe('an iPad-width window with a touch pointer', () => {
+  test.use({ viewport: { width: 1180, height: 820 }, hasTouch: true });
+  test('the selection handle keeps every button at 44 px', async ({ page }) => {
+    test.skip(test.info().project.name === 'phone', 'The wide touch family runs once');
+    await openWorkspace(page);
+    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    expect(isPhone(page)).toBe(false);
+    await selectTile(page, 'Weather');
+    const handle = page.getByTestId('node-handle');
+    await expect(handle).toBeVisible();
+    const sizes = await handle.getByRole('button').evaluateAll(buttons => buttons.map(button => { const box = button.getBoundingClientRect(); return `${button.getAttribute('aria-label')} ${Math.round(box.width)}x${Math.round(box.height)}`; }));
+    expect(sizes.length).toBeGreaterThanOrEqual(3);
+    expect(sizes.filter(size => { const [w, h] = size.split(' ').at(-1)!.split('x').map(Number); return w < 44 || h < 44; })).toEqual([]);
+  });
+});

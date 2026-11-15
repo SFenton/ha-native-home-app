@@ -226,6 +226,7 @@
 .w2-handle button:hover, .w2-handle button[aria-expanded=true] { background: rgba(0,0,0,.1); }
 .w2-handle button:focus-visible { outline: 2px solid var(--studio-selection, #03a9f4); outline-offset: 1px; }
 .w2-handle-grip { cursor: grab !important; }
+@media (pointer: coarse) { .w2-handle button { width: 44px; height: 44px; } }
 
 /* This Page (spec 5.3) */
 .w2-pages-views { margin: 0 12px 8px; }
