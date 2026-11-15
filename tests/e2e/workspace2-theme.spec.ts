@@ -51,14 +51,17 @@ test('a theme that sets only its primary colour recolours the chrome and keeps e
 test('the chrome follows a live theme change in the parent, and the preview does not', async ({ page }) => {
   const frame = await openInHomeAssistant(page, themes.light);
   const preview = frame.locator('[data-preview-root]').first();
-  const lightPreview = await preview.screenshot({ animations: 'disabled' });
+  const box = (await preview.boundingBox())!;
+  // Inside the device, clear of its rounded corners (which show the stage behind) and of any sheet.
+  const clip = { x: box.x + 4, y: box.y + 40, width: box.width - 8, height: 300 };
+  const lightPreview = await page.screenshot({ clip, animations: 'disabled' });
   const light = await tokens(page);
   await page.evaluate(style => { document.documentElement.setAttribute('style', style); }, themes.dark);
   await expect.poll(async () => (await tokens(page))['--w2-bg']).not.toBe(light['--w2-bg']);
   const dark = await tokens(page);
   expect(contrast(colour(dark['--w2-ink']), colour(dark['--w2-bg']))).toBeGreaterThanOrEqual(4.5);
   expect(await page.frames().find(frame => frame !== page.mainFrame())!.evaluate(() => document.documentElement.style.colorScheme)).toBe('dark');
-  const darkPreview = await preview.screenshot({ animations: 'disabled' });
+  const darkPreview = await page.screenshot({ clip, animations: 'disabled' });
   expect(darkPreview.equals(lightPreview), 'the preview draws the same pixels in a light and a dark chrome').toBeTruthy();
 });
 

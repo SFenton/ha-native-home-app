@@ -142,13 +142,17 @@ export function deriveTheme(read: HaVariables, preferDark: boolean): DerivedThem
   const haOnPrimary = readColor('--text-primary-color');
   const onPrimary = haOnPrimary && contrast(haOnPrimary, primary) >= 4.5 ? { ...haOnPrimary, a: 1 }
     : contrast({ r: 6, g: 34, b: 46, a: 1 }, primary) >= contrast(WHITE, primary) ? { r: 6, g: 34, b: 46, a: 1 } : WHITE;
+  // The filled button's ground: the primary colour, darkened (or lightened) just far enough for its text to reach 4.5:1.
+  const fillStart = { ...primary, a: 1 }, away = onPrimary.r + onPrimary.g + onPrimary.b > 382 ? BLACK : WHITE;
+  let primaryFill = fillStart;
+  for (let step = 1; step <= 40 && contrast(onPrimary, primaryFill) < 4.5; step++) primaryFill = mix(fillStart, away, step / 40);
   const withAlpha = (source: Rgb, alpha: number): Rgb => ({ ...source, a: alpha });
   const fill = (source: Rgb, alpha: number) => toCss(over(withAlpha(source, alpha), card));
   const pick = (name: HaVariable) => read[name]?.trim() || base[name];
   const variables: Record<string, string> = {
     '--w2-bg': toCss(bg), '--w2-card': toCss(card), '--w2-ink': toCss(inkOnBg), '--w2-ink-card': toCss(ink), '--w2-muted': toCss(muted),
     '--w2-line': toCss(line.a < 1 ? line : { ...line, a: 0.14 }),
-    '--w2-primary': toCss(primary), '--w2-on-primary': toCss(onPrimary),
+    '--w2-primary': toCss(primary), '--w2-primary-fill': toCss(primaryFill), '--w2-on-primary': toCss(onPrimary),
     '--w2-err': toCss(status('--error-color')), '--w2-warn': toCss(status('--warning-color')), '--w2-ok': toCss(status('--success-color')),
     '--w2-err-text': toCss(text(status('--error-color'))), '--w2-warn-text': toCss(text(status('--warning-color'))), '--w2-ok-text': toCss(text(status('--success-color'))),
     '--w2-link': toCss(text(primary)),
@@ -161,7 +165,7 @@ export function deriveTheme(read: HaVariables, preferDark: boolean): DerivedThem
 /** The text and ground pairs the theme promises to keep at 4.5:1, for tests and the contrast probe. */
 export const textPairs: [text: string, ground: string][] = [
   ['--w2-ink', '--w2-bg'], ['--w2-ink-card', '--w2-card'], ['--w2-muted', '--w2-bg'], ['--w2-muted', '--w2-card'], ['--w2-link', '--w2-card'],
-  ['--w2-err-text', '--w2-card'], ['--w2-warn-text', '--w2-card'], ['--w2-ok-text', '--w2-card'], ['--w2-on-primary', '--w2-primary'],
+  ['--w2-err-text', '--w2-card'], ['--w2-warn-text', '--w2-card'], ['--w2-ok-text', '--w2-card'], ['--w2-on-primary', '--w2-primary-fill'],
 ];
 
 /**

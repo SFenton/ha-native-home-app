@@ -12,7 +12,7 @@
 .w2-scope button:where(:not(.w2-stage *)) { font: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--w2-line); border-radius: 8px; background: transparent; color: var(--w2-ink-card); cursor: pointer; }
 .w2-scope button:where(:not(.w2-stage *)):hover:not(:disabled) { background: var(--w2-hover); border-color: var(--w2-line); }
 .w2-scope button:where(:not(.w2-stage *)):disabled { opacity: .5; cursor: not-allowed; }
-.w2-scope button.w2-primary, .w2-scope button.w2-primary:hover:not(:disabled) { background: var(--w2-primary); border-color: var(--w2-primary); color: var(--w2-on-primary); font-weight: 600; }
+.w2-scope button.w2-primary, .w2-scope button.w2-primary:hover:not(:disabled) { background: var(--w2-primary-fill); border-color: var(--w2-primary-fill); color: var(--w2-on-primary); font-weight: 600; }
 .w2-scope button.w2-primary:disabled { background: var(--w2-field); border-color: var(--w2-line); color: var(--w2-muted); opacity: 1; }
 .w2-scope .w2-icon-button { width: 32px; padding: 0; border-color: transparent; }
 .w2-scope input:not([type=checkbox]):not([type=radio]):where(:not(.w2-stage *)), .w2-scope select:where(:not(.w2-stage *)), .w2-scope textarea:where(:not(.w2-stage *)) { font: inherit; width: 100%; min-width: 0; min-height: 32px; padding: 6px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--w2-field); color: var(--w2-ink-card); }
