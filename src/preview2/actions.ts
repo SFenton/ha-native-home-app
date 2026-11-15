@@ -3,7 +3,7 @@ import { acceptsLocalValue } from '../shared/composition/shell';
 import type { Json } from '../shared/types';
 import { evaluateOperand } from './evaluate';
 import { isNavAction, type NavAction } from './navigation';
-import { applyCall, applyLocal, createEnvironment, type House, type Overlay, type ResolvedCall, resolveCall } from './projections';
+import { applyCall, applyLocal, createEnvironment, shownEntity, type House, type Overlay, type ResolvedCall, resolveCall } from './projections';
 
 /** What an action does in the preview. Every field is optional: an action the preview does not simulate plans nothing. */
 export interface ActionPlan {
@@ -11,7 +11,7 @@ export interface ActionPlan {
   nav?: NavAction;
   /** The overlay after a simulated change, only when it differs from the one passed in. */
   overlay?: Overlay;
-  /** The line for the Checks pill, such as `Simulated light.turn_on`. */
+  /** The line for the Checks pill, such as `Kitchen light: turn on`. */
   simulated?: string;
 }
 /** What planning needs from the document and the house. */
@@ -23,7 +23,20 @@ export interface ActionInput {
   control?: Json;
 }
 
-const summary = (call: ResolvedCall) => `Simulated ${call.domain}.${call.service}`;
+/** `turn_on` as "turn on". */
+const serviceWords = (service: string) => service.replace(/_/g, ' ');
+const domainWords = (domain: string) => { const text = domain.replace(/_/g, ' '); return text.charAt(0).toUpperCase() + text.slice(1); };
+
+/**
+ * The line for a simulated call, in words: the entity's friendly name and what happened to it ("Kitchen light: toggle").
+ * Several entities read "Kitchen light and 2 more: turn off"; a call with no entity reads "Light: turn on".
+ */
+export function callSummary(call: ResolvedCall, house: House, overlay: Overlay): string {
+  const names = call.entityIds.map(id => shownEntity(house, overlay, id)?.name || domainWords(id.split('.').slice(1).join(' ').replace(/_/g, ' ') || id));
+  const who = names.length === 0 ? domainWords(call.domain) : names.length === 1 ? names[0] : `${names[0]} and ${names.length - 1} more`;
+  return `${who}: ${serviceWords(call.service)}`;
+}
+const summary = (call: ResolvedCall, input: ActionInput) => callSummary(call, input.house, input.overlay);
 
 /**
  * Plans what a Use-mode action does. A `call-service` resolves its operands through `resolveCall` and lays the result over
@@ -38,7 +51,7 @@ export function planAction(action: CompositionAction, input: ActionInput): Actio
       const resolved = resolveCall(action, env);
       if (!resolved) return {};
       const next = applyCall(input.house, input.overlay, resolved);
-      return { simulated: summary(resolved), overlay: next === input.overlay ? undefined : next };
+      return { simulated: summary(resolved, input), overlay: next === input.overlay ? undefined : next };
     }
     case 'domain': {
       const source = input.document.dataSources.find(item => item.id === action.sourceId);
@@ -47,7 +60,7 @@ export function planAction(action: CompositionAction, input: ActionInput): Actio
       if (found?.status !== 'value' || typeof found.value !== 'string') return {};
       const call: ResolvedCall = { domain: found.value.split('.')[0], service: 'toggle', entityIds: [found.value], data: {} };
       const next = applyCall(input.house, input.overlay, call);
-      return { simulated: summary(call), overlay: next === input.overlay ? undefined : next };
+      return { simulated: summary(call, input), overlay: next === input.overlay ? undefined : next };
     }
     case 'set-local': {
       const field = input.document.localState?.find(item => item.id === action.stateId);

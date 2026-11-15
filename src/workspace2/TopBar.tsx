@@ -23,8 +23,8 @@ export function ChecksPill({ ws, narrow, onOpenChange, open, showPill = true }: 
   const bad = count > 0 || failing;
   const label = count > 0 ? `${count} Problem${count === 1 ? '' : 's'}` : failing ? 'Not Saved' : 'No Problems';
   const simulated = ws.flash || undefined;
-  const pill = <button type="button" className={`w2-pill ${bad ? 'w2-pill-error' : ''}`} data-testid="checks-pill" hidden={!showPill} onClick={narrow ? () => onOpenChange(true) : undefined}>
-    {bad ? <AlertTriangle size={14} aria-hidden/> : <CheckCircle2 size={14} aria-hidden/>}<span>{bad ? label : simulated ?? label}</span></button>;
+  const pill = <button type="button" className={`w2-pill ${bad ? 'w2-pill-error' : simulated ? 'w2-pill-note' : ''}`} data-testid="checks-pill" hidden={!showPill} onClick={narrow ? () => onOpenChange(true) : undefined}>
+    {bad ? <AlertTriangle size={14} aria-hidden/> : <CheckCircle2 size={14} aria-hidden/>}<span role={simulated && !bad ? 'status' : undefined}>{bad ? label : simulated ?? label}</span></button>;
   // Narrow: the pill is a plain button and the sheet opens on its own, so the Not Saved tag can open it while a properties sheet hides the pill.
   return <>{narrow && pill}<Overlay narrow={narrow} open={open} onOpenChange={onOpenChange} trigger={narrow ? undefined : pill} label="Checks" className="w2-checks-pop" popupWidth={360}>
     <PushStack rootTitle="Checks" root={<ChecksPanel checks={ws.checks} saveFailure={ws.failedSave ? ws.saveReason || 'Try again.' : undefined}

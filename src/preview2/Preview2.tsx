@@ -37,7 +37,7 @@ export interface Preview2Props {
   overlay: Overlay;
   /** Simulated calls and `set-local` in Use. */
   onOverlayChange(next: Overlay): void;
-  /** For example `Simulated light.turn_on`. */
+  /** For example `Kitchen light: turn on`. */
   onSimulatedCall?(summary: string): void;
   /** Scrolls this node into view. */
   revealKey?: SelectionKey;

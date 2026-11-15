@@ -97,7 +97,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
         {loadingState ?? <div className="w2-stage" data-mode={ws.mode} ref={setStageElement}>{stage}</div>}
         {!narrow && <HandleSlot ws={ws} stage={stageElement} onError={showError}/>}
-        {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave}/></div>}
+        {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave || Boolean(ws.flash)}/></div>}
         {!narrow && properties && <aside className="w2-card" aria-label="Properties">{properties}</aside>}
       </main>
       {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/>{ws.mode === 'edit' && <BottomAdd/>}

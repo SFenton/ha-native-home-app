@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CompositionAction } from '../src/shared/composition/schema';
-import { planAction, type ActionInput } from '../src/preview2/actions';
+import { callSummary, planAction, type ActionInput } from '../src/preview2/actions';
 import { emptyOverlay, houseFrom } from '../src/preview2/projections';
 
 const house = houseFrom({ states: [{ entityId: 'light.kitchen', name: 'Kitchen', state: 'off' }, { entityId: 'input_boolean.guest', name: 'Guest', state: 'off' }] });
@@ -17,12 +17,12 @@ describe('planAction', () => {
   });
 
   it('plans a simulated call-service with its overlay and summary', () => {
-    expect(planAction(call('turn_on'), input())).toEqual({ simulated: 'Simulated light.turn_on', overlay: { entities: { 'light.kitchen': { state: 'on' } }, local: {} } });
+    expect(planAction(call('turn_on'), input())).toEqual({ simulated: 'Kitchen: turn on', overlay: { entities: { 'light.kitchen': { state: 'on' } }, local: {} } });
   });
 
   it('reports a call it resolves but changes nothing for without an overlay', () => {
     const plan = planAction(call('turn_off'), input());
-    expect(plan.simulated).toBe('Simulated light.turn_off');
+    expect(plan.simulated).toBe('Kitchen: turn off');
     expect(plan.overlay).toBeUndefined();
   });
 
@@ -39,7 +39,7 @@ describe('planAction', () => {
 
   it('toggles the entity of a power domain action through its source', () => {
     const plan = planAction({ type: 'domain', sourceId: 'guest', intent: 'power.toggle', feedback: 'policy', confirmation: { type: 'policy' } }, input());
-    expect(plan.simulated).toBe('Simulated input_boolean.toggle');
+    expect(plan.simulated).toBe('Guest: toggle');
     expect(plan.overlay?.entities['input_boolean.guest']).toEqual({ state: 'on' });
     expect(planAction({ type: 'domain', sourceId: 'unknown', intent: 'power.toggle', feedback: 'policy', confirmation: { type: 'policy' } }, input())).toEqual({});
   });
@@ -48,5 +48,22 @@ describe('planAction', () => {
     expect(planAction({ type: 'set-local', stateId: 'flag', value: { type: 'boolean', value: true } }, input()).overlay?.local).toEqual({ flag: { type: 'boolean', value: true } });
     expect(planAction({ type: 'set-local', stateId: 'level', value: { type: 'number', value: 9 } }, input())).toEqual({});
     expect(planAction({ type: 'set-local', stateId: 'missing', value: { type: 'boolean', value: true } }, input())).toEqual({});
+  });
+});
+
+describe('callSummary', () => {
+  const resolved = (entityIds: string[], service = 'turn_on', domain = 'light') => ({ domain, service, entityIds, data: {} });
+  it('says the friendly name and the service in words', () => {
+    expect(callSummary(resolved(['light.kitchen'], 'toggle'), house, emptyOverlay)).toBe('Kitchen: toggle');
+    expect(callSummary(resolved(['light.kitchen'], 'turn_on'), house, emptyOverlay)).toBe('Kitchen: turn on');
+    expect(callSummary(resolved(['input_boolean.guest'], 'toggle', 'input_boolean'), house, emptyOverlay)).toBe('Guest: toggle');
+  });
+  it('counts the rest when several entities are called, and falls back to the words in the id and the domain', () => {
+    expect(callSummary(resolved(['light.kitchen', 'light.a', 'light.b'], 'turn_off'), house, emptyOverlay)).toBe('Kitchen and 2 more: turn off');
+    expect(callSummary(resolved(['light.not_there']), house, emptyOverlay)).toBe('Not there: turn on');
+    expect(callSummary(resolved([], 'turn_on', 'input_boolean'), house, emptyOverlay)).toBe('Input boolean: turn on');
+  });
+  it('never prints a raw service id', () => {
+    expect(callSummary(resolved(['light.kitchen'], 'set_temperature', 'climate'), house, emptyOverlay)).not.toMatch(/climate\.set_temperature|_/);
   });
 });

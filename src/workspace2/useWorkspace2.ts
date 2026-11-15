@@ -133,15 +133,16 @@ export function useWorkspace2(active: boolean) {
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const log = useCallback((text: string) => setActivity(list => [{ id: (list[0]?.id ?? 0) + 1, text }, ...list].slice(0, 100)), []);
   // A simulated call shows in the Checks pill for this long; Project > Activity keeps the line.
-  const [flash, setFlash] = useState('');
+  // Each call restarts the 4 s, even when the line is the same as the last.
+  const [flash, setFlash] = useState(''), [flashes, setFlashes] = useState(0);
   const simulated = useCallback((summary: string) => {
-    log(summary); setFlash(summary);
+    log(summary); setFlash(summary); setFlashes(count => count + 1);
   }, [log]);
   useEffect(() => {
     if (!flash) return;
     const timer = setTimeout(() => setFlash(''), SIMULATED_FLASH_MS);
     return () => clearTimeout(timer);
-  }, [flash]);
+  }, [flash, flashes]);
   const openPublish = useCallback(() => { setPublishError(''); setPhase('confirm'); void refreshPublication(); }, [refreshPublication]);
   const closePublish = useCallback(() => setPhase(current => current === 'publishing' ? current : 'idle'), []);
   const publish = useCallback(async (): Promise<boolean> => {

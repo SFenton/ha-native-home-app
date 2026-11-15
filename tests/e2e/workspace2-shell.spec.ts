@@ -344,3 +344,23 @@ test('the Problems pill on the narrow layout never sits on the preview tab bar o
   await pill.click();
   await expect(page.getByText(/Lights: |Problem/).first()).toBeVisible();
 });
+
+test('a tap in Use shows a readable note in words that stays for at least four seconds', async ({ page }) => {
+  await openWorkspace(page);
+  await page.getByRole('button', { name: 'Use', exact: true }).click();
+  await previewRoot(page).locator('.sh-tab', { hasText: 'Security' }).click();
+  await previewRoot(page).locator('.sh-page[data-current] .sh-node[data-type="action-tile"]').first().click();
+  const note = page.getByTestId('checks-pill');
+  await expect(note).toBeVisible();
+  const text = (await note.textContent())!.trim();
+  expect(text).toMatch(/^.+: [a-z ]+$/);
+  expect(text).not.toMatch(/Simulated|[a-z]+_[a-z]+\.|\b[a-z_]+\.[a-z_]+\b/);
+  const style = await note.evaluate(element => { const css = getComputedStyle(element); return { color: css.color, background: css.backgroundColor }; });
+  const luminance = (value: string) => { const [r, g, b] = value.match(/\d+(\.\d+)?/g)!.slice(0, 3).map(Number).map(channel => { const c = channel / 255; return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
+  const [light, dark] = [luminance(style.color), luminance(style.background)].sort((a, b) => b - a);
+  expect((light + .05) / (dark + .05)).toBeGreaterThanOrEqual(4.5);
+  await page.waitForTimeout(3600);
+  await expect(note).toContainText(text);
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-use-note`);
+  await expect(note).not.toContainText(text, { timeout: 3000 });
+});

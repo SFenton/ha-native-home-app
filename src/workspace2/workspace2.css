@@ -65,6 +65,7 @@
 .w2-checks-slot { position: absolute; left: 16px; bottom: 16px; z-index: 1; }
 .w2-narrow .w2-checks-slot { top: 8px; bottom: auto; left: 50%; transform: translateX(-50%); }
 .w2-pill { border-radius: 16px; min-height: 32px; background: var(--w2-card); box-shadow: var(--w2-shadow); }
+.w2-scope .w2-pill-note, .w2-scope .w2-pill-note:hover:not(:disabled) { background: var(--w2-ink); color: var(--w2-bg); border-color: var(--w2-ink); font-weight: 600; }
 .w2-scope .w2-pill-error { color: var(--w2-err-text); border-color: var(--w2-err); }
 .w2-card { position: absolute; top: 12px; right: 16px; bottom: auto; width: 376px; max-height: calc(100% - 24px); overflow: auto; background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: var(--w2-radius); box-shadow: var(--w2-shadow); z-index: 1; }
 .w2-bottombar { flex: none; display: flex; justify-content: center; align-items: center; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: var(--w2-card); border-top: 1px solid var(--w2-line); }

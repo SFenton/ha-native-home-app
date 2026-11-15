@@ -236,7 +236,7 @@ describe('Preview2 Use actions', () => {
     mount(button(), { mode: 'use', house: houseFrom({ states: [light] }), onOverlayChange, onSimulatedCall });
     fireEvent.click(screen.getByRole('button', { name: 'Lights on' }));
     expect(onOverlayChange).toHaveBeenCalledWith({ entities: { 'light.kitchen': { state: 'on' } }, local: {} });
-    expect(onSimulatedCall).toHaveBeenCalledWith('Simulated light.turn_on');
+    expect(onSimulatedCall).toHaveBeenCalledWith('Kitchen: turn on');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -260,10 +260,10 @@ describe('Preview2 Use actions', () => {
     const toggle = screen.getByRole('switch', { name: 'Kitchen' });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle);
-    expect(calls).toEqual(['Simulated light.turn_on']);
+    expect(calls).toEqual(['Kitchen: turn on']);
     expect(screen.getByRole('switch', { name: 'Kitchen' }).getAttribute('aria-checked')).toBe('true');
     fireEvent.click(screen.getByRole('switch', { name: 'Kitchen' }));
-    expect(calls).toEqual(['Simulated light.turn_on', 'Simulated light.turn_off']);
+    expect(calls).toEqual(['Kitchen: turn on', 'Kitchen: turn off']);
   });
 
   it('writes a set-local control into the overlay and shows it', () => {
