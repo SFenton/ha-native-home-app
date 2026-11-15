@@ -48,7 +48,8 @@
 .w2-rule-parts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .w2-rule-group { margin: 6px 0 6px 12px; padding-inline-start: 10px; border-inline-start: 2px solid var(--w2-line); }
 .w2-rule-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 0; }
-.w2-rule-actions { display: flex; gap: 8px; padding-top: 8px; }
+.w2-rule-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 8px; }
+.w2-rule-actions > .w2-picker-row { flex: 1 1 11rem; min-height: 0; }
 @media (max-width: 420px) { .w2-field-row { grid-template-columns: minmax(0, 1fr) auto; } .w2-field-row .w2-field-control { grid-column: 1 / -1; grid-row: 2; } }
 .w2-choice-list { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow-y: auto; }
 .w2-scope button.w2-choice { justify-content: flex-start; width: 100%; min-height: 48px; border-color: transparent; text-align: start; padding: 4px 10px; }

@@ -184,7 +184,12 @@ test('the rule builder round-trips a rule and keeps the JSON for the rest', asyn
   await panel.getByRole('button', { name: /Visible when/ }).click();
   const editor = page.getByTestId('rule-editor');
   await expect(editor).toBeVisible();
-  await editor.getByRole('button', { name: /Add Condition/ }).click();
+  // The button shows its whole name, "Add Condition", with nothing cut off.
+  const add = editor.getByRole('button', { name: /Add Condition/ });
+  const fit = await add.evaluate(button => [...button.querySelectorAll<HTMLElement>('span')].map(span => span.scrollWidth - span.clientWidth));
+  expect(Math.max(0, ...fit)).toBeLessThanOrEqual(0);
+  expect(await add.evaluate(button => button.getBoundingClientRect().width)).toBeGreaterThan(120);
+  await add.click();
   await page.getByRole('button', { name: 'The person using the app' }).click();
   await expect(editor.getByLabel('The person')).toHaveValue('true');
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-rule-builder`);

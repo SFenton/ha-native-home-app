@@ -82,7 +82,7 @@ function Group({ draft, items, mode, level, onChange, root }: { draft: Draft; it
         : <Condition key={at} draft={draft} predicate={item} kind={kind} level={level} onChange={next => set(at, next)} onRemove={() => set(at, undefined)}/>;
     })}
     <div className="w2-rule-actions">
-      <PickerRow title="Add Condition" primary={<><Plus size={14} aria-hidden/> Add Condition</>}>
+      <PickerRow stacked title="Add Condition" primary={<><Plus size={14} aria-hidden/> Add Condition</>}>
         {close => <div className="w2-rule-add">
           <button type="button" className="w2-choice" onClick={() => { addPredicate({ type: 'viewer', isAdmin: true }); close(); }}>The person using the app</button>
           <EntityList onPick={row => { const made = entityCondition(draft.get(), row.entityId); draft.set(made.document); addPredicate(made.predicate); close(); }} height={300}/>
