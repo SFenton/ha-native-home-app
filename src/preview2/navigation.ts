@@ -65,9 +65,11 @@ function pushPage(document: CompositionDocument, state: NavState, pageId: string
   const sheet = state.sheets.at(-1);
   if (sheet) {
     const next = pushOnto(sheet.pages, pageId);
+    if (next.motion === 'none') return state;
     return { ...state, sheets: [...state.sheets.slice(0, -1), { ...sheet, pages: next.stack }], motion: next.motion };
   }
   const next = pushOnto(tabStack(document, state), pageId);
+  if (next.motion === 'none') return state;
   return { ...state, stacks: withStack(state, next.stack), motion: next.motion };
 }
 function dismissTop(state: NavState): NavState {

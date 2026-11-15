@@ -3,6 +3,7 @@ import type { CompositionAction, CompositionNode } from '../../shared/compositio
 import type { Json } from '../../shared/types';
 import { evaluateOperand, type ReadResult } from '../evaluate';
 import type { Operand } from '../../shared/composition/expression';
+import { ArrowUpRight, BatteryFull, Check, ChevronUp, CircleCheck, CircleDot, CloudSun, DoorClosed, DoorOpen, Droplet, Footprints, Keyboard, Layers, LockOpen, Menu, Minus, PanelTop, Pause, PersonStanding, Power, ShieldAlert, SkipBack, SkipForward, Thermometer, TriangleAlert, Tv, Volume2, VolumeX, Warehouse, Wind, type LucideIcon } from 'lucide-react';
 import { Icon } from '../../ui';
 import { useRender } from '../render-context';
 
@@ -12,9 +13,23 @@ export type NodeOf<T extends CompositionNode['type']> = Extract<CompositionNode,
 export type SfSymbol = { name: string };
 type Fill = { type: 'standard' } | { type: 'solid-rgb'; red: number; green: number; blue: number };
 
-/** A glyph; SF symbol names resolve through the Studio's icon aliases and fall back to a generic glyph. */
+/** SF symbols the document uses that the Studio's own icon aliases lack, mapped to the nearest lucide glyph. */
+const sfAliases: Record<string, LucideIcon> = {
+  'thermometer.medium': Thermometer, 'line.3.horizontal': Menu, 'door.left.hand.closed': DoorClosed, 'aqi.medium': Wind, power: Power,
+  'shield.lefthalf.filled': ShieldAlert, 'exclamationmark.shield': ShieldAlert, 'lock.trianglebadge.exclamationmark': ShieldAlert, 'figure.walk.motion': Footprints,
+  'figure.stand': PersonStanding, 'window.vertical.open': PanelTop, 'window.vertical.closed': PanelTop, 'lock.open': LockOpen, 'door.garage.closed': Warehouse,
+  'door.garage.open': DoorOpen, 'checkmark.circle': CircleCheck, 'exclamationmark.triangle.fill': TriangleAlert, 'speaker.slash.fill': VolumeX, 'speaker.slash': VolumeX,
+  'speaker.wave.2.fill': Volume2, 'record.circle': CircleDot, 'square.stack': Layers, 'battery.100percent': BatteryFull, 'arrow.up.right': ArrowUpRight, drop: Droplet,
+  checkmark: Check, 'cloud.sun': CloudSun, 'chevron.up': ChevronUp, keyboard: Keyboard, 'pause.fill': Pause, minus: Minus, 'play.tv': Tv, 'backward.fill': SkipBack, 'forward.fill': SkipForward,
+};
+/** A glyph by SF symbol name: the aliases above, then the Studio's icon set, then a generic glyph. */
+export function GlyphByName({ name, size = 22 }: { name: string; size?: number }) {
+  const Alias = sfAliases[name];
+  return Alias ? <Alias size={size} strokeWidth={1.8} data-icon={name} aria-hidden="true"/> : <Icon name={name} size={size}/>;
+}
+/** A glyph from a document symbol. */
 export function Glyph({ symbol, size = 22 }: { symbol?: SfSymbol; size?: number }) {
-  return symbol ? <Icon name={symbol.name} size={size}/> : null;
+  return symbol ? <GlyphByName name={symbol.name} size={size}/> : null;
 }
 /** `rgb()` for a solid fill; undefined for the standard fill. */
 export const rgb = (fill: Fill | undefined): string | undefined => fill?.type === 'solid-rgb' ? `rgb(${fill.red} ${fill.green} ${fill.blue})` : undefined;

@@ -2,7 +2,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import type { CompositionAction, CompositionDocument, CompositionGroups } from '../shared/composition/schema';
 import { isShown, type VisibilityRule } from './evaluate';
 import type { SelectionKey } from './model';
-import { Icon } from '../ui';
+import { GlyphByName } from './nodes/shared';
 import { useRender } from './render-context';
 import { useIsSelected } from './selection-store';
 
@@ -14,7 +14,7 @@ function Circle({ selKey, label, icon, action, className = '' }: { selKey?: Sele
   const selected = useIsSelected(ctx.store, selKey ?? 'chrome-item:');
   return <button type="button" className={`sh-circle ${className}`.trim()} aria-label={label} title={label} data-sel={selKey}
     data-selected={selKey && selected && ctx.mode === 'edit' ? '' : undefined}
-    onClick={() => { if (ctx.mode === 'use' && action) ctx.run(action); }}><Icon name={icon} size={20}/></button>;
+    onClick={() => { if (ctx.mode === 'use' && action) ctx.run(action); }}><GlyphByName name={icon} size={20}/></button>;
 }
 
 /** The two buttons of the app's `shell-header` item: Quick Links, then Profile. */
@@ -71,7 +71,7 @@ function TabButton({ tab, selected, ctx }: { tab: CompositionDocument['navigatio
   return <button type="button" className="sh-tab" aria-current={selected ? 'page' : undefined} data-sel={key} data-active={selected ? '' : undefined}
     data-selected={picked && ctx.mode === 'edit' ? '' : undefined} data-hidden={!visible ? '' : undefined}
     onClick={() => { if (ctx.mode === 'use') ctx.run({ type: 'select-tab', tabId: tab.id }); }}>
-    <Icon name={tab.icon.name} size={22}/><span>{tab.label}</span>
+    <GlyphByName name={tab.icon.name} size={22}/><span>{tab.label}</span>
   </button>;
 }
 

@@ -28,7 +28,7 @@ export function PageBody({ surface, largeTitle, scrollToTop = 0 }: PageBodyProps
   const scroller = useRef<HTMLDivElement>(null);
   const title = useSourceText(surface.titleSourceId, surface.title);
   useEffect(() => {
-    if (scrollToTop > 0) scroller.current?.scrollTo({ top: 0, behavior: matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (scrollToTop > 0) scroller.current?.scrollTo({ top: 0, behavior: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, [scrollToTop]);
   const { layout } = surface;
   const column = {

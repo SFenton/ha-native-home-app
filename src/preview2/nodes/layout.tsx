@@ -26,12 +26,11 @@ export function SectionNode({ node }: { node: NodeOf<'section'> }) {
 export function StatusRailNode({ node }: { node: NodeOf<'status-rail'> }) {
   return <div className="sh-rail" role="list" aria-label={node.title}><Children nodes={node.children}/></div>;
 }
-/** `room-section`: a room's title over a two-column grid of its tiles. */
+/** `room-section`: a room's nodes in a column, or in two columns when the arrangement fills two. */
 export function RoomSectionNode({ node }: { node: NodeOf<'room-section'> }) {
-  return <section className="sh-section sh-room-section" data-arrangement={node.props.arrangement} aria-label={node.title}>
-    <h2 className="sh-section-header">{node.title}</h2>
-    <div className="sh-grid" style={{ '--min': '150px', '--max': 2, '--gap': '12px' } as CSSProperties}><Children nodes={node.children}/></div>
-  </section>;
+  const two = node.props.arrangement === 'two-column-fill';
+  return <section className={`sh-room-section ${two ? 'sh-grid' : 'sh-section-body'}`} data-arrangement={node.props.arrangement} aria-label={node.title}
+    style={{ '--min': '150px', '--max': two ? 2 : 1, '--gap': '12px' } as CSSProperties}><Children nodes={node.children}/></section>;
 }
 /** `paged-row`: children in a snapping row, `perPage` to a page, with the page dots when asked. */
 export function PagedRowNode({ node }: { node: NodeOf<'paged-row'> }) {

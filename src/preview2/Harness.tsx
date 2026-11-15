@@ -24,14 +24,14 @@ export default function Harness() {
   if (!document || !house) return <p>Loading the fixture…</p>;
   const shown = surface ?? { kind: 'page' as const, id: document.navigation.initialPageId };
   const bezel = query.get('bezel') !== '0';
-  return <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', height: '100vh', background: '#e9eaee', font: '13px system-ui' }}>
+  return <div style={{ display: 'grid', gridTemplateColumns: query.get('panel') === '0' ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 280px', height: '100vh', background: '#e9eaee', font: '13px system-ui' }}>
     <div style={{ minWidth: 0, minHeight: 0, ['--studio-selection' as string]: '#03a9f4' }} data-testid="preview2-host"><Preview2 document={document} mode={mode} surface={shown} onSurfaceChange={setSurface}
       selection={selection} onSelect={setSelection} window={previewWindows[0]} bezel={bezel} house={house} overlay={overlay} onOverlayChange={setOverlay}
       onSimulatedCall={summary => setLog(old => [...old, summary])}/></div>
-    <aside style={{ padding: 12, overflow: 'auto' }}>
+    {query.get('panel') !== '0' && <aside style={{ padding: 12, overflow: 'auto' }}>
       <button onClick={() => setMode(mode === 'edit' ? 'use' : 'edit')}>Mode: {mode}</button>
       <p data-testid="surface">{shown.kind}:{shown.id}</p><p data-testid="selection">{selection ?? 'none'}</p>
       <ol data-testid="log">{log.map((line, i) => <li key={i}>{line}</li>)}</ol>
-    </aside>
+    </aside>}
   </div>;
 }
