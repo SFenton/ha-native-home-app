@@ -1,3 +1,4 @@
+import type { CompositionDocument } from '../../shared/composition/schema';
 import type { SurfaceRef } from '../outline';
 
 /** What the New Page dialog starts with. */
@@ -8,6 +9,8 @@ export interface CreatePageOptions {
   hideLink?: boolean;
   /** Move the preview to the new page (default true). */
   switchTo?: boolean;
+  /** Folds one more change into the same undo step as the new page (the caller points its action or tab at it). */
+  connect?: (document: CompositionDocument, pageId: string) => CompositionDocument;
 }
 /** What the New Sheet dialog starts with. */
 export interface CreateSheetOptions {

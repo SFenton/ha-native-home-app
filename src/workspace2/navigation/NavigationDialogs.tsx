@@ -31,7 +31,7 @@ function NewPage({ ws, options, onDone }: { ws: Workspace2; options: CreatePageO
     if (!name.trim()) return;
     const link = options.hideLink ? undefined : from === 'none' ? undefined : parseRef(from);
     const made = addPage(document, name, link);
-    ws.studio.apply(made.document);
+    ws.studio.apply(options.connect ? options.connect(made.document, made.id) : made.document);
     if (options.switchTo !== false) { ws.setSurface({ kind: 'page', id: made.id }); ws.select(undefined); }
     onDone(made.id);
   };

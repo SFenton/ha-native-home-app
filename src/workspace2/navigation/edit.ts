@@ -87,6 +87,22 @@ export function tabRoom(document: CompositionDocument): { room: boolean; reason?
   return { room: false, reason: 'The tab bar holds 5.' };
 }
 
+/** The first page of a tab carries the app's menu button, so a page with its own header buttons and none of those goes back to the app's. */
+function asTabRoot(document: CompositionDocument, pageId: string): CompositionDocument {
+  const root = document.pages.findIndex(page => page.id === pageId);
+  const own = document.pages[root]?.toolbar;
+  return own?.type === 'replace' && !own.groups.some(group => group.items.some(item => item.type === 'shell-menu')) ? replaceAt(document, ['pages', root, 'toolbar'], { type: 'inherit' }) : document;
+}
+
+/** Points tab number `index` at another page, keeping the page the app opens first in step when this tab is the one that opens first. */
+export function setTabPage(document: CompositionDocument, index: number, pageId: string): CompositionDocument {
+  const tab = document.navigation.tabs[index];
+  if (!tab) return document;
+  let next = asTabRoot(document, pageId);
+  next = replaceAt(next, ['navigation', 'tabs', index, 'pageId'], pageId);
+  return next.navigation.initialTabId === tab.id ? replaceAt(next, ['navigation', 'initialPageId'], pageId) : next;
+}
+
 /** The tab to add: a label, an icon and the page it opens (an existing one, else a new page named for the label). */
 export interface TabDraft { label: string; icon: string; pageId?: string }
 
@@ -95,10 +111,7 @@ export function addTab(document: CompositionDocument, draft: TabDraft): Added & 
   if (!tabRoom(document).room) throw new Error('The tab bar holds 5.');
   let next = document, pageId = draft.pageId;
   if (!pageId) { const made = addPage(document, draft.label); next = made.document; pageId = made.id; }
-  // The first page of a tab carries the app's menu button, so a page with its own header buttons and none of those goes back to the app's.
-  const root = next.pages.findIndex(page => page.id === pageId);
-  const own = next.pages[root]?.toolbar;
-  if (own?.type === 'replace' && !own.groups.some(group => group.items.some(item => item.type === 'shell-menu'))) next = replaceAt(next, ['pages', root, 'toolbar'], { type: 'inherit' });
+  next = asTabRoot(next, pageId);
   const tab: Tab = { id: uid('tab'), label: draft.label.trim() || 'New Tab', icon: symbol(draft.icon) as Tab['icon'], pageId, arguments: {} } as Tab;
   next = replaceAt(next, ['navigation', 'tabs'], [...next.navigation.tabs, tab]);
   if (next.navigation.tabs.length === 1 && next.navigation.initialTabId === null) next = replaceAt(next, ['navigation'], { ...next.navigation, initialTabId: tab.id, initialPageId: pageId });
