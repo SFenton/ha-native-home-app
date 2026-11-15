@@ -106,6 +106,8 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
         onOpenChange={(open, details) => {
           // A dialog opened from inside the sheet (New Page…, New Sheet…) sits outside it; pressing in the dialog is not a press outside the sheet.
           if (!open && details.reason === 'outside-press' && (details.event.target as Element | null)?.closest?.('[role=dialog], [role=alertdialog]')) return;
+          // Undo and Redo edit what the sheet shows; the document change itself closes the sheet when the selection is gone.
+          if (!open && details.reason === 'outside-press' && (details.event.target as Element | null)?.closest?.('[data-keeps-sheet]')) return;
           if (!open) close();
         }}>
         <Drawer.Portal><Drawer.Viewport className="w2-props-viewport"><Drawer.Popup className="w2-scope w2-sheet w2-props-sheet" aria-label="Properties" style={{ '--w2-sheet-hidden': `${Math.max(0, window.innerHeight - coverage(snap))}px` } as CSSProperties}>

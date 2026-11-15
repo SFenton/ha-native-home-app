@@ -370,3 +370,18 @@ test('the narrow layout hides the Problems pill while there is nothing to report
   await openWorkspace(page);
   await expect(page.getByTestId('checks-pill')).toBeHidden();
 });
+
+test('Undo on a phone keeps the properties sheet open on the same selection', async ({ page }) => {
+  test.skip(!isPhone(page), 'The sheet is the narrow layout');
+  await openWorkspace(page);
+  await selectTile(page, 'Lights');
+  const sheet = page.getByLabel('Properties');
+  const title = sheet.getByLabel('Title', { exact: true }).first();
+  await title.fill('Lamps');
+  await expect(previewRoot(page)).toContainText('Lamps');
+  await page.getByRole('button', { name: 'Undo', exact: true }).tap();
+  await expect(previewRoot(page)).not.toContainText('Lamps');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('heading', { name: 'Lights', exact: true })).toBeVisible();
+  await expect(title).toHaveValue('Lights');
+});

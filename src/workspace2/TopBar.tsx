@@ -65,8 +65,8 @@ export default function TopBar({ ws, narrow, window: current, onWindow, pagesOpe
       <WindowMenu window={current} onWindow={onWindow}/>
     </div>}
     <div className="w2-trailing">
-      <button type="button" className="w2-icon-button" aria-label="Undo" disabled={!ws.studio.canUndo} onClick={ws.studio.undo}><Undo2 size={18} aria-hidden/></button>
-      {!narrow && <button type="button" className="w2-icon-button" aria-label="Redo" disabled={!ws.studio.canRedo} onClick={ws.studio.redo}><Redo2 size={18} aria-hidden/></button>}
+      <button type="button" className="w2-icon-button" aria-label="Undo" data-keeps-sheet="" disabled={!ws.studio.canUndo} onClick={ws.studio.undo}><Undo2 size={18} aria-hidden/></button>
+      {!narrow && <button type="button" className="w2-icon-button" aria-label="Redo" data-keeps-sheet="" disabled={!ws.studio.canRedo} onClick={ws.studio.redo}><Redo2 size={18} aria-hidden/></button>}
       {!narrow && tag()}
       <button type="button" className="w2-primary" disabled={!narrow && blocked || ws.studio.conflict || ws.studio.busy && ws.phase === 'idle'}
         title={!narrow && blocked ? `Fix ${ws.problemCount} problem${ws.problemCount === 1 ? '' : 's'} to publish.` : undefined} onClick={ws.openPublish}>Publish</button>

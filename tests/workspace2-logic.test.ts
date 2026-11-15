@@ -4,6 +4,8 @@ import type { CompositionDocument } from '../src/shared/composition/schema';
 import { fillTabGroups, groupWithRoom, tabGroups } from '../src/workspace2/capacity';
 import { runChecks } from '../src/workspace2/checks';
 import { labelFor, labelText, mechanicalLabel } from '../src/workspace2/labels';
+import { buildDocumentIndex } from '../src/preview2/model';
+import { survivingSelection } from '../src/workspace2/selection';
 import { buildOutline, type OutlineRow } from '../src/workspace2/outline';
 import { contrast, deriveTheme, over, parseColor, textPairs, type Rgb } from '../src/workspace2/theme';
 
@@ -90,5 +92,26 @@ describe('labels', () => {
   it('prefers the owner entry, then the shared path, then the last key', () => {
     expect(labelText('nothing', ['unmappedThing'])).toBe('Unmapped thing');
     expect(labelFor('project', ['dataSources'])?.add).toBe('Add Source');
+  });
+});
+
+describe('selection survival across Undo and Redo', () => {
+  const emptied = (document: CompositionDocument) => ({
+    ...document,
+    pages: document.pages.map(page => ({ ...page, components: [] })),
+    modals: document.modals.map(modal => ({ ...modal, components: [] })),
+  }) as unknown as CompositionDocument;
+  it('keeps a selection whose node still exists and drops one the change removed', () => {
+    const before = buildDocumentIndex(fixture.document);
+    const key = before.keys.find(item => item.startsWith('node:'))!;
+    expect(before.get(key)).toBeDefined();
+    expect(survivingSelection(key, before)).toBe(key);
+    const after = buildDocumentIndex(emptied(fixture.document));
+    expect(after.get(key)).toBeUndefined();
+    expect(survivingSelection(key, after)).toBeUndefined();
+  });
+  it('passes through no selection and no index', () => {
+    expect(survivingSelection(undefined, undefined)).toBeUndefined();
+    expect(survivingSelection('node:x', undefined)).toBe('node:x');
   });
 });

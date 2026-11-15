@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { request } from '../api';
 import { useCompositionStudio } from '../useCompositionStudio';
 import { useHouseStates } from '../preview2/useHouseStates';
+import { survivingSelection } from './selection';
 import { buildDocumentIndex, parseSelectionKey, selectionKey, type DocumentIndex, type SelectionKey } from '../preview2/model';
 import { canonicalCompositionJSON } from '../shared/composition/json';
 import type { CompositionDocument } from '../shared/composition/schema';
@@ -59,6 +60,8 @@ export function useWorkspace2(active: boolean) {
     return exists ? surfaceState : firstSurface(document);
   }, [document, surfaceState]);
   const select = useCallback((next: SelectionKey | undefined) => { setSelectionState(next); setPanel(undefined); if (next) setRevealKey(next); }, []);
+  // A change that removes the selected node (Undo of an add) ends the selection; any other change keeps it.
+  useEffect(() => { setSelectionState(held => survivingSelection(held, index)); }, [index]);
   const changeSurface = useCallback((next: PreviewSurface) => { setSurfaceState(next); }, []);
   const changeMode = useCallback((next: 'edit' | 'use') => { setMode(next); if (next === 'use') { setSelectionState(undefined); setPanel(undefined); } }, []);
 
