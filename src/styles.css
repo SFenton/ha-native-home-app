@@ -304,7 +304,9 @@ button.primary:hover:not(:disabled){background:#23564d;border-color:#23564d}
 @media(prefers-reduced-motion:reduce){.native-scroll.navigation-enter:not(.navigation-none){animation:native-crossfade .2s ease-out!important}.native-scroll.navigation-exit{visibility:hidden}}
 
 /* Device containment: nothing inside the preview scrolls the Studio, selects text or ghost-drags. */
-.device-screen,.device-screen *{overscroll-behavior:contain;-webkit-tap-highlight-color:transparent}
+.device-screen,.native-app,.native-scroll,.native-modal-scroll{overscroll-behavior:contain}
+/* Contain stays off inner carousels: an x-only scroller would swallow vertical wheel input instead of chaining to the page scroller inside the device. The wheel guard stops the rest. */
+.device-screen,.device-screen *{-webkit-tap-highlight-color:transparent}
 .device-screen,.device-screen *:not(input):not(textarea){user-select:none;-webkit-user-select:none}
 .device-screen input,.device-screen textarea{user-select:text;-webkit-user-select:text}
 .device-screen img,.device-screen a{-webkit-user-drag:none;user-drag:none}

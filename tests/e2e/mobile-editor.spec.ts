@@ -242,14 +242,14 @@ for (const viewport of mobileViewports) {
       await expect(inspector(page)).toHaveCount(0);
     }
     await page.getByLabel('Preview device', { exact: true }).selectOption('duo');
-    await page.getByRole('button', { name: 'View controls', exact: true }).click();
+    await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: 'Flat', exact: true }).click();
     for (const label of ['Preview device', 'Device theme', 'Preview data state', 'Fold angle', 'Device yaw', 'Device pitch']) {
       await reachable(page, page.getByLabel(label, { exact: true }));
     }
     for (const name of [
-      'Opaque chrome', 'Rotate device 90 degrees counterclockwise', 'Rotate device 90 degrees clockwise',
-      '3D', 'View controls', 'Fit', 'Zoom out', 'Reset preview zoom to 100 percent', 'Zoom in',
+      'Solid bars', 'Rotate device 90 degrees counterclockwise', 'Rotate device 90 degrees clockwise',
+      '3D', 'More', 'Fit', 'Zoom out', 'Reset preview zoom to 100 percent', 'Zoom in',
       'Closed', 'Partial', 'Open', 'Reset view',
     ]) await reachable(page, page.getByRole('button', { name, exact: true }));
     for (const name of ['Save', 'Undo', 'Redo']) {
@@ -316,7 +316,7 @@ test('M4 focused raw source dialog survives resize and Escape restores its invok
   const before = await editorDocument(page);
   const sourceButton = page.getByRole('button', { name: 'View and edit source', exact: true });
   await sourceButton.click();
-  const dialog = page.getByRole('dialog', { name: 'Your experience, in code', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Source', exact: true });
   const source = dialog.getByRole('textbox', { name: 'Document source', exact: true });
   const rawDraft = '{"name": "Uncommitted source draft", "unfinished":';
   await source.fill(rawDraft);
@@ -613,7 +613,7 @@ test('M3 inspector action, condition, binding, JSON, sample editing and simulati
   await projectBrowser(page);
   await pane(page, 'Preview');
   await node(page, 'mobile-service').getByRole('button', { name: 'Synthetic light', exact: true }).tap();
-  await expect(page.getByText('Simulated light.turn_on. No Home Assistant device was changed.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Simulated light.turn_on.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /^Activity(?:\s*\d+)?$/ }).click();
   await expect(page.getByText(/SIMULATED light\.turn_on.*light\.mobile_fixture/)).toBeVisible();
   expect((await draft(request)).document).toEqual(mobileEditorDocument());
@@ -666,13 +666,13 @@ test('M3 compact Save and stale conflicts preserve local work across pane switch
   await page.getByRole('button', { name: 'Save', exact: true }).tap();
   const conflict = page.getByRole('alert').filter({ hasText: 'The server draft changed in another session.' });
   await expect(conflict).toBeVisible();
-  await reachable(page, conflict.getByRole('button', { name: 'Keep local & replace server', exact: true }));
-  await reachable(page, conflict.getByRole('button', { name: 'Reload server version', exact: true }));
+  await reachable(page, conflict.getByRole('button', { name: 'Keep mine', exact: true }));
+  await reachable(page, conflict.getByRole('button', { name: 'Use the server version', exact: true }));
   await pane(page, 'Project');
   await pane(page, 'Inspect');
   await expect(inspector(page).getByLabel('Page title', { exact: true })).toHaveValue('Local mobile work');
   expect((await draft(request)).document.name).toBe('Other synthetic session');
-  await conflict.getByRole('button', { name: 'Keep local & replace server', exact: true }).tap();
+  await conflict.getByRole('button', { name: 'Keep mine', exact: true }).tap();
   await expect.poll(async () => (await draft(request)).document.pages[0].title).toBe('Local mobile work');
 });
 
@@ -776,7 +776,7 @@ test('M4 200 percent editor text-scale stress and reduced motion/transparency pr
   await reachable(page, project(page).getByRole('button', { name: /^Variables & conditions/ }));
   await noDocumentOverflow(page);
   await pane(page, 'Preview');
-  await page.getByRole('button', { name: 'Opaque chrome', exact: true }).click();
+  await page.getByRole('button', { name: 'Solid bars', exact: true }).click();
   await expect(page.locator('.native-tabbar')).toHaveCSS('backdrop-filter', 'none');
   expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
   await page.getByRole('button', { name: 'Interact', exact: true }).click();

@@ -142,7 +142,7 @@ function LegacyStudio({ active, onNative }: { active: boolean; onNative: () => v
       case 'set': setVariableOverrides(previous => ({ ...previous, [action.variable]: action.value })); appendLog(`${action.variable} → ${JSON.stringify(action.value)}`); break;
       case 'service':
         appendLog(`SIMULATED ${action.domain}.${action.service} → ${action.entityId} ${JSON.stringify(action.data ?? {})}`, 'success');
-        /* the activity log above already records the simulated call */
+        notify(`Simulated ${action.domain}.${action.service}.`, 'info')
         break;
       case 'url': {
         const url = safeHttpUrl(action.url, window.location.href);

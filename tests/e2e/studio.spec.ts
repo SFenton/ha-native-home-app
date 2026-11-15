@@ -60,7 +60,7 @@ test('native weather, alarm, subpage chrome and device themes stay data driven',
   await page.locator('.device-screen').screenshot({ path: testInfo.outputPath('weather-detail.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Dismiss app modal' }).click();
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.getByRole('button', { name: 'Opaque chrome', exact: true }).click();
+  await page.getByRole('button', { name: 'Solid bars', exact: true }).click();
   await expect(page.locator('.native-app')).toHaveClass(/opaque-chrome/);
   await expect(page.locator('.native-tabbar')).toHaveCSS('backdrop-filter', 'none');
   await page.getByRole('region', { name: 'Device canvas' }).getByRole('button', { name: 'Security', exact: true }).click();
@@ -375,7 +375,7 @@ test('folded camera frames do not create a second media request or remount the a
   await page.goto('/');
   await expect.poll(() => page.getByAltText('Captured camera').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(16);
   await page.getByLabel('Preview device').selectOption('duo');
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('slider', { name: 'Fold angle', exact: true }).fill('90');
   await expect(page.locator('.duo-fold-face img')).toHaveCount(2);
   await expect.poll(() => page.locator('.duo-fold-face img').first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
@@ -419,7 +419,7 @@ test('device quarter turns, pointer orbit and continuous Duo fold share a single
   await stage.focus(); await page.keyboard.press('ArrowLeft');
   expect(await model.evaluate(element => element.style.transform)).not.toBe(stopped);
   await page.getByLabel('Preview device').selectOption('duo');
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('slider', { name: 'Fold angle', exact: true }).fill('120');
   await expect(model).toHaveAttribute('data-posture', 'partial');
   await expect(page.locator('.duo-fold-face img')).toHaveCount(2);
@@ -428,9 +428,9 @@ test('device quarter turns, pointer orbit and continuous Duo fold share a single
   const foldB = await page.locator('.duo-fold-face.leading').evaluate(element => getComputedStyle(element).transform);
   expect(foldB).not.toBe(foldA);
   await expect(page.locator('.native-app')).toHaveCount(1);
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await stage.screenshot({ path: testInfo.outputPath('duo-hinge.png') });
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('slider', { name: 'Fold angle', exact: true }).fill('0');
   await expect(model).toHaveAttribute('data-posture', 'closed');
   await expect(page.locator('.native-app')).toHaveCount(1);
@@ -473,7 +473,7 @@ test('Duo postures avoid the active landscape crease and keep a single app insta
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto('/');
   await page.getByLabel('Preview device').selectOption('duo');
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   for (const posture of ['Closed', 'Partial', 'Open']) {
     await page.getByRole('button', { name: posture, exact: true }).click();
     for (const landscape of [false, true]) {
@@ -519,7 +519,7 @@ test('preview navigation, conditional visibility, modals, and feedback work with
   await page.getByLabel('What went wrong?', { exact: true }).fill('Test feedback');
   await page.getByLabel('Details', { exact: true }).fill('Isolated browser test; do not submit externally.');
   await page.getByRole('button', { name: 'Save feedback', exact: true }).click();
-  await expect(page.getByText('Feedback saved to the server queue. No external issue was created.')).toBeVisible();
+  await expect(page.getByText('Saved.', { exact: true })).toBeVisible();
 });
 
 test('device and Live Activity variants are selectable without changing configuration', async ({ page, request }) => {
@@ -537,7 +537,7 @@ test('device and Live Activity variants are selectable without changing configur
       return device.bottom < dock.top && device.left >= canvas.left && device.right <= canvas.right;
     })).toBeTruthy();
   }
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByLabel('Fold angle', { exact: true }).focus();
   await page.keyboard.press('Home');
   await expect(page.getByLabel('Fold angle', { exact: true })).toHaveValue('0');
@@ -592,10 +592,10 @@ test('native initialization is reviewed and undoable, with live values kept out 
   } }));
   await page.goto('/');
   await page.getByRole('button', { name: /Data sources/ }).click();
-  await page.getByRole('button', { name: 'Initialize from Native Home', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Replace editor with native reference' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Import house config', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Replace draft' })).toBeEnabled();
   expect((await (await request.get('/api/draft')).json()).revision).toBe(before.revision);
-  await page.getByRole('button', { name: 'Replace editor with native reference' }).click();
+  await page.getByRole('button', { name: 'Replace draft' }).click();
   await expect(page.getByRole('button', { name: 'Live data: on', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Live data received', { exact: false })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'App tabs' }).getByRole('button')).toHaveText(['Home', 'Security', 'Climate', 'Chores', 'Settings']);
@@ -710,7 +710,7 @@ test('normal status chips stay on one scrollable rail with a usable desktop scro
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto('/');
   await page.getByLabel('Preview device').selectOption('duo');
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   const rail = page.locator('[data-component-id="rail"]');
   const measure = () => rail.evaluate(element => {
@@ -853,7 +853,7 @@ test('source edits invalidate fetched values and ignore stale in-flight response
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^Data sources/ }).click();
-  await page.getByLabel('Allow fetching configured data for this preview session').check();
+  await page.getByLabel('Use live data in the preview').check();
   await page.locator('.page-row').filter({ hasText: /^Settings/ }).click();
   await expect(page.locator('[data-component-id="settings-profile"] .native-copy strong')).toHaveText('Previously fetched');
   await page.getByRole('button', { name: /^Data sources/ }).click();

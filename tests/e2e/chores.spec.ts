@@ -244,7 +244,7 @@ test('different resident, unmapped viewer, empty lists and read failures never b
   await expect(canvas.getByRole('button', { name: 'Complete Task Today', exact: true })).toBeVisible();
   await expect(canvas.getByText('Task Alpha', { exact: true })).toHaveCount(0);
   await page.locator('.device-screen').screenshot({ path: testInfo.outputPath('chores-read-error.png'), animations: 'disabled' });
-  await page.getByRole('button', { name: 'View controls', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByLabel('Preview data state', { exact: true }).selectOption('loading');
   await expect(canvas.getByText('Loading chores...', { exact: true })).toBeVisible();
 });
