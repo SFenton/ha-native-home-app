@@ -62,11 +62,7 @@ try {
   });
   assert.equal(savedResponse.status, 200);
   const saved = await savedResponse.json();
-  const publishedResponse = await fetch(`${base}/api/publish`, {
-    method: 'POST', headers, body: JSON.stringify({ expectedRevision: saved.revision }),
-  });
-  assert.equal(publishedResponse.status, 200);
-  const published = await publishedResponse.json();
+  // The legacy house-layout publication (/api/publish, /api/published) is gone: the draft is the only legacy state left to persist.
 
   assert.equal((await fetch(`${base}/native/api/draft`)).status, 401, 'Native authoring must also require authentication');
   const nativeDraft = await (await fetch(`${base}/native/api/draft`, { headers })).json();
@@ -101,8 +97,8 @@ try {
   const restartedBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${restartedBindings['4800/tcp'][0].HostPort}`;
   await waitUntilReady(base);
-  const restored = await (await fetch(`${base}/api/published`, { headers })).json();
-  assert.equal(restored.revision, published.revision);
+  const restored = await (await fetch(`${base}/api/draft`, { headers })).json();
+  assert.equal(restored.revision, saved.revision);
   assert.equal(restored.document.name, 'Container persistence check');
 
   docker('stop', '--time', '10', container);
@@ -114,8 +110,6 @@ try {
   const replacementBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${replacementBindings['4800/tcp'][0].HostPort}`;
   await waitUntilReady(base);
-  const afterReplacement = await (await fetch(`${base}/api/published`, { headers })).json();
-  assert.deepEqual(afterReplacement, restored, 'Replacing the container must preserve the publication');
   const draftAfterReplacement = await (await fetch(`${base}/api/draft`, { headers })).json();
   assert.equal(draftAfterReplacement.revision, saved.revision);
   assert.deepEqual(draftAfterReplacement.document, saved.document);
