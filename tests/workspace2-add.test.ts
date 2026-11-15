@@ -44,10 +44,10 @@ describe('the Add picker offers only what a container accepts, and what it adds 
 
   it('adds a tile for an entity of the right kind, with its source, and no id typed', () => {
     const where = after(doc, first('action-tile').key) as Destination;
-    expect(typeForEntity('switch.plug').type).toBe('action-tile');
-    const { document, key } = insertEntity(doc, where, 'switch.plug', 'Plug');
+    expect(typeForEntity('switch.demo_plug').type).toBe('action-tile');
+    const { document, key } = insertEntity(doc, where, 'switch.demo_plug', 'Plug');
     expect(compositionErrors(document)).toEqual([]);
-    expect(JSON.stringify(document)).toContain('switch.plug');
+    expect(JSON.stringify(document)).toContain('switch.demo_plug');
     expect(buildDocumentIndex(document).get(key)?.node?.title).toBe('Plug');
   });
 });

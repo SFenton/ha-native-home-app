@@ -1,6 +1,6 @@
 {
   "name": "native-home-studio",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "A Home Assistant app for designing and publishing native server-driven experiences.",
@@ -10,7 +10,9 @@
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "scan:house": "tsx scripts/house-scan.ts",
+    "check:release": "tsx scripts/release.ts check"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -21,6 +23,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsx": "^4.20.0",
+    "yaml": "^2.8.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

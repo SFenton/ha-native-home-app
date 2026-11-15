@@ -37,10 +37,10 @@ function liveFixture() {
   tile.props.alarm = {
     sourceId: 'source-panel', projection: 'alarm-navigation@1',
     states: [{ state: 'disarmed', appearance: {
-      icon: { type: 'sf-symbol', name: 'shield.slash', rendering: 'canonical', unavailable: 'reject' },
+      icon: { type: 'sf-symbol', name: 'shield.slash', rendering: 'canonical', unavailable: 'fallback' },
       fill: { type: 'solid-rgb', red: 67, green: 160, blue: 71 }, text: 'At rest',
     } }],
-    fallback: { icon: { type: 'sf-symbol', name: 'shield', rendering: 'canonical', unavailable: 'reject' },
+    fallback: { icon: { type: 'sf-symbol', name: 'shield', rendering: 'canonical', unavailable: 'fallback' },
       fill: { type: 'solid-rgb', red: 84, green: 110, blue: 122 }, text: 'Panel' },
     loadingText: 'Reading panel', unavailableText: 'Panel unavailable', errorText: 'No response', hiddenText: 'Private',
   };
@@ -271,7 +271,7 @@ describe('settings links', () => {
     const publication = fixture();
     publication.document.pages[2].components[0] = {
       id: 'settings-demo', type: 'settings-link', title: 'Sample setting', layout: { span: 1 },
-      icon: { type: 'sf-symbol', name: 'gearshape', rendering: 'canonical', unavailable: 'reject' },
+      icon: { type: 'sf-symbol', name: 'gearshape', rendering: 'canonical', unavailable: 'fallback' },
       props: { subtitle: 'Open details', hint: 'Opens details', showsChevron: true },
       action: { type: 'push', pageId: 'page-echo', arguments: {}, origin: 'sender', duplicate: 'reuse-nearest' },
     };

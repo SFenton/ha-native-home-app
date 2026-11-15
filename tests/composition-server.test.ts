@@ -474,6 +474,16 @@ describe('Publish', () => {
     expect((await live.request('/native/api/ha/publish', 'POST', {})).status).toBe(400);
   });
 
+  it('answers the style editor reads: unconfigured is 503, a malformed query 400, and no sign-in 401', async () => {
+    const f = await fixture();
+    for (const endpoint of ['/native/api/ha/entities', '/native/api/ha/entity-states?entityId=lock.fixture_front', '/native/api/ha/exists?id=script.fixture_known'])
+      expect((await f.request(endpoint)).status).toBe(503);
+    expect((await f.request('/native/api/ha/entities?domain=Bad%20Domain')).status).toBe(400);
+    expect((await f.request('/native/api/ha/entity-states')).status).toBe(400);
+    expect((await f.request('/native/api/ha/exists?id=light.fixture')).status).toBe(400);
+    expect((await f.request('/native/api/ha/entities', 'GET', undefined, {})).status).toBe(401);
+  });
+
   it('requires Studio authentication', async () => {
     const { fake, f } = await home();
     for (const [endpoint, method, body] of [['/native/api/ha/publication', 'GET'], ['/native/api/ha/publish', 'POST', { expectedRevision: 1 }],

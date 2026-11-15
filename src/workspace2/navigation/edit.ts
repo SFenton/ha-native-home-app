@@ -10,7 +10,7 @@ type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
 type Tab = CompositionDocument['navigation']['tabs'][number];
 
-const symbol = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'reject' as const });
+const symbol = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'fallback' as const });
 const surfaces = (document: CompositionDocument, kind: SurfaceRef['kind']) => kind === 'page' ? document.pages : document.modals;
 const keyOf = (kind: SurfaceRef['kind']) => kind === 'page' ? 'pages' : 'modals';
 

@@ -1,13 +1,14 @@
 import { z } from 'zod/v4';
 import { identifierSchema as id } from '../validation';
 import { visibilityFields } from './expression';
+import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;
 const text = (max = 240) => z.string().max(max).refine(value => Boolean(value.trim()));
 const entity = text(160);
 const title = text();
 const symbol = object({ type: z.literal('sf-symbol'), name: text(80),
-  rendering: z.literal('canonical'), unavailable: z.literal('reject') });
+  rendering: z.literal('canonical'), unavailable: symbolUnavailable });
 
 /** Targets, room order and transforms are document values, not house-global defaults. */
 export const vacuumDescriptorSchema = object({

@@ -32,23 +32,23 @@
       "controls": [
         {
           "intent": "snapshot", "title": "Snapshot", "activeTitle": "Saved to Photos", "busyTitle": "Saving", "failureTitle": "Not Saved",
-          "icon": { "type": "sf-symbol", "name": "camera.fill", "rendering": "canonical", "unavailable": "reject" },
-          "activeIcon": { "type": "sf-symbol", "name": "checkmark.circle.fill", "rendering": "canonical", "unavailable": "reject" },
-          "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "reject" },
+          "icon": { "type": "sf-symbol", "name": "camera.fill", "rendering": "canonical", "unavailable": "fallback" },
+          "activeIcon": { "type": "sf-symbol", "name": "checkmark.circle.fill", "rendering": "canonical", "unavailable": "fallback" },
+          "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "fallback" },
           "tint": "action"
         },
         {
           "intent": "sound", "title": "Muted", "activeTitle": "Sound On", "busyTitle": "Changing Sound", "failureTitle": "Sound unavailable",
-          "icon": { "type": "sf-symbol", "name": "speaker.slash.fill", "rendering": "canonical", "unavailable": "reject" },
-          "activeIcon": { "type": "sf-symbol", "name": "speaker.wave.2.fill", "rendering": "canonical", "unavailable": "reject" },
-          "failureIcon": { "type": "sf-symbol", "name": "speaker.slash.fill", "rendering": "canonical", "unavailable": "reject" },
+          "icon": { "type": "sf-symbol", "name": "speaker.slash.fill", "rendering": "canonical", "unavailable": "fallback" },
+          "activeIcon": { "type": "sf-symbol", "name": "speaker.wave.2.fill", "rendering": "canonical", "unavailable": "fallback" },
+          "failureIcon": { "type": "sf-symbol", "name": "speaker.slash.fill", "rendering": "canonical", "unavailable": "fallback" },
           "tint": "action"
         },
         {
           "intent": "record", "title": "Record", "activeTitle": "Recording", "busyTitle": "Changing Recording", "failureTitle": "Recording Failed",
-          "icon": { "type": "sf-symbol", "name": "record.circle", "rendering": "canonical", "unavailable": "reject" },
-          "activeIcon": { "type": "sf-symbol", "name": "record.circle", "rendering": "canonical", "unavailable": "reject" },
-          "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "reject" },
+          "icon": { "type": "sf-symbol", "name": "record.circle", "rendering": "canonical", "unavailable": "fallback" },
+          "activeIcon": { "type": "sf-symbol", "name": "record.circle", "rendering": "canonical", "unavailable": "fallback" },
+          "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "fallback" },
           "tint": "danger"
         }
       ]

@@ -44,7 +44,7 @@ function withEverything(document: CompositionDocument): CompositionDocument {
     },
     liveActivities: [{ id: 'activity-1', jobId: 'dryer', type: 'activity-presentation@1', title: 'Dryer', glyph: 'dryer', tint: 'cleaning', source: 'activity-engine@1', privacy: 'system-sensitive@1', updates: 'engine@1', intents: 'engine-safe@1' }],
     extensions: {
-      type: 'native-extensions@1', watch: 'stub@1', linkPrefixes: ['hc'], cameras: [{ entityId: 'camera.front_door', title: 'Front door', liveLabel: 'Live', unavailableLabel: 'Unavailable' }],
+      type: 'native-extensions@1', watch: 'stub@1', linkPrefixes: ['hc'], cameras: [{ entityId: 'camera.demo_front_door', title: 'Front door', liveLabel: 'Live', unavailableLabel: 'Unavailable' }],
       routes: [{ id: 'route-1', path: 'home', pageId: page.id, title: page.title, summary: page.title, icon: 'house' }],
     },
   } as CompositionDocument;

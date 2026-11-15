@@ -25,7 +25,7 @@ export const formatCompositionIssue = (issue: CompositionIssue) =>
   `${issue.pointer || '/'}: ${issue.code}${issue.capability ? ` (${issue.capability})` : ''}. ${issueHints[issue.code]}`;
 
 export const compositionSymbol = (name = 'square.grid.2x2'): CompositionDocument['pages'][number]['icon'] =>
-  ({ type: 'sf-symbol', name, rendering: 'canonical', unavailable: 'reject' });
+  ({ type: 'sf-symbol', name, rendering: 'canonical', unavailable: 'fallback' });
 
 export function createCompositionPage(id: string): CompositionDocument['pages'][number] {
   const space = { type: 'token', name: 'm' } as const;

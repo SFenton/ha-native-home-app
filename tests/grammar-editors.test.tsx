@@ -13,7 +13,7 @@ const lit = (value: unknown) => ({ type: 'literal', value });
 const nodeSchema = (type: string) => fieldVariants(nodeDefinition()).find(variant => variant.properties?.type?.const === type)!;
 function fixture(components: unknown[]) {
   const document = createCompositionDocument('grammar-ui');
-  document.dataSources.push({ id: 'fan', kind: 'ha-entity', entityId: { type: 'literal', value: 'fan.guest' } },
+  document.dataSources.push({ id: 'fan', kind: 'ha-entity', entityId: { type: 'literal', value: 'fan.demo_guest' } },
     { id: 'temp', kind: 'ha-entity', entityId: { type: 'literal', value: 'sensor.demo_temp' } });
   document.pages[0].components = components as CompositionDocument['pages'][number]['components'];
   return document;
@@ -30,7 +30,7 @@ const node = (current: () => CompositionDocument) => { try { return compileCompo
 
 beforeEach(() => {
   resetHaEntities();
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ states: [{ entityId: 'light.kitchen' }, { entityId: 'lock.demo_front_door' }, { entityId: 'fan.guest' }] }))));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ states: [{ entityId: 'light.demo_kitchen' }, { entityId: 'lock.demo_front_door' }, { entityId: 'fan.demo_guest' }] }))));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -40,8 +40,8 @@ describe('service call editor', () => {
     fireEvent.change(screen.getByLabelText('Domain'), { target: { value: 'fan' } });
     fireEvent.change(screen.getByLabelText('Service'), { target: { value: 'set_percentage' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add entity_id' }));
-    await waitFor(() => expect(document.querySelector('datalist option[value="light.kitchen"]')).toBeTruthy());
-    fireEvent.change(screen.getByLabelText('Entity'), { target: { value: 'fan.guest' } });
+    await waitFor(() => expect(document.querySelector('datalist option[value="light.demo_kitchen"]')).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('Entity'), { target: { value: 'fan.demo_guest' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add service data' }));
     fireEvent.change(screen.getByLabelText('New data field name'), { target: { value: 'percentage' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add data field' }));
@@ -53,7 +53,7 @@ describe('service call editor', () => {
     fireEvent.change(screen.getByLabelText('Confirmation title'), { target: { value: 'Speed up?' } });
     fireEvent.change(screen.getByLabelText('Skip for these user ids (comma separated)'), { target: { value: 'u1, u2' } });
     expect(node(current).action).toEqual({
-      type: 'call-service', domain: 'fan', service: 'set_percentage', target: { entity_id: lit('fan.guest') },
+      type: 'call-service', domain: 'fan', service: 'set_percentage', target: { entity_id: lit('fan.demo_guest') },
       data: { type: 'object', fields: { percentage: lit(50) } },
       optimistic: [{ sourceId: 'fan', value: 'on', revertAfterSeconds: 2, failsOnTimeout: false }],
       confirmation: { type: 'additional', style: 'alert', title: 'Speed up?', confirmLabel: 'Confirm', cancelLabel: 'Cancel', destructive: false, exemptUserIds: ['u1', 'u2'] },
@@ -61,7 +61,7 @@ describe('service call editor', () => {
   });
 
   it('binds a target to an entity read and a data field to a format', () => {
-    const current = mount(fixture([button({ type: 'call-service', domain: 'notify', service: 'mobile_app', target: { entity_id: lit('fan.guest') } })]));
+    const current = mount(fixture([button({ type: 'call-service', domain: 'notify', service: 'mobile_app', target: { entity_id: lit('fan.demo_guest') } })]));
     fireEvent.click(screen.getByRole('button', { name: 'Use a bound value' }));
     fireEvent.change(screen.getByLabelText('entity_id source'), { target: { value: 'fan' } });
     fireEvent.change(screen.getByLabelText('entity_id as'), { target: { value: 'entity-id' } });

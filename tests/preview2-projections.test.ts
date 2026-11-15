@@ -171,7 +171,7 @@ describe('overlay and simulated calls', () => {
     expect(run('climate', 'set_hvac_mode', 'climate.demo_entity_83', { hvac_mode: 'cool' }).state).toBe('cool');
   });
   it('returns the same overlay when nothing is simulated, so a view does not redraw', () => {
-    for (const unsimulated of [call('vacuum', 'start', [light]), call('light', 'turn_on', ['light.not_there']), call('climate', 'set_temperature', ['climate.demo_entity_83']),
+    for (const unsimulated of [call('vacuum', 'start', [light]), call('light', 'turn_on', ['light.demo_not_there']), call('climate', 'set_temperature', ['climate.demo_entity_83']),
       call('light', 'turn_on', [])]) expect(applyCall(base, emptyOverlay, unsimulated)).toBe(emptyOverlay);
     const unavailableHouse = house(entity(light, 'unavailable'));
     expect(applyCall(unavailableHouse, emptyOverlay, call('light', 'turn_on', [light]))).toBe(emptyOverlay);
@@ -191,8 +191,8 @@ describe('overlay and simulated calls', () => {
     };
     expect(resolveCall(action, createEnvironment(document, base, emptyOverlay, 5))).toEqual({ domain: 'light', service: 'turn_on', entityIds: [light], data: { brightness_pct: 50 } });
     expect(resolveCall(action, createEnvironment(document, base))).toBeUndefined();
-    expect(resolveCall({ ...action, data: undefined, target: { entity_id: { type: 'literal', value: ['light.a', 'light.b'] } } }, createEnvironment(document, base)))
-      .toEqual({ domain: 'light', service: 'turn_on', entityIds: ['light.a', 'light.b'], data: {} });
+    expect(resolveCall({ ...action, data: undefined, target: { entity_id: { type: 'literal', value: ['light.demo_a', 'light.demo_b'] } } }, createEnvironment(document, base)))
+      .toEqual({ domain: 'light', service: 'turn_on', entityIds: ['light.demo_a', 'light.demo_b'], data: {} });
     expect(resolveCall({ type: 'call-service', domain: 'light', service: 'turn_off' }, createEnvironment(document, base))?.entityIds).toEqual([]);
     expect(evaluateOperand({ type: 'literal', value: 1 }, createEnvironment(document, base))).toEqual(value(1));
   });

@@ -6,7 +6,7 @@ import { createCompositionDocument } from './workspace';
 /** An explicit recipe, not renderer defaults. No credentials, real house IDs or service execution. */
 export function securityExample(): CompositionDocument {
   const document = createCompositionDocument('demo-security');
-  const icon = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'reject' as const });
+  const icon = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'fallback' as const });
   const fill = (red: number, green: number, blue: number) => ({ type: 'solid-rgb' as const, red, green, blue });
   const appearance = (text: string, name: string, color = fill(84, 110, 122)) => ({ text, icon: icon(name), fill: color });
   const panel: Extract<CompositionNode, { type: 'alarm-panel' }> = {

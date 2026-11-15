@@ -44,7 +44,7 @@ export default function Live() {
     push?.push({ title: made.title, body: <ActivityFields id={made.id}/> });
   };
   const addCamera = () => {
-    const made: Camera = { entityId: 'camera.front_door', title: 'Front door', liveLabel: 'Live', unavailableLabel: 'Unavailable' };
+    const made: Camera = { entityId: 'camera.demo_front_door', title: 'Front door', liveLabel: 'Live', unavailableLabel: 'Unavailable' };
     const extensions = document.extensions ?? { type: 'native-extensions@1' as const, watch: 'stub@1' as const, routes: [], cameras: [] };
     onChange({ ...document, extensions: { ...extensions, cameras: [...extensions.cameras, made] } });
     push?.push({ title: made.title, body: <CameraFields at={extensions.cameras.length}/> });

@@ -35,7 +35,7 @@ export function EntityPicker({ label, value, onChange }: { label: string; value:
   const { entities, loaded } = useHaEntities();
   const listId = `entities-${label.replace(/\W/g, '')}`;
   const bad = value !== '' && !/^[a-z][a-z0-9_]*\.[a-z0-9_]+$/.test(value);
-  return <Field label={label} hint={bad ? 'An entity id looks like light.kitchen.' : loaded && !entities.length ? 'The Home Assistant entity list is unavailable; type an entity id.' : undefined}>
+  return <Field label={label} hint={bad ? 'An entity id looks like light.demo_kitchen.' : loaded && !entities.length ? 'The Home Assistant entity list is unavailable; type an entity id.' : undefined}>
     <input value={value} list={listId} aria-invalid={bad} onChange={event => onChange(event.target.value.trim())}/>
     <datalist id={listId}>{entities.map(entity => <option key={entity} value={entity}/>)}</datalist>
   </Field>;

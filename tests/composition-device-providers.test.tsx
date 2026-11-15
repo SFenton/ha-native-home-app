@@ -29,7 +29,7 @@ describe('authored device provider assemblies', () => {
 
   it('only accepts resident-aware title and family on a device tile that renders them', () => {
     const tile = remoteControlSchema.parse({ kind: 'device', key: 'Demo PC', presentation: 'tile', family: 'power',
-      icon: { type: 'sf-symbol', name: 'desktopcomputer', rendering: 'canonical', unavailable: 'reject' },
+      icon: { type: 'sf-symbol', name: 'desktopcomputer', rendering: 'canonical', unavailable: 'fallback' },
       states: [], fallbackText: 'Off', unavailableText: 'Unavailable',
       personalization: { residentId: 'demo-resident', ownTitle: 'Your PC', otherTitle: 'Demo PC' } });
     expect(remoteControlIssues(tile)).toEqual([]);

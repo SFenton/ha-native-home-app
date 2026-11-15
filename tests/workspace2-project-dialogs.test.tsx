@@ -26,7 +26,7 @@ function Dialog({ dialog, document = base, stub, seen }: { dialog: DialogKey; do
 
 describe('Data', () => {
   const sample = (kind: 'used' | 'unused'): CompositionDocument => {
-    const unused = { id: 'lonely-weather', kind: 'model', model: 'home-weather@1', inputs: { weatherEntityId: { type: 'literal', value: 'weather.home' }, units: 'source@1' } };
+    const unused = { id: 'lonely-weather', kind: 'model', model: 'home-weather@1', inputs: { weatherEntityId: { type: 'literal', value: 'weather.demo_home' }, units: 'source@1' } };
     return { ...base, dataSources: kind === 'unused' ? [...base.dataSources, unused as never] : base.dataSources };
   };
   it('names models in the app\'s words and counts what reads each source', () => {

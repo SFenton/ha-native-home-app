@@ -7,6 +7,8 @@
  * Deviation from the spec: this lives in `src/workspace2/` rather than `src/shared/composition/` (the lane owns only the former).
  */
 
+import { builtInStyles } from '../shared/composition/state-styles';
+
 /** The four groups of the properties body, in order. */
 export type FieldGroup = 'what' | 'look' | 'behaviour' | 'advanced';
 export const groupOrder: readonly FieldGroup[] = ['what', 'look', 'behaviour', 'advanced'];
@@ -86,6 +88,10 @@ const authored: Record<string, FieldLabel> = {
   'chrome-group.vertical': advanced('Stacked', { options: { 'shared@1': 'One capsule', 'separate@1': 'Separate circles' } }),
   'chrome-item.priority': advanced('Priority', { options: { required: 'Required', normal: 'Normal', low: 'Low' } }),
   'chrome-item.quickLinksAction': behaviour('Quick Links', 1), 'chrome-item.profileAction': behaviour('Profile', 2),
+  // A state tile (`sh.state-style@1`): the style comes from this composition's library or from a built-in, and a few layers can be overridden.
+  'state-tile.binding.styleId': entry('Saved style', { order: 5, caption: 'A style kept in this composition. It wins over the built-in one.' }),
+  'state-tile.binding.builtIn': entry('Built-in style', { order: 6, options: Object.fromEntries(builtInStyles.map(style => [style.id, style.name])) }),
+  'state-tile.binding.overrides': advanced('Overrides'),
   'camera-notification.entityId': entry('Camera', { order: 1 }),
   'camera-notification.liveLabel': entry('Live label', { order: 3 }), 'camera-notification.unavailableLabel': entry('Unavailable label', { order: 4 }),
 };

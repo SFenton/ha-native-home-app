@@ -2,10 +2,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * The Studio's browser tests. The native API always authenticates, so they run their own server with a test token on
- * their own port and data directory. Both are overridable so parallel runs never collide.
+ * their own port and data directory. Both are overridable so parallel runs never collide; `STUDIO_E2E_DATA` is the
+ * older name of the data override and still works.
  */
 const port = process.env.STUDIO_E2E_PORT ?? '4815';
-const dataDir = process.env.STUDIO_E2E_DATA_DIR ?? './test-results/studio-data';
+const dataDir = process.env.STUDIO_E2E_DATA_DIR ?? process.env.STUDIO_E2E_DATA ?? './test-results/studio-data';
 const token = 'e2e-token-for-workspace2-tests-0001';
 
 export default defineConfig({

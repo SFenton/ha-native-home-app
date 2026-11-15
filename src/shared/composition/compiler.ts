@@ -12,6 +12,7 @@ import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroo
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
 import { checkCallService, checkOperand, checkPredicate, type CallService, type ExpressionFacts, type Predicate, type WhenUnknown } from './expression';
+import { checkStateStyleLibrary, checkStateTileBinding } from './state-styles';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 
 export const firstSliceCapabilities = [
@@ -49,7 +50,7 @@ export const supportedCompositionCapabilities: readonly string[] = [
   'sh.camera-stream@1', 'sh.camera-tile@1', 'sh.camera-video@1', 'sh.camera-controls@1', 'sh.camera-viewer@1',
   'sh.activity-presentation@1', 'sh.native-extensions@1', 'sh.route-links@1',
   'sh.call-service@1', 'sh.bound-control@1', 'sh.visible-when@1', 'sh.selected-when@1', 'sh.operands@1',
-  'sh.todo-collection@1',
+  'sh.todo-collection@1', 'sh.state-style@1',
 ];
 const unsupported: Record<string, string> = {
   'room-app-launch': 'room-app-launch', 'section-sides': 'section-sides', 'content-panes': 'content-panes',
@@ -204,6 +205,11 @@ export function compileCompositionDocument(input: unknown): { document: Composit
     document.extensions.cameras.forEach((camera, index) => {
       register('extension-camera', camera.entityId, `/document/extensions/cameras/${index}/entityId`);
     });
+  }
+  if (document.stateStyles) {
+    require('state-style');
+    document.stateStyles.styles.forEach((style, index) => register('state-style', style.id, `/document/stateStyles/styles/${index}/id`));
+    issues.push(...checkStateStyleLibrary(document.stateStyles, '/document/stateStyles'));
   }
   const powerRefs: { id: string; path: string; code: CompositionIssue['code'] }[] = [];
   const alarmRefs: { id: string; path: string }[] = [];
@@ -763,6 +769,9 @@ export function compileCompositionDocument(input: unknown): { document: Composit
             });
           }
           binding(item.props.subtitle, 'string', `${p}/props/subtitle`); action(item.action, `${p}/action`); break;
+        case 'state-tile':
+          require('tiles'); require('state-style');
+          issues.push(...checkStateTileBinding(item.binding, document.stateStyles, `${p}/binding`)); break;
         case 'action-tile':
           require('tiles'); require('bindings'); require('power-toggle');
           if (item.props.powerLabels || item.props.family === 'occupancy') require('power-labels');

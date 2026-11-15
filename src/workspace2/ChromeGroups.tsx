@@ -29,7 +29,7 @@ export function ChromeGroups({ path }: { path: EditorPath }) {
   const groups = (valueAt(document, path) ?? []) as Group[];
   const add = (placement: Group['placement']) => {
     const button = {
-      id: uid('chrome'), type: 'button', label: 'Button', menuLabel: 'Button', icon: { type: 'sf-symbol', name: 'circle', rendering: 'canonical', unavailable: 'reject' },
+      id: uid('chrome'), type: 'button', label: 'Button', menuLabel: 'Button', icon: { type: 'sf-symbol', name: 'circle', rendering: 'canonical', unavailable: 'fallback' },
       visibility: 'always', priority: 'normal', rail: 'eligible', badge: { type: 'none' }, action: { type: 'back' },
     };
     const at = groups.findIndex(group => group.placement === placement);

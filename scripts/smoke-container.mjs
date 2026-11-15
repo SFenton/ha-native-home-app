@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test';
 const image = process.argv[2] ?? 'native-home-studio:check';
 const token = randomBytes(32).toString('hex');
 let container;
+let volume;
 let proxy;
 let browser;
 const docker = (...args) => execFileSync('docker', args, {
@@ -32,7 +33,9 @@ async function waitUntilReady(base) {
 }
 
 try {
-  container = docker('run', '--detach', '--rm', '--publish', '127.0.0.1::4800',
+  volume = docker('volume', 'create');
+  container = docker('run', '--detach', '--publish', '127.0.0.1::4800',
+    '--mount', `type=volume,source=${volume},target=/data`,
     '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
   const bindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   let base = `http://127.0.0.1:${bindings['4800/tcp'][0].HostPort}`;
@@ -51,21 +54,59 @@ try {
   assert.ok(asset, 'Built HTML must use relative asset paths for Ingress');
   assert.equal((await fetch(new URL(asset, `${base}/`), { headers })).status, 200);
 
-  const draft = await (await fetch(`${base}/native/api/draft`, { headers })).json();
-  draft.document.name = 'Container persistence check';
-  const savedResponse = await fetch(`${base}/native/api/draft`, {
-    method: 'PUT', headers,
-    body: JSON.stringify({ document: draft.document, expectedRevision: draft.revision }),
+  const nativeDraft = await (await fetch(`${base}/native/api/draft`, { headers })).json();
+  assert.equal(nativeDraft.document.schemaVersion, '2.0');
+  nativeDraft.document.name = 'Native container persistence check';
+  const nativeValidation = await fetch(`${base}/native/api/validate`, {
+    method: 'POST', headers, body: JSON.stringify({ document: nativeDraft.document }),
   });
-  assert.equal(savedResponse.status, 200);
-  const saved = await savedResponse.json();
+  assert.equal(nativeValidation.status, 200);
+  assert.equal((await nativeValidation.json()).valid, true);
+  const nativeSavedResponse = await fetch(`${base}/native/api/draft`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ document: nativeDraft.document, expectedRevision: nativeDraft.revision }),
+  });
+  assert.equal(nativeSavedResponse.status, 200);
+  const nativeSaved = await nativeSavedResponse.json();
+  const nativePublishedResponse = await fetch(`${base}/native/api/publish`, {
+    method: 'POST', headers, body: JSON.stringify({ expectedRevision: nativeSaved.revision }),
+  });
+  assert.equal(nativePublishedResponse.status, 200);
+  const nativePublished = await nativePublishedResponse.json();
+  assert.deepEqual(nativePublished.document, nativeDraft.document);
+  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const uploadedResponse = await fetch(`${base}/native/api/assets`, {
+    method: 'POST', headers: { ...headers, 'Content-Type': 'image/png' }, body: pixel,
+  });
+  assert.equal(uploadedResponse.status, 201);
+  const uploaded = await uploadedResponse.json();
+  assert.match(uploaded.source.path, /^\/api\/assets\/[a-f0-9]{64}\.png$/);
+
   docker('restart', container);
   const restartedBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${restartedBindings['4800/tcp'][0].HostPort}`;
   await waitUntilReady(base);
   const restored = await (await fetch(`${base}/native/api/draft`, { headers })).json();
-  assert.equal(restored.revision, saved.revision);
-  assert.equal(restored.document.name, 'Container persistence check');
+  assert.equal(restored.revision, nativeSaved.revision);
+  assert.equal(restored.document.name, 'Native container persistence check');
+
+  docker('stop', '--time', '10', container);
+  docker('rm', container);
+  container = undefined;
+  container = docker('run', '--detach', '--publish', '127.0.0.1::4800',
+    '--mount', `type=volume,source=${volume},target=/data`,
+    '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
+  const replacementBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
+  base = `http://127.0.0.1:${replacementBindings['4800/tcp'][0].HostPort}`;
+  await waitUntilReady(base);
+  const draftAfterReplacement = await (await fetch(`${base}/native/api/draft`, { headers })).json();
+  assert.equal(draftAfterReplacement.revision, nativeSaved.revision);
+  assert.deepEqual(draftAfterReplacement.document, nativeSaved.document);
+  const nativeAfterReplacement = await (await fetch(`${base}/native/api/published`, { headers })).json();
+  assert.deepEqual(nativeAfterReplacement, nativePublished, 'The publication must survive container replacement');
+  const nativeAssetAfterReplacement = await fetch(`${base}/native${uploaded.source.path}`, { headers });
+  assert.equal(nativeAssetAfterReplacement.status, 200);
+  assert.deepEqual(Buffer.from(await nativeAssetAfterReplacement.arrayBuffer()), pixel);
 
   const mount = '/api/hassio_ingress/studio-test/';
   const escapedRequests = [];
@@ -96,14 +137,24 @@ try {
   await tab.goto(`http://127.0.0.1:${address.port}${mount}`);
   await tab.getByRole('button', { name: 'Publish' }).waitFor();
   await tab.locator('[data-preview-root]').first().waitFor();
+  const mountedNative = await fetch(`http://127.0.0.1:${address.port}${mount}native/api/published`);
+  assert.equal(mountedNative.status, 200);
+  assert.deepEqual(await mountedNative.json(), nativePublished);
+  const mountedAsset = await fetch(`http://127.0.0.1:${address.port}${mount}native${uploaded.source.path}`);
+  assert.equal(mountedAsset.status, 200);
+  assert.deepEqual(Buffer.from(await mountedAsset.arrayBuffer()), pixel);
   assert.deepEqual(browserErrors, []);
-  assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/')), []);
-  console.log('Production container: auth, assets, draft save, restart persistence, and mounted-path workspace load passed.');
+  assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/') || url?.startsWith('/native/')), []);
 } finally {
   await browser?.close();
   if (proxy) {
     proxy.closeAllConnections();
     await new Promise(resolve => proxy.close(resolve));
   }
-  if (container) docker('stop', '--time', '10', container);
+  if (container) {
+    docker('stop', '--time', '10', container);
+    docker('rm', container);
+  }
+  if (volume) docker('volume', 'rm', volume);
 }
+console.log('Production container: auth, assets, save/publish, restart/replacement persistence, mounted-path routing, and cleanup passed.');

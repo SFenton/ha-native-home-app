@@ -9,7 +9,9 @@ import { remoteControlSchema, remoteSourceSchema } from './remote';
 import { vacuumControlSchema, vacuumDescriptorSchema, type VacuumControl } from './vacuum';
 import { cameraInputs, cameraLabels } from './camera';
 import { deviceProviderSchemas, deviceControlSchemas } from './device-providers';
+import { stateStyleLibrarySchema, stateTileBindingSchema } from './state-styles';
 import { callServiceSchema, predicateSchema, operandSchema, visibilityFields, type WhenUnknown, type Predicate } from './expression';
+import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;
 const id = identifierSchema;
@@ -21,7 +23,7 @@ const integer = (minimum: number, maximum: number) => z.number().int().min(minim
 const empty = object({});
 const symbol = object({
   type: z.literal('sf-symbol'), name: text(80),
-  rendering: z.literal('canonical'), unavailable: z.literal('reject'),
+  rendering: z.literal('canonical'), unavailable: symbolUnavailable,
 });
 const space = z.discriminatedUnion('type', [
   object({ type: z.literal('token'), name: z.enum(['zero', 'xs', 's', 'm', 'l', 'xl', 'section-header']) }),
@@ -237,6 +239,11 @@ const actionTile = object({
   }),
   action: domainAction,
 });
+/**
+ * A tile whose look comes from a state style (`sh.state-style@1`): the entity, the library style it applies by id, its own
+ * built-in style (used when the style id is unknown or the device lacks the capability) and per-layer overrides.
+ */
+const stateTile = object({ ...node, type: z.literal('state-tile'), icon: symbol, binding: stateTileBindingSchema, props: empty });
 const gridProps = object({
   minimum: z.enum(['tile@1', 'tile-dynamic-type@1', 'section-wide@1']), maxColumns: integer(1, 4), spacing: space,
   equalRowHeights: z.boolean(), shortRow: z.enum(['share', 'leading']), fold: z.enum(['page', 'container']),
@@ -347,7 +354,7 @@ const settingsControl = object({
 });
 export type CompositionNode = z.infer<typeof settingsControl> | z.infer<typeof customLightControl> | z.infer<typeof sprinklerControl>
  | z.infer<typeof infoBox> | z.infer<typeof statusPill> | z.infer<typeof textNode> | z.infer<typeof collection> | z.infer<typeof recordForm>
- | z.infer<typeof recipePart> | (z.infer<typeof pinnedActions> & { children?: CompositionNode[] }) | z.infer<typeof navigationTile> | z.infer<typeof actionTile> | z.infer<typeof row> | z.infer<typeof localControl> | z.infer<typeof boundControl> | z.infer<typeof button> | z.infer<typeof rowCollection> | z.infer<typeof statusChip> | z.infer<typeof roomOverviewTile> | z.infer<typeof lightGroupTile> | z.infer<typeof weatherPanel> | z.infer<typeof alarmPanel> | z.infer<typeof doorTile> | z.infer<typeof climateNode> | z.infer<typeof settingsLink> | z.infer<typeof roomCard> | z.infer<typeof roomChip> | z.infer<typeof roomNavigationGrid> | z.infer<typeof roomDeviceControlSchema> | z.infer<typeof bedroomControl> | z.infer<typeof remoteNode> | VacuumControl | z.infer<typeof accountHeader> | z.infer<typeof cameraTile> | z.infer<typeof cameraVideo> | z.infer<typeof cameraControls> | z.infer<typeof cameraViewer> | z.infer<typeof bootstrapMessage> | z.infer<typeof notificationBanner> | {
+ | z.infer<typeof recipePart> | (z.infer<typeof pinnedActions> & { children?: CompositionNode[] }) | z.infer<typeof navigationTile> | z.infer<typeof actionTile> | z.infer<typeof stateTile> | z.infer<typeof row> | z.infer<typeof localControl> | z.infer<typeof boundControl> | z.infer<typeof button> | z.infer<typeof rowCollection> | z.infer<typeof statusChip> | z.infer<typeof roomOverviewTile> | z.infer<typeof lightGroupTile> | z.infer<typeof weatherPanel> | z.infer<typeof alarmPanel> | z.infer<typeof doorTile> | z.infer<typeof climateNode> | z.infer<typeof settingsLink> | z.infer<typeof roomCard> | z.infer<typeof roomChip> | z.infer<typeof roomNavigationGrid> | z.infer<typeof roomDeviceControlSchema> | z.infer<typeof bedroomControl> | z.infer<typeof remoteNode> | VacuumControl | z.infer<typeof accountHeader> | z.infer<typeof cameraTile> | z.infer<typeof cameraVideo> | z.infer<typeof cameraControls> | z.infer<typeof cameraViewer> | z.infer<typeof bootstrapMessage> | z.infer<typeof notificationBanner> | {
   id: string; title: string; type: 'tile-grid'; layout: { span: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof gridProps>; children: CompositionNode[];
 } | {
@@ -370,7 +377,7 @@ export type CompositionNode = z.infer<typeof settingsControl> | z.infer<typeof c
 };
 export const compositionNodeSchema: z.ZodType<CompositionNode> = z.lazy(() => z.discriminatedUnion('type', [
   customLightControl, sprinklerControl,
-  textNode, navigationTile, actionTile, statusChip, roomOverviewTile, lightGroupTile, weatherPanel, alarmPanel, doorTile, settingsLink, roomCard, roomChip, roomNavigationGrid, roomDeviceControlSchema, bedroomControl, remoteNode, vacuumControlSchema, cameraTile, cameraVideo, cameraControls, cameraViewer,
+  textNode, navigationTile, actionTile, stateTile, statusChip, roomOverviewTile, lightGroupTile, weatherPanel, alarmPanel, doorTile, settingsLink, roomCard, roomChip, roomNavigationGrid, roomDeviceControlSchema, bedroomControl, remoteNode, vacuumControlSchema, cameraTile, cameraVideo, cameraControls, cameraViewer,
   object({ ...node, type: z.literal('tile-grid'), props: gridProps, children: z.array(compositionNodeSchema).max(100) }),
   row, localControl, boundControl, button, rowCollection, collection, recordForm, recipePart,
   pinnedActions.extend({ children: z.array(compositionNodeSchema).max(1).optional() }),
@@ -638,6 +645,8 @@ export const compositionDocumentSchema = object({
   localState: z.array(localFieldSchema).max(100).optional(),
   liveActivities: z.array(activityPresentationSchema).max(16),
   extensions: extensionPresentationSchema.optional(),
+  /** The style library `state-tile` nodes apply by id (`sh.state-style@1`). */
+  stateStyles: stateStyleLibrarySchema.optional(),
   bootstrap: object({
     type: z.literal('native-bootstrap@1'), arrivalAnnouncement: title,
     recovery: object({ loadingTitle: title, unavailableTitle: title, unavailableMessage: text(2000), retryLabel: label }),

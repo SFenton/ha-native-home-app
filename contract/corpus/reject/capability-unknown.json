@@ -60,7 +60,7 @@
                   "type": "sf-symbol",
                   "name": "line.3.horizontal",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 }
               }
             ]
@@ -80,7 +80,7 @@
           "type": "sf-symbol",
           "name": "lightbulb",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "toolbar": {
           "type": "inherit"

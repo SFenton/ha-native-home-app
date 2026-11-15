@@ -23,7 +23,7 @@ const PAGE = 2;
 const lit = (value: unknown) => ({ type: 'literal', value });
 const read = (sourceId: string, p: string[], as = 'string') => ({ type: 'read', from: { type: 'source', sourceId, path: p }, as, missing: 'unavailable' });
 const isOn: J = { type: 'state', sourceId: 'guest-fan', path: ['state'], in: ['on'] };
-const symbol = (name: string) => ({ type: 'sf-symbol', name, rendering: 'canonical', unavailable: 'reject' });
+const symbol = (name: string) => ({ type: 'sf-symbol', name, rendering: 'canonical', unavailable: 'fallback' });
 const call = (service: string, extra: J = {}, domain = 'fan'): J =>
   ({ type: 'call-service', domain, service, target: { entity_id: lit('fan.demo_bath_fan') }, ...extra });
 const node = (id: string, type: string, rest: J): J => ({ id, title: id, type, layout: { span: 1 }, ...rest });
@@ -55,7 +55,7 @@ accept('grammar-call-service-button', 'A button calls any domain and service wit
   [button(call('turn_on', { optimistic: [{ sourceId: 'guest-fan', value: 'on', revertAfterSeconds: 2, failsOnTimeout: false }] }))]);
 accept('grammar-call-service-script-and-lock', 'Any script name and a lock service with an authored confirmation are accepted; the app keeps no allow list.',
   [button({ type: 'call-service', domain: 'script', service: 'goodnight_routine' }, 'script'),
-    button({ type: 'call-service', domain: 'lock', service: 'unlock', target: { entity_id: lit('lock.front_door') },
+    button({ type: 'call-service', domain: 'lock', service: 'unlock', target: { entity_id: lit('lock.demo_front_door') },
       confirmation: { type: 'additional', style: 'alert', title: 'Unlock?', confirmLabel: 'Unlock', cancelLabel: 'Cancel', destructive: true, exemptUserIds: ['u1'] } }, 'lock')]);
 accept('grammar-call-service-operands', 'Call data and target built from every operand kind: read, viewer, format, map, math, list and object.',
   [button({

@@ -26,11 +26,23 @@ const literal = (value: string) => ({ type: 'literal', value });
 const isRecord = (value: unknown): value is J => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = (value: unknown): J[] => Array.isArray(value) ? value.filter(isRecord) : [];
 
-/** The icon names the import knows; any other house icon falls back to the generic symbol and is reported. */
+/**
+ * The icon names the import knows; any other house icon falls back to the generic symbol and is reported. The names agree with
+ * the native app's own icon map (`HassDesign/SymbolMap.swift`), so a room card shows the symbol the app already uses for that icon.
+ */
 const symbols: Record<string, string> = {
   'mdi:lightbulb-group': 'lightbulb.2', 'mdi:lightbulb': 'lightbulb', 'mdi:thermometer': 'thermometer.medium', 'mdi:sofa': 'sofa',
   'mdi:bed': 'bed.double', 'mdi:air-filter': 'wind', 'mdi:fan': 'fan', 'mdi:door': 'door.left.hand.closed',
+  'mdi:motion-sensor': 'figure.walk.motion', 'mdi:window-closed': 'window.vertical.closed', 'mdi:air-purifier': 'air.purifier',
+  'mdi:robot-vacuum': 'robotic.vacuum', 'mdi:remote': 'appletvremote.gen4', 'mdi:weather-sunset-up': 'sunrise', 'mdi:apple': 'apple.logo',
+  'mdi:air-humidifier': 'humidifier', 'mdi:controller': 'gamecontroller', 'mdi:gamepad': 'gamecontroller', 'mdi:dishwasher': 'dishwasher',
+  'mdi:grill': 'flame', 'mdi:microsoft-xbox': 'gamecontroller', 'mdi:server': 'server.rack', 'mdi:microsoft-windows': 'pc',
+  'mdi:projector': 'videoprojector', 'mdi:television': 'tv', 'mdi:washing-machine': 'washer', 'mdi:tumble-dryer': 'dryer',
+  'mdi:garage': 'door.garage.closed', 'mdi:heat-wave': 'heat.waves',
 };
+/** A house colour channel (0 to 1) as the publication's 0 to 255 channel. */
+const channel = (value: unknown) => Math.max(0, Math.min(255, Math.round(Number(value ?? 0) * 255)));
+const solidRgb = (color: J) => ({ type: 'solid-rgb', red: channel(color.red), green: channel(color.green), blue: channel(color.blue) });
 
 /**
  * Adds the layout house configuration used to carry to `draft`: chores pages as `todo-collection@1` sources and the rooms the
@@ -155,36 +167,40 @@ function importRooms(result: HouseImportResult, rooms: J) {
       sources.push({ id, kind: 'ha-entity', entityId: literal(entityId) });
       return id;
     };
-    const cardsOf = (cards: J[], base: string) => cards.flatMap((card, cardIndex) => {
+    // `scope` is the card group's position in the room ('o' for the overview, 's<n>' for section n); with the card's index it
+    // names every generated id, so ids stay unique and stable however the labels repeat.
+    const cardsOf = (cards: J[], base: string, scope: string) => cards.flatMap((card, cardIndex) => {
       const cardPath = `${base}[${cardIndex}]`;
+      const position = `${scope}-c${cardIndex}`;
       if (!roomKinds.has(card.kind)) { notes.push({ path: `${cardPath}.kind`, reason: `Card kind "${card.kind}" has no room card; the card was not imported.` }); return []; }
-      const sourceId = entity(card.entityId, `${base.replace(/[^a-z]/gi, '')}${cardIndex}`);
+      const sourceId = entity(card.entityId, position);
       if (!sourceId) { notes.push({ path: `${cardPath}.entityId`, reason: 'The card has no entity; it was not imported.' }); return []; }
       if (card.sheet) notes.push({ path: `${cardPath}.sheet`, reason: 'The detail sheet is not carried; author the card action.' });
       if (list(card.modalItems).length > 0) notes.push({ path: `${cardPath}.modalItems`, reason: 'Modal items are not carried.' });
-      if (isRecord(card.stateColors) && Object.keys(card.stateColors).length > 0) notes.push({ path: `${cardPath}.stateColors`, reason: 'State colours are not carried.' });
       if (card.isFullWidth) notes.push({ path: `${cardPath}.isFullWidth`, reason: 'Card width follows the section arrangement.' });
       const symbolName = symbols[String(card.icon)];
       if (!symbolName) notes.push({ path: `${cardPath}.icon`, reason: `Icon "${card.icon}" has no symbol mapping; a generic symbol was used.` });
       const subtitleSourceIds = (Array.isArray(card.subtitleEntityIds) ? card.subtitleEntityIds : [])
-        .map((value: unknown, subIndex: number) => entity(value, `${base.replace(/[^a-z]/gi, '')}${cardIndex}-s${subIndex}`)).filter(Boolean);
+        .map((value: unknown, subIndex: number) => entity(value, `${position}-sub${subIndex}`)).filter(Boolean);
       const props: J = {
         kind: card.kind, showState: card.showState !== false, subtitleSourceIds,
         activeStates: card.activeStates ?? [], disabledStates: card.disabledStates ?? [],
         stateLabels: Object.entries(isRecord(card.stateLabels) ? card.stateLabels : {}).map(([state, label]) => ({ state, label })),
       };
       if (card.climateActionTone) props.climateActionTone = true;
+      const stateColors = Object.entries(isRecord(card.stateColors) ? card.stateColors : {}).filter(([, color]) => isRecord(color));
+      if (stateColors.length > 0) props.stateColors = stateColors.map(([state, color]) => ({ state, fill: solidRgb(color as J) }));
       return [{
-        id: `room-${roomId}-card-${base.replace(/[^a-z]/gi, '')}${cardIndex}`, title: String(card.title ?? 'Card'), type: 'room-card', layout: { span: 1 },
+        id: `room-${roomId}-card-${position}`, title: String(card.title ?? 'Card'), type: 'room-card', layout: { span: 1 },
         icon: compositionSymbol(symbolName), binding: { sourceId, projection: 'room-state@1' }, props,
       }];
     });
     const sections: J[] = [];
-    const overview = cardsOf(list(room.overviewCards), `${path}.overviewCards`);
+    const overview = cardsOf(list(room.overviewCards), `${path}.overviewCards`, 'o');
     if (overview.length > 0) sections.push({ id: `room-${roomId}-overview`, title: 'Overview', type: 'room-section', layout: { span: 1 },
       props: { arrangement: 'grid', leadJoinsAtRegularWidth: false }, children: overview });
     list(room.sections).forEach((section, sectionIndex) => {
-      const children = cardsOf(list(section.cards), `${path}.sections[${sectionIndex}].cards`);
+      const children = cardsOf(list(section.cards), `${path}.sections[${sectionIndex}].cards`, `s${sectionIndex}`);
       if (children.length > 0) sections.push({ id: `room-${roomId}-section-${sectionIndex}`, title: String(section.title ?? 'Devices'), type: 'room-section',
         layout: { span: 1 }, props: { arrangement: 'grid', leadJoinsAtRegularWidth: false }, children });
     });
@@ -203,7 +219,6 @@ function importRooms(result: HouseImportResult, rooms: J) {
     const navigation = result.document.dataSources.find(source => source.kind === 'model' && (source as J).model === 'room-navigation@1') as J | undefined;
     if (item && navigation && !navigation.items.some((existing: J) => existing.id === roomId)) {
       const color = isRecord(item.color) ? item.color : {};
-      const channel = (value: unknown) => Math.max(0, Math.min(255, Math.round(Number(value ?? 0) * 255)));
       const ranked = navigation.ranking !== 'configured';
       if (!ranked && (item.accessCounterEntityId || item.accessKey)) {
         result.dropped.push({ path: `rooms.items[${items.indexOf(item)}].accessKey`, reason: 'The draft ranks rooms as configured; visit counting is not carried.' });
@@ -214,7 +229,7 @@ function importRooms(result: HouseImportResult, rooms: J) {
         const target = document.dataSources.find(source => source.id === navigation.id) as J;
         target.items.push({
           id: roomId, title: String(item.title ?? roomId), icon: compositionSymbol(symbolName),
-          fill: { type: 'solid-rgb', red: channel(color.red), green: channel(color.green), blue: channel(color.blue) },
+          fill: solidRgb(color),
           ...(ranked && typeof item.accessCounterEntityId === 'string' ? { counterEntityId: literal(item.accessCounterEntityId) } : {}),
           ...(ranked && typeof item.accessKey === 'string' ? { visitKey: item.accessKey } : {}),
           bodyHint: `Opens ${String(item.title ?? roomId)}`,

@@ -162,6 +162,17 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   app.post('/native/api/ha/rollback', async (req, res) => {
     res.json(await ha.publication.rollback(z.strictObject({ revision: revision }).parse(req.body).revision));
   });
+  // Read-only lookups for the style editor: the entity list, one entity's states, and whether a script or timer exists.
+  app.get('/native/api/ha/entities', async (req, res) => {
+    const { domain } = z.strictObject({ domain: z.string().regex(/^[a-z][a-z0-9_]*$/).optional() }).parse(req.query);
+    res.json(await ha.entities.list(domain));
+  });
+  app.get('/native/api/ha/entity-states', async (req, res) => {
+    res.json(await ha.entities.states(z.strictObject({ entityId: z.string().max(160) }).parse(req.query).entityId));
+  });
+  app.get('/native/api/ha/exists', async (req, res) => {
+    res.json({ exists: await ha.entities.exists(z.strictObject({ id: z.string().max(160) }).parse(req.query).id) });
+  });
   app.get('/native/api/published', (req, res) => {
     const published = store.native.getPublished();
     const etag = `"native-${published.publisherId}-${published.revision}"`;

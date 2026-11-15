@@ -2,7 +2,7 @@ import type { CompositionDocument, CompositionNode } from '../../shared/composit
 import { createId as uid } from '../../shared/ids';
 
 /** An SF Symbol reference as the document stores it. */
-export const symbol = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'reject' as const });
+export const symbol = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'fallback' as const });
 type Source = CompositionDocument['dataSources'][number];
 const literal = (value: string) => ({ type: 'literal' as const, value });
 const spacing = { type: 'token' as const, name: 'm' as const };

@@ -36,6 +36,8 @@ the empty state and the resident variant. They are written by `scripts/generate-
 fixture; do not edit them by hand. `todo-collection-collection-without-source` records that a todo collection node whose
 source is not defined still compiles: the app shows nothing for it and never reads house configuration.
 
-Checked against the app at native-home branch sdui-h1-scrub with `scripts/app-corpus-check/run.sh <native-home> `: all 188
-cases decode or fail with exactly the recorded first issue, and the app's capability list equals `capabilities.json`
-(163 entries).
+The `state-style-*` files (8 accept, 26 reject) cover `sh.state-style@1`: the document-level style library (rules, fallback,
+actions, request settings, the closed indicator list, the arc refused on a state with an action) and the `state-tile` node
+(style id, the tile's built-in style, per-state overrides). They are written by `scripts/generate-state-style-corpus.ts`; do not
+edit them by hand. `state-styles/built-in.json` is the eight built-in styles as data: not a case, but a fixture the Studio and the
+app both test their own built-in data against.

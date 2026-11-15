@@ -15,7 +15,7 @@ function fixture(): CompositionDocument {
     inputs: { providerId: 'private-preferences', domain: 'preferences' } });
   document.pages[2].components = [{
     id: 'blur', title: 'Background Blur', type: 'settings-control', layout: { span: 1 },
-    icon: { type: 'sf-symbol', name: 'gearshape', rendering: 'canonical', unavailable: 'reject' },
+    icon: { type: 'sf-symbol', name: 'gearshape', rendering: 'canonical', unavailable: 'fallback' },
     props: { sourceId: 'preferences', kind: 'background-blur', item: '', subtitle: '' },
   }];
   return document;

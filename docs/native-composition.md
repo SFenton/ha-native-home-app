@@ -448,6 +448,9 @@ Rules the corpus pins down:
 - **Object keys** that are equal after Unicode NFC normalisation are duplicates, in the streaming parser and in the bounds walk.
 - **`collection.props.pullToRefresh`** is an optional boolean, off unless true, and adds no capability beyond `sh.collection@1`.
 - **Home nodes** (status chip, room tile, weather panel, climate control) accept `present` actions with `ifPresented: "reject"` only.
+- **State styles** (`sh.state-style@1`, `src/shared/composition/state-styles.ts`). A document may carry
+  `stateStyles: { type: "state-styles@1", styles: [...] }` (at most 32) and a page may carry `state-tile` nodes. The capability is
+  required when either is present. See [State styles](#state-styles-shstate-style1) below.
 
 ## Additional capability notes
 
@@ -572,6 +575,72 @@ Camera, contacts/status rail, split sections and conditional guest-presence
 composition still require the owning camera/shell interfaces. No unsupported
 surface is replaced with a successful placeholder.
 
+### State styles (`sh.state-style@1`)
+
+A style is a named state map the app resolves into the four layers of the state-styled tile: icon, text, indicator and colour.
+The design rules are `.agents/design/state-styles.md` and `state-styled-tile.md` in the app repository. Capability name and shape
+are identical in both repositories.
+
+```json
+"stateStyles": { "type": "state-styles@1", "styles": [{
+  "id": "tidy-vacuum", "name": "Tidy vacuum", "base": "robot", "domain": "vacuum",
+  "rules": [
+    { "states": ["cleaning"], "class": "resting", "active": true, "icon": "fan", "text": "Tidying", "indicator": "breathe" },
+    { "states": ["unavailable", "unknown"], "class": "unknown", "active": false }
+  ],
+  "fallback": { "class": "unknown", "active": false },
+  "request": { "lockoutSeconds": 2, "ackTimeoutSeconds": 10, "settleTimeoutSeconds": 45, "errorHoldSeconds": 8, "onTimeout": "error" }
+}] }
+```
+
+A tile applies a style by id:
+
+```json
+{ "id": "robot-tile", "title": "Vacuum", "type": "state-tile", "layout": { "span": 1 }, "icon": { "type": "sf-symbol", "name": "fan",
+  "rendering": "canonical", "unavailable": "fallback" }, "props": {},
+  "binding": { "entityId": "vacuum.demo_robot", "styleId": "tidy-vacuum", "builtIn": "robot",
+               "overrides": [{ "state": "cleaning", "text": "Vacuuming", "indicator": "pulse" }] } }
+```
+
+- **Rules** are tried in order, first match wins; `fallback` is the rule for every other state. A rule gives `class`
+  (`resting`, `in-progress`, `warning`, `error`, `unknown`), `active` (lit or unlit face) and optionally `icon` (SF Symbol name),
+  `text`, `indicator` and `colour`. `unavailable` and `unknown` must be the `unknown` class.
+- **Indicators** are the closed list `none`, `arc-spinner`, `pulse`, `breathe`, `bounce`, `wiggle`. `arc-spinner` is rejected
+  (`invalid_combination` at the rule's `indicator`) on a rule that has an `action`, and on the `unknown` class: the arc stands in
+  for the disc, so a state whose tap does something keeps its disc. The same check applies to a tile override, against the style
+  the tile resolves to.
+- **Colour** is `unlit` or `lit`, the face of a resting or in-progress state; never changes the class. A colour on a warning, error
+  or unknown state (a rule, or a tile override resolved against its style) is `invalid_combination` at the `colour` pointer.
+- **Action**: `verb`, `icon`, `service` on the style's `domain` (absent: nothing to send), `tappable` (default true),
+  `confirmation`, and `requiresFeature` (a `supported_features` bit) with `otherwise` (the same action without it).
+- **Request**: client timings in whole seconds, `onTimeout` (`error` or `revert`), `pendingWords` by service, `errorWords`, and an
+  optional Home Assistant `script` with its `errorTimer` (a `script.*` and a `timer.*`, named together). The Studio installs
+  neither; it checks they exist and warns when one is missing.
+- **Tile binding**: a literal `entityId`; `styleId` (the library style) and `builtIn` (the tile's own built-in style) - at least
+  one; `overrides` per state, one layer or more each, a state once. The entity is in the domain of the style it ends up with.
+- **Fallbacks, never rejections**: a `styleId` the library does not define is accepted and the app uses `builtIn`; a device
+  without the capability keeps the built-in style; a state no rule names resolves to `fallback`.
+- **An unavailable or unknown entity** takes the style's first rule of the `unknown` class, whatever the authored `fallback` says.
+  A style with none gets one made for it, as the app does: the node's own icon, the words "Unavailable", unlit, and an untappable
+  copy of the style's first action. The preview (`ruleFor`, `unknownRuleFor`) draws the same.
+- **Built-in styles** (`garage-door`, `lock`, `blind`, `alarm`, `robot`, `detector`, `notice`, `switch`) are data in
+  `state-styles.ts` and in `contract/corpus/state-styles/built-in.json`. The app decodes that file and tests it equal to its own
+  `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Regenerate with `scripts/generate-state-style-corpus.ts`.
+
+**Authoring** (the Styles section, `src/StateStyles.tsx`). The library lists the built-ins read-only; Duplicate makes a saved
+style, Rename and Delete apply to saved styles, and Delete is blocked while a tile uses the style ("Used by N tiles"; editing a
+used style warns how many tiles change). The state-map editor offers the arc spinner only for a state with no action ("No arc while
+this state has an action") and names the iOS 17 fallbacks beside Breathe (Pulse) and Wiggle (Bounce). A tile's per-state overrides
+are one layer each, with reset, and Save as New Style folds them into a saved style. The picker lists live entities and fills a
+state map from Home Assistant's own states and translated names; states seen only in history are listed as unclassified, and the
+map always ends in a fallback. The preview (`state-style-preview.ts`) resolves a state the way the app does and draws it at iPhone,
+Duo and iPad widths, with the 0.2 s disc and arc cross-fade and the VoiceOver value ("dimmed" while the arc shows).
+
+The picker reads Home Assistant through three read-only endpoints (`GET /native/api/ha/entities?domain=`,
+`/native/api/ha/entity-states?entityId=`, `/native/api/ha/exists?id=`) in `server/ha-entities.ts`: the entity list, a domain's states
+with their translated names plus the states of the last ten days of history, and whether a `script.*` or `timer.*` exists. Nothing
+is written or installed.
+
 ### Todo counts (`sh.todo-counts@1`)
 
 An authored `todo-counts@1` model sums the states of one to 64 distinct literal
@@ -618,6 +687,19 @@ the binding supplies the state line. This also requires the existing
 `{ "type": "standard" }`; the alarm appearance owns the fill, avoiding ignored
 competing RGB values. Layout, title lines and body hint remain editable there.
 
+Every wire symbol is `{ "type": "sf-symbol", "name", "rendering": "canonical", "unavailable": "fallback" }`. `unavailable` says
+what the app does when the device has no such symbol: it draws a fallback symbol (`questionmark.circle`) and never rejects the
+document. The Studio emits only `"fallback"`. An older or imported document may carry `"reject"`; the validator accepts it as a
+legacy alias and the compiler rewrites it to `"fallback"`, so a compiled document never holds it (`symbol-unavailable.ts`).
+
+The app's rejection classes, copied word for word from the native repo's `.agents/platforms/apple/architecture.md` (Server-driven root):
+
+- **Rejection classes.** Only an invalid document rejects (an unknown capability, a grammar error, a broken reference); the last good layout stays.
+  - A device or runtime gap (a symbol or feature this OS lacks, a missing entity or copy entry) degrades one node and logs a diagnostic.
+  - A launch fact (window geometry, the viewer, an open interaction) defers the candidate and retries.
+
+`unavailable` belongs to the device or runtime gap.
+
 Example `props.alarm`:
 
 ```json
@@ -628,7 +710,7 @@ Example `props.alarm`:
     {
       "state": "disarmed",
       "appearance": {
-        "icon": { "type": "sf-symbol", "name": "shield.slash", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "shield.slash", "rendering": "canonical", "unavailable": "fallback" },
         "fill": { "type": "solid-rgb", "red": 67, "green": 160, "blue": 71 },
         "text": "Disarmed"
       }
@@ -636,14 +718,14 @@ Example `props.alarm`:
     {
       "state": "armed_home",
       "appearance": {
-        "icon": { "type": "sf-symbol", "name": "shield.lefthalf.filled", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "shield.lefthalf.filled", "rendering": "canonical", "unavailable": "fallback" },
         "fill": { "type": "solid-rgb", "red": 30, "green": 136, "blue": 229 },
         "text": "Armed Home"
       }
     }
   ],
   "fallback": {
-    "icon": { "type": "sf-symbol", "name": "shield", "rendering": "canonical", "unavailable": "reject" },
+    "icon": { "type": "sf-symbol", "name": "shield", "rendering": "canonical", "unavailable": "fallback" },
     "fill": { "type": "solid-rgb", "red": 84, "green": 110, "blue": 122 },
     "text": "Security System"
   },
@@ -807,9 +889,9 @@ Every node also has ordinary `id`, `title` and `layout.span`. A control is:
 {
   "intent": "snapshot", "title": "Snapshot", "activeTitle": "Saved to Photos",
   "busyTitle": "Saving", "failureTitle": "Not Saved", "tint": "action",
-  "icon": { "type": "sf-symbol", "name": "camera.fill", "rendering": "canonical", "unavailable": "reject" },
-  "activeIcon": { "type": "sf-symbol", "name": "checkmark.circle.fill", "rendering": "canonical", "unavailable": "reject" },
-  "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "reject" }
+  "icon": { "type": "sf-symbol", "name": "camera.fill", "rendering": "canonical", "unavailable": "fallback" },
+  "activeIcon": { "type": "sf-symbol", "name": "checkmark.circle.fill", "rendering": "canonical", "unavailable": "fallback" },
+  "failureIcon": { "type": "sf-symbol", "name": "exclamationmark.triangle.fill", "rendering": "canonical", "unavailable": "fallback" }
 }
 ```
 

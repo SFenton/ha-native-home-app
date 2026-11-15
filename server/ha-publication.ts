@@ -40,7 +40,7 @@ export interface HaPublishResult {
 /** Reads published asset bytes by their content-addressed Studio name (`<sha256>.png|jpg`). */
 export type AssetSource = (name: string) => Promise<{ bytes: Buffer }>;
 
-interface Transport {
+export interface Transport {
   base?: string;
   token?: string;
   websocketUrl?: string;
@@ -88,9 +88,9 @@ export function mapCommandError(command: string, code: unknown, message: unknown
 }
 
 /** One authenticated websocket request, then the socket closes. */
-async function command(transport: Transport, name: string, payload: Record<string, unknown>, signal: AbortSignal): Promise<unknown> {
+export async function command(transport: Transport, name: string, payload: Record<string, unknown>, signal: AbortSignal, fullType?: string): Promise<unknown> {
   if (!transport.websocketUrl || !transport.token) throw new HttpError(503, 'Home Assistant is not configured');
-  const token = transport.token, type = `fenton_home/ui_publication/${name}`;
+  const token = transport.token, type = fullType ?? `fenton_home/ui_publication/${name}`;
   const socket = (() => {
     try { return new WebSocket(transport.websocketUrl); }
     catch { throw new HttpError(502, 'Home Assistant WebSocket connection failed'); }

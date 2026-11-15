@@ -64,7 +64,7 @@
             "type": "sf-symbol",
             "name": "square.grid.2x2",
             "rendering": "canonical",
-            "unavailable": "reject"
+            "unavailable": "fallback"
           },
           "pageId": "page-orbit",
           "arguments": {}
@@ -76,7 +76,7 @@
             "type": "sf-symbol",
             "name": "square.stack",
             "rendering": "canonical",
-            "unavailable": "reject"
+            "unavailable": "fallback"
           },
           "pageId": "page-lattice",
           "arguments": {}
@@ -106,7 +106,7 @@
                   "type": "sf-symbol",
                   "name": "line.3.horizontal",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "visibility": "root-when-menu-available"
               },
@@ -119,7 +119,7 @@
                   "type": "sf-symbol",
                   "name": "info.circle",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "visibility": "root-only",
                 "priority": "normal",
@@ -152,7 +152,7 @@
                   "type": "sf-symbol",
                   "name": "slider.horizontal.3",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "visibility": "always",
                 "priority": "required",
@@ -180,7 +180,7 @@
           "type": "sf-symbol",
           "name": "square.grid.2x2",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {
@@ -248,7 +248,7 @@
                   "type": "sf-symbol",
                   "name": "power",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "binding": {
                   "sourceId": "source-power",
@@ -284,7 +284,7 @@
                   "type": "sf-symbol",
                   "name": "info.circle",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "props": {
                   "family": "neutral",
@@ -316,7 +316,7 @@
           "type": "sf-symbol",
           "name": "square.stack",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {
@@ -381,7 +381,7 @@
               "type": "sf-symbol",
               "name": "info.circle",
               "rendering": "canonical",
-              "unavailable": "reject"
+              "unavailable": "fallback"
             },
             "props": {
               "family": "neutral",
@@ -411,7 +411,7 @@
           "type": "sf-symbol",
           "name": "info.circle",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {
@@ -569,7 +569,7 @@
                   "type": "sf-symbol",
                   "name": "info.circle",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "props": {
                   "value": {
@@ -595,7 +595,7 @@
                   "type": "sf-symbol",
                   "name": "battery.100percent",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "props": {
                   "value": {
@@ -626,7 +626,7 @@
           "type": "sf-symbol",
           "name": "slider.horizontal.3",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {
@@ -692,7 +692,7 @@
               "type": "sf-symbol",
               "name": "info.circle",
               "rendering": "canonical",
-              "unavailable": "reject"
+              "unavailable": "fallback"
             },
             "props": {
               "family": "neutral",
@@ -721,7 +721,7 @@
               "type": "sf-symbol",
               "name": "arrow.up.right",
               "rendering": "canonical",
-              "unavailable": "reject"
+              "unavailable": "fallback"
             },
             "props": {
               "family": "neutral",

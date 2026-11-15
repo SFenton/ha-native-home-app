@@ -53,8 +53,22 @@ The [design notes](docs/design.md) record the workspace rules and the
 
 ## Home Assistant installation
 
-See [deployment](docs/deployment.md) for the installable app/container,
-Ingress, persistent storage and direct-access authentication.
+After the first successful release, add this repository URL in **Settings >
+Apps > Install app > Repositories**:
+
+```text
+https://github.com/SFenton/ha-native-home-app#stable
+```
+
+[![Add to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FSFenton%2Fha-native-home-app%23stable)
+
+Install **S+H Studio**, start it, then select **Open Web UI**. Home
+Assistant downloads prebuilt amd64/aarch64 images and offers subsequent
+versioned updates. Requires Home Assistant OS or Supervisor; not HACS.
+
+See [deployment](docs/deployment.md) for Ingress, persistent storage, and
+direct-access authentication, and [releasing](docs/releasing.md) for the
+image-first publishing pipeline and one-time public-access setup.
 
 See [architecture](docs/architecture.md) for the app/integration boundary and
 [research](docs/research.md) for the evaluated open-source building blocks.
@@ -81,7 +95,8 @@ node scripts/smoke-container.mjs
 ```
 
 The smoke check starts its own loopback-only container, verifies authentication
-and draft persistence across a restart, and removes it afterward.
+and save/publish persistence across restart and container replacement, and
+removes the test container and volume afterward.
 
 ### Removal of the 1.0 workspace
 

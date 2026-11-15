@@ -61,7 +61,7 @@ export function attributeOf(entity: NativeState, name: string): Json | undefined
 /** `RoomFormat.compact`: the state a tile line shows. */
 export function compactState(entity: NativeState | undefined): string {
   if (!entity || entity.state === 'unavailable') return 'Unavailable';
-  if (entity.entityId.startsWith('binary_sensor.contact')) return entity.state === 'on' ? 'Open' : 'Closed';
+  if (domainOf(entity.entityId) === 'binary_sensor' && entity.entityId.split('.')[1]?.startsWith('contact')) return entity.state === 'on' ? 'Open' : 'Closed';
   if (domainOf(entity.entityId) === 'binary_sensor') return entity.state === 'on' ? 'Active' : 'Clear';
   if (domainOf(entity.entityId) === 'light') return entity.state === 'on' ? 'On' : 'Off';
   return titleCase(entity.state);

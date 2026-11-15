@@ -190,10 +190,10 @@ describe('Preview2 rules', () => {
   const rule = (entityId: string) => ({ type: 'state' as const, sourceId: 'lamp', path: ['state'], in: ['on'] });
   function ruled() {
     const hit = find('navigation-tile')!;
-    const node = { ...hit.node, id: 'ruled', title: 'Kitchen lamp', visibleWhen: rule('light.kitchen'), whenUnknown: 'hide' } as CompositionNode;
-    const lamp = { id: 'lamp', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.kitchen' } } as CompositionDocument['dataSources'][number];
+    const node = { ...hit.node, id: 'ruled', title: 'Kitchen lamp', visibleWhen: rule('light.demo_kitchen'), whenUnknown: 'hide' } as CompositionNode;
+    const lamp = { id: 'lamp', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.demo_kitchen' } } as CompositionDocument['dataSources'][number];
     const document = pageOf(hit.document, [node], { dataSources: [...hit.document.dataSources, lamp] });
-    const house = (state: string) => houseFrom({ states: [{ entityId: 'light.kitchen', name: 'Kitchen', state }] });
+    const house = (state: string) => houseFrom({ states: [{ entityId: 'light.demo_kitchen', name: 'Kitchen', state }] });
     return { document, house };
   }
 
@@ -223,10 +223,10 @@ describe('Preview2 rules', () => {
 });
 
 describe('Preview2 Use actions', () => {
-  const light = { entityId: 'light.kitchen', name: 'Kitchen', state: 'off' };
+  const light = { entityId: 'light.demo_kitchen', name: 'Kitchen', state: 'off' };
   function button() {
     const hit = find('primary-button')!;
-    const node = { ...hit.node, id: 'go', title: 'Lights on', action: { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.kitchen' } } } } as CompositionNode;
+    const node = { ...hit.node, id: 'go', title: 'Lights on', action: { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.demo_kitchen' } } } } as CompositionNode;
     return pageOf(hit.document, [node]);
   }
 
@@ -235,7 +235,7 @@ describe('Preview2 Use actions', () => {
     const onOverlayChange = vi.fn(), onSimulatedCall = vi.fn();
     mount(button(), { mode: 'use', house: houseFrom({ states: [light] }), onOverlayChange, onSimulatedCall });
     fireEvent.click(screen.getByRole('button', { name: 'Lights on' }));
-    expect(onOverlayChange).toHaveBeenCalledWith({ entities: { 'light.kitchen': { state: 'on' } }, local: {} });
+    expect(onOverlayChange).toHaveBeenCalledWith({ entities: { 'light.demo_kitchen': { state: 'on' } }, local: {} });
     expect(onSimulatedCall).toHaveBeenCalledWith('Kitchen: turn on');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -252,9 +252,9 @@ describe('Preview2 Use actions', () => {
     const hit = find('bound-control')!;
     const document = pageOf(hit.document, [{
       id: 'toggle', title: 'Kitchen', type: 'bound-control', layout: { span: 1 }, props: { kind: 'toggle', isOn: { type: 'state', sourceId: 'lamp', path: ['state'], in: ['on'] }, unavailableText: 'Unavailable' },
-      onAction: { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.kitchen' } } },
-      offAction: { type: 'call-service', domain: 'light', service: 'turn_off', target: { entity_id: { type: 'literal', value: 'light.kitchen' } } },
-    } as CompositionNode], { dataSources: [{ id: 'lamp', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.kitchen' } }] });
+      onAction: { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.demo_kitchen' } } },
+      offAction: { type: 'call-service', domain: 'light', service: 'turn_off', target: { entity_id: { type: 'literal', value: 'light.demo_kitchen' } } },
+    } as CompositionNode], { dataSources: [{ id: 'lamp', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.demo_kitchen' } }] });
     const calls: string[] = [];
     render(<Shell document={document} mode="use" house={houseFrom({ states: [light] })} onCall={line => calls.push(line)}/>);
     const toggle = screen.getByRole('switch', { name: 'Kitchen' });

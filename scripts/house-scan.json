@@ -1,0 +1,19 @@
+{
+  "addresses": [
+    "172.30.32.2"
+  ],
+  "hexPaths": [
+    "docs/"
+  ],
+  "debt": {
+    "src/preview2/projections.ts": 1,
+    "src/shared/native-entities.ts": 5,
+    "src/workspace2/labels.ts": 3,
+    "tests/allowed-hosts.test.ts": 3,
+    "tests/native-entities.test.ts": 4,
+    "tests/native-state.test.ts": 15,
+    "tests/preview2-house-states.test.tsx": 1,
+    "tests/preview2-projections.test.ts": 1,
+    "tests/server.test.ts": 6
+  }
+}

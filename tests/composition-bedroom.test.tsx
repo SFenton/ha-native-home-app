@@ -19,7 +19,7 @@ function props(control: typeof bedroomKinds[number]): Extract<CompositionNode, {
   const value = {
     control, sourceId: 'source-bedroom', label: 'Synthetic control', unavailableText: 'Unavailable',
     ...(['bed-mode', 'bed-power'].includes(control) ? { activeLabel: 'Stop' } : {}),
-    ...(control === 'bed-mode' ? { icon: { type: 'sf-symbol', name: 'snowflake', rendering: 'canonical', unavailable: 'reject' },
+    ...(control === 'bed-mode' ? { icon: { type: 'sf-symbol', name: 'snowflake', rendering: 'canonical', unavailable: 'fallback' },
       family: 'cooling', inactiveLabel: 'Inactive', countdownSuffix: 'remaining' } : {}),
     ...(control === 'bed-stage' ? { parameter: 'asleep' } : {}),
     ...(control === 'alarm-bed-target' ? { parameter: 'left' } : {}),

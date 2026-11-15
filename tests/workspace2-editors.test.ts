@@ -23,9 +23,9 @@ const samples: Record<string, Predicate> = {
   between: { type: 'numeric', sourceId: source, path: ['state'], above: { type: 'literal', value: 1 }, below: { type: 'literal', value: 9 } },
   admin: { type: 'viewer', isAdmin: true },
   users: { type: 'viewer', userIds: ['abc'] },
-  person: { type: 'viewer-person', in: ['person.a', 'person.b'] },
-  all: { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['person.a'] }] },
-  any: { type: 'any', of: [{ type: 'viewer', isAdmin: false }, { type: 'viewer-person', in: ['person.a'] }] },
+  person: { type: 'viewer-person', in: ['person.demo_a', 'person.demo_b'] },
+  all: { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['person.demo_a'] }] },
+  any: { type: 'any', of: [{ type: 'viewer', isAdmin: false }, { type: 'viewer-person', in: ['person.demo_a'] }] },
 };
 const deep: Predicate = { type: 'all', of: [{ type: 'any', of: [{ type: 'all', of: [{ type: 'viewer', isAdmin: true }] }] }] };
 
@@ -50,10 +50,10 @@ describe('rule builder model', () => {
     expect(closeRule(root)).toEqual(deep);
   });
   it('builds entity and number conditions through a data source and compiles', () => {
-    const { document, predicate } = entityCondition(doc, 'light.new_lamp', ['on']);
+    const { document, predicate } = entityCondition(doc, 'light.demo_new_lamp', ['on']);
     const tile = [...buildDocumentIndex(document).entries.values()].find(entry => entry.node?.type === 'action-tile')!;
     expect(compositionErrors(replaceAt(document, [...tile.path, 'visibleWhen'], predicate))).toEqual([]);
-    const second = numericCondition(document, 'light.new_lamp', 'above', 3);
+    const second = numericCondition(document, 'light.demo_new_lamp', 'above', 3);
     expect(second.document.dataSources.length).toBe(document.dataSources.length);
     expect(compositionErrors(replaceAt(second.document, [...tile.path, 'visibleWhen'], second.predicate))).toEqual([]);
   });
@@ -89,15 +89,15 @@ describe('action model', () => {
   it('edits targets and data fields of a call', () => {
     let call = { type: 'call-service' as const, domain: 'light', service: 'turn_on' };
     expect(targetEntities(call)).toEqual([]);
-    call = withTargetEntities(call, ['light.a']) as typeof call;
-    expect(call).toMatchObject({ target: { entity_id: { type: 'literal', value: 'light.a' } } });
-    call = withTargetEntities(call, ['light.a', 'light.b']) as typeof call;
-    expect(targetEntities(call)).toEqual(['light.a', 'light.b']);
+    call = withTargetEntities(call, ['light.demo_a']) as typeof call;
+    expect(call).toMatchObject({ target: { entity_id: { type: 'literal', value: 'light.demo_a' } } });
+    call = withTargetEntities(call, ['light.demo_a', 'light.demo_b']) as typeof call;
+    expect(targetEntities(call)).toEqual(['light.demo_a', 'light.demo_b']);
     expect((withTargetEntities(call, []) as { target?: unknown }).target).toBeUndefined();
     const withField = withDataField(call, 'brightness', { type: 'literal', value: 120 });
     expect(dataOf(withField).brightness).toEqual({ type: 'literal', value: 120 });
     expect(withDataField(withField, 'brightness', undefined).data).toBeUndefined();
-    expect(withService(call, 'switch', 'toggle')).toMatchObject({ domain: 'switch', service: 'toggle', target: { entity_id: { value: ['light.a', 'light.b'] } } });
+    expect(withService(call, 'switch', 'toggle')).toMatchObject({ domain: 'switch', service: 'toggle', target: { entity_id: { value: ['light.demo_a', 'light.demo_b'] } } });
   });
   it('names the source of a value and converts between sources', () => {
     expect(sourceOf({ type: 'literal', value: 1 })).toBe('fixed');
@@ -112,25 +112,25 @@ describe('action model', () => {
 describe('entity binding', () => {
   it('creates or reuses a data source for the entity and rewrites the tile in one document', () => {
     const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'action-tile')!;
-    const first = bindEntity(doc, tile.path, 'switch.new_plug');
-    expect(boundEntity(first, tile.path)).toBe('switch.new_plug');
+    const first = bindEntity(doc, tile.path, 'switch.demo_new_plug');
+    expect(boundEntity(first, tile.path)).toBe('switch.demo_new_plug');
     expect(compositionErrors(first)).toEqual([]);
-    const again = bindEntity(first, tile.path, 'switch.new_plug');
+    const again = bindEntity(first, tile.path, 'switch.demo_new_plug');
     expect(again.dataSources.length).toBe(first.dataSources.length);
   });
   it('rebinds a light tile to another light with a copy of its own model, and reuses that copy the next time', () => {
     const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'light-group-tile')!;
     const before = doc.dataSources.find(item => item.id === nodeSourceId(doc, tile.path)) as { model: string; inputs: { entityId: { value: string }; memberEntityIds?: unknown[] } };
     expect(before.inputs.memberEntityIds?.length).toBeGreaterThan(0);
-    const first = bindEntity(doc, tile.path, 'light.another_lamp');
+    const first = bindEntity(doc, tile.path, 'light.demo_another_lamp');
     expect(first.dataSources.length).toBe(doc.dataSources.length + 1);
-    expect(boundEntity(first, tile.path)).toBe('light.another_lamp');
+    expect(boundEntity(first, tile.path)).toBe('light.demo_another_lamp');
     const made = first.dataSources.find(item => item.id === nodeSourceId(first, tile.path)) as typeof before;
     expect(made.model).toBe(before.model);
     expect(made.inputs.memberEntityIds).toBeUndefined();
     expect(compositionErrors(first)).toEqual([]);
     const other = [...buildDocumentIndex(first).entries.values()].filter(entry => entry.node?.type === 'light-group-tile')[1]!;
-    const shared = bindEntity(first, other.path, 'light.another_lamp');
+    const shared = bindEntity(first, other.path, 'light.demo_another_lamp');
     expect(shared.dataSources.length).toBe(first.dataSources.length);
     expect(nodeSourceId(shared, other.path)).toBe(nodeSourceId(first, tile.path));
   });
@@ -173,7 +173,7 @@ describe('the entity picker offers only entities the node can read', () => {
     const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'camera-tile')!;
     expect(sourceChoices(doc, tile.path).acceptsEntity).toBe(false);
     const camera = doc.dataSources.find(item => item.id === nodeSourceId(doc, tile.path)) as any;
-    const twin = { ...camera, id: 'camera-two', inputs: { ...camera.inputs, entityId: { type: 'literal', value: 'camera.two' }, snapshotEntityId: { type: 'literal', value: 'camera.two' } } };
+    const twin = { ...camera, id: 'camera-two', inputs: { ...camera.inputs, entityId: { type: 'literal', value: 'camera.demo_two' }, snapshotEntityId: { type: 'literal', value: 'camera.demo_two' } } };
     // The fixture's second camera tile opens the same sheet, so the first cannot change camera; give that one a sheet of its own.
     const other = [...buildDocumentIndex(doc).entries.values()].filter(entry => entry.node?.type === 'camera-tile')[1]!;
     const sheet = doc.modals.find(modal => modal.id === 'hc-camera-0-modal')!;
@@ -187,15 +187,15 @@ describe('the entity picker offers only entities the node can read', () => {
   it('would have refused the light the picker used to offer a power-toggle tile', () => {
     const tile = entries.find(entry => entry.node?.type === 'action-tile')!;
     expect(acceptedDomains(doc, tile.path)).not.toContain('light');
-    expect(compositionErrors(bindEntity(doc, tile.path, 'light.probe_entity')).length).toBeGreaterThan(0);
+    expect(compositionErrors(bindEntity(doc, tile.path, 'light.demo_probe_entity')).length).toBeGreaterThan(0);
   });
 });
 
 describe('picker data', () => {
   it('searches name, id, area and domain, and filters by domain', () => {
-    const rows = [{ entityId: 'light.sofa', name: 'Sofa lamp', domain: 'light', area: 'Living Room' }, { entityId: 'switch.fan', name: 'Desk fan', domain: 'switch', area: 'Office' }];
-    expect(filterEntities(rows, 'living').map(row => row.entityId)).toEqual(['light.sofa']);
-    expect(filterEntities(rows, 'fan').map(row => row.entityId)).toEqual(['switch.fan']);
+    const rows = [{ entityId: 'light.demo_sofa', name: 'Sofa lamp', domain: 'light', area: 'Living Room' }, { entityId: 'switch.demo_fan', name: 'Desk fan', domain: 'switch', area: 'Office' }];
+    expect(filterEntities(rows, 'living').map(row => row.entityId)).toEqual(['light.demo_sofa']);
+    expect(filterEntities(rows, 'fan').map(row => row.entityId)).toEqual(['switch.demo_fan']);
     expect(filterEntities(rows, '', new Set(['light'])).length).toBe(1);
     expect(filterEntities(rows, 'sofa switch')).toEqual([]);
     expect(rowsFromDocument(doc).length).toBeGreaterThan(0);

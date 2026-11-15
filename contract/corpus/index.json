@@ -1308,6 +1308,316 @@
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/0/children/0/type"
       }
+    },
+    {
+      "file": "accept/state-style-authored-vacuum.json",
+      "outcome": "accept",
+      "note": "A saved style over a vacuum with a tile that overrides one state layer by layer."
+    },
+    {
+      "file": "accept/state-style-every-built-in-copy.json",
+      "outcome": "accept",
+      "note": "A library holding the eight built-in styles as saved copies, each with its explicit fallback."
+    },
+    {
+      "file": "accept/state-style-request-lifecycle.json",
+      "outcome": "accept",
+      "note": "Request settings with pending words, a Home Assistant script and its error timer, and a state action with a confirmation."
+    },
+    {
+      "file": "accept/state-style-built-in-only-tile.json",
+      "outcome": "accept",
+      "note": "A tile with a built-in style and no library: it requires the capability and nothing else."
+    },
+    {
+      "file": "accept/state-style-unknown-style-id-falls-back.json",
+      "outcome": "accept",
+      "note": "A style id the library does not define is accepted; the app uses the tile's built-in style."
+    },
+    {
+      "file": "accept/state-style-library-without-tiles.json",
+      "outcome": "accept",
+      "note": "A library no tile uses is accepted; it costs nothing."
+    },
+    {
+      "file": "accept/state-style-style-without-base-or-built-in.json",
+      "outcome": "accept",
+      "note": "A style with no built-in base on a tile with no built-in style of its own."
+    },
+    {
+      "file": "accept/state-style-override-arc-on-state-without-action.json",
+      "outcome": "accept",
+      "note": "An arc override on a state that has no action is accepted."
+    },
+    {
+      "file": "reject/state-style-arc-spinner-on-state-with-action.json",
+      "outcome": "reject",
+      "note": "The arc stands in for the disc, so a rule whose state has an action refuses it.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/rules/1/indicator"
+      }
+    },
+    {
+      "file": "reject/state-style-arc-spinner-on-unknown-class.json",
+      "outcome": "reject",
+      "note": "An unavailable state never shows an arc, so busy and unavailable differ.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/rules/4/indicator"
+      }
+    },
+    {
+      "file": "reject/state-style-fallback-arc-with-action.json",
+      "outcome": "reject",
+      "note": "The fallback rule follows the same rule about the arc.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/fallback/indicator"
+      }
+    },
+    {
+      "file": "reject/state-style-override-arc-on-state-with-action.json",
+      "outcome": "reject",
+      "note": "A tile's arc override follows the resolved style: the state it names has an action.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/overrides/0/indicator"
+      }
+    },
+    {
+      "file": "reject/state-style-override-arc-on-built-in-state-with-action.json",
+      "outcome": "reject",
+      "note": "With no library style the tile's built-in style decides: a lock's locking state has an action.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/overrides/0/indicator"
+      }
+    },
+    {
+      "file": "reject/state-style-unavailable-state-not-unknown-class.json",
+      "outcome": "reject",
+      "note": "`unavailable` and `unknown` are the unknown class in every style.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/rules/4/class"
+      }
+    },
+    {
+      "file": "reject/state-style-duplicate-style-id.json",
+      "outcome": "reject",
+      "note": "A library names each style id once.",
+      "issue": {
+        "code": "duplicate_id",
+        "pointer": "/document/stateStyles/styles/0/id"
+      }
+    },
+    {
+      "file": "reject/state-style-fallback-missing.json",
+      "outcome": "reject",
+      "note": "Every style ends with a fallback rule.",
+      "issue": {
+        "code": "missing_required",
+        "pointer": "/document/stateStyles/styles/0/fallback"
+      }
+    },
+    {
+      "file": "reject/state-style-indicator-not-in-list.json",
+      "outcome": "reject",
+      "note": "The indicator list is closed.",
+      "issue": {
+        "code": "unknown_variant",
+        "pointer": "/document/stateStyles/styles/0/rules/1/indicator"
+      }
+    },
+    {
+      "file": "reject/state-style-colour-not-in-list.json",
+      "outcome": "reject",
+      "note": "The colour layer is a palette token, never a value.",
+      "issue": {
+        "code": "unknown_variant",
+        "pointer": "/document/stateStyles/styles/0/rules/1/colour"
+      }
+    },
+    {
+      "file": "reject/state-style-colour-warning-token.json",
+      "outcome": "reject",
+      "note": "The colour layer has two tokens, unlit and lit; a class is never a token.",
+      "issue": {
+        "code": "unknown_variant",
+        "pointer": "/document/stateStyles/styles/0/rules/1/colour"
+      }
+    },
+    {
+      "file": "reject/state-style-colour-on-warning-class.json",
+      "outcome": "reject",
+      "note": "A colour token is for a resting or in-progress state; a warning keeps the face of its class.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/rules/3/colour"
+      }
+    },
+    {
+      "file": "reject/state-style-colour-on-error-class.json",
+      "outcome": "reject",
+      "note": "An error keeps the face of its class, so a rule of that class refuses a colour token.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/rules/4/colour"
+      }
+    },
+    {
+      "file": "reject/state-style-override-colour-on-warning-state.json",
+      "outcome": "reject",
+      "note": "A tile's colour override follows the resolved style: a paused vacuum is a warning and keeps its face.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/overrides/0/colour"
+      }
+    },
+    {
+      "file": "reject/state-style-class-not-in-list.json",
+      "outcome": "reject",
+      "note": "A state has one of the five classes.",
+      "issue": {
+        "code": "unknown_variant",
+        "pointer": "/document/stateStyles/styles/0/rules/1/class"
+      }
+    },
+    {
+      "file": "reject/state-style-rule-unknown-field.json",
+      "outcome": "reject",
+      "note": "A rule takes the fields of its schema and no others.",
+      "issue": {
+        "code": "unknown_field",
+        "pointer": "/document/stateStyles/styles/0/rules/1/tint"
+      }
+    },
+    {
+      "file": "reject/state-style-rule-without-states.json",
+      "outcome": "reject",
+      "note": "A rule names at least one state; the fallback is the rule that names none.",
+      "issue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/stateStyles/styles/0/rules/1/states"
+      }
+    },
+    {
+      "file": "reject/state-style-base-not-built-in.json",
+      "outcome": "reject",
+      "note": "A base is one of the eight built-in styles.",
+      "issue": {
+        "code": "unknown_variant",
+        "pointer": "/document/stateStyles/styles/0/base"
+      }
+    },
+    {
+      "file": "reject/state-style-action-otherwise-without-feature.json",
+      "outcome": "reject",
+      "note": "`otherwise` is the same action without a feature, so it needs `requiresFeature`.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/rules/2/action/otherwise"
+      }
+    },
+    {
+      "file": "reject/state-style-request-script-without-timer.json",
+      "outcome": "reject",
+      "note": "The lifecycle names its script and its error timer together.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/request/errorTimer"
+      }
+    },
+    {
+      "file": "reject/state-style-request-script-not-a-script.json",
+      "outcome": "reject",
+      "note": "The lifecycle script is a script entity.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/stateStyles/styles/0/request/script"
+      }
+    },
+    {
+      "file": "reject/state-style-request-seconds-over-limit.json",
+      "outcome": "reject",
+      "note": "A timing has an upper bound.",
+      "issue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/stateStyles/styles/0/request/settleTimeoutSeconds"
+      }
+    },
+    {
+      "file": "reject/state-style-tile-without-style-or-built-in.json",
+      "outcome": "reject",
+      "note": "A tile names a library style, a built-in style, or both.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding"
+      }
+    },
+    {
+      "file": "reject/state-style-tile-entity-not-the-style-domain.json",
+      "outcome": "reject",
+      "note": "A tile's entity is in the domain its style acts on.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/entityId"
+      }
+    },
+    {
+      "file": "reject/state-style-tile-entity-not-the-built-in-domain.json",
+      "outcome": "reject",
+      "note": "A tile's built-in style acts on its own domain.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/builtIn"
+      }
+    },
+    {
+      "file": "reject/state-style-tile-entity-malformed.json",
+      "outcome": "reject",
+      "note": "An entity id has the form domain.object.",
+      "issue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/binding/entityId"
+      }
+    },
+    {
+      "file": "reject/state-style-override-without-a-layer.json",
+      "outcome": "reject",
+      "note": "An override sets at least one layer.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/overrides/0"
+      }
+    },
+    {
+      "file": "reject/state-style-override-state-twice.json",
+      "outcome": "reject",
+      "note": "A tile overrides a state once.",
+      "issue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/binding/overrides/1/state"
+      }
+    },
+    {
+      "file": "reject/state-style-tile-binding-unknown-field.json",
+      "outcome": "reject",
+      "note": "A binding takes the fields of its schema and no others.",
+      "issue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/binding/tint"
+      }
+    },
+    {
+      "file": "reject/state-style-capability-missing-from-manifest.json",
+      "outcome": "reject",
+      "note": "A document that carries a style library must list the capability.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
     }
   ]
 }

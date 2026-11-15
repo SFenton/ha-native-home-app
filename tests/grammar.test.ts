@@ -10,12 +10,12 @@ const lit = (value: unknown) => ({ type: 'literal', value }) as Operand;
 const read = (path: string[], as: 'string' | 'number' = 'string'): Operand => ({ type: 'read', from: { type: 'source', sourceId: 'fan', path }, as, missing: 'unavailable' });
 function documentWith(components: unknown[], extra: (document: CompositionDocument) => void = () => {}) {
   const document = createCompositionDocument('grammar');
-  document.dataSources.push({ id: 'fan', kind: 'ha-entity', entityId: { type: 'literal', value: 'fan.guest' } });
+  document.dataSources.push({ id: 'fan', kind: 'ha-entity', entityId: { type: 'literal', value: 'fan.demo_guest' } });
   document.pages[0].components = components as CompositionDocument['pages'][number]['components'];
   extra(document);
   return document;
 }
-const call = (extra: object = {}) => ({ type: 'call-service', domain: 'fan', service: 'turn_on', target: { entity_id: lit('fan.guest') }, ...extra });
+const call = (extra: object = {}) => ({ type: 'call-service', domain: 'fan', service: 'turn_on', target: { entity_id: lit('fan.demo_guest') }, ...extra });
 const button = (action: unknown) => ({ id: 'go', title: 'Go', type: 'primary-button', layout: { span: 1 }, props: {}, action });
 function firstIssue(document: unknown) {
   try { compileCompositionDocument(document); return undefined; }

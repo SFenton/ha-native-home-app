@@ -19,7 +19,7 @@ const full = () => ({
   liveActivities: [{ id: 'activity-dryer', jobId: 'dryer', type: 'activity-presentation@1', title: 'Dryer', glyph: 'dryer', tint: 'cleaning', source: 'activity-engine@1', privacy: 'system-sensitive@1', updates: 'engine@1', intents: 'engine-safe@1' }],
   extensions: {
     type: 'native-extensions@1', watch: 'stub@1', linkPrefixes: ['hc'],
-    cameras: [{ entityId: 'camera.front_door', title: 'Front door', liveLabel: 'Live', unavailableLabel: 'Unavailable' }],
+    cameras: [{ entityId: 'camera.demo_front_door', title: 'Front door', liveLabel: 'Live', unavailableLabel: 'Unavailable' }],
     routes: [{ id: 'route-home', path: 'home', pageId: 'page-home', title: 'Home', summary: 'Home', icon: 'house', tabId: 'hc-tab-home' }],
   },
 });

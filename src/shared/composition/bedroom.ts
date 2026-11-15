@@ -1,5 +1,6 @@
 import { z } from 'zod/v4';
 import { identifierSchema } from '../validation';
+import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;
 const title = z.string().max(240).refine(value => Boolean(value.trim()));
@@ -26,7 +27,7 @@ const base = { sourceId: identifierSchema, label: title, unavailableText: title 
 const question = object({ title, message, confirmLabel: title, cancelLabel: title });
 const scope = object({ title, message, tonightLabel: title, allNightsLabel: title, cancelLabel: title });
 const symbol = object({ type: z.literal('sf-symbol'), name: z.string().max(80).refine(value => Boolean(value.trim())),
-  rendering: z.literal('canonical'), unavailable: z.literal('reject') });
+  rendering: z.literal('canonical'), unavailable: symbolUnavailable });
 const options = <T extends readonly [string, ...string[]]>(values: T) =>
   z.array(object({ value: z.enum(values), label: title })).min(1).max(16);
 export const bedroomPropsSchema = z.discriminatedUnion('control', [

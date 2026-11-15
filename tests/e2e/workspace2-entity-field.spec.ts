@@ -70,7 +70,7 @@ test('a tile that reads a model lists its models in a Models group, without an e
 
 /** A house with lights, switches and input booleans, so the picker could offer a wrong kind. */
 async function stubMixedHouse(page: Page) {
-  const states = [['light.lamp_15', 'Lamp 15'], ['light.demo_entity_308', 'Hall lamp'], ['switch.plug_1', 'Plug 1'], ['input_boolean.guest_mode', 'Guest mode'], ['sensor.hall_temperature', 'Hall temperature']]
+  const states = [['light.demo_lamp_15', 'Lamp 15'], ['light.demo_entity_308', 'Hall lamp'], ['switch.demo_plug_1', 'Plug 1'], ['input_boolean.demo_guest_mode', 'Guest mode'], ['sensor.demo_hall_temperature', 'Hall temperature']]
     .map(([entityId, name]) => ({ entityId, name, state: 'on' }));
   await page.route('**/api/native-home', route => route.fulfill({ json: { mode: 'live', houseConfig: { schema: 2, hash: 'a'.repeat(64), config: {} }, states } }));
 }
@@ -83,22 +83,22 @@ for (const width of [390, 430]) {
     await openWorkspace(page);
     const toggle = await selectTile(page, 'Demo Guests 1');
     await toggle.locator('[data-field-path$="binding/sourceId"]').getByRole('button', { name: 'Entity' }).click();
-    await expect(page.locator('[data-entity="switch.plug_1"]')).toBeVisible();
-    await expect(page.locator('[data-entity="input_boolean.guest_mode"]')).toBeVisible();
-    await expect(page.locator('[data-entity="light.lamp_15"]')).toHaveCount(0);
-    await expect(page.locator('[data-entity="sensor.hall_temperature"]')).toHaveCount(0);
+    await expect(page.locator('[data-entity="switch.demo_plug_1"]')).toBeVisible();
+    await expect(page.locator('[data-entity="input_boolean.demo_guest_mode"]')).toBeVisible();
+    await expect(page.locator('[data-entity="light.demo_lamp_15"]')).toHaveCount(0);
+    await expect(page.locator('[data-entity="sensor.demo_hall_temperature"]')).toHaveCount(0);
     // Searching for the light finds nothing, and a typed light id is not offered either.
     const search = page.getByRole('searchbox', { name: 'Search entities' });
     await search.fill('lamp');
     await expect(page.locator('[data-entity]')).toHaveCount(0);
-    await search.fill('light.lamp_15');
+    await search.fill('light.demo_lamp_15');
     await expect(page.getByRole('option', { name: /Use/ })).toHaveCount(0);
     await expect(page.locator('[data-restricted]')).toContainText('switch and input boolean only');
     await snap(page, `entity-restricted-${width}`);
     await search.fill('plug');
-    await page.locator('[data-entity="switch.plug_1"]').click();
+    await page.locator('[data-entity="switch.demo_plug_1"]').click();
     await expect(page.getByText('Not Saved')).toHaveCount(0);
-    await expect.poll(() => savedEntity(page, 'hc-home-guest-0')).toBe('switch.plug_1');
+    await expect.poll(() => savedEntity(page, 'hc-home-guest-0')).toBe('switch.demo_plug_1');
   });
 
   test(`at ${width} px a light tile lists lights, switches and input booleans but not sensors`, async ({ page }) => {
@@ -108,11 +108,11 @@ for (const width of [390, 430]) {
     await openWorkspace(page);
     const panel = await selectTile(page, 'Hall light');
     await panel.locator('[data-field-path$="props/sourceId"]').getByRole('button', { name: 'Entity' }).click();
-    await expect(page.locator('[data-entity="light.lamp_15"]')).toBeVisible();
-    await expect(page.locator('[data-entity="switch.plug_1"]')).toBeVisible();
-    await expect(page.locator('[data-entity="sensor.hall_temperature"]')).toHaveCount(0);
-    await page.locator('[data-entity="light.lamp_15"]').click();
+    await expect(page.locator('[data-entity="light.demo_lamp_15"]')).toBeVisible();
+    await expect(page.locator('[data-entity="switch.demo_plug_1"]')).toBeVisible();
+    await expect(page.locator('[data-entity="sensor.demo_hall_temperature"]')).toHaveCount(0);
+    await page.locator('[data-entity="light.demo_lamp_15"]').click();
     await expect(page.getByText('Not Saved')).toHaveCount(0);
-    await expect.poll(() => savedEntity(page, 'demo-hall-light')).toBe('light.lamp_15');
+    await expect.poll(() => savedEntity(page, 'demo-hall-light')).toBe('light.demo_lamp_15');
   });
 }

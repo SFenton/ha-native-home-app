@@ -87,11 +87,11 @@ describe('every compiler error names its target, its field and what to change, a
 
   it('names the data source and the entity kind when a power switch reads a light', () => {
     const at = home.dataSources.findIndex(source => source.kind === 'model' && source.model === 'power-toggle@1');
-    const document = replaceAt(home, ['dataSources', at, 'inputs', 'entityId', 'value'], 'light.lamp_15');
+    const document = replaceAt(home, ['dataSources', at, 'inputs', 'entityId', 'value'], 'light.demo_lamp_15');
     const problems = runChecks(document).problems;
     expect(problems).toHaveLength(1);
     expect(problems[0].sentence).toContain('Data source Power switch');
-    expect(problems[0].sentence).toContain('Entity “light.lamp_15” is not switch or input boolean');
+    expect(problems[0].sentence).toContain('Entity “light.demo_lamp_15” is not switch or input boolean');
     expect(problems[0].go).toEqual({ dialog: 'data' });
     expect(problems[0].sentence).not.toMatch(/work together/);
   });

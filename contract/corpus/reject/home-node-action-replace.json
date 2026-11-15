@@ -67,7 +67,7 @@
                   "type": "sf-symbol",
                   "name": "line.3.horizontal",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "visibility": "root-when-menu-available"
               }
@@ -84,7 +84,7 @@
           "type": "sf-symbol",
           "name": "house",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "navigation": {
@@ -151,7 +151,7 @@
                           "type": "sf-symbol",
                           "name": "lightbulb.fill",
                           "rendering": "canonical",
-                          "unavailable": "reject"
+                          "unavailable": "fallback"
                         },
                         "fill": {
                           "type": "solid-rgb",
@@ -173,7 +173,7 @@
                       "type": "sf-symbol",
                       "name": "lightbulb",
                       "rendering": "canonical",
-                      "unavailable": "reject"
+                      "unavailable": "fallback"
                     },
                     "fill": {
                       "type": "standard"
@@ -233,7 +233,7 @@
           "type": "sf-symbol",
           "name": "lightbulb",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "navigation": {
@@ -296,7 +296,7 @@
           "type": "sf-symbol",
           "name": "lightbulb",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {
@@ -389,7 +389,7 @@
                       "type": "sf-symbol",
                       "name": "lightbulb",
                       "rendering": "canonical",
-                      "unavailable": "reject"
+                      "unavailable": "fallback"
                     },
                     "fill": {
                       "type": "standard"
@@ -417,7 +417,7 @@
           "type": "sf-symbol",
           "name": "cloud.sun",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {

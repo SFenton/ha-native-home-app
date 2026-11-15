@@ -58,7 +58,7 @@
                   "type": "sf-symbol",
                   "name": "line.3.horizontal",
                   "rendering": "canonical",
-                  "unavailable": "reject"
+                  "unavailable": "fallback"
                 },
                 "visibility": "root-when-menu-available"
               }
@@ -75,7 +75,7 @@
           "type": "sf-symbol",
           "name": "square.grid.2x2",
           "rendering": "canonical",
-          "unavailable": "reject"
+          "unavailable": "fallback"
         },
         "parameters": {},
         "toolbar": {

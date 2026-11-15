@@ -29,12 +29,12 @@
       "tabs": [
         {
           "id": "tab-alpha", "label": "Canvas",
-          "icon": { "type": "sf-symbol", "name": "square.grid.2x2", "rendering": "canonical", "unavailable": "reject" },
+          "icon": { "type": "sf-symbol", "name": "square.grid.2x2", "rendering": "canonical", "unavailable": "fallback" },
           "pageId": "page-orbit", "arguments": {}
         },
         {
           "id": "tab-beta", "label": "Shelf",
-          "icon": { "type": "sf-symbol", "name": "square.stack", "rendering": "canonical", "unavailable": "reject" },
+          "icon": { "type": "sf-symbol", "name": "square.stack", "rendering": "canonical", "unavailable": "fallback" },
           "pageId": "page-lattice", "arguments": {}
         }
       ],
@@ -51,12 +51,12 @@
             "items": [
               {
                 "id": "chrome-menu", "type": "shell-menu", "label": "Sections",
-                "icon": { "type": "sf-symbol", "name": "line.3.horizontal", "rendering": "canonical", "unavailable": "reject" },
+                "icon": { "type": "sf-symbol", "name": "line.3.horizontal", "rendering": "canonical", "unavailable": "fallback" },
                 "visibility": "root-when-menu-available"
               },
               {
                 "id": "chrome-inspect", "type": "button", "label": "Inspect", "menuLabel": "Inspect Sample",
-                "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "reject" },
+                "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "fallback" },
                 "visibility": "root-only", "priority": "normal", "rail": "eligible", "badge": { "type": "none" },
                 "action": { "type": "push", "pageId": "page-echo", "arguments": {}, "origin": "sender", "duplicate": "reuse-nearest" }
               }
@@ -68,7 +68,7 @@
             "items": [
               {
                 "id": "chrome-palette", "type": "button", "label": "Palette", "menuLabel": "Open Palette",
-                "icon": { "type": "sf-symbol", "name": "slider.horizontal.3", "rendering": "canonical", "unavailable": "reject" },
+                "icon": { "type": "sf-symbol", "name": "slider.horizontal.3", "rendering": "canonical", "unavailable": "fallback" },
                 "visibility": "always", "priority": "required", "rail": "eligible", "badge": { "type": "none" },
                 "action": { "type": "present", "modalId": "modal-swatch", "arguments": {}, "ifPresented": "reject" }
               }
@@ -80,7 +80,7 @@
     "pages": [
       {
         "id": "page-orbit", "title": "Canvas",
-        "icon": { "type": "sf-symbol", "name": "square.grid.2x2", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "square.grid.2x2", "rendering": "canonical", "unavailable": "fallback" },
         "parameters": {}, "navigation": { "type": "stack" },
         "layout": {
           "type": "column",
@@ -102,7 +102,7 @@
             "children": [
               {
                 "id": "node-output", "type": "action-tile", "title": "Sample Output",
-                "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "reject" },
+                "icon": { "type": "sf-symbol", "name": "power", "rendering": "canonical", "unavailable": "fallback" },
                 "layout": { "span": 1 }, "binding": { "sourceId": "source-power", "projection": "power-tile@1" },
                 "props": { "family": "lights", "bodyActionId": "power", "actionOrder": ["power"], "stateText": "provider", "feedback": "policy" },
                 "action": {
@@ -112,7 +112,7 @@
               },
               {
                 "id": "node-open-echo", "type": "navigation-tile", "title": "Inspect Sample",
-                "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "reject" },
+                "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "fallback" },
                 "layout": { "span": 1 },
                 "props": { "family": "neutral", "selected": "navigation-path", "subtitle": { "type": "literal", "value": "Open an arbitrary page" } },
                 "action": { "type": "push", "pageId": "page-echo", "arguments": {}, "origin": "sender", "duplicate": "reuse-nearest" }
@@ -123,7 +123,7 @@
       },
       {
         "id": "page-lattice", "title": "Shelf",
-        "icon": { "type": "sf-symbol", "name": "square.stack", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "square.stack", "rendering": "canonical", "unavailable": "fallback" },
         "parameters": {}, "navigation": { "type": "stack" },
         "layout": {
           "type": "column",
@@ -142,7 +142,7 @@
           },
           {
             "id": "node-shelf-detail", "type": "navigation-tile", "title": "Inspect Sample",
-            "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "reject" },
+            "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "fallback" },
             "layout": { "span": 1 },
             "props": { "family": "neutral", "selected": "navigation-path", "subtitle": { "type": "literal", "value": "The same page definition, in this tab" } },
             "action": { "type": "push", "pageId": "page-echo", "arguments": {}, "origin": "sender", "duplicate": "reuse-nearest" }
@@ -151,7 +151,7 @@
       },
       {
         "id": "page-echo", "title": "Sample Detail",
-        "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "fallback" },
         "parameters": {}, "navigation": { "type": "stack" },
         "layout": {
           "type": "column",
@@ -177,7 +177,7 @@
     "modals": [
       {
         "id": "modal-swatch", "title": "Palette",
-        "icon": { "type": "sf-symbol", "name": "slider.horizontal.3", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "slider.horizontal.3", "rendering": "canonical", "unavailable": "fallback" },
         "parameters": {},
         "layout": {
           "type": "column",
@@ -207,14 +207,14 @@
           },
           {
             "id": "node-palette-local", "type": "navigation-tile", "title": "Inspect Here",
-            "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "reject" },
+            "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "fallback" },
             "layout": { "span": 1 },
             "props": { "family": "neutral", "selected": "navigation-path", "subtitle": { "type": "literal", "value": "Push inside this sheet" } },
             "action": { "type": "push", "pageId": "page-echo", "arguments": {}, "origin": "sender", "duplicate": "reuse-nearest" }
           },
           {
             "id": "node-palette-external", "type": "navigation-tile", "title": "Inspect on Canvas",
-            "icon": { "type": "sf-symbol", "name": "arrow.up.right", "rendering": "canonical", "unavailable": "reject" },
+            "icon": { "type": "sf-symbol", "name": "arrow.up.right", "rendering": "canonical", "unavailable": "fallback" },
             "layout": { "span": 1 },
             "props": { "family": "neutral", "selected": "navigation-path", "subtitle": { "type": "literal", "value": "Close, then push in the presenting tab" } },
             "action": {

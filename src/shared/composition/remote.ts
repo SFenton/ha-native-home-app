@@ -1,12 +1,13 @@
 import { z } from 'zod/v4';
 import { identifierSchema } from '../validation';
+import { symbolUnavailable } from './symbol-unavailable';
 
 const object = z.strictObject;
 const text = (maximum: number) => z.string().max(maximum).refine(value => Boolean(value.trim()));
 const label = text(80), title = text(240);
 const symbol = object({
   type: z.literal('sf-symbol'), name: text(80),
-  rendering: z.literal('canonical'), unavailable: z.literal('reject'),
+  rendering: z.literal('canonical'), unavailable: symbolUnavailable,
 });
 export const remoteSourceSchema = object({
   id: identifierSchema, kind: z.literal('model'), model: z.literal('media-remote@1'),

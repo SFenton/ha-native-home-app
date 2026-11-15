@@ -9,12 +9,12 @@
     "children": [
       {
         "id": "shell-pill-a", "title": "Controller", "type": "status-pill", "layout": { "span": 1 },
-        "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "info.circle", "rendering": "canonical", "unavailable": "fallback" },
         "props": { "value": { "type": "literal", "value": "Ready" }, "detail": { "type": "literal", "value": "" }, "tone": "ok", "unavailableText": "Unavailable" }
       },
       {
         "id": "shell-pill-b", "title": "Battery", "type": "status-pill", "layout": { "span": 1 },
-        "icon": { "type": "sf-symbol", "name": "battery.100percent", "rendering": "canonical", "unavailable": "reject" },
+        "icon": { "type": "sf-symbol", "name": "battery.100percent", "rendering": "canonical", "unavailable": "fallback" },
         "props": { "value": { "type": "literal", "value": "100%" }, "detail": { "type": "literal", "value": "Charged" }, "tone": "neutral", "unavailableText": "Unavailable" }
       }
     ]
