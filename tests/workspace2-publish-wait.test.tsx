@@ -34,7 +34,7 @@ describe('publishing while an autosave is in flight', () => {
     const calls: string[] = [];
     vi.mocked(request).mockImplementation((async (url: string, init?: RequestInit) => {
       calls.push(`${init?.method ?? 'GET'} ${url}`);
-      if (url === '/native/api/draft' && init?.method === 'PUT') return new Promise(resolve => { finishSave = resolve; });
+      if (url === '/native/api/draft' && init?.method === 'PUT') return new Promise<CompositionDraft>(resolve => { finishSave = resolve; });
       if (url === '/native/api/ha/publish') return { revision: 5 };
       return {};
     }) as typeof request);
