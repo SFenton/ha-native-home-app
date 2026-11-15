@@ -11,6 +11,7 @@ import { PushStack, Tag, usePush } from './kit';
 import { HeaderPanel, TabsPanel, WallpaperPanel } from './panels';
 import { collectLinks } from './outline';
 import { useAdd } from './add/AddHost';
+import { useDeepRows } from './editors/overrides';
 import { after } from './add/insert';
 import { deleteNode, duplicateNode, moveNodeBy, moveNodeTo, moveTargets } from './nodeActions';
 import { copyText, typeName } from './util';
@@ -60,11 +61,12 @@ function NodeBody({ path }: { path: EditorPath }) {
   const push = usePush();
   const { document } = useRows();
   const node = valueAt(document, path) as { id: string } | undefined;
+  const overrides = useDeepRows(path);
   if (!node) return null;
   return <>
-    <ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={notChildren} groups={['what', 'look', 'behaviour']}/>
+    <ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={notChildren} overrides={overrides} groups={['what', 'look', 'behaviour']}/>
     <section className="w2-group"><button type="button" className="w2-disclosure-head w2-advanced-row" onClick={() => push?.push({
-      title: 'Advanced', body: <><IdRow id={node.id} path={[...path, 'id'].join('/')}/><ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={child => notChildren(child) || child.at(-1) === 'id'} groups={['advanced']}/></>,
+      title: 'Advanced', body: <><IdRow id={node.id} path={[...path, 'id'].join('/')}/><ObjectRows path={path} owner={String((node as { type?: string }).type)} skip={child => notChildren(child) || child.at(-1) === 'id'} overrides={overrides} groups={['advanced']}/></>,
     })}><span className="w2-row-label">Advanced</span><span className="w2-summary"/><ChevronRight size={16} aria-hidden/></button></section>
   </>;
 }
@@ -76,7 +78,8 @@ function PageBody({ ws, kind, path, onGo, onOpenProject }: { ws: Workspace2; kin
   const owner = kind === 'page' ? 'page' : 'sheet';
   const skip = (at: EditorPath) => at.at(-1) === 'components';
   const set = (at: EditorPath, value: Json) => onChange(replaceAt(document, at, value));
-  const overrides: Record<string, RowOverride> = kind === 'page' ? {
+  const deep = useDeepRows(path);
+  const overrides: Record<string, RowOverride> = { ...deep, ...(kind === 'page' ? {
     navigation: ({ path: at }) => {
       const on = (surface as CompositionDocument['pages'][number]).navigation.type === 'navigation-columns';
       return <>
@@ -106,7 +109,7 @@ function PageBody({ ws, kind, path, onGo, onOpenProject }: { ws: Workspace2; kin
           onClick={() => (type === 'full') !== full && set(at, type === 'full' ? { type: 'full' } : { type: 'fitted', follows: 'root', firstOpen: 'canonical@1' })}>{type === 'full' ? 'Full' : 'Fitted'}</button>)}
       </div>;
     },
-  };
+  }) };
   const routes = (document.extensions?.routes ?? []).filter(route => route.pageId === surface.id).length;
   const advancedExtra = kind === 'page' && surface.navigation.type === 'navigation-columns' ? <>
     {(['onDemand', 'standalone'] as const).map(name => <div className="w2-row" key={name}><CompositionFields schema={{ type: 'boolean' }} value={Boolean((surface.navigation as unknown as Record<string, Json>)[name])}

@@ -137,7 +137,7 @@ export function fieldOptions(owner: string, base: EditorPath, skip?: (path: Edit
 }
 
 /** A custom control for one field, keyed by its path below the object (for fields the generator draws poorly). */
-export type RowOverride = (entry: { path: EditorPath; value: Json; label: string }) => ReactNode;
+export type RowOverride = (entry: { path: EditorPath; value: Json; label: string }) => ReactNode | undefined;
 
 /**
  * The fields of the object at `path` as rows in four groups: what it shows, how it looks, "Behaviour", "Advanced".
@@ -153,7 +153,9 @@ export function ObjectRows({ path, owner, skip, overrides = {}, extra, groups = 
   const render = ({ entry, label, mapped }: typeof entries[number]) => {
     const key = mapPath(entry.rel), name = String(entry.rel.at(-1));
     const override = overrides[key];
-    if (override) return override({ path: entry.path, value: entry.value, label });
+    // An override that returns undefined declines, and the generated control is used.
+    const custom = override?.({ path: entry.path, value: entry.value, label });
+    if (custom !== undefined) return custom;
     const resolved = resolveField(entry.schema), variants = fieldVariants(entry.schema);
     const complex = resolved.type === 'array' || variants.length > 1 || opaque.has(name) || (resolved.type === 'object' && Object.keys(resolved.properties ?? {}).length > 0) || typeof resolved.additionalProperties === 'object';
     const generated = <CompositionFields schema={entry.schema} value={entry.value} path={entry.path} label={label} document={document} onChange={onChange} onError={onError} options={options}/>;

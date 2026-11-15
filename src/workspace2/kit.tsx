@@ -23,7 +23,7 @@ export function Tag({ tone = 'neutral', children, className = '', ...rest }: { t
 }
 
 /** A pushed page inside one surface: depth is a push with Back, never a second sheet (spec principle 4). */
-export interface PushedPage { title: string; body: ReactNode; done?: ReactNode }
+export interface PushedPage { title: string; body: ReactNode; done?: ReactNode; /** Called by Back; returning false keeps the page (an editor with changes asks first). */ guard?: () => boolean }
 interface PushApi { push(page: PushedPage): void; pop(): void; depth: number }
 const PushContext = createContext<PushApi | undefined>(undefined);
 export const usePush = () => useContext(PushContext);
@@ -41,7 +41,7 @@ export function PushStack({ root, rootTitle, rootHeader, onBackAtRoot }: { root:
   return <PushContext.Provider value={{ push, pop, depth: stack.length }}>
     {top ? <div className="w2-pushed">
       <header className="w2-pushed-head">
-        <button type="button" className="w2-back" onClick={pop}><ChevronLeft size={16} aria-hidden/>{parent}</button>
+        <button type="button" className="w2-back" onClick={() => { if (top.guard?.() !== false) pop(); }}><ChevronLeft size={16} aria-hidden/>{parent}</button>
         <h2>{top.title}</h2>{top.done}
       </header>
       <div className="w2-pushed-body">{top.body}</div>

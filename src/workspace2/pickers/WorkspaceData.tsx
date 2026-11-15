@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { House } from '../../preview2/projections';
+import type { Environment } from '../../preview2/evaluate';
 import { rowsFromDocument, rowsFromStates, type EntityRow } from './entities';
 
 /** Starts a creation flow and calls `done` with the id it made. Supplied by the navigation lane; absent, the picker row is hidden. */
@@ -14,17 +15,19 @@ export interface WorkspaceData {
   connected: boolean;
   onCreatePage?: CreateFlow;
   onCreateSheet?: CreateFlow;
+  /** The house the preview reads, for "Shown now" and "Hidden now" in the rule editor. */
+  environment?: Environment;
 }
 const Data = createContext<WorkspaceData>({ entities: [], connected: false });
 /** The data the pickers read. */
 export const useWorkspaceData = () => useContext(Data);
 
 /** Provides {@link WorkspaceData} from the house the preview already reads, so there is no second request. */
-export function WorkspaceDataProvider({ document, house, onCreatePage, onCreateSheet, children }: { document: CompositionDocument | undefined; house: House; onCreatePage?: CreateFlow; onCreateSheet?: CreateFlow; children: ReactNode }) {
+export function WorkspaceDataProvider({ document, house, environment, onCreatePage, onCreateSheet, children }: { document: CompositionDocument | undefined; house: House; environment?: Environment; onCreatePage?: CreateFlow; onCreateSheet?: CreateFlow; children: ReactNode }) {
   const states = house.states;
   const value = useMemo<WorkspaceData>(() => {
     const live = states && states.size > 0;
-    return { entities: live ? rowsFromStates(states.values()) : document ? rowsFromDocument(document) : [], connected: Boolean(live), onCreatePage, onCreateSheet };
-  }, [states, document, onCreatePage, onCreateSheet]);
+    return { entities: live ? rowsFromStates(states.values()) : document ? rowsFromDocument(document) : [], connected: Boolean(live), onCreatePage, onCreateSheet, environment };
+  }, [states, document, onCreatePage, onCreateSheet, environment]);
   return <Data.Provider value={value}>{children}</Data.Provider>;
 }

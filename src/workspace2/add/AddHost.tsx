@@ -21,6 +21,9 @@ const AddContext = createContext<AddApi | undefined>(undefined);
 /** The add triggers' API, or undefined outside the host. */
 export const useAdd = () => useContext(AddContext);
 
+/** A point at the middle of the stage, for an add that no button started (the "A" key): a popover cannot anchor to something taller than the window. */
+const centre = (stage: HTMLElement | null) => stage ? { getBoundingClientRect: () => { const box = stage.getBoundingClientRect(); return new DOMRect(box.left + box.width / 2, box.top + Math.min(box.height / 2, 220), 0, 0); } } : undefined;
+
 /** The empty `.sh-add-slot` elements the preview draws at the end of each container in Edit, with the container they belong to. */
 function useAddSlots(stage: HTMLElement | null): { element: HTMLElement; owner: SelectionKey }[] {
   const [slots, setSlots] = useState<{ element: HTMLElement; owner: SelectionKey }[]>([]);
@@ -93,7 +96,7 @@ export default function AddHost({ ws, narrow, stage, onError, children }: { ws: 
       return destination && accepts(destination) ? createPortal(<button type="button" className="w2-add-slot" aria-label="Add" onClick={event => open(destination, event.currentTarget)}><Plus size={16} aria-hidden/>Add</button>, element, owner) : null;
     })}
     {state && !narrow && <Popover.Root open onOpenChange={next => { if (!next) close(); }}>
-      <Popover.Portal><Popover.Positioner anchor={state.anchor ?? stage ?? undefined} sideOffset={8} align="center" className="w2-positioner"><Popover.Popup className="w2-scope w2-popover w2-add-pop" aria-label="Add" data-add-open>
+      <Popover.Portal><Popover.Positioner anchor={state.anchor ?? centre(stage)} sideOffset={8} align="center" className="w2-positioner"><Popover.Popup className="w2-scope w2-popover w2-add-pop" aria-label="Add" data-add-open>
         <Popover.Title className="w2-sr">Add</Popover.Title>{content}
       </Popover.Popup></Popover.Positioner></Popover.Portal>
     </Popover.Root>}

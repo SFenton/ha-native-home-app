@@ -16,3 +16,6 @@
 .w2-bottombar { gap: 12px; }
 .w2-scope button.w2-bottom-add { min-height: 36px; padding: 0 16px; border-radius: 18px; background: var(--w2-primary-fill); border-color: var(--w2-primary-fill); color: var(--w2-on-primary); font-weight: 600; }
 @media (pointer: coarse) { .w2-scope button.w2-bottom-add { min-height: 44px; } }
+.sh-add-slot { align-self: start; }
+.sh-add-slot > .w2-add-slot { height: 36px; }
+@media (pointer: coarse) { .sh-add-slot > .w2-add-slot { height: 44px; } }

@@ -5,6 +5,7 @@ import { useStudioTheme } from './useStudioTheme';
 import { useWorkspace2, type PanelKind } from './useWorkspace2';
 import { ModeSegment, ChecksPill } from './TopBar';
 import AddHost, { useAdd } from './add/AddHost';
+import { SHEET_SNAP_EVENT } from './editors/EditorRow';
 import { WorkspaceDataProvider, type CreateFlow } from './pickers/WorkspaceData';
 import TopBar from './TopBar';
 import PropertiesPanel from './PropertiesPanel';
@@ -59,6 +60,12 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
   const showError = useCallback((message: string) => setNotice(message), []);
   useEffect(() => setNotice(''), [target?.kind, ws.selection]);
   useEffect(() => { if (target) setSnap(SNAP_HALF); }, [target?.kind, ws.selection, ws.panel]);
+  // An editor pushed inside the properties sheet takes it to full height, and gives it back to half (spec 5.5).
+  useEffect(() => {
+    const listener = (event: Event) => setSnap((event as CustomEvent<'full' | 'half'>).detail === 'full' ? SNAP_FULL : SNAP_HALF);
+    window.addEventListener(SHEET_SNAP_EVENT, listener);
+    return () => window.removeEventListener(SHEET_SNAP_EVENT, listener);
+  }, []);
   // One open sheet at a time on narrow widths: a menu, Pages or Checks replaces the properties sheet.
   const overlayOpen = pagesOpen || projectOpen || checksOpen || ws.phase !== 'idle';
   useEffect(() => { if (narrow && overlayOpen && target) { ws.select(undefined); } }, [narrow, overlayOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -77,7 +84,7 @@ export default function Workspace2({ active, onLegacy, onCreatePage, onCreateShe
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
     <ToastHost>
-      <WorkspaceDataProvider document={document} house={ws.houseStates.house} onCreatePage={onCreatePage} onCreateSheet={onCreateSheet}>
+      <WorkspaceDataProvider document={document} house={ws.houseStates.house} environment={ws.houseStates.environment} onCreatePage={onCreatePage} onCreateSheet={onCreateSheet}>
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
         dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError} onChecks={() => setChecksOpen(true)}/>
