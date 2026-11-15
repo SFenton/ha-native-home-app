@@ -37,7 +37,7 @@
 
 /* Top bar */
 .w2-topbar { flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 12px; background: var(--w2-card); border-bottom: 1px solid var(--w2-line); position: relative; z-index: 2; }
-.w2-narrow .w2-topbar { height: 52px; gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
+.w2-narrow .w2-topbar { height: 52px; gap: 4px; padding: 0 6px; flex-wrap: nowrap; }
 .w2-wordmark { font-weight: 700; font-size: 15px; letter-spacing: -.01em; padding-inline: 4px; white-space: nowrap; }
 .w2-page-button { max-width: 240px; }
 .w2-page-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -48,7 +48,9 @@
 .w2-scope .w2-segment-pill button[aria-pressed=true], .w2-scope .w2-segment-pill button[aria-checked=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
 .w2-window-button { font-variant-numeric: tabular-nums; }
 .w2-status-narrow { margin-inline-start: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 0 7px; flex: 0 1 auto; }
-.w2-narrow .w2-page-button { max-width: 36vw; min-width: 0; padding: 0 8px; }
+.w2-narrow .w2-page-button { flex: 1 1 0; max-width: none; min-width: 96px; justify-content: flex-start; padding: 0 8px; }
+.w2-narrow .w2-trailing { flex: none; margin-inline-start: 0; }
+.w2-narrow .w2-status-narrow { flex: none; overflow: visible; }
 .w2-tag { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--w2-field); color: var(--w2-ink-card); }
 .w2-scope button.w2-tag-button { border: 0; min-height: 22px; padding: 0 9px; border-radius: 11px; }
 .w2-tag-success { color: var(--w2-ok-text); background: color-mix(in srgb, var(--w2-ok) 16%, var(--w2-card)); }

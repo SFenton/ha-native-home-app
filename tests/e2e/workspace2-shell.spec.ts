@@ -301,3 +301,15 @@ test('a selected status chip stays readable: the Studio hover never repaints the
   }
   expect(await chip.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgb(242, 241, 252)');
 });
+
+test('the page button shows a short page name whole on the narrow top bar', async ({ page }) => {
+  test.skip(!isPhone(page), 'The narrow top bar is the phone layout');
+  await openWorkspace(page);
+  const label = page.getByRole('button', { name: 'Pages' }).first().locator('span');
+  await expect(label).toHaveText('Home');
+  const fit = await label.evaluate(element => ({ clipped: element.scrollWidth > element.clientWidth, width: element.getBoundingClientRect().width }));
+  expect(fit.clipped).toBe(false);
+  expect(fit.width).toBeGreaterThan(30);
+  const bar = await page.locator('.w2-topbar').evaluate(element => element.scrollWidth <= element.clientWidth);
+  expect(bar).toBe(true);
+});
