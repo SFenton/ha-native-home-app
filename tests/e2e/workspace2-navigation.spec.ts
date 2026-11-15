@@ -22,7 +22,12 @@ async function addPage(page: Page, name: string, from?: string) {
 }
 /** Opens Project > Window on a phone, or the Window menu on a desk. */
 async function openWindow(page: Page) {
-  if (isPhone(page)) { await page.getByRole('button', { name: 'Project' }).click(); await page.getByRole('button', { name: 'Window', exact: true }).click(); }
+  if (isPhone(page)) {
+        // Wait out a sheet that is still sliding away from the last Escape.
+    await expect(page.locator('.w2-back', { hasText: 'Project' })).toHaveCount(0);
+    await page.getByTestId('workspace2').getByRole('button', { name: 'Project' }).click();
+    await page.getByRole('button', { name: 'Window', exact: true }).click();
+  }
   else await page.getByRole('button', { name: 'Window' }).click();
 }
 async function chooseWindow(page: Page, label: string) {
