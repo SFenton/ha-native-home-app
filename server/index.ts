@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { buildAllowedHosts } from './allowed-hosts';
 import { createApp } from './app';
 import { discoverIngress, loadConfig } from './config';
 import { StudioStore } from './store';
@@ -22,7 +23,7 @@ try {
     });
   } else {
     const { createServer } = await import('vite');
-    vite = await createServer({ root, server: { middlewareMode: true, hmr: { server } }, appType: 'custom' });
+    vite = await createServer({ root, server: { middlewareMode: true, hmr: { server }, allowedHosts: buildAllowedHosts() }, appType: 'custom' });
     application.app.use(vite.middlewares);
     application.app.get('/{*path}', async (req, res) => {
       const template = await readFile(path.join(root, 'index.html'), 'utf8');

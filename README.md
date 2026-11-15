@@ -17,6 +17,7 @@ npm run dev
 
 Open `http://localhost:4800`. The development server listens on all interfaces,
 so another device can use `http://<this-machine-lan-or-tailscale-ip>:4800`.
+Development accepts Tailscale `.ts.net` host names (for Tailscale Serve over https; HMR follows the page's host and port); set `STUDIO_ALLOWED_HOSTS=a.example,b.example` to allow other names.
 Development mode is for a trusted network and sample data, not public internet
 exposure. See [deployment and authentication](docs/deployment.md) before
 connecting a real Home Assistant instance or enabling direct production access.
