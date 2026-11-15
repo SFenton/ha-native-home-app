@@ -3,6 +3,8 @@ import { MoreHorizontal } from 'lucide-react';
 import { compositionSourceText } from '../composition-editor';
 import { Modal, Overlay, PushStack, usePush, type PushedPage } from './kit';
 import { DialogBody, dialogTitles, type DialogKey } from './projectDialogs';
+import { useProjectRows } from './dialogs/parts';
+import { RowsProvider } from './rows';
 import ChecksPanel from './ChecksPanel';
 import { windowLabel } from '../preview2';
 import { WindowChoices } from './navigation/WindowMenu';
@@ -43,7 +45,7 @@ function SheetList({ ws, narrowOnly, onPanel, onClose, window: current, onWindow
   const page = (title: string, body: PushedPage['body']) => push?.push({ title, body });
   const row = (entry: Entry) => <li key={entry.id}><button type="button" className="w2-list-row" onClick={() => {
     if (entry.kind === 'panel') { onPanel(entry.panel); onClose(); }
-    else if (entry.kind === 'action') { entry.run(); if (entry.id === 'legacy') onClose(); }
+    else if (entry.kind === 'action') entry.run();
     else page(dialogTitles[entry.dialog], <DialogBody dialog={entry.dialog} ws={ws} close={() => push?.pop()} onError={onError}/>);
   }}>{entry.label}</button></li>;
   return <div className="w2-project-sheet">
@@ -70,8 +72,10 @@ export default function ProjectMenu({ ws, narrow, onPanel, window: current, onWi
   open: boolean; onOpenChange: (open: boolean) => void; dialog: DialogKey | undefined; onDialog: (dialog: DialogKey | undefined) => void;
 }) {
   const trigger = <button type="button" className="w2-icon-button" aria-label="Project"><MoreHorizontal size={18} aria-hidden/></button>;
+  const context = useProjectRows(ws, onError);
+  // The rows a dialog pushes are drawn by this stack, so the live document is provided above it.
   if (narrow) return <Overlay narrow open={open} onOpenChange={onOpenChange} trigger={trigger} label="Project" fullHeight>
-    <PushStack rootTitle="Project" root={<SheetList ws={ws} narrowOnly onPanel={onPanel} onClose={() => onOpenChange(false)} window={current} onWindow={onWindow} onError={onError}/>}/>
+    {context ? <RowsProvider value={context}><PushStack rootTitle="Project" root={<SheetList ws={ws} narrowOnly onPanel={onPanel} onClose={() => onOpenChange(false)} window={current} onWindow={onWindow} onError={onError}/>}/></RowsProvider> : null}
   </Overlay>;
   const groups = sections(ws);
   return <>

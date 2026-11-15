@@ -28,7 +28,7 @@ export function useDeepRows(path: EditorPath): Record<string, RowOverride> {
     return <EntityField label={label} entityId={bound} domains={domainsFor[String(node?.type)]} path={at.join('/')} onPick={row => onChange(bindEntity(document, path, row.entityId))}/>;
   };
   return {
-    action, onAction: action, offAction: action,
+    action, onAction: action, offAction: action, quickLinksAction: action, profileAction: action,
     visibleWhen: ({ path: at, label }) => <RuleRow label={label} path={at} itemName={itemName}/>,
     'icon.name': ({ path: at, value, label }) => <IconField label={label} symbol={String(value)} path={at.join('/')} onPick={symbol => onChange(replaceAt(document, at, symbol))}/>,
     'binding.sourceId': entity, 'props.sourceId': entity,

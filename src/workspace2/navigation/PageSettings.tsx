@@ -4,6 +4,7 @@ import type { Json } from '../../shared/types';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import CompositionFields from '../../CompositionFields';
 import IdRow from '../IdRow';
+import { ChromeGroups } from '../ChromeGroups';
 import { usePush } from '../kit';
 import { collectLinks } from '../outline';
 import { fieldOptions, ObjectRows, useRows, type RowOverride } from '../rows';
@@ -65,7 +66,7 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
           {(['inherit', 'replace'] as const).map(type => <button key={type} type="button" aria-pressed={surface.toolbar.type === type}
             onClick={() => type !== surface.toolbar.type && set(at, type === 'inherit' ? { type: 'inherit' } : { type: 'replace', groups: [] })}>{type === 'inherit' ? 'Same as app' : 'Custom'}</button>)}
         </div>
-        {custom && <CompositionFields schema={{ type: 'array', items: {} }} value={(surface.toolbar as { groups: Json }).groups} path={[...at, 'groups']} label="Header buttons" document={document} onChange={onChange} onError={ws.studio.setError} options={options}/>}
+        {custom && <ChromeGroups path={[...at, 'groups']}/>}
       </>;
     },
   } : {

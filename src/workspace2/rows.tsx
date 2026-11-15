@@ -1,27 +1,14 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { CompositionDocument } from '../shared/composition/schema';
+import { Disclosure } from './Disclosure';
+import { useRows } from './rowsContext';
 import type { Json } from '../shared/types';
 import CompositionFields, { type FieldOptions } from '../CompositionFields';
 import { compositionEditorSchema, defaultField, fieldVariants, replaceAt, resolveField, selectedVariant, valueAt, type EditorPath, type SchemaField } from '../composition-editor';
 import { groupOrder, groupTitles, labelFor, mapPath, mechanicalLabel, type FieldGroup } from './labels';
 
-/** Everything a row needs to read and change the document. */
-export interface RowsContext {
-  document: CompositionDocument;
-  onChange: (document: CompositionDocument) => void;
-  onError: (message: string) => void;
-  /** Test hook: render every disclosure open so a walk can find every field. */
-  openAll?: boolean;
-}
-const Rows = createContext<RowsContext | undefined>(undefined);
-/** Provides the document and its setters to the rows below. */
-export const RowsProvider = Rows.Provider;
-export function useRows(): RowsContext {
-  const value = useContext(Rows);
-  if (!value) throw new Error('Rows need a RowsProvider');
-  return value;
-}
+export { RowsProvider, useRows, type RowsContext } from './rowsContext';
+export { Disclosure } from './Disclosure';
 
 /** The schema that governs the value at `path`, following union variants by what the value is. */
 export function schemaAt(document: CompositionDocument, path: EditorPath): SchemaField {
@@ -50,7 +37,7 @@ export const variantWords: Record<string, string> = {
 /** One field to show: where it is, what governs it and how it sits among its neighbours. */
 interface Entry { path: EditorPath; rel: EditorPath; schema: SchemaField; required: boolean; present: boolean; value: Json }
 
-const opaque = new Set(['action', 'onAction', 'offAction', 'visibleWhen', 'selectedWhen', 'isOn']);
+const opaque = new Set(['action', 'onAction', 'offAction', 'quickLinksAction', 'profileAction', 'visibleWhen', 'selectedWhen', 'isOn']);
 const isEmptyObject = (schema: SchemaField) => schema.type === 'object' && !Object.keys(schema.properties ?? {}).length && typeof schema.additionalProperties !== 'object';
 
 /** The fields of the object at `path`, flattening plain nested objects (`props`, `layout`) so their members read as rows. */
@@ -81,7 +68,7 @@ const countConditions = (predicate: Json): number => {
 };
 /** The one-line summary of a field that opens into a form (spec section 10, "Tile rows"). */
 export function summarize(document: CompositionDocument, name: string, value: Json | undefined): string {
-  if (name === 'action') {
+  if (name === 'action' || /Action$/.test(name)) {
     const action = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : undefined;
     if (!action) return 'Nothing';
     const page = (id: Json) => document.pages.find(item => item.id === id)?.title ?? String(id);
@@ -109,19 +96,6 @@ export function summarize(document: CompositionDocument, name: string, value: Js
   if (Array.isArray(value)) return `${value.length}`;
   if (value && typeof value === 'object') return String((value as Record<string, Json>).type ?? '');
   return '';
-}
-
-/** A row that opens into a form: label and summary leading, a chevron trailing. */
-export function Disclosure({ label, summary, children, defaultOpen = false, path }: { label: string; summary?: string; children: ReactNode; defaultOpen?: boolean; path?: string }) {
-  const { openAll } = useRows();
-  const [open, setOpen] = useState(defaultOpen);
-  const shown = open || openAll;
-  return <div className="w2-disclosure" data-open={shown || undefined} data-disclosure={path}>
-    <button type="button" className="w2-disclosure-head" aria-expanded={Boolean(shown)} onClick={() => setOpen(!open)}>
-      <span className="w2-row-label">{label}</span><span className="w2-summary">{summary}</span>{shown ? <ChevronDown size={16} aria-hidden/> : <ChevronRight size={16} aria-hidden/>}
-    </button>
-    {shown && <div className="w2-disclosure-body">{children}</div>}
-  </div>;
 }
 
 /** Hooks the label map into the field generator. `base` is the path of the object the rows belong to. */

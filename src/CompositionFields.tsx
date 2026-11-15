@@ -4,6 +4,7 @@ import { changeFieldVariant, defaultField, fieldVariants, removeCompositionItem,
 import { Field, NumberField, SelectField, TextField } from './ui';
 import { useState, type ReactElement } from 'react';
 import { CallServiceEditor, OperandEditor, PredicateBuilder } from './GrammarEditors';
+import { Disclosure } from './workspace2/Disclosure';
 
 /**
  * Opt-in behaviour for the workspace. Without it the form renders its plain default: generated labels, "Include"
@@ -28,7 +29,17 @@ export type FieldOptions = {
 type Props = {
   schema: SchemaField; value: Json; path: EditorPath; label: string; document: CompositionDocument;
   onChange: (document: CompositionDocument) => void; onError: (message: string) => void; options?: FieldOptions;
+  /** Rows mode only: this is a part inside another, so it names itself with a group title. */
+  nested?: boolean;
 };
+
+/**
+ * What the workspace draws instead of a fieldset: a labelled group whose parts are rows, with a title only when it sits inside
+ * another part (the row that opened it already carries the name).
+ */
+function Group({ label, nested, children }: { label: string; nested?: boolean; children: React.ReactNode }) {
+  return <div className="w2-subform" role={label ? 'group' : undefined} aria-label={label || undefined}>{nested && label && <h4 className="w2-group-title">{label}</h4>}{children}</div>;
+}
 export const nameOf = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, letter => letter.toUpperCase());
 const relationship = (key: string, document: CompositionDocument) => {
   if (key === 'pageId' || key === 'initialPageId') return document.pages.map(item => ({ value: item.id, label: `${item.title} (${item.id})` }));
@@ -97,6 +108,11 @@ export default function CompositionFields(props: Props) {
   }
   if (variants.length > 1) {
     const selected = selectedVariant(schema, value), index = variants.indexOf(selected);
+    if (options?.rows) return <Group label="">
+      <SelectField label={label} value={String(index)} options={variants.map((variant, i) => ({ value: String(i), label: options.variantLabel?.(path, variantName(variant)) ?? variantName(variant) }))}
+        onChange={choice => set(changeFieldVariant(variants[Number(choice)], value, document, key))}/>
+      <CompositionFields {...props} schema={selected} nested={false}/>
+    </Group>;
     return <fieldset className="composition-fieldset"><legend>{label}</legend>
       <SelectField label={`${label} type`} value={String(index)} options={variants.map((variant, i) => ({ value: String(i), label: options?.variantLabel?.(path, variantName(variant)) ?? variantName(variant) }))}
         onChange={choice => set(changeFieldVariant(variants[Number(choice)], value, document, key))}/>
@@ -114,7 +130,7 @@ export default function CompositionFields(props: Props) {
     if (!properties.length) return null;
     const editable = properties.filter(([name, child]) => child.const === undefined && !options?.skip?.([...path, name])
       && !(options?.rows && resolveField(child).enum?.length === 1));
-    return <fieldset className="composition-fieldset"><legend>{label}</legend>
+    const members = <>
       {editable.map(([name, child]) => {
         const required = schema.required?.includes(name), present = Object.hasOwn(value, name);
         const childLabel = options?.label?.([...path, name], name) ?? nameOf(name);
@@ -128,33 +144,49 @@ export default function CompositionFields(props: Props) {
           {!required && !options?.rows && <label className="checkbox-field"><input type="checkbox" checked={present} onChange={event => toggle(event.target.checked)}/>{`Include ${nameOf(name)}`}</label>}
           {!required && options?.rows && !present && <div className="add-row" data-field-path={[...path, name].join('/')}><span>{childLabel}</span><button type="button" onClick={() => toggle(true)}>{`Add ${childLabel}`}</button></div>}
           {!required && options?.rows && present && <div className="remove-row"><button type="button" onClick={() => toggle(false)}>{`Remove ${childLabel}`}</button></div>}
-          {(required || present) && <CompositionFields {...props} schema={child} label={childLabel} value={value[name] ?? null} path={[...path, name]}/>}
+          {(required || present) && <CompositionFields {...props} schema={child} label={childLabel} value={value[name] ?? null} path={[...path, name]} nested/>}
         </div>;
       })}
-    </fieldset>;
+    </>;
+    return options?.rows ? <Group label={label} nested={props.nested}>{members}</Group> : <fieldset className="composition-fieldset"><legend>{label}</legend>{members}</fieldset>;
   }
 
   if (schema.type === 'array' && Array.isArray(value)) {
     const tuple = Array.isArray(schema.items) ? schema.items : undefined;
     const itemSchema: SchemaField = Array.isArray(schema.items) ? {} : schema.items ?? {};
     const maximum = schema.maxItems ?? 100;
+    const summaryOf = (item: Json, index: number) => item !== null && typeof item === 'object' && !Array.isArray(item) ? String(item.title ?? item.label ?? item.id ?? item.type ?? `Item ${index + 1}`) : `Item ${index + 1}`;
+    const keyOf = (item: Json, index: number) => item && typeof item === 'object' && !Array.isArray(item) && typeof item.id === 'string' ? item.id : index;
+    const controls = (summary: string, index: number) => !tuple && <div className="composition-actions">
+      <button type="button" aria-label={`Move ${summary} up`} disabled={index === 0} onClick={() => run(() => reorderCompositionItem(document, path, index, -1))}>Up</button>
+      <button type="button" aria-label={`Move ${summary} down`} disabled={index === value.length - 1} onClick={() => run(() => reorderCompositionItem(document, path, index, 1))}>Down</button>
+      <button type="button" aria-label={`Delete ${summary}`} onClick={() => run(() => removeCompositionItem(document, path, index))}>Delete</button>
+    </div>;
+    const add = !tuple && maximum > 0 && <button type="button" className="add-button" disabled={value.length >= maximum}
+      onClick={() => set([...value, defaultField(itemSchema, document)])}>{options?.rows ? options.addLabel?.(path) ?? `Add ${label}` : `Add ${label.toLowerCase()} item`}</button>;
+    if (options?.rows) return <Group label={label} nested={props.nested}>
+      {value.map((item, index) => {
+        if (options.skip?.([...path, index])) return null;
+        const summary = summaryOf(item, index);
+        return <Disclosure key={keyOf(item, index)} label={`${index + 1}. ${summary}`} defaultOpen={value.length === 1} path={[...path, index].join('/')}>
+          {controls(summary, index)}
+          <CompositionFields {...props} schema={tuple?.[index] ?? itemSchema} label={summary} value={item} path={[...path, index]} nested={false}/>
+        </Disclosure>;
+      })}
+      {add}
+    </Group>;
     return <fieldset className="composition-fieldset"><legend>{label} ({value.length})</legend>
       {value.map((item, index) => {
-        const summary = item !== null && typeof item === 'object' && !Array.isArray(item) ? String(item.title ?? item.label ?? item.id ?? item.type ?? `Item ${index + 1}`) : `Item ${index + 1}`;
+        const summary = summaryOf(item, index);
         if (options?.skip?.([...path, index])) return null;
-        return <details className="composition-item" key={item && typeof item === 'object' && !Array.isArray(item) && typeof item.id === 'string' ? item.id : index} open={value.length === 1}>
+        return <details className="composition-item" key={keyOf(item, index)} open={value.length === 1}>
           <summary>{index + 1}. {summary}</summary>
-          {!tuple && <div className="composition-actions">
-            <button type="button" aria-label={`Move ${summary} up`} disabled={index === 0} onClick={() => run(() => reorderCompositionItem(document, path, index, -1))}>Up</button>
-            <button type="button" aria-label={`Move ${summary} down`} disabled={index === value.length - 1} onClick={() => run(() => reorderCompositionItem(document, path, index, 1))}>Down</button>
-            <button type="button" aria-label={`Delete ${summary}`} onClick={() => run(() => removeCompositionItem(document, path, index))}>Delete</button>
-          </div>}
+          {controls(summary, index)}
           <CompositionFields {...props} schema={tuple?.[index] ?? itemSchema} label={summary} value={item} path={[...path, index]}/>
         </details>;
       })}
-      {!tuple && maximum > 0 && <button type="button" className="add-button" disabled={value.length >= maximum}
-        onClick={() => set([...value, defaultField(itemSchema, document)])}>{options?.rows ? options.addLabel?.(path) ?? `Add ${label}` : `Add ${label.toLowerCase()} item`}</button>}
-      {maximum === 0 && !options?.rows && <p className="field-note">Not supported.</p>}
+      {add}
+      {maximum === 0 && <p className="field-note">Not supported.</p>}
     </fieldset>;
   }
   if (schema.type === 'boolean') return leaf(<label className="checkbox-field"><input type="checkbox" role={options?.rows ? 'switch' : undefined} checked={Boolean(value)} onChange={event => set(event.target.checked)}/>{label}</label>);
@@ -178,15 +210,17 @@ function DictionaryFields(props: Omit<Props, 'value'> & { itemSchema: SchemaFiel
     props.onChange(replaceAt(props.document, props.path, { ...props.value, [key]: defaultField(props.itemSchema, props.document) }));
     setKey('');
   };
-  return <fieldset className="composition-fieldset"><legend>{props.label}</legend>
+  const rows = props.options?.rows;
+  const body = <>
     {Object.entries(props.value).map(([name, value]) => <div key={name}>
-      <CompositionFields {...props} schema={props.itemSchema} path={[...props.path, name]} label={name} value={value}/>
+      <CompositionFields {...props} schema={props.itemSchema} path={[...props.path, name]} label={name} value={value} nested={rows ? true : undefined}/>
       <button type="button" aria-label={`Delete ${name}`} onClick={() => {
         const next = { ...props.value }; delete next[name];
         props.onChange(replaceAt(props.document, props.path, next));
       }}>Delete</button>
     </div>)}
-    <TextField label="New field name" value={key} onChange={setKey}/>
-    <button type="button" onClick={add} disabled={Object.keys(props.value).length >= 64}>Add field</button>
-  </fieldset>;
+    <TextField label={rows ? 'Field name' : 'New field name'} value={key} onChange={setKey}/>
+    <button type="button" onClick={add} disabled={Object.keys(props.value).length >= 64}>{rows ? 'Add Field' : 'Add field'}</button>
+  </>;
+  return rows ? <Group label={props.label} nested={props.nested}>{body}</Group> : <fieldset className="composition-fieldset"><legend>{props.label}</legend>{body}</fieldset>;
 }

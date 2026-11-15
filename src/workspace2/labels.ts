@@ -76,6 +76,15 @@ const authored: Record<string, FieldLabel> = {
   'project.extensions.cameras': entry('Camera notifications', { add: 'Add Camera' }),
   'chrome.groups': entry('Header Buttons', { add: 'Add Button' }), 'chrome.groups.items': entry('Buttons', { add: 'Add Button' }),
   'tab.tabs': entry('Tabs', { add: 'Add Tab' }),
+  // Project > Live Activities and its camera notifications.
+  'activity.jobId': entry('Job ID', { order: 1, caption: 'Matches the job’s tag without “job.”.' }),
+  'activity.glyph': entry('Glyph', { group: 'look', order: 1, options: { fan: 'Fan', dishwasher: 'Dishwasher', dryer: 'Dryer', washer: 'Washer', vacuum: 'Vacuum', hot_flash: 'Hot flash', generic: 'Generic' } }),
+  'activity.tint': entry('Tint', { group: 'look', order: 2, options: { engine: 'Engine', neutral: 'Neutral', air: 'Air', cleaning: 'Cleaning', water: 'Water', cooling: 'Cooling' } }),
+  'background.blur': entry('Blur', { group: 'look', order: 1 }), 'background.scrim': entry('Dimming', { group: 'look', order: 2 }),
+  'chrome-item.priority': advanced('Priority', { options: { required: 'Required', normal: 'Normal', low: 'Low' } }),
+  'chrome-item.quickLinksAction': behaviour('Quick Links', 1), 'chrome-item.profileAction': behaviour('Profile', 2),
+  'camera-notification.entityId': entry('Camera', { order: 1 }),
+  'camera-notification.liveLabel': entry('Live label', { order: 3 }), 'camera-notification.unavailableLabel': entry('Unavailable label', { order: 4 }),
 };
 
 /**

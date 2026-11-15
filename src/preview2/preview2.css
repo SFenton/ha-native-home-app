@@ -37,6 +37,8 @@
 
   /* Wallpaper: one still layer under every page, the base colour under the canonical scrim. */
   .sh-wall { position: absolute; inset: 0; z-index: 0; background: radial-gradient(120% 60% at 20% 8%, #2c4262 0, transparent 60%), radial-gradient(90% 50% at 90% 80%, #3b2a22 0, transparent 70%), #111723; }
+  .sh-wall { overflow: hidden; }
+  .sh-wall-image { position: absolute; inset: -28px; background-size: cover; background-position: center; }
   .sh-wall::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, .44) 0, rgba(0, 0, 0, .45) 28%, rgba(0, 0, 0, .46) 50%, rgba(0, 0, 0, .52) 75%, rgba(0, 0, 0, .64) 100%); }
   .sh-status { position: absolute; inset: 0 0 auto 0; height: var(--sh-safe-top); z-index: 40; pointer-events: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 30px 12px; font: 600 17px/1 var(--sh-font); }
   .sh-island { position: absolute; left: 50%; top: 11px; width: 120px; height: 34px; margin-left: -60px; border-radius: 17px; background: #000; }

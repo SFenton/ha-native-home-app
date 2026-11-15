@@ -112,9 +112,15 @@ export function useWorkspace2(active: boolean) {
   // --- Publication state --------------------------------------------------------------------------------------
   const [publication, setPublication] = useState<HaPublicationSummary>();
   const [publishedJson, setPublishedJson] = useState<{ json: string; revision: number }>();
+  const [publicationError, setPublicationError] = useState('');
   const refreshPublication = useCallback(async () => {
-    try { const next = await request<HaPublicationSummary>('/native/api/ha/publication'); setPublication(next); return next; }
-    catch { return undefined; }
+    try {
+      const next = await request<HaPublicationSummary>('/native/api/ha/publication');
+      setPublication(next); setPublicationError('');
+      // A roll back, or a publish from elsewhere, changes what the app serves: what this session published no longer counts.
+      setPublishedJson(held => held && next.current && held.revision !== next.current.revision ? undefined : held);
+      return next;
+    } catch (reason) { setPublicationError(reason instanceof Error ? reason.message : String(reason)); return undefined; }
   }, []);
   useEffect(() => { if (active) void refreshPublication(); }, [active, refreshPublication]);
   const liveRevision = publication?.current?.revision;
@@ -163,9 +169,11 @@ export function useWorkspace2(active: boolean) {
     if (busy || dirty) return { text: 'Saving…', tone: 'neutral' };
     if (savedAt && now < savedAt + SAVED_TAG_MS && Date.now() < savedAt + SAVED_TAG_MS) return { text: 'Draft · Saved', tone: 'neutral' };
     if (publishedJson && publishedJson.json === canonicalCompositionJSON(document)) return { text: `Published · ${publishedJson.revision}`, tone: 'success' };
+    // After a reload the server says whether the saved draft is what the app serves.
+    if (publication?.draftIsLive && publication.current && publication.draftRevision === studio.envelope?.revision) return { text: `Published · ${publication.current.revision}`, tone: 'success' };
     if (!publication) return { text: 'Draft · Saved', tone: 'neutral' };
     return { text: 'Not Published', tone: 'warning' };
-  }, [document, conflict, failedFor, dirty, problemCount, busy, savedAt, now, publishedJson, publication]);
+  }, [document, conflict, failedFor, dirty, problemCount, busy, savedAt, now, publishedJson, publication, studio.envelope?.revision]);
 
   return {
     studio, document, previewDocument, index, checks, problemCount,
@@ -173,7 +181,7 @@ export function useWorkspace2(active: boolean) {
     selection, select, panel, setPanel, target, revealKey,
     status, saveNow, persist, failedSave: failedFor !== undefined && failedFor === document, saveReason,
     retrySave: () => { setFailedFor(undefined); studio.setError(''); setSaveReason(''); },
-    publication, liveRevision, refreshPublication, publishedJson, phase, publishError, openPublish, closePublish, publish,
+    publication, publicationError, liveRevision, refreshPublication, publishedJson, phase, publishError, openPublish, closePublish, publish,
     conflictDecided, decideLater: () => setConflictDecided(true),
     activity, log, houseStates, simulated, flash,
     /** Moves the preview to the surface a selection key lives on, then selects it. */

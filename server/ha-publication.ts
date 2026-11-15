@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CompositionPublication } from '../src/shared/composition/schema';
+import { canonicalCompositionJSON } from '../src/shared/composition/json';
 import { HttpError } from './store';
 
 /** Contract: `fenton_home` integration 1.4.0+, `custom_components/fenton_home/ui_publication.py`. */
@@ -21,6 +22,13 @@ export interface HaPublicationSummary {
   current: HaPublicationEntry | null;
   history: HaPublicationEntry[];
   storedAssets: number;
+  /**
+   * Whether the document Home Assistant serves now is the draft's document: `null` when it cannot be told (no live entry, or
+   * Home Assistant did not return its envelope). Added by {@link HaPublicationClient.get}; the status tag reads it after a reload.
+   */
+  draftIsLive?: boolean | null;
+  /** The saved draft revision `draftIsLive` was worked out against; a client that holds a newer one ignores it. */
+  draftRevision?: number;
 }
 export interface HaPublishResult {
   epoch: string;
@@ -152,21 +160,30 @@ export class HaPublicationClient {
     this.queue = result.catch(() => undefined);
     return result;
   }
-  private async rawGet(): Promise<{ summary: HaPublicationSummary; assets: Set<string> }> {
+  private async rawGet(): Promise<{ summary: HaPublicationSummary; assets: Set<string>; liveDocument?: unknown }> {
     const raw = await command(this.transport, 'get', {}, this.shutdown.signal);
     if (!isRecord(raw) || typeof raw.epoch !== 'string' || !Array.isArray(raw.history))
       throw new HttpError(502, 'Home Assistant returned an unreadable publication summary');
     const assets = new Set(isRecord(raw.assets) ? Object.keys(raw.assets).filter(sha => shaPattern.test(sha)) : []);
+    const liveDocument = isRecord(raw.current) && isRecord(raw.current.envelope) ? raw.current.envelope.document : undefined;
     return {
-      assets,
+      assets, liveDocument,
       summary: {
         epoch: raw.epoch, current: raw.current ? entry(raw.current) : null,
         history: raw.history.map(entry), storedAssets: assets.size,
       },
     };
   }
-  /** Current entry and history, without any envelope. */
-  async get(): Promise<HaPublicationSummary> { return (await this.rawGet()).summary; }
+  /**
+   * Current entry and history, without any envelope. Pass the draft to learn whether it is what the app serves now
+   * (`draftIsLive`); the document itself is compared here and never returned.
+   */
+  async get(draft?: { document: unknown; revision: number }): Promise<HaPublicationSummary> {
+    const { summary, liveDocument } = await this.rawGet();
+    if (draft === undefined) return summary;
+    const comparable = summary.current !== null && liveDocument !== undefined;
+    return { ...summary, draftRevision: draft.revision, draftIsLive: comparable ? canonicalCompositionJSON(liveDocument) === canonicalCompositionJSON(draft.document) : null };
+  }
 
   private async upload(sha: string, mimeType: string, bytes: Buffer) {
     if (createHash('sha256').update(bytes).digest('hex') !== sha) throw new HttpError(500, 'A stored Studio image no longer matches its hash');

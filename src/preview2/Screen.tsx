@@ -5,6 +5,7 @@ import { basePageId, columnPanes, tabStack, type NavState } from './navigation';
 import { PageView } from './PageView';
 import { RenderCtx, useRender } from './render-context';
 import { SheetView } from './Sheet';
+import { wallpaperImage } from './wallpaper';
 import { splitGeometry, usesFlyout } from './split';
 import type { PreviewWindow } from './windows';
 
@@ -44,6 +45,7 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
   const out = leaving ? document.pages.find(item => item.id === leaving.id) : undefined;
   const motion = leaving?.motion ?? 'none';
   const background = document.theme.background;
+  const image = wallpaperImage(document);
   const geometry = splitGeometry(win), panes = geometry ? columnPanes(document, stack) : undefined;
   const hostPage = panes ? document.pages.find(item => item.id === panes.host) : undefined;
   const detailPage = panes?.detail ? document.pages.find(item => item.id === panes.detail) : undefined;
@@ -66,7 +68,7 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
   return <RenderCtx.Provider value={ctx}><div className="sh-screen" data-sel={`page:${pageId}`} data-covered={nav.sheets.length ? '' : undefined}
     data-rail={win.rail ? '' : undefined} data-short-bar={win.safeTop < 50 ? '' : undefined} data-flyout={hasFlyout ? '' : undefined}
     style={{ '--sh-safe-top': `${win.safeTop}px`, '--sh-safe-bottom': `${win.safeBottom}px`, '--sh-rail': `${win.rail ?? 0}px` } as React.CSSProperties}>
-    <div className="sh-wall" data-background={background.type} aria-hidden="true"/>
+    <div className="sh-wall" data-background={background.type} aria-hidden="true">{image && <div className="sh-wall-image" style={{ backgroundImage: `url("${image.url}")`, filter: `blur(${image.blur}px)` }}/>}</div>
     {content}
     {hinge && <div className="sh-fold" data-axis={hinge.axis} aria-hidden="true"
       style={hinge.axis === 'vertical' ? { left: (win.rail ?? 0) + hinge.start, width: hinge.length } : { top: hinge.start, height: hinge.length }}/>}

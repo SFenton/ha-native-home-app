@@ -146,6 +146,8 @@
 .w2-scope .composition-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 .w2-scope .add-button { width: 100%; border: 1px dashed var(--w2-line); border-radius: 8px; background: transparent; color: var(--w2-link); min-height: 36px; font-size: 13px; }
 .w2-scope .composition-policy { display: none; }
+.w2-scope .w2-subform { min-width: 0; }
+.w2-scope .w2-subform .w2-subform { margin-inline-start: 8px; padding-inline-start: 10px; border-inline-start: 2px solid var(--w2-line); }
 .w2-scope .field-note { color: var(--w2-muted); font-size: 12px; margin: 4px 0; }
 .w2-add-row, .w2-disclosure-head, .w2-switch-row, .w2-segment, .w2-id-row, .w2-about-row { display: flex; align-items: center; gap: 12px; min-height: 48px; }
 .w2-scope .w2-add-row button { margin-inline-start: auto; }

@@ -3,12 +3,12 @@ import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import { apiUrl, request } from '../api';
 import { createId as uid } from '../shared/ids';
 import { removeCompositionItem, reorderCompositionItem } from '../composition-editor';
-import type { Json } from '../shared/types';
 import type { UploadedCompositionAsset } from '../shared/composition/workspace';
-import CompositionFields from '../CompositionFields';
 import { Icon } from '../ui';
 import { fillTabGroups, groupWithRoom, tabGroups, type TabGroup } from './capacity';
-import { Disclosure, fieldOptions, ObjectRows, schemaAt, useRows } from './rows';
+import { ObjectRows, useRows } from './rows';
+import { Disclosure } from './Disclosure';
+import { ChromeGroups } from './ChromeGroups';
 import { PushStack, Tag, usePush } from './kit';
 import { toastManager } from './toasts';
 import { createPage, createTab } from './navigation/controller';
@@ -86,13 +86,9 @@ function TabFields({ index }: { index: number }) {
   </>;
 }
 
-/** The app-wide header buttons (spec 4): the generated groups, labelled in the app's words. */
+/** The app-wide header buttons (spec 5.2): leading and trailing, each button a row. */
 export function HeaderPanel() {
-  const { document, onChange, onError } = useRows();
-  return <div className="w2-form">
-    <CompositionFields schema={schemaAt(document, ['navigation', 'chrome', 'groups'])} value={document.navigation.chrome.groups as unknown as Json} path={['navigation', 'chrome', 'groups']}
-      label="Header Buttons" document={document} onChange={onChange} onError={onError} options={fieldOptions('chrome', ['navigation', 'chrome'])}/>
-  </div>;
+  return <div className="w2-form"><ChromeGroups path={['navigation', 'chrome', 'groups']}/></div>;
 }
 
 /** Wallpaper (spec 5.2): the current image, upload, earlier uploads, "No Image". No hash, byte count or "immutable" wording. */
@@ -137,8 +133,9 @@ export function WallpaperPanel() {
     </div>
     <p className="w2-caption">PNG or JPEG, up to 8 MB.</p>
     {error && <p role="alert" className="w2-error-text">{error}</p>}
-    <Disclosure label="Advanced" path="theme/background"><CompositionFields schema={schemaAt(document, ['theme', 'background'])} value={document.theme.background as unknown as Json} path={['theme', 'background']}
-      label="Background" document={document} onChange={onChange} onError={() => {}} options={fieldOptions('project', [])}/></Disclosure>
+    {document.theme.background.type === 'downloaded' && <Disclosure label="Advanced" path="theme/background">
+      <ObjectRows path={['theme', 'background']} owner="background" skip={at => at.at(-1) === 'assetId'}/>
+    </Disclosure>}
     {assets.length > 0 && <section aria-label="Earlier images"><h3 className="w2-group-title">Earlier images</h3>
       <div className="w2-thumb-row">{assets.map((asset, at) => <button type="button" key={asset.sha256} className="w2-thumb-button" aria-label={`Use earlier image ${at + 1}`} aria-pressed={current?.sha256 === asset.sha256} onClick={() => choose(asset)}>{thumb(asset.source.path, '')}</button>)}</div>
     </section>}

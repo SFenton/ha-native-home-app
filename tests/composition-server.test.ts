@@ -399,11 +399,15 @@ describe('Publish', () => {
     expect(JSON.stringify(summary)).not.toContain('envelope"');
     expect(summary.current).not.toHaveProperty('envelope');
     expect(summary.history[0]).not.toHaveProperty('envelope');
+    // The draft is the document the app serves now, so the status tag can say "Published · 2" after a reload.
+    expect(summary.draftIsLive).toBe(true);
 
     const rolled = await f.request('/native/api/ha/rollback', 'POST', { revision: 1 });
     expect(rolled.status).toBe(200);
     expect(await rolled.json()).toMatchObject({ epoch: 'epoch-1', revision: 3 });
     expect(fake.state.current?.revision).toBe(3);
+    // After a roll back the app serves the first layout, not the draft.
+    expect((await (await f.request('/native/api/ha/publication')).json()).draftIsLive).toBe(false);
     const missing = await f.request('/native/api/ha/rollback', 'POST', { revision: 99 });
     expect(missing.status).toBe(404);
     expect((await missing.json()).error).toContain('no longer in the Home Assistant history');

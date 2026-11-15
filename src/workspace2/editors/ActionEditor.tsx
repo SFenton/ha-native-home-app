@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { kindWords as stateKindWords, newLocalState } from '../dialogs/states';
 import { useEffect, useState } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { MoreHorizontal, Plus, X } from 'lucide-react';
@@ -169,7 +170,7 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId }: Act
     const { [String(path.at(-1))]: _gone, ...rest } = parent;
     draft.set(replaceAt(current, path.slice(0, -1), rest));
   };
-  const disabled = (item: ActionKind) => item === 'present' ? doc.modals.length === 0 && !onCreateSheet : item === 'select-tab' ? doc.navigation.tabs.length === 0 : item === 'set-local' ? !doc.localState?.length : false;
+  const disabled = (item: ActionKind) => item === 'present' ? doc.modals.length === 0 && !onCreateSheet : item === 'select-tab' ? doc.navigation.tabs.length === 0 : false;
   const present = (schema && JSON.stringify(schema).includes('"replace"')) || false;
   const pages = doc.pages.map(page => ({ id: page.id, label: page.title }));
   /** Runs a creation flow, then copies what it made into this draft (the document has it already), so Done keeps it. */
@@ -194,8 +195,9 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId }: Act
     </>}
     {kind === 'select-tab' && action && <ChoiceField label="Tab" choices={doc.navigation.tabs.map(tab => ({ id: tab.id, label: tab.label }))} value={action.tabId} onPick={id => withDraftValue({ tabId: id })}/>}
     {kind === 'set-local' && action && <>
-      <ChoiceField label="State" choices={(doc.localState ?? []).map(field => ({ id: field.id, label: field.id, detail: field.type }))} value={action.stateId} onPick={id => {
-        const field = doc.localState?.find(item => item.id === id);
+      <ChoiceField label="State" choices={(doc.localState ?? []).map(field => ({ id: field.id, label: field.id, detail: stateKindWords[field.type] }))} value={action.stateId}
+        create={{ label: 'New…', run: done => { const made = newLocalState(draft.get()); draft.set({ ...draft.get(), localState: [...(draft.get().localState ?? []), made] }); done(made.id); } }} onPick={id => {
+        const field = draft.get().localState?.find(item => item.id === id);
         withDraftValue({ stateId: id, value: field?.type === 'boolean' ? { type: 'boolean', value: field.initial } : field?.type === 'number' ? { type: 'number', value: field.initial } : { type: 'string', value: field?.initial ?? '' } });
       }}/>
       <LabeledRow label="Value">{localField?.type === 'boolean' ? <input type="checkbox" role="switch" aria-label="Value" checked={action.value?.value === true} onChange={event => withDraftValue({ value: { type: 'boolean', value: event.target.checked } })}/>
