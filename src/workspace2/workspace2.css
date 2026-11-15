@@ -50,8 +50,7 @@
 .w2-status-narrow { margin-inline-start: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 0 7px; flex: 0 1 auto; }
 .w2-narrow .w2-page-button { flex: 1 1 auto; max-width: none; min-width: 96px; justify-content: flex-start; padding: 0 8px; }
 .w2-narrow .w2-trailing { flex: none; margin-inline-start: 0; }
-/* The status tag shrinks before the page name does: "Draft · Saved" reads "Saved" on a phone. */
-.w2-narrow .w2-tag-draft { display: none; }
+/* The page name takes the room the status tag gives up: "Draft · Saved" reads "Saved" on a phone (TopBar). */
 .w2-narrow .w2-status-narrow { flex: none; overflow: visible; }
 .w2-tag { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--w2-field); color: var(--w2-ink-card); }
 .w2-scope button.w2-tag-button { border: 0; min-height: 22px; padding: 0 9px; border-radius: 11px; }

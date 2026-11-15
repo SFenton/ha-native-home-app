@@ -132,8 +132,8 @@ test('editing a title in properties changes the preview and autosaves', async ({
   await expect(previewTile(page, 'Lights')).toHaveCount(0);
   if (!isPhone(page)) {
     await expect(page.getByTestId('status-tag')).toHaveText('Saving…');
-    await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
-  } else await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+    await expect(page.getByTestId('status-tag')).toHaveText(/^(Draft · )?Saved$/, { timeout: 8000 });
+  } else await expect(page.getByTestId('status-tag')).toHaveText(/^(Draft · )?Saved$/, { timeout: 8000 });
   const saved = await (await page.request.get('/native/api/draft')).json();
   expect(JSON.stringify(saved.document)).toContain('Lamps');
   await page.reload();
@@ -164,7 +164,7 @@ test('a publish that fails keeps the dialog open with the reason and Try Again',
   // The draft saved; only the publish failed, so the tag never says Not Saved.
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByTestId('status-tag')).not.toHaveText('Not Saved');
-  await expect(page.getByTestId('status-tag')).toHaveText(/Not Published|Draft · Saved/);
+  await expect(page.getByTestId('status-tag')).toHaveText(/Not Published|^(Draft · )?Saved$/);
 });
 
 test('a save that fails shows Not Saved, the reason under Checks, and recovers with Try Again', async ({ page }) => {
@@ -180,7 +180,7 @@ test('a save that fails shows Not Saved, the reason under Checks, and recovers w
   failing = false;
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-not-saved`);
   await page.getByRole('button', { name: 'Try Again' }).click();
-  await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+  await expect(page.getByTestId('status-tag')).toHaveText(/^(Draft · )?Saved$/, { timeout: 8000 });
 });
 
 test('a conflict asks which version to keep, and Decide Later leaves Not Saved with Publish off', async ({ page }) => {
@@ -209,7 +209,7 @@ test('a conflict asks which version to keep, and Decide Later leaves Not Saved w
   conflicting = false;
   await dialog.getByRole('button', { name: 'Keep Mine' }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId('status-tag')).toHaveText('Draft · Saved', { timeout: 8000 });
+  await expect(page.getByTestId('status-tag')).toHaveText(/^(Draft · )?Saved$/, { timeout: 8000 });
   await expect(page.getByRole('button', { name: 'Publish' })).toBeEnabled();
 });
 

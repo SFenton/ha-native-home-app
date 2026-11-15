@@ -72,7 +72,10 @@ function projectPart(document: CompositionDocument, path: Path): { place: string
   }
 }
 
-const blank = (value: unknown) => value === undefined || (typeof value === 'string' && value.trim() === '');
+/** The keys that hold words a person types, so a missing one is an empty field, not a missing setting. */
+const textKeys = new Set(['title', 'label', 'subtitle', 'detail', 'menuLabel', 'name', 'placeholder']);
+/** An emptied or missing text field: a blank string, or a text key that is not there. */
+const emptyText = (value: unknown, target: Target) => Boolean(target.field) && (typeof value === 'string' ? value.trim() === '' : value === undefined && textKeys.has(String(target.rel.at(-1))));
 
 /** A node's name for a sentence: its title, or, when it has none, "Untitled action tile in <Section>" by where it sits. */
 function nodePlace(document: CompositionDocument, key: SelectionKey, node: { type: string; title?: string }): string {
@@ -138,8 +141,8 @@ export function wordsFor(document: CompositionDocument, issue: CompositionIssue,
     case 'unsupported_schema': return 'This project is saved in a version the app does not read. Open Edit as JSON and set the current version.';
     case 'unknown_field': return `${f ?? 'A setting'} is not one the app knows. Remove it.`;
     case 'unknown_variant': return `${f ?? 'A choice'}${quoted(value)} is not one the app supports. Pick one of the listed choices.`;
-    case 'missing_required': return blank(value) && f ? emptyWords(f) : `${f ?? 'A required value'} is needed. Add it.`;
-    case 'invalid_value': return blank(value) && f ? emptyWords(f) : `${f ?? 'A value'}${quoted(value)} is not allowed. Change it to a value the app accepts.`;
+    case 'missing_required': return emptyText(value, target) && f ? emptyWords(f) : `${f ?? 'A required value'} is needed. Add it.`;
+    case 'invalid_value': return emptyText(value, target) && f ? emptyWords(f) : `${f ?? 'A value'}${quoted(value)} is not allowed. Change it to a value the app accepts.`;
     case 'duplicate_key': return `${f ?? 'A setting'} appears twice. Delete one of them in Edit as JSON.`;
     case 'limit_exceeded': return `${f ?? 'A list'} ${tooMany(value)}`;
     case 'duplicate_id': return `${f ?? 'An ID'}${quoted(value)} is used twice. Give one of them a different name.`;
