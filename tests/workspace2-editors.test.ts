@@ -4,7 +4,7 @@ import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { Predicate } from '../src/shared/composition/expression';
 import { compositionErrors, replaceAt } from '../src/composition-editor';
 import { buildDocumentIndex } from '../src/preview2/model';
-import { bindEntity, boundEntity } from '../src/workspace2/add/sources';
+import { bindEntity, bindSource, boundEntity, nodeSourceId, sourceChoices } from '../src/workspace2/add/sources';
 import { changeOperator, closeRule, conditionCount, entityCondition, groupDepth, numericCondition, openRule, ruleProblem, ruleSummary, rowKind } from '../src/workspace2/editors/rule';
 import { acceptedKinds, dataOf, defaultAction, operandDepth, operandFor, sourceOf, targetEntities, withDataField, withService, withTargetEntities } from '../src/workspace2/editors/action';
 import { schemaAt } from '../src/workspace2/rows';
@@ -117,6 +117,37 @@ describe('entity binding', () => {
     expect(compositionErrors(first)).toEqual([]);
     const again = bindEntity(first, tile.path, 'switch.new_plug');
     expect(again.dataSources.length).toBe(first.dataSources.length);
+  });
+  it('rebinds a light tile to another light with a copy of its own model, and reuses that copy the next time', () => {
+    const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'light-group-tile')!;
+    const before = doc.dataSources.find(item => item.id === nodeSourceId(doc, tile.path)) as { model: string; inputs: { entityId: { value: string }; memberEntityIds?: unknown[] } };
+    expect(before.inputs.memberEntityIds?.length).toBeGreaterThan(0);
+    const first = bindEntity(doc, tile.path, 'light.another_lamp');
+    expect(first.dataSources.length).toBe(doc.dataSources.length + 1);
+    expect(boundEntity(first, tile.path)).toBe('light.another_lamp');
+    const made = first.dataSources.find(item => item.id === nodeSourceId(first, tile.path)) as typeof before;
+    expect(made.model).toBe(before.model);
+    expect(made.inputs.memberEntityIds).toBeUndefined();
+    expect(compositionErrors(first)).toEqual([]);
+    const other = [...buildDocumentIndex(first).entries.values()].filter(entry => entry.node?.type === 'light-group-tile')[1]!;
+    const shared = bindEntity(first, other.path, 'light.another_lamp');
+    expect(shared.dataSources.length).toBe(first.dataSources.length);
+    expect(nodeSourceId(shared, other.path)).toBe(nodeSourceId(first, tile.path));
+  });
+  it('offers the entity picker to a node that reads one entity and only the Models group to one that reads a model', () => {
+    const entries = [...buildDocumentIndex(doc).entries.values()];
+    const light = sourceChoices(doc, entries.find(entry => entry.node?.type === 'light-group-tile')!.path);
+    expect(light.acceptsEntity).toBe(true);
+    const chipPath = entries.find(entry => entry.node?.type === 'status-chip')!.path;
+    const chip = sourceChoices(doc, chipPath);
+    expect(chip.acceptsEntity).toBe(false);
+    expect(chip.models.length).toBeGreaterThan(1);
+    expect(chip.models.every(item => item.kind === 'model' && item.model === 'home-status@1')).toBe(true);
+    const target = chip.models.find(item => item.id !== nodeSourceId(doc, chipPath))!;
+    const moved = bindSource(doc, chipPath, target.id);
+    expect(nodeSourceId(moved, chipPath)).toBe(target.id);
+    expect(moved.dataSources.length).toBe(doc.dataSources.length);
+    expect(compositionErrors(moved)).toEqual([]);
   });
 });
 
