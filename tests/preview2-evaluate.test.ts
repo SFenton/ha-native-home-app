@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Operand, Predicate } from '../src/shared/composition/expression';
-import { evaluateOperand, evaluatePredicate, formatNumber, isSelected, isShown, loading, unavailable, value, type Environment, type Tri } from '../src/preview2/evaluate';
+import { evaluateOperand, scalarText, evaluatePredicate, formatNumber, isSelected, isShown, loading, unavailable, value, type Environment, type Tri } from '../src/preview2/evaluate';
 import type { Json } from '../src/shared/types';
 
 /** A tiny environment: `data` maps `source/path` to a value; absent is unavailable, `LOADING` is loading. */
@@ -46,7 +46,7 @@ describe('operands', () => {
     const pattern = (text: string, args: Record<string, Operand>, formats?: Record<string, { number: { maximumFractionDigits: number } }>): Operand =>
       ({ type: 'format', pattern: text, args, formats });
     expect(v(pattern('{t}° in {room}', { t: read('t', ['state'], 'number'), room: lit('Den') }, { t: { number: { maximumFractionDigits: 1 } } }), e)).toEqual(value('21.5° in Den'));
-    expect(v(pattern('{n}', { n: lit(2.5) }, { n: { number: { maximumFractionDigits: 0 } } }))).toEqual(value('3'));
+    expect(v(pattern('{n}', { n: lit(2.5) }, { n: { number: { maximumFractionDigits: 0 } } }))).toEqual(value('2'));
     expect(v(pattern('{n}', { n: lit(3) }))).toEqual(value('3'));
     expect(v(pattern('{a}', { a: read('nope', ['state']) }), e)).toEqual(unavailable);
     expect(v(pattern('{a}{b}', { a: read('nope', ['state']), b: read('l', ['state']) }), env({ 'l/state': LOADING }))).toEqual(loading);
@@ -54,6 +54,24 @@ describe('operands', () => {
     expect(v(pattern('open {', {}))).toEqual(value('open {'));
     expect(formatNumber(-0.0001, 2)).toBe('0');
     expect(formatNumber(2.5, 3)).toBe('2.5');
+  });
+
+  it('format rounds like the app: the exact binary value, and an exact tie to the even digit', () => {
+    // Values checked against Swift `String(format: "%.Nf")` on macOS.
+    const table: [number, number, string][] = [
+      [2.5, 0, '2'], [3.5, 0, '4'], [-2.5, 0, '-2'], [-3.5, 0, '-4'], [22.5, 0, '22'], [23.5, 0, '24'], [0.5, 0, '0'], [1.5, 0, '2'], [-0.5, 0, '0'],
+      [0.125, 2, '0.12'], [0.375, 2, '0.38'], [-0.125, 2, '-0.12'], [2.675, 2, '2.67'], [1.005, 2, '1'], [21.456, 1, '21.5'], [2.25, 1, '2.2'], [2.35, 1, '2.4'],
+      [1234.5, 0, '1234'], [1235.5, 0, '1236'], [10, 3, '10'], [0.1 + 0.2, 6, '0.3'], [5e-7, 6, '0'], [1e21, 2, '1000000000000000000000'],
+    ];
+    for (const [input, digits, text] of table) expect([input, digits, formatNumber(input, digits)]).toEqual([input, digits, text]);
+  });
+
+  it('prints whole numbers as Swift does from 1e15', () => {
+    expect(scalarText(21)).toBe('21');
+    expect(scalarText(1e15)).toBe('1000000000000000.0');
+    expect(scalarText(1e16)).toBe('1e+16');
+    expect(scalarText(-1.5e17)).toBe('-1.5e+17');
+    expect(scalarText(2.5)).toBe('2.5');
   });
 
   it('map picks the first matching case, comparing scalars as text, else otherwise', () => {
@@ -77,6 +95,11 @@ describe('operands', () => {
     expect(v(math('max', ...n(4, 2, 8)))).toEqual(value(8));
     expect(v(math('round', ...n(2.567)))).toEqual(value(3));
     expect(v(math('round', ...n(2.567, 2)))).toEqual(value(2.57));
+    // Swift's `.rounded()`: a tie goes away from zero.
+    for (const [input, places, expected] of [[2.5, 0, 3], [3.5, 0, 4], [-2.5, 0, -3], [-3.5, 0, -4], [22.5, 0, 23], [0.5, 0, 1], [-0.5, 0, -1], [0.125, 2, 0.13], [-0.125, 2, -0.13], [2.567, 2, 2.57]] as const) {
+      expect([input, places, v(math('round', ...n(input, places)))]).toEqual([input, places, value(expected)]);
+    }
+    expect(v(math('round', ...n(-0.4)))).toEqual(value(0));
     expect(v(math('round', ...n(2.567, 7)))).toEqual(unavailable);
     expect(v(math('round', ...n(2.567, 1.5)))).toEqual(unavailable);
     expect(v(math('clamp', ...n(15, 0, 10)))).toEqual(value(10));

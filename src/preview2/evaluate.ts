@@ -40,9 +40,17 @@ export function finiteNumber(v: Json | undefined): number | undefined {
 /** A scalar as text: strings as they are, whole numbers without a fraction, booleans as `true`/`false`. */
 export function scalarText(v: Json | undefined): string | undefined {
   if (typeof v === 'string') return v;
-  if (typeof v === 'number') return String(v);
+  if (typeof v === 'number') return numberText(v);
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   return undefined;
+}
+/**
+ * A number as Swift prints it. Whole numbers below 1e15 have no fraction; from 1e15 Swift's `String(Double)` keeps ".0"
+ * up to 1e16 and switches to exponent form (`1e+16`) from there, where JavaScript keeps writing every digit.
+ */
+function numberText(n: number): string {
+  if (!Number.isFinite(n) || Number.isNaN(n) || Math.abs(n) < 1e15 || !Number.isInteger(n)) return String(n);
+  return Math.abs(n) < 1e16 ? `${n}.0` : n.toExponential();
 }
 function coerce(v: Json, kind: 'string' | 'number' | 'boolean' | 'entity-id'): Json | undefined {
   if ((kind === 'string' || kind === 'entity-id') && typeof v === 'string') return v;
@@ -58,9 +66,28 @@ const matches = (a: Json, b: Json) => {
   const left = scalarText(a), right = scalarText(b);
   return left !== undefined && right !== undefined && left === right;
 };
+/**
+ * `n` with exactly `digits` fraction digits, rounded like C's `printf("%.Nf")`, which the app uses: the exact binary value
+ * is rounded, and only a value exactly halfway rounds to the even digit (2.5 gives "2", 3.5 gives "4", 0.125 gives "0.12").
+ * `toFixed` agrees except on those exact ties, where it rounds the magnitude up.
+ */
+function fixed(n: number, digits: number): string {
+  const magnitude = Math.abs(n);
+  // `toFixed` switches to exponent form from 1e21; `printf` writes every digit.
+  let text = magnitude < 1e21 ? magnitude.toFixed(digits) : `${BigInt(magnitude)}${digits ? `.${'0'.repeat(digits)}` : ''}`;
+  if (magnitude < 1e21) {
+    const exact = magnitude.toFixed(100), dot = exact.indexOf('.');
+    const tail = exact.slice(dot + 1 + digits);
+    if (/^50*$/.test(tail)) {
+      const kept = digits === 0 ? exact.slice(0, dot) : exact.slice(0, dot + 1 + digits);
+      if (Number(kept.at(-1)) % 2 === 0) text = kept;
+    }
+  }
+  return n < 0 ? `-${text}` : text;
+}
 /** The text of a number with at most `digits` fraction digits and no trailing zeros. */
 export function formatNumber(n: number, digits: number): string {
-  let text = n.toFixed(Math.max(0, Math.min(6, digits)));
+  let text = fixed(n, Math.max(0, Math.min(6, digits)));
   if (text.includes('.')) text = text.replace(/0+$/, '').replace(/\.$/, '');
   return text === '-0' ? '0' : text;
 }
@@ -68,6 +95,9 @@ const combine = (parts: ReadResult[]): ReadResult | undefined =>
   parts.some(p => p.status === 'loading') ? loading : parts.some(p => p.status === 'unavailable') ? unavailable : undefined;
 
 // MARK: Operands
+
+/** Swift's `.rounded()`: ties go away from zero (`Math.round` sends -2.5 to -2). */
+export const roundHalfAwayFromZero = (x: number) => x < 0 ? -Math.round(-x) : Math.round(x);
 
 function compute(op: Extract<Operand, { type: 'math' }>['op'], n: number[]): number | undefined {
   switch (op) {
@@ -81,7 +111,7 @@ function compute(op: Extract<Operand, { type: 'math' }>['op'], n: number[]): num
       const places = n.length === 2 ? n[1] : 0;
       if (!Number.isInteger(places) || places < 0 || places > 6) return undefined;
       const factor = 10 ** places;
-      return Math.round(n[0] * factor) / factor;
+      return roundHalfAwayFromZero(n[0] * factor) / factor || 0;
     }
     case 'clamp': return n[1] <= n[2] ? Math.min(Math.max(n[0], n[1]), n[2]) : undefined;
     case 'scale': return n[1] === n[2] ? undefined : n[3] + (n[0] - n[1]) / (n[2] - n[1]) * (n[4] - n[3]);
