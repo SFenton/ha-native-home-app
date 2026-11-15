@@ -68,6 +68,17 @@ test('a tile low on the page is scrolled above the half sheet when it is selecte
   expect(box && sheetBox && box.y >= 0 && box.y + box.height <= sheetBox.y + 1, `tile ${JSON.stringify(box)} sits above sheet ${JSON.stringify(sheetBox)}`).toBeTruthy();
 });
 
+test('the last row of the half sheet scrolls into view above the fold', async ({ page }) => {
+  test.skip(!isPhone(page), 'The sheet is the narrow layout');
+  await openWorkspace(page);
+  await selectTile(page, 'Lights');
+  await page.waitForTimeout(900);
+  const advanced = page.getByRole('button', { name: 'Advanced' });
+  await advanced.scrollIntoViewIfNeeded();
+  const box = await advanced.boundingBox();
+  expect(box && box.y + box.height <= 844, `Advanced at ${JSON.stringify(box)} is on screen`).toBeTruthy();
+});
+
 test('a title typed in properties reaches the preview in the same frame', async ({ page }) => {
   await openWorkspace(page);
   await selectTile(page, 'Lights');

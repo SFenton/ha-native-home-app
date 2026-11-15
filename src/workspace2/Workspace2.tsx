@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
 import Preview2, { previewWindows, type PreviewWindow } from './preview';
 import { useStudioTheme } from './useStudioTheme';
@@ -80,7 +80,7 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
       {narrow && document && !target && <nav className="w2-bottombar" aria-label="Mode"><ModeSegment mode={ws.mode} onChange={ws.setMode}/></nav>}
       {narrow && properties && <Drawer.Root open modal={false} disablePointerDismissal={false} snapPoints={snapPoints} snapPoint={snap} onSnapPointChange={next => setSnap(next)}
         onOpenChange={open => { if (!open) close(); }}>
-        <Drawer.Portal><Drawer.Viewport className="w2-props-viewport"><Drawer.Popup className="w2-scope w2-sheet w2-props-sheet" aria-label="Properties">
+        <Drawer.Portal><Drawer.Viewport className="w2-props-viewport"><Drawer.Popup className="w2-scope w2-sheet w2-props-sheet" aria-label="Properties" style={{ '--w2-sheet-hidden': `${Math.max(0, window.innerHeight - coverage(snap))}px` } as CSSProperties}>
           <div className="w2-grabber" aria-hidden/>
           <Drawer.Content className="w2-sheet-content w2-props-content">{properties}</Drawer.Content>
         </Drawer.Popup></Drawer.Viewport></Drawer.Portal>

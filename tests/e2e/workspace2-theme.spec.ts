@@ -6,6 +6,7 @@ import { isPhone, seed } from './workspace2-helpers';
 test.beforeEach(async ({ request }) => { await seed(request); });
 
 const evidence = process.env.STUDIO_EVIDENCE_DIR;
+test.use({ actionTimeout: 10_000 });
 
 /** Home Assistant's default light and dark themes, as variables on its root element. */
 const themes = {

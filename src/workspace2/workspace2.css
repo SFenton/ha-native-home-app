@@ -106,7 +106,8 @@
 .w2-props-sheet[data-starting-style], .w2-props-sheet[data-ending-style] { transform: translateY(100%); }
 .w2-grabber { flex: none; width: 36px; height: 5px; border-radius: 3px; background: var(--w2-line); margin: 8px auto 4px; }
 .w2-sheet-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom); touch-action: pan-y; }
-.w2-props-content { padding-bottom: max(16px, calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px) + 16px)); }
+/* The sheet is as tall as the screen and slid down to its snap point, so its content ends below the fold: pad by the hidden part (set from the snap in Workspace2) so the last row scrolls into view. */
+.w2-props-content { padding-bottom: calc(var(--w2-sheet-hidden, 0px) + 16px); }
 .w2-sheet-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px 8px; }
 .w2-sheet-title { margin: 0; font-size: 17px; padding: 4px 16px; }
 .w2-sheet-bar .w2-sheet-title { padding: 0; }
