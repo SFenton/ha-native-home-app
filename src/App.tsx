@@ -19,7 +19,7 @@ import Inspector from './Inspector';
 import DevicePreview, { initialPreview } from './DevicePreview';
 import { DataPanel, NavigationPanel, VariablesPanel } from './ProjectPanels';
 import { Dialog, EmptyState, Field, Icon, IconButton, SelectField, TextField } from './ui';
-const NativeCompositionWorkspace = lazy(() => import('./NativeCompositionWorkspace'));
+const Workspace2 = lazy(() => import('./workspace2/Workspace2'));
 
 type DialogKind = 'source' | 'import' | 'native-import' | 'reset' | 'reload' | 'delete-surface' | 'report-issue' | 'request-feature' | undefined;
 type ActionLog = { id: string; time: string; message: string; tone: 'info' | 'error' | 'success' };
@@ -44,12 +44,20 @@ function downloadText(content: string, name: string, mime: string) {
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+const WORKSPACE_KEY = 'studio.workspace';
+/** Which editor opened last: the 2.0 workspace is the default, and Project > Open 1.0 Editor remembers the other. */
+const rememberedWorkspace = (): '1.0' | '2.0' => { try { return window.localStorage.getItem(WORKSPACE_KEY) === '1.0' ? '1.0' : '2.0'; } catch { return '2.0'; } };
+const rememberWorkspace = (value: '1.0' | '2.0') => { try { window.localStorage.setItem(WORKSPACE_KEY, value); } catch { /* storage may be blocked */ } };
 export default function App() {
-  const [native, setNative] = useState(false);
-  const [visitedNative, setVisitedNative] = useState(false);
+  const [native, setNative] = useState(() => rememberedWorkspace() === '2.0');
+  const [visitedNative, setVisitedNative] = useState(native), [visitedLegacy, setVisitedLegacy] = useState(!native);
+  const show = (next: boolean) => {
+    setNative(next); rememberWorkspace(next ? '2.0' : '1.0');
+    if (next) setVisitedNative(true); else setVisitedLegacy(true);
+  };
   return <>
-    <div hidden={native}><LegacyStudio active={!native} onNative={() => { setVisitedNative(true); setNative(true); }}/></div>
-    {visitedNative && <div hidden={!native}><Suspense fallback={<div className="loading-card" role="status">Loading…</div>}><NativeCompositionWorkspace active={native} onLegacy={() => setNative(false)}/></Suspense></div>}
+    {visitedLegacy && <div hidden={native}><LegacyStudio active={!native} onNative={() => show(true)}/></div>}
+    {visitedNative && <Suspense fallback={<div className="loading-card" role="status">Loading…</div>}><Workspace2 active={native} onLegacy={() => show(false)}/></Suspense>}
   </>;
 }
 function LegacyStudio({ active, onNative }: { active: boolean; onNative: () => void }) {

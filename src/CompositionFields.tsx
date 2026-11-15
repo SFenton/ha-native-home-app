@@ -2,7 +2,7 @@ import type { CompositionDocument } from './shared/composition/schema';
 import type { Json } from './shared/types';
 import { changeFieldVariant, defaultField, fieldVariants, removeCompositionItem, reorderCompositionItem, replaceAt, resolveField, selectedVariant, valueAt, variantName, type EditorPath, type SchemaField } from './composition-editor';
 import { Field, NumberField, SelectField, TextField } from './ui';
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { CallServiceEditor, OperandEditor, PredicateBuilder } from './GrammarEditors';
 
 /**
@@ -20,6 +20,8 @@ export type FieldOptions = {
   rows?: boolean;
   /** Mark every leaf control with `data-field-path`, so a test can find each field. */
   fieldPath?: boolean;
+  /** The words on an array's add button, when it is not "Add <label>". */
+  addLabel?: (path: EditorPath) => string | undefined;
   /** A part that is edited elsewhere (child nodes). */
   skip?: (path: EditorPath) => boolean;
 };
@@ -48,10 +50,23 @@ export function specialEditor(document: CompositionDocument, path: EditorPath, v
   return undefined;
 }
 
+/** The choices a reference field offers (pages, sheets, tabs, sources, assets, local states), or undefined for any other field. */
+export function relationOptions(document: CompositionDocument, path: EditorPath): { value: string; label: string }[] | undefined { return relationInfo(document, path).relations; }
+function relationInfo(document: CompositionDocument, path: EditorPath) {
+  const key = fieldKey(path);
+  const container = path.at(-3) === 'tabs' ? valueAt(document, path.slice(0, -3)) : undefined;
+  const localStateId = container && typeof container === 'object' && 'type' in container && container.type === 'local-tabs'
+    && 'props' in container && container.props && typeof container.props === 'object' && 'stateId' in container.props
+    ? container.props.stateId : undefined;
+  const tabField = document.localState?.find(field => field.id === localStateId);
+  const tabOptions = key === 'id' && tabField?.type === 'choice' ? tabField.options : undefined;
+  return { tabOptions, relations: tabOptions?.map(option => ({ value: option.id, label: option.label })) ?? relationship(key, document) };
+}
+
 /** The closed contract supplies fields and variants; references remain explicit relationship selectors. */
 export default function CompositionFields(props: Props) {
   const { value, path, label, document, onChange, onError, options } = props;
-  const leaf = (element: JSX.Element) => options?.fieldPath ? <div className="field-leaf" data-field-path={path.join('/')}>{element}</div> : element;
+  const leaf = (element: ReactElement) => options?.fieldPath ? <div className="field-leaf" data-field-path={path.join('/')}>{element}</div> : element;
   const schema = resolveField(props.schema), key = fieldKey(path);
   const set = (next: Json) => onChange(replaceAt(document, path, next));
   const run = (operation: () => CompositionDocument) => {
@@ -69,13 +84,7 @@ export default function CompositionFields(props: Props) {
   if (object && key === 'value' && typeof object.type === 'string' && valueAt(document, path.slice(0, -2)) && (valueAt(document, path.slice(0, -2)) as Record<string, Json>).type === 'bound-control')
     return leaf(<OperandEditor label={label} value={object} document={document} onChange={set}/>);
   const variants = fieldVariants(schema);
-  const container = path.at(-3) === 'tabs' ? valueAt(document, path.slice(0, -3)) : undefined;
-  const localStateId = container && typeof container === 'object' && 'type' in container && container.type === 'local-tabs'
-    && 'props' in container && container.props && typeof container.props === 'object' && 'stateId' in container.props
-    ? container.props.stateId : undefined;
-  const tabField = document.localState?.find(field => field.id === localStateId);
-  const tabOptions = key === 'id' && tabField?.type === 'choice' ? tabField.options : undefined;
-  const relations = tabOptions?.map(option => ({ value: option.id, label: option.label })) ?? relationship(key, document);
+  const { relations, tabOptions } = relationInfo(document, path);
   if (relations) {
     const nullable = key === 'initialTabId';
     const selectOptions = [...(nullable ? [{ value: '', label: 'No selected tab' }] : [{ value: '', label: 'Select a destination' }]), ...relations];
@@ -144,7 +153,7 @@ export default function CompositionFields(props: Props) {
         </details>;
       })}
       {!tuple && maximum > 0 && <button type="button" className="add-button" disabled={value.length >= maximum}
-        onClick={() => set([...value, defaultField(itemSchema, document)])}>{options?.rows ? `Add ${label}` : `Add ${label.toLowerCase()} item`}</button>}
+        onClick={() => set([...value, defaultField(itemSchema, document)])}>{options?.rows ? options.addLabel?.(path) ?? `Add ${label}` : `Add ${label.toLowerCase()} item`}</button>}
       {maximum === 0 && !options?.rows && <p className="field-note">Not supported.</p>}
     </fieldset>;
   }

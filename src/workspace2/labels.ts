@@ -23,6 +23,8 @@ export interface FieldLabel {
   options?: Record<string, string>;
   /** Never shown; the part is edited somewhere else. */
   hidden?: boolean;
+  /** The words on the add button of a list. */
+  add?: string;
 }
 
 const entry = (label: string, more: Omit<FieldLabel, 'label'> = {}): FieldLabel => ({ label, ...more });
@@ -68,6 +70,12 @@ export const labelMap: Readonly<Record<string, FieldLabel>> = {
   '*.recovery.unavailableMessage': entry('Unavailable message'), '*.recovery.retryLabel': entry('Retry button'),
   '*.explanation': entry('Why we ask'),
   '*.id': advanced('ID'),
+  '*.icon.name': entry('Icon', { order: 3 }),
+  'project.dataSources': entry('Data', { add: 'Add Source' }), 'project.localState': entry('Local State', { add: 'Add State' }),
+  'project.liveActivities': entry('Live Activities', { add: 'Add Activity' }), 'project.extensions.routes': entry('Links', { add: 'Add Link' }),
+  'project.extensions.cameras': entry('Camera notifications', { add: 'Add Camera' }),
+  'chrome.groups': entry('Header Buttons', { add: 'Add Button' }), 'chrome.groups.items': entry('Buttons', { add: 'Add Button' }),
+  'tab.tabs': entry('Tabs', { add: 'Add Tab' }),
 };
 
 /** `key` split into words, sentence case, with "Id" as "ID". */
