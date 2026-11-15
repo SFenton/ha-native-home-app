@@ -6,11 +6,29 @@ const fixture = JSON.parse(readFileSync(new URL('../fixtures/home-domains.json',
 /** Optional folder for evidence screenshots (a phase deliverable). */
 const evidence = process.env.STUDIO_EVIDENCE_DIR;
 
-/** Replaces the server's draft with the `home-domains` fixture so every test starts from the same project. */
+/**
+ * Replaces the server's draft with the `home-domains` fixture so every test starts from the same project.
+ * The previous test's page may still have an autosave in flight that lands between the read and the write and moves the
+ * revision, so a conflict (409) is read again and retried; the write only counts once the revision has held still.
+ */
 export async function seed(request: APIRequestContext, document: unknown = fixture.document): Promise<void> {
-  const current = await (await request.get('/native/api/draft')).json();
-  const put = await request.put('/native/api/draft', { data: { document: { ...(document as object), id: current.document.id }, expectedRevision: current.revision } });
-  expect(put.ok(), await put.text()).toBeTruthy();
+  let last = '';
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const current = await (await request.get('/native/api/draft')).json();
+    const put = await request.put('/native/api/draft', { data: { document: { ...(document as object), id: current.document.id }, expectedRevision: current.revision } });
+    if (put.ok()) {
+      // A save from the page that just closed may still land after this write: wait for the revision to hold, and write again if it moved.
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const after = await (await request.get('/native/api/draft')).json();
+      if (after.revision === current.revision + 1) return;
+      last = `the revision moved from ${current.revision + 1} to ${after.revision} after the seed`;
+      continue;
+    }
+    last = await put.text();
+    if (put.status() !== 409) break;
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  throw new Error(`The draft could not be seeded: ${last}`);
 }
 
 /** The preview's own root. When the renderer merges its root keeps `data-preview-root`; only this helper knows how to find a tile. */
