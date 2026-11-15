@@ -63,7 +63,7 @@
 .w2-canvas[data-card=open] .w2-stage { padding-inline-end: calc(376px + 32px); }
 .w2-narrow .w2-stage { padding: 0; }
 .w2-checks-slot { position: absolute; left: 16px; bottom: 16px; z-index: 1; }
-.w2-narrow .w2-checks-slot { bottom: 72px; }
+.w2-narrow .w2-checks-slot { top: 8px; bottom: auto; left: 50%; transform: translateX(-50%); }
 .w2-pill { border-radius: 16px; min-height: 32px; background: var(--w2-card); box-shadow: var(--w2-shadow); }
 .w2-scope .w2-pill-error { color: var(--w2-err-text); border-color: var(--w2-err); }
 .w2-card { position: absolute; top: 12px; right: 16px; bottom: auto; width: 376px; max-height: calc(100% - 24px); overflow: auto; background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: var(--w2-radius); box-shadow: var(--w2-shadow); z-index: 1; }

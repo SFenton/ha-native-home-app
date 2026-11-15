@@ -317,3 +317,30 @@ test('the page button shows a short page name whole on the narrow top bar', asyn
   const bar = await page.locator('.w2-topbar').evaluate(element => element.scrollWidth <= element.clientWidth);
   expect(bar).toBe(true);
 });
+
+test('the Problems pill on the narrow layout never sits on the preview tab bar or the status bar area controls', async ({ page }) => {
+  test.skip(!isPhone(page), 'The narrow layout');
+  await openWorkspace(page);
+  await selectTile(page, 'Lights');
+  await page.getByLabel('Title', { exact: true }).first().fill('');
+  await expect(page.getByTestId('status-tag')).toHaveText('Not Saved', { timeout: 8000 });
+  await page.getByRole('button', { name: 'Close', exact: true }).first().click();
+  const pill = page.getByTestId('checks-pill');
+  await expect(pill).toBeVisible();
+  const [pillBox, bar, canvas] = await Promise.all([pill.boundingBox(), previewRoot(page).locator('.sh-tabbar').first().boundingBox(), page.locator('.w2-canvas').boundingBox()]);
+  expect(pillBox && bar && canvas).toBeTruthy();
+  const overlaps = pillBox!.x < bar!.x + bar!.width && pillBox!.x + pillBox!.width > bar!.x && pillBox!.y < bar!.y + bar!.height && pillBox!.y + pillBox!.height > bar!.y;
+  expect(overlaps).toBe(false);
+  expect(pillBox!.y).toBeGreaterThanOrEqual(canvas!.y);
+  expect(pillBox!.y + pillBox!.height).toBeLessThanOrEqual(canvas!.y + canvas!.height);
+  expect(pillBox!.height).toBeGreaterThanOrEqual(43.5);
+  // It covers no control or text the preview draws.
+  const covered = await page.evaluate(box => [...document.querySelectorAll<HTMLElement>('[data-preview-root] button, [data-preview-root] h1, [data-preview-root] h2, [data-preview-root] [role=heading]')].filter(element => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.x < box.x + box.width && rect.x + rect.width > box.x && rect.y < box.y + box.height && rect.y + rect.height > box.y;
+  }).map(element => element.textContent?.trim().slice(0, 20) || element.className), pillBox!);
+  expect(covered).toEqual([]);
+  // A tap on the pill opens Checks: nothing covers it.
+  await pill.click();
+  await expect(page.getByText(/Lights: |Problem/).first()).toBeVisible();
+});
