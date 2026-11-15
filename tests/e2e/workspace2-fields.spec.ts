@@ -29,7 +29,7 @@ test('acceptance 2: every editable field of every kind of node is reachable from
   const seen = new Set<string>(), misses: string[] = []; let checked = 0;
   for (const entry of index.entries.values()) {
     if (entry.kind !== 'node' || !entry.node || seen.has(entry.node.type)) continue;
-    const tile = page.locator(`[data-preview-root] [data-node-key="${entry.key}"]`).first();
+    const tile = page.locator(`[data-preview-root] [data-sel="${entry.key}"]`).first();
     if (await tile.count() === 0) {
       const surface = index.get(entry.surface!)!;
       const holder = surface.kind === 'page' ? fixture.document.pages.find((item: any) => item.id === surface.id) : fixture.document.modals.find((item: any) => item.id === surface.id);
@@ -41,7 +41,7 @@ test('acceptance 2: every editable field of every kind of node is reachable from
     if (await tile.count() === 0) continue;
     seen.add(entry.node.type);
     await tile.scrollIntoViewIfNeeded();
-    await page.locator(`[data-preview-root] [data-node-key="${entry.key}"]`).first().click();
+    await page.locator(`[data-preview-root] [data-sel="${entry.key}"]`).first().click();
     const panel = page.getByLabel('Properties');
     await expect(panel).toBeVisible();
     const paths = new Set<string>();

@@ -148,7 +148,7 @@ export default function Preview2(props: Preview2Props) {
     if (tab) latest.current.onSurfaceChange({ kind: 'page', id: tab.pageId });
   }, []);
   const style = { '--sh-inset': `${bottomInset / zoom}px` } as CSSProperties;
-  return <div ref={host} className="sh-preview2" data-mode={mode} data-bezel={bezel ? '' : undefined} style={style}>
+  return <div ref={host} className="sh-preview2" data-preview-root data-mode={mode} data-bezel={bezel ? '' : undefined} style={style}>
     <RenderCtx.Provider value={context}>
       <DeviceFrame width={modelWidth} height={height} zoom={zoom} pan={mode === 'use'} padding={bezel ? STAGE_PADDING : { x: 0, y: 0 }}
         modelClassName={`sh-model ${bezel ? 'sh-bezel' : 'sh-flat'}`}>

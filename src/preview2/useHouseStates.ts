@@ -19,6 +19,8 @@ export interface HouseStates {
   simulateCall(call: CallService, control?: Parameters<typeof createEnvironment>[3]): boolean;
   /** Simulates a `set-local` action. */
   setLocal(stateId: string, value: LocalValue): void;
+  /** Replaces the overlay with one the preview computed (a simulated tap in Use). */
+  setOverlay(next: Overlay): void;
   /** Drops every simulated change. */
   resetOverlay(): void;
   /** Reads the house again now. */
@@ -72,5 +74,5 @@ export function useHouseStates(document: Pick<CompositionDocument, 'dataSources'
   const setLocal = useCallback((stateId: string, value: LocalValue) => setOverlay(current => applyLocal(current, stateId, value)), []);
   const resetOverlay = useCallback(() => setOverlay(emptyOverlay), []);
   const refresh = useCallback(() => setTick(value => value + 1), []);
-  return { house, overlay, status, error, environment, simulateCall, setLocal, resetOverlay, refresh };
+  return { house, overlay, status, error, environment, simulateCall, setLocal, setOverlay, resetOverlay, refresh };
 }

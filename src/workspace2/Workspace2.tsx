@@ -6,6 +6,7 @@ import { useWorkspace2, type PanelKind } from './useWorkspace2';
 import { ModeSegment, ChecksPill } from './TopBar';
 import TopBar from './TopBar';
 import PropertiesPanel from './PropertiesPanel';
+import HandleSlot from './HandleSlot';
 import { PublishDialog, ConflictDialog } from './PublishDialogs';
 import { useNarrow } from './kit';
 import { ToastHost } from './toasts';
@@ -45,6 +46,7 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
   const [dialog, setDialog] = useState<DialogKey>();
   const [snap, setSnap] = useState<Snap | null>(SNAP_HALF);
   const [notice, setNotice] = useState('');
+  const [stageElement, setStageElement] = useState<HTMLElement | null>(null);
   const { target, document, studio } = ws;
   const showError = useCallback((message: string) => setNotice(message), []);
   useEffect(() => setNotice(''), [target?.kind, ws.selection]);
@@ -60,9 +62,9 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
   const stage = useMemo(() => document && ws.surface && ws.previewDocument ? <Preview2
     document={ws.previewDocument} mode={ws.mode} surface={ws.surface} onSurfaceChange={ws.setSurface} selection={ws.mode === 'edit' ? ws.selection : undefined} onSelect={ws.select}
     window={window_} bezel={!narrow} house={ws.houseStates.status === 'loading' ? undefined : ws.houseStates.house} overlay={ws.houseStates.overlay}
-    onOverlayChange={() => {}} onSimulatedCall={summary => ws.log(summary)} revealKey={ws.revealKey} bottomInset={bottomInset}/> : undefined,
+    onOverlayChange={ws.houseStates.setOverlay} onSimulatedCall={ws.simulated} revealKey={ws.revealKey} bottomInset={bottomInset}/> : undefined,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [ws.previewDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.house, ws.houseStates.overlay, ws.houseStates.status, window_, narrow, ws.revealKey, bottomInset, ws.setSurface, ws.select]);
+  [ws.previewDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.house, ws.houseStates.overlay, ws.houseStates.status, window_, narrow, ws.revealKey, bottomInset, ws.setSurface, ws.select, ws.houseStates.setOverlay, ws.simulated]);
   const properties = target && document ? <PropertiesPanel ws={ws} onClose={close} onOpenProject={openProjectDialog} notice={notice} onError={showError}/> : null;
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
@@ -70,7 +72,8 @@ export default function Workspace2({ active, onLegacy }: { active: boolean; onLe
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
         dialog={dialog} onDialog={setDialog} onPanel={openPanel} onOpen1={() => { setProjectOpen(false); setDialog(undefined); onLegacy(); }} onError={showError} onChecks={() => setChecksOpen(true)}/>
       <main className="w2-canvas" data-card={!narrow && target ? 'open' : undefined}>
-        {loadingState ?? <div className="w2-stage" data-mode={ws.mode}>{stage}</div>}
+        {loadingState ?? <div className="w2-stage" data-mode={ws.mode} ref={setStageElement}>{stage}</div>}
+        {!narrow && <HandleSlot ws={ws} stage={stageElement} onError={showError}/>}
         {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} showPill={!narrow || ws.problemCount > 0 || ws.failedSave}/></div>}
         {!narrow && properties && <aside className="w2-card" aria-label="Properties">{properties}</aside>}
       </main>

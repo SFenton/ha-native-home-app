@@ -123,15 +123,25 @@ function PageBody({ ws, kind, path, onGo, onOpenProject }: { ws: Workspace2; kin
 }
 
 /** The node's More menu: Duplicate, Move Up, Move Down, Move To…, Delete. Move To… pushes a page inside the surface. */
-function NodeMenu({ ws, path, id, selectionKey }: { ws: Workspace2; path: EditorPath; id: string; selectionKey: SelectionKey }) {
-  const { document, onError } = useRows();
+function PropertiesNodeMenu(props: { ws: Workspace2; path: EditorPath; id: string; selectionKey: SelectionKey }) {
+  const { onError } = useRows();
   const push = usePush();
+  const { id, ...rest } = props;
+  return <NodeMenu {...rest} onError={onError} onMoveTo={push ? () => push.push({ title: 'Move To…', body: <MoveToPage id={id} onDone={moved => { props.ws.studio.apply(moved); push.pop(); }}/> }) : undefined}/>;
+}
+
+/**
+ * The node's More menu. Wide, the selected tile's handle shows it too (without Move To…, which needs the properties page);
+ * `onMoveTo` adds that item.
+ */
+export function NodeMenu({ ws, path, selectionKey, onError, onMoveTo, className = 'w2-icon-button' }: { ws: Workspace2; path: EditorPath; selectionKey: SelectionKey; onError: (message: string) => void; onMoveTo?: () => void; className?: string }) {
+  const document = ws.document!;
   const [open, setOpen] = useState(false);
   const index = ws.index!;
   const position = Number(path.at(-1)), siblings = (valueAt(document, path.slice(0, -1)) as unknown[]).length;
   const run = (operation: () => void) => { try { operation(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
   return <Menu.Root open={open} onOpenChange={setOpen}>
-    <Menu.Trigger className="w2-icon-button" aria-label="More"><MoreHorizontal size={18} aria-hidden/></Menu.Trigger>
+    <Menu.Trigger className={className} aria-label="More"><MoreHorizontal size={18} aria-hidden/></Menu.Trigger>
     <Menu.Portal><Menu.Positioner sideOffset={6} align="end" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu">
       <Menu.Item className="w2-menu-item" onClick={() => run(() => {
         const copy = duplicateNode(document, path); ws.studio.apply(copy.document);
@@ -139,7 +149,7 @@ function NodeMenu({ ws, path, id, selectionKey }: { ws: Workspace2; path: Editor
       })}>Duplicate</Menu.Item>
       <Menu.Item className="w2-menu-item" disabled={position === 0} onClick={() => run(() => ws.studio.apply(moveNodeBy(document, path, -1)))}>Move Up</Menu.Item>
       <Menu.Item className="w2-menu-item" disabled={position >= siblings - 1} onClick={() => run(() => ws.studio.apply(moveNodeBy(document, path, 1)))}>Move Down</Menu.Item>
-      <Menu.Item className="w2-menu-item" onClick={() => push?.push({ title: 'Move To…', body: <MoveToPage id={id} onDone={moved => { ws.studio.apply(moved); push.pop(); }}/> })}>Move To…</Menu.Item>
+      {onMoveTo && <Menu.Item className="w2-menu-item" onClick={onMoveTo}>Move To…</Menu.Item>}
       <Menu.Separator className="w2-menu-sep"/>
       <Menu.Item className="w2-menu-item w2-danger-item" onClick={() => run(() => {
         ws.studio.apply(deleteNode(document, path));
@@ -168,7 +178,7 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     header = <Header onClose={onClose} icon={(node as { icon?: { name: string } }).icon?.name ?? 'grid'} title={node.title}
       line={`${typeName(node.type)} · ${surfaceTitle(entry.surface)}${section ? ` › ${section.title}` : ''}`}
       tags={hidden ? <Tag><EyeOff size={12} aria-hidden/> Hidden by Rule</Tag> : undefined}
-      more={<NodeMenu ws={ws} path={entry.path} id={node.id} selectionKey={target.key}/>}/>;
+      more={<PropertiesNodeMenu ws={ws} path={entry.path} id={node.id} selectionKey={target.key}/>}/>;
     body = <NodeBody path={entry.path}/>;
   } else if (target.kind === 'page' || target.kind === 'modal') {
     const entry = index.get(target.key)!;

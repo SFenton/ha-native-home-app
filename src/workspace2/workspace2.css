@@ -48,7 +48,6 @@
 .w2-window-button { font-variant-numeric: tabular-nums; }
 .w2-status-narrow { margin-inline-start: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 0 7px; flex: 0 1 auto; }
 .w2-narrow .w2-page-button { max-width: 36vw; min-width: 0; padding: 0 8px; }
-.sh-stub button:hover:not(:disabled) { background: #26262a; border-color: #3a3a3f; }
 .w2-tag { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--w2-field); color: var(--w2-ink-card); }
 .w2-scope button.w2-tag-button { border: 0; min-height: 22px; padding: 0 9px; border-radius: 11px; }
 .w2-tag-success { color: var(--w2-ok-text); background: color-mix(in srgb, var(--w2-ok) 16%, var(--w2-card)); }
@@ -214,14 +213,10 @@
 .w2-toast { background: var(--w2-ink); color: var(--w2-bg); border-radius: 10px; padding: 10px 16px; font-weight: 600; box-shadow: var(--w2-shadow); transition: opacity .2s, transform .2s; }
 .w2-toast[data-starting-style], .w2-toast[data-ending-style] { opacity: 0; transform: translateY(8px); }
 
-/* The preview stand-in. The real preview keeps its own S+H look and reads only --studio-selection. */
-.sh-stub { color-scheme: dark; background: #101114; color: #f2f2f7; border-radius: 28px; padding: 54px 16px 24px; display: flex; flex-direction: column; gap: 8px; font-family: system-ui, sans-serif; }
-.sh-stub.bare { border-radius: 16px 16px 0 0; min-height: 100%; }
-.sh-stub.bezel { border: 10px solid #000; box-shadow: 0 0 0 2px #2a2a2e; }
-.sh-stub button { background: #1c1c1f; color: #f2f2f7; border: 1px solid #2c2c30; border-radius: 12px; min-height: 40px; justify-content: flex-start; padding: 0 12px; }
-.sh-stub button[data-selected] { outline: 3px solid var(--studio-selection, #03a9f4); outline-offset: 3px; box-shadow: 0 0 0 4px #fff; }
-.sh-stub-title { font-size: 28px; font-weight: 700; background: transparent !important; border: 0 !important; min-height: 44px; }
-.sh-stub-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.sh-stub-list li { display: flex; flex-direction: column; }
-.sh-stub-tabs { display: flex; gap: 6px; margin-top: auto; padding-top: 16px; }
-.sh-stub-tabs button { flex: 1; justify-content: center; }
+
+/* The selected tile's handle (wide): drawn into the preview's slot, so it uses its own look, not the chrome's. */
+.w2-handle { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: #fff; color: #1c1c1e; box-shadow: 0 1px 6px rgba(0,0,0,.35); transform: scale(var(--w2-handle-scale, 1)); transform-origin: top right; }
+.w2-handle button { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.w2-handle button:hover, .w2-handle button[aria-expanded=true] { background: rgba(0,0,0,.1); }
+.w2-handle button:focus-visible { outline: 2px solid var(--studio-selection, #03a9f4); outline-offset: 1px; }
+.w2-handle-grip { cursor: grab !important; }

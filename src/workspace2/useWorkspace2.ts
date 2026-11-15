@@ -13,6 +13,8 @@ import type { PreviewSurface } from './preview';
 export const AUTOSAVE_MS = 1500;
 /** "Draft · Saved" stays this long after a save before the tag settles on the publish state. */
 export const SAVED_TAG_MS = 4000;
+/** A simulated call stays in the Checks pill this long. */
+export const SIMULATED_FLASH_MS = 4000;
 
 /** What the top bar's status tag says and how it is toned. */
 export type StatusTag = { text: string; tone: 'neutral' | 'success' | 'warning' | 'error' };
@@ -120,6 +122,16 @@ export function useWorkspace2(active: boolean) {
   const [publishError, setPublishError] = useState('');
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const log = useCallback((text: string) => setActivity(list => [{ id: (list[0]?.id ?? 0) + 1, text }, ...list].slice(0, 100)), []);
+  // A simulated call shows in the Checks pill for this long; Project > Activity keeps the line.
+  const [flash, setFlash] = useState('');
+  const simulated = useCallback((summary: string) => {
+    log(summary); setFlash(summary);
+  }, [log]);
+  useEffect(() => {
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(''), SIMULATED_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flash]);
   const openPublish = useCallback(() => { setPublishError(''); setPhase('confirm'); void refreshPublication(); }, [refreshPublication]);
   const closePublish = useCallback(() => setPhase(current => current === 'publishing' ? current : 'idle'), []);
   const publish = useCallback(async (): Promise<boolean> => {
@@ -163,7 +175,7 @@ export function useWorkspace2(active: boolean) {
     retrySave: () => { setFailedFor(undefined); studio.setError(''); setSaveReason(''); },
     publication, liveRevision, refreshPublication, publishedJson, phase, publishError, openPublish, closePublish, publish,
     conflictDecided, decideLater: () => setConflictDecided(true),
-    activity, log, houseStates,
+    activity, log, houseStates, simulated, flash,
     /** Moves the preview to the surface a selection key lives on, then selects it. */
     selectAnywhere: (key: SelectionKey) => {
       const entry = index?.get(key);
