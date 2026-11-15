@@ -54,7 +54,8 @@ test('the chrome follows a live theme change in the parent, and the preview does
   const preview = frame.locator('[data-preview-root] .sh-model').first();
   const box = (await preview.boundingBox())!;
   // Inside the device, clear of its rounded corners (which show the stage behind) and of any sheet.
-  const clip = { x: box.x + 4, y: box.y + 40, width: box.width - 8, height: 300 };
+  const clip = { x: box.x + 16, y: box.y + 40, width: box.width - 32, height: 300 };
+  await page.waitForTimeout(1200); // the house reads in and the first frame settles
   const lightPreview = await page.screenshot({ clip, animations: 'disabled' });
   const light = await tokens(page);
   await page.evaluate(style => { document.documentElement.setAttribute('style', style); }, themes.dark);
@@ -62,6 +63,7 @@ test('the chrome follows a live theme change in the parent, and the preview does
   const dark = await tokens(page);
   expect(contrast(colour(dark['--w2-ink']), colour(dark['--w2-bg']))).toBeGreaterThanOrEqual(4.5);
   expect(await page.frames().find(frame => frame !== page.mainFrame())!.evaluate(() => document.documentElement.style.colorScheme)).toBe('dark');
+  await page.waitForTimeout(600);
   const darkPreview = await page.screenshot({ clip, animations: 'disabled' });
   expect(darkPreview.equals(lightPreview), 'the preview draws the same pixels in a light and a dark chrome').toBeTruthy();
 });
@@ -80,6 +82,10 @@ test('evidence: rest, tile selected, Pages, Project menu and Publish, in light a
     await frame.locator('[data-preview-root]').getByText('Lights', { exact: true }).first().click();
     await page.waitForTimeout(900);
     await shot('tile');
+    await frame.getByRole('button', { name: 'Advanced' }).click();
+    await page.waitForTimeout(500);
+    await shot('advanced');
+    await frame.locator('.w2-back').click();
     await frame.getByRole('button', { name: 'Close', exact: true }).first().click();
     await frame.getByRole('button', { name: 'Pages' }).click();
     await page.waitForTimeout(500);
@@ -94,6 +100,15 @@ test('evidence: rest, tile selected, Pages, Project menu and Publish, in light a
     await frame.getByRole('button', { name: 'Publish' }).click();
     await page.waitForTimeout(500);
     await shot('publish');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    // Use mode: tap the first action tile that is drawn; the call is simulated and the Checks pill says so.
+    await frame.getByRole('button', { name: 'Use', exact: true }).click();
+    await frame.locator('.sh-tab', { hasText: 'Security' }).click();
+    await page.waitForTimeout(600);
+    await frame.locator('[data-preview-root] .sh-page[data-current] .sh-node[data-type="action-tile"]').first().click();
+    await page.waitForTimeout(400);
+    await shot('use');
     await page.unroute('**/ha-host.html');
   }
 });
