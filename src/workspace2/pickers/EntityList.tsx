@@ -28,17 +28,18 @@ export function EntityRowView({ row, onPick }: { row: EntityRow; onPick: (row: E
  * The entity list of spec 8.1: search over name, id and area; domain chips (pre-set to the domains a field accepts); the
  * five most recent first; virtualised rows. Not connected, it lists what the document names and "Use “<text>”" takes a typed id.
  */
-export default function EntityList({ domains, onPick, height = 360, kind = 'entities', autoFocus = true, query: given, hideSearch }: { domains?: readonly string[]; onPick: (row: EntityRow) => void; height?: number; kind?: string; autoFocus?: boolean; /** A search the caller owns (the Add picker shares one box across its segments). */ query?: string; hideSearch?: boolean }) {
-  const { entities, connected } = useWorkspaceData();
+export default function EntityList({ domains, restrict, onPick, height = 360, kind = 'entities', autoFocus = true, query: given, hideSearch }: { domains?: readonly string[]; /** Only these domains may be picked (a model that rejects the rest): other entities, chips and typed ids are not offered. */ restrict?: readonly string[]; onPick: (row: EntityRow) => void; height?: number; kind?: string; autoFocus?: boolean; /** A search the caller owns (the Add picker shares one box across its segments). */ query?: string; hideSearch?: boolean }) {
+  const { entities: all, connected } = useWorkspaceData();
+  const entities = useMemo(() => restrict ? all.filter(row => restrict.includes(row.domain)) : all, [all, restrict]);
   const [own, setQuery] = useState('');
   const query = given ?? own;
-  const [chips, setChips] = useState<ReadonlySet<string>>(() => new Set(domains));
+  const [chips, setChips] = useState<ReadonlySet<string>>(() => new Set(restrict ?? domains));
   const present = useMemo(() => domainsOf(entities), [entities]);
   const text = query.trim();
   const matches = useMemo(() => filterEntities(entities, text, chips), [entities, text, chips]);
   const recent = useMemo(() => recents(kind).map(id => entities.find(row => row.entityId === id)).filter((row): row is EntityRow => Boolean(row) && (!chips.size || chips.has(row!.domain))), [entities, kind, chips]);
   const items = useMemo(() => {
-    const typed: EntityRow[] = isEntityId(text) && !entities.some(row => row.entityId === text) ? [{ entityId: text, name: `Use “${text}”`, domain: text.split('.')[0] }] : [];
+    const typed: EntityRow[] = isEntityId(text) && (!restrict || restrict.includes(text.split('.')[0])) && !entities.some(row => row.entityId === text) ? [{ entityId: text, name: `Use “${text}”`, domain: text.split('.')[0] }] : [];
     const head = text ? [] : recent;
     return [...typed, ...head, ...matches.filter(row => !head.includes(row))];
   }, [text, entities, matches, recent]);
@@ -48,6 +49,7 @@ export default function EntityList({ domains, onPick, height = 360, kind = 'enti
     {!hideSearch && <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Search entities" aria-label="Search entities" value={query} autoFocus={autoFocus} onChange={event => setQuery(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter' && items[0]) pick(items[0]); }}/></label>}
     {present.length > 1 && <div className="w2-chips" role="group" aria-label="Domains">{present.slice(0, 12).map(domain => <button type="button" key={domain} className="w2-chip" aria-pressed={chips.has(domain)} onClick={() => toggle(domain)}>{domainName(domain)}</button>)}</div>}
+    {restrict && <p className="w2-caption" data-restricted>{`Showing ${restrict.map(domain => domainName(domain).toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')} only: the kind of entity this tile works with.`}</p>}
     {!connected && <p className="w2-caption">Not connected to Home Assistant. Type an entity ID.</p>}
     {!text && recent.length > 0 && <h3 className="w2-group-title">Recent</h3>}
     <VirtualList items={items} rowHeight={ENTITY_ROW} height={height} label="Entities" onActivate={pick}

@@ -1,6 +1,6 @@
 import type { Json } from '../../shared/types';
 import { replaceAt, selectedVariant, valueAt, type EditorPath } from '../../composition-editor';
-import { bindEntity, bindSource, nodeSourceId, sourceChoices } from '../add/sources';
+import { acceptedDomains, bindEntity, bindSource, nodeSourceId, sourceChoices } from '../add/sources';
 import { IconField } from '../pickers/PickerField';
 import SourceField from '../pickers/SourceField';
 import { schemaAt, useRows, type RowOverride } from '../rows';
@@ -32,7 +32,7 @@ export function useDeepRows(path: EditorPath): Record<string, RowOverride> {
     const id = nodeSourceId(document, path);
     const choices = sourceChoices(document, path);
     return <SourceField label={label} path={at.join('/')} current={document.dataSources.find(source => source.id === id)} acceptsEntity={choices.acceptsEntity} models={choices.models}
-      domains={domainsFor[String(node?.type)]} onPickEntity={row => onChange(bindEntity(document, path, row.entityId))} onPickSource={sourceId => onChange(bindSource(document, path, sourceId))}/>;
+      domains={domainsFor[String(node?.type)]} restrict={acceptedDomains(document, path, domainsFor)} onPickEntity={row => onChange(bindEntity(document, path, row.entityId))} onPickSource={sourceId => onChange(bindSource(document, path, sourceId))}/>;
   };
   return {
     action, onAction: action, offAction: action, quickLinksAction: action, profileAction: action,

@@ -4,7 +4,7 @@ import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { Predicate } from '../src/shared/composition/expression';
 import { compositionErrors, replaceAt } from '../src/composition-editor';
 import { buildDocumentIndex } from '../src/preview2/model';
-import { bindEntity, bindSource, boundEntity, nodeSourceId, sourceChoices } from '../src/workspace2/add/sources';
+import { acceptedDomains, bindEntity, bindSource, boundEntity, nodeSourceId, sourceChoices } from '../src/workspace2/add/sources';
 import { changeOperator, closeRule, conditionCount, entityCondition, groupDepth, numericCondition, openRule, ruleProblem, ruleSummary, rowKind } from '../src/workspace2/editors/rule';
 import { acceptedKinds, dataOf, defaultAction, operandDepth, operandFor, sourceOf, targetEntities, withDataField, withService, withTargetEntities } from '../src/workspace2/editors/action';
 import { schemaAt } from '../src/workspace2/rows';
@@ -148,6 +148,46 @@ describe('entity binding', () => {
     expect(nodeSourceId(moved, chipPath)).toBe(target.id);
     expect(moved.dataSources.length).toBe(doc.dataSources.length);
     expect(compositionErrors(moved)).toEqual([]);
+  });
+});
+
+describe('the entity picker offers only entities the node can read', () => {
+  const entries = [...buildDocumentIndex(doc).entries.values()].filter(entry => entry.node && nodeSourceId(doc, entry.path) && sourceChoices(doc, entry.path).acceptsEntity);
+  it('limits a power-toggle tile to switches and input booleans, and a light tile to lights, switches and input booleans', () => {
+    const tile = entries.find(entry => entry.node?.type === 'action-tile')!;
+    expect(acceptedDomains(doc, tile.path)).toEqual(['switch', 'input_boolean']);
+    expect(acceptedDomains(doc, entries.find(entry => entry.node?.type === 'light-group-tile')!.path)).toEqual(['light', 'switch', 'input_boolean']);
+  });
+  it('leaves the draft valid for every entity of every accepted domain, on every node the picker serves', () => {
+    expect(entries.length).toBeGreaterThan(5);
+    const kinds = new Set<string>();
+    for (const entry of entries) {
+      const domains = acceptedDomains(doc, entry.path);
+      if (!domains) continue;
+      kinds.add(`${entry.node!.type}:${domains.join(',')}`);
+      for (const domain of domains) expect(compositionErrors(bindEntity(doc, entry.path, `${domain}.probe_entity`)), `${entry.node!.type} + ${domain}`).toEqual([]);
+    }
+    expect(kinds.size).toBeGreaterThan(2);
+  });
+  it('swaps a camera tile for another camera source with its sheet, and offers no single entity for it', () => {
+    const tile = [...buildDocumentIndex(doc).entries.values()].find(entry => entry.node?.type === 'camera-tile')!;
+    expect(sourceChoices(doc, tile.path).acceptsEntity).toBe(false);
+    const camera = doc.dataSources.find(item => item.id === nodeSourceId(doc, tile.path)) as any;
+    const twin = { ...camera, id: 'camera-two', inputs: { ...camera.inputs, entityId: { type: 'literal', value: 'camera.two' }, snapshotEntityId: { type: 'literal', value: 'camera.two' } } };
+    // The fixture's second camera tile opens the same sheet, so the first cannot change camera; give that one a sheet of its own.
+    const other = [...buildDocumentIndex(doc).entries.values()].filter(entry => entry.node?.type === 'camera-tile')[1]!;
+    const sheet = doc.modals.find(modal => modal.id === 'hc-camera-0-modal')!;
+    expect(sourceChoices(doc, tile.path).models.map(item => item.id)).toEqual(['hc-camera-0']);
+    const split = replaceAt({ ...doc, modals: [...doc.modals, { ...JSON.parse(JSON.stringify(sheet).replace(/"id":"([^"]+)"/g, '"id":"$1-2"')) }] } as CompositionDocument, [...other.path, 'action', 'modalId'], 'hc-camera-0-modal-2');
+    expect(compositionErrors(split)).toEqual([]);
+    const two = { ...split, dataSources: [...split.dataSources, twin] } as CompositionDocument;
+    expect(sourceChoices(two, tile.path).models.map(item => item.id)).toContain('camera-two');
+    expect(compositionErrors(bindSource(two, tile.path, 'camera-two'))).toEqual([]);
+  });
+  it('would have refused the light the picker used to offer a power-toggle tile', () => {
+    const tile = entries.find(entry => entry.node?.type === 'action-tile')!;
+    expect(acceptedDomains(doc, tile.path)).not.toContain('light');
+    expect(compositionErrors(bindEntity(doc, tile.path, 'light.probe_entity')).length).toBeGreaterThan(0);
   });
 });
 

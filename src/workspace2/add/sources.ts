@@ -25,7 +25,7 @@ export function ensureSource(document: CompositionDocument, entityId: string, mo
   return { document: { ...document, dataSources: [...document.dataSources, source] }, sourceId: id };
 }
 
-type NodeRefs = { type: string; binding?: { sourceId: string }; props?: Record<string, unknown>; action?: { type: string; sourceId?: string } };
+type NodeRefs = { type: string; binding?: { sourceId: string }; props?: Record<string, unknown>; action?: { type: string; sourceId?: string; modalId?: string } };
 
 /** The id of the data source a node reads through `binding.sourceId` or `props.sourceId`. */
 export function nodeSourceId(document: CompositionDocument, path: EditorPath): string | undefined {
@@ -65,6 +65,14 @@ function pointAt(document: CompositionDocument, path: EditorPath, sourceId: stri
   if (node.binding) next = replaceAt(next, [...path, 'binding', 'sourceId'], sourceId);
   if (node.props && 'sourceId' in node.props) next = replaceAt(next, [...path, 'props', 'sourceId'], sourceId);
   if (node.action?.type === 'domain') next = replaceAt(next, [...path, 'action', 'sourceId'], sourceId);
+  // A camera tile opens a sheet that must play the same camera, so the sheet follows in the same step.
+  const old = node.props?.sourceId, sheet = node.type === 'camera-tile' ? node.action?.modalId : undefined;
+  const modalAt = document.modals.findIndex(modal => modal.id === sheet);
+  if (typeof old === 'string' && old !== sourceId && modalAt >= 0) {
+    const follow = (value: unknown): unknown => Array.isArray(value) ? value.map(follow) : value && typeof value === 'object'
+      ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, key === 'sourceId' && child === old ? sourceId : follow(child)])) : value;
+    next = replaceAt(next, ['modals', modalAt, 'components'], follow(document.modals[modalAt].components));
+  }
   return next;
 }
 
@@ -84,14 +92,25 @@ export function bindEntity(document: CompositionDocument, path: EditorPath, enti
 /** Points the node at an existing source (a "Models" choice). */
 export const bindSource = (document: CompositionDocument, path: EditorPath, sourceId: string): CompositionDocument => pointAt(document, path, sourceId);
 
+/** Whether the camera tile at `path` is the only node that opens its sheet, so the sheet may follow a new camera. */
+function ownsSheet(document: CompositionDocument, path: EditorPath): boolean {
+  const modalId = (valueAt(document, path) as NodeRefs | undefined)?.action?.modalId;
+  const count = (value: unknown): number => Array.isArray(value) ? value.reduce<number>((sum, child) => sum + count(child), 0) : value && typeof value === 'object'
+    ? Object.entries(value).reduce<number>((sum, [key, child]) => sum + (key === 'modalId' && child === modalId ? 1 : count(child)), 0) : 0;
+  return modalId !== undefined && count(document.pages) + count(document.modals) + count(document.navigation) === 1;
+}
+
 /**
  * What a node's data field offers: whether a Home Assistant entity can be picked (the node reads one entity, or nothing yet),
  * and the model sources it may switch to (same model as now, reading no single entity).
  */
 export function sourceChoices(document: CompositionDocument, path: EditorPath): { acceptsEntity: boolean; models: Source[] } {
   const current = document.dataSources.find(source => source.id === nodeSourceId(document, path));
-  const acceptsEntity = !current || sourceEntity(current) !== undefined;
-  const models = document.dataSources.filter(source => source.kind === 'model' && sourceEntity(source) === undefined && (!current || (current.kind === 'model' && current.model === source.model)));
+  // A camera is more than one entity (its stream, snapshot and recording belong together), so it is swapped for another camera source, never re-pointed.
+  const camera = current?.kind === 'model' && current.model === 'camera-stream@1';
+  const acceptsEntity = !current || (sourceEntity(current) !== undefined && !camera);
+  const models = document.dataSources.filter(source => source.kind === 'model' && (camera ? source.model === 'camera-stream@1' && (source.id === current?.id || ownsSheet(document, path)) : sourceEntity(source) === undefined)
+    && (!current || (current.kind === 'model' && current.model === source.model)));
   return { acceptsEntity, models };
 }
 
@@ -100,4 +119,30 @@ export function boundEntity(document: CompositionDocument, path: EditorPath): st
   const node = valueAt(document, path) as { binding?: { sourceId: string }; props?: { sourceId?: string } } | undefined;
   const id = node?.binding?.sourceId ?? node?.props?.sourceId;
   return sourceEntity(document.dataSources.find(source => source.id === id));
+}
+
+/** Domains a node's source model accepts for its one entity; the compiler rejects any other (spec 8.1). */
+const modelDomains = (source: Source): readonly string[] | undefined => {
+  if (source.kind !== 'model') return undefined;
+  switch (source.model) {
+    case 'power-toggle@1': return ['switch', 'input_boolean'];
+    case 'home-light@1': return ['light', 'switch', 'input_boolean'];
+    case 'camera-stream@1': return ['camera'];
+    case 'alarm-mode@1': return ['alarm_control_panel'];
+    case 'security-door@1': return [source.inputs.kind === 'lock' ? 'lock' : 'cover'];
+    case 'household-away-status@1': return ['sensor'];
+    default: return undefined;
+  }
+};
+
+/**
+ * The domains the entity picker may offer a node: those its current source model accepts, else (no source yet) those its type
+ * needs. `undefined` means any entity fits (a plain entity source). A picker choice outside this set would leave the draft
+ * invalid, so the picker lists nothing else; to read a light, add a Toggle or Light tile from Entities instead.
+ */
+export function acceptedDomains(document: CompositionDocument, path: EditorPath, byType: Readonly<Record<string, readonly string[]>> = {}): readonly string[] | undefined {
+  const current = document.dataSources.find(source => source.id === nodeSourceId(document, path));
+  if (current) return modelDomains(current);
+  const node = valueAt(document, path) as { type?: string } | undefined;
+  return byType[String(node?.type)];
 }
