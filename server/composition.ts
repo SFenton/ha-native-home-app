@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { compileCompositionDocument, supportedCompositionCapabilities, parseCompositionShape, legacyManifest } from '../src/shared/composition/compiler';
 import { assertCompositionBounds, canonicalCompositionJSON, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON, reject } from '../src/shared/composition/json';
+import { assertNoLogic } from '../src/shared/composition/logic-library';
 import { compositionPublicationSchema, type CompositionDocument, type CompositionPublication } from '../src/shared/composition/schema';
 
 export function compositionAssetManifestHash(assets: CompositionDocument['assets']): string {
@@ -10,6 +11,8 @@ export function compositionAssetManifestHash(assets: CompositionDocument['assets
 /** Server publication gate; the browser's document compiler never needs secure-context crypto. */
 export function validateCompositionPublication(input: unknown): CompositionPublication {
   assertCompositionBounds(input);
+  // The library is the draft's; a publication holds only what it worked out into.
+  if (input && typeof input === 'object' && 'document' in input) assertNoLogic(input.document);
   if (input && typeof input === 'object' && 'envelopeVersion' in input && input.envelopeVersion !== '2.0') reject('unsupported_schema', '/envelopeVersion');
   if (input && typeof input === 'object' && 'document' in input && input.document && typeof input.document === 'object'
     && 'schemaVersion' in input.document && input.document.schemaVersion !== '2.0') reject('unsupported_schema', '/document/schemaVersion');

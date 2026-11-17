@@ -6,13 +6,15 @@ import { z } from 'zod/v4';
 import { compileCompositionDocument, parseCompositionShape } from '../src/shared/composition/compiler';
 import { canonicalCompositionJSON, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON, reject } from '../src/shared/composition/json';
 import { compositionPublicationSchema, type CompositionDocument, type CompositionPublication } from '../src/shared/composition/schema';
+import { publishedDocument } from '../src/shared/composition/logic-library';
 import { createCompositionDocument, type CompositionDraft, type UploadedCompositionAsset } from '../src/shared/composition/workspace';
 import { compositionAssetManifestHash, validateCompositionPublication } from './composition';
 import { compositionAssetName, inspectCompositionImage, MAX_COMPOSITION_ASSET_BYTES } from './composition-assets';
 import { atomicJson, HttpError } from './store';
 
 const stateSchema = z.strictObject({
-  draft: compositionPublicationSchema.omit({ publishedAt: true }),
+  // The draft's document may hold a logic library and uses; `validateDraft` checks it by working it out.
+  draft: compositionPublicationSchema.omit({ publishedAt: true, document: true }).extend({ document: z.unknown() }),
   publishedRevision: z.number().int().positive().nullable(),
 });
 const migrationStateSchema = z.object({
@@ -68,7 +70,7 @@ export class CompositionStore {
     const bytes = await optionalRead(path.join(store.directory, 'state.json'), MAX_COMPOSITION_ENVELOPE_BYTES + 1024);
     if (bytes) {
       const state = parseCompositionShape(stateSchema, parseCompositionJSON(bytes));
-      store.draft = store.validateDraft(state.draft);
+      store.draft = store.validateDraft(state.draft as CompositionDraft);
       if (state.publishedRevision !== null) {
         store.published = validateCompositionPublication(parseCompositionJSON(await boundedRead(
           path.join(store.directory, 'revisions', `${state.publishedRevision}.json`), MAX_COMPOSITION_ENVELOPE_BYTES)));
@@ -77,7 +79,7 @@ export class CompositionStore {
           throw new Error('Native publication identity or revision does not match stored state');
         if (store.published.revision === store.draft.revision
           && canonicalCompositionJSON({ ...store.published, publishedAt: store.draft.updatedAt })
-            !== canonicalCompositionJSON({ ...store.draft, publishedAt: store.draft.updatedAt }))
+            !== canonicalCompositionJSON({ ...store.draft, document: publishedDocument(store.draft.document), publishedAt: store.draft.updatedAt }))
           throw new Error('Native publication does not match its saved draft revision');
         await store.verifyAssets(store.published.document);
       }
@@ -114,10 +116,14 @@ export class CompositionStore {
     await store.persist(next, state.publishedRevision);
     return { from: state.draft.revision, to: next.revision };
   }
+  /**
+   * Checks the draft as it would be published: its logic worked out, the capabilities those texts need. The result keeps the draft's own document
+   * (library and uses included); {@link published} is the published form.
+   */
   private validateDraft(draft: CompositionDraft): CompositionDraft {
-    const publication = validateCompositionPublication({ ...draft, publishedAt: draft.updatedAt });
-    const { publishedAt: _publishedAt, ...validated } = publication;
-    return validated;
+    const publication = validateCompositionPublication({ ...draft, document: publishedDocument(draft.document), publishedAt: draft.updatedAt });
+    const { publishedAt: _publishedAt, document: _document, ...validated } = publication;
+    return { ...validated, document: draft.document };
   }
   private makeDraft(input: unknown, revision: number, publisherId: string): CompositionDraft {
     const { document, capabilities } = compileCompositionDocument(input);
@@ -227,11 +233,13 @@ export class CompositionStore {
       const draft = this.validateDraft(this.draft);
       await this.verifyAssets(draft.document);
       if (this.published?.revision === expected) return this.getPublished();
+      // What is published is the draft with its logic worked out.
+      const worked: CompositionDraft = { ...draft, document: publishedDocument(draft.document) };
       const file = path.join(this.directory, 'revisions', `${expected}.json`);
       const existing = await optionalRead(file, MAX_COMPOSITION_ENVELOPE_BYTES);
       const next = existing ? validateCompositionPublication(parseCompositionJSON(existing))
-        : validateCompositionPublication({ ...draft, publishedAt: new Date().toISOString() });
-      if (canonicalCompositionJSON({ ...next, publishedAt: draft.updatedAt }) !== canonicalCompositionJSON({ ...draft, publishedAt: draft.updatedAt }))
+        : validateCompositionPublication({ ...worked, publishedAt: new Date().toISOString() });
+      if (canonicalCompositionJSON({ ...next, publishedAt: draft.updatedAt }) !== canonicalCompositionJSON({ ...worked, publishedAt: draft.updatedAt }))
         throw new Error('Immutable native publication conflicts with draft');
       if (!existing) await immutableWrite(file, Buffer.from(canonicalCompositionJSON(next)));
       await this.persist(draft, expected);

@@ -24,6 +24,7 @@ import { checkPipelineProvider, checkPipelineRead, checkPipelineSource, checkRep
 import { checkRepeat } from './repeat';
 import { checkChartOperandKind, checkChartSource } from './chart-source';
 import { tileInkDefault } from './tile-ink-gate';
+import { expandBounded, remapLogicIssues } from './logic-library';
 import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
 import { groupProblems } from './grid-groups';
@@ -216,8 +217,39 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 /** Pure first-slice compiler. No requests, actions, asset-byte checks, or native fidelity claims. */
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
 export interface CompileOptions { tileInkDefault?: boolean }
-export function compileCompositionDocument(input: unknown, options: CompileOptions = {}): { document: CompositionDocument; capabilities: string[] } {
+export function compileCompositionDocument(input: unknown, options: CompileOptions = {}): CompiledComposition {
   assertCompositionBounds(input);
+  let expansion: ReturnType<typeof expandBounded>;
+  try { expansion = expandBounded(input); }
+  catch (error) {
+    // Like every other compile issue, a logic issue reads from the document's root.
+    if (error instanceof CompositionValidationError) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
+    throw error;
+  }
+  if (expansion.document === input) {
+    const compiled = compilePlain(input, options, true);
+    return { ...compiled, expanded: compiled.document };
+  }
+  // The draft holds named logic: every use is worked out first, so capabilities, budgets and every other check read plain operands and conditions.
+  // An issue inside a worked-out use is reported where the use stands in the draft.
+  try {
+    const compiled = compilePlain(expansion.document, options);
+    return { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document };
+  } catch (error) {
+    if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings));
+    throw error;
+  }
+}
+/** What compiling a document gives: `document` as it was authored, the `capabilities` its published form needs, and `expanded`, the published form. */
+export interface CompiledComposition {
+  /** The document as authored (a draft keeps its `logicLibrary` and uses); the same object as `expanded` when it holds no logic. */
+  document: CompositionDocument;
+  capabilities: string[];
+  /** The document with every logic use worked out and no `logicLibrary`: what a publication carries. */
+  expanded: CompositionDocument;
+}
+function compilePlain(input: unknown, options: CompileOptions, bounded = false): { document: CompositionDocument; capabilities: string[] } {
+  if (!bounded) assertCompositionBounds(input);
   if (record(input) && input.schemaVersion !== undefined && input.schemaVersion !== '2.0') reject('unsupported_schema', '/document/schemaVersion');
   if (new TextEncoder().encode(canonicalOfBounded(input)).byteLength > MAX_COMPOSITION_BYTES) reject('limit_exceeded', '/document');
   let document: CompositionDocument;

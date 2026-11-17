@@ -417,6 +417,20 @@ Rules the corpus pins down:
   (`src/shared/composition/service-vocabulary.ts`, mirroring the app's `ServerUIServiceVocabulary.allows`): a target must
   start with the called domain and a `script` call has no target. The per-slot service tables and the publish-time
   house-script check are gone; Home Assistant enforces what each person may call.
+- **Logic library** (Studio only, `src/shared/composition/logic-library.ts`). A draft may hold `logicLibrary`, up to 100 entries
+  `{id, name, kind: 'operand' | 'condition', params[], body}` (up to 8 parameters of kind `source-id`, `text`, `number`,
+  `operand` or `condition`, each with an optional `label` and `sample`), and uses `{type: 'logic-ref', logicId, args}` wherever an operand or a condition stands. The body
+  marks each argument with `{type: 'hole', name}` and may itself use other entries (a departure from the design proposal, which kept bodies flat). Before anything else reads the draft, `expandLogic` works every use out
+  (an entry may use another to depth 4; a cycle is refused), so capabilities, the budgets (8 deep, 64 nodes, 32 condition
+  nodes) and the 100,000-value cap all see plain operands and conditions. Expansion has its own budget of 100,000 values, which also
+  counts what each hole copies, so nested arguments cannot make a draft grow without bound; it reports `limit_exceeded`. Issues carry the `/document` prefix like every compile issue; those found in worked-out text are reported at the
+  use's `args` pointer. A publication holds no library, `logic-ref` or `hole` (`assertNoLogic` refuses one), the capability list
+  is unchanged by it, and native and the shared corpus never see it. The draft stays the master: `draftIsLive` and the open
+  check compare the worked-out draft with what the app serves. A saved component whose binding fills an argument of a use in its
+  body has the binding re-pointed to every field the argument lands in (also into a string inside an operand argument);
+  a binding that points at no string in the argument is refused as `binding_type` at the binding. House import (`POST
+  /native/api/import-house-config`) answers 409 for a draft that holds a library. A published copy of a use costs its worked-out size
+  (a count phrase of one case and an otherwise: about 62 values and 790 bytes per use, node included).
 - **Generic actions and rules** (`src/shared/composition/expression.ts`, native-home 7154723). `call-service` is an action
   (`sh.call-service@1`): any `domain.service`, a `target` of operands (`entity_id`, `device_id`, `area_id`, `floor_id`,
   `label_id`), `data` as an `object` operand, `optimistic[]` keyed by a declared `ha-entity` source, and an optional
@@ -424,7 +438,7 @@ Rules the corpus pins down:
   (`sh.bound-control@1`) is a toggle (row or tile, `isOn`, `onAction`, `offAction`), stepper (`value`, `range`, `format`,
   `action`), slider (`value`, `action`; no range or format), choice (2 to 12 `options`, each with `selectedWhen` and an
   `action`) or button (`action`). Operands (`sh.operands@1`) are `literal`, `read`, `control` (only inside a bound control's
-  own call), `viewer`, `format`, `map`, `math`, `object` and `list`; there is no template language. Predicates are `state`,
+  own call), `viewer`, `format`, `map`, `math`, `object` and `list`; the published grammar has no template language (the Studio's draft has one, below). Predicates are `state`,
   `numeric`, `viewer`, `viewer-person`, `all`, `any` and `not`. Limits: depth 8, 64 nodes per expression (128 per call),
   texts 2,000 characters. `visibleWhen` (`sh.visible-when@1`) with `whenUnknown` (`show`, `hide`, `keep`, default `keep`) sits
   on nodes and navigation tabs, never on children of a module list, paged row, status rail or room section, and never on a
