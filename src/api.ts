@@ -5,7 +5,7 @@ export class ApiError extends Error {
 export const apiUrl = (path: string) => `./${path.replace(/^\/+/, '')}`;
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(apiUrl(path), { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
+  const response = await fetch(apiUrl(path), { ...init, headers: { ...(init?.body === undefined || init.body === null ? {} : { 'Content-Type': 'application/json' }), ...init?.headers } });
   const text = await response.text();
   let body: unknown;
   try { body = text ? JSON.parse(text) : undefined; }
