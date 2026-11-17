@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- The dial's inspector gains a Text place group that moves the text in the middle.
+
 ## 0.3.2
 
 - Studio can show when an entity last changed, countdowns, durations and truncated numbers.
