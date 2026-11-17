@@ -20,6 +20,7 @@ import { swipeSchema } from './tile-swipe';
 import { stateWordsSchema } from './state-words';
 import { gridGroupsSchema } from './grid-groups';
 import { avatarLooks, avatarPersonSchema, avatarSizes, badgeSchema, shellProfileSchema } from './profile-badges';
+import { dialControlPropsSchema } from './dial-control';
 
 export { badgeSchema };
 
@@ -738,6 +739,11 @@ const dialNode = object({
     flag: object({ at: z.number().min(0).max(1), ink: inkSchema }).optional(),
     /** Text drawn in the middle, a line each, from the top: the same props as a `text`. */
     center: z.array(textNode.shape.props).min(1).max(3).optional(),
+    /**
+     * Where the block of lines in the middle stands (`sh.dial-text-place@1`): its centre is `share` of the dial's height down (absent: the ring's `centerY`), plus
+     * `offset` points (absent: 0; plain points, not scaled with the text size). A dial that states neither draws as `sh.dial@1` does. At least one is stated.
+     */
+    textAt: object({ share: dialShare.optional(), offset: z.number().min(-64).max(64).optional() }).optional(),
     /** Whether a right-to-left layout flips the sweep. Absent: it does not (a dial is an instrument in space). */
     mirrors: z.boolean().optional(),
   }),
@@ -746,6 +752,19 @@ const dialNode = object({
     object({ element: z.literal('value'), label: textValue(240, false), value: textValue(240, true).optional() }),
   ]),
 });
+/**
+ * A dial control (`sh.dial-control@1`): one or two stoppers on the thermostat's ring, each writing a value, with a rule between them and an optional lowest and
+ * highest each. A release sends the dial's one `action` (reading each stopper as `control` with a `stopper`) or each stopper's own. The readout is one element, its
+ * `a11y`; each drawn stopper is its own adjustable element. See `dial-control.ts` and `dial-control-math.ts`.
+ */
+const dialControlNode = object({
+  ...node, type: z.literal('dial-control'),
+  props: dialControlPropsSchema(inkSchema),
+  action: callServiceSchema.optional(),
+  enabledWhen: enabledWhenSchema.optional(),
+  a11y: object({ label: textValue(240, false), value: textValue(240, true).optional() }),
+});
+export type DialControlNode = z.infer<typeof dialControlNode>;
 const arcPoint = z.tuple([z.number().min(0).max(1000), z.number().min(0).max(1000)]);
 /**
  * An arc with a marker (`sh.arc-track@1`): a curve (a quadratic Bezier from `from` to `to`, bent toward `control`) in a `box` whose shape sets the height, an
@@ -808,7 +827,7 @@ export type CompositionNode = ComponentRefNode | z.infer<typeof settingsControl>
   props: StackProps; action?: CompositionActionSlot; a11y?: StackA11y; children: CompositionNode[];
 } | z.infer<typeof shapeNode> | z.infer<typeof symbolPart> | RepeatNode
  | z.infer<typeof chartNode> | z.infer<typeof gaugeNode>
- | z.infer<typeof dialNode> | z.infer<typeof arcTrackNode> | z.infer<typeof avatarNode>;
+ | z.infer<typeof dialNode> | z.infer<typeof arcTrackNode> | z.infer<typeof avatarNode> | z.infer<typeof dialControlNode>;
 export const compositionNodeSchema: z.ZodType<CompositionNode> = z.lazy(() => z.discriminatedUnion('type', [
   customLightControl, sprinklerControl,
   textNode, navigationTile, actionTile, stateTile, statusChip, roomOverviewTile, lightGroupTile, weatherPanel, alarmPanel, doorTile, settingsLink, roomCard, roomChip, roomNavigationGrid, roomDeviceControlSchema, bedroomControl, remoteNode, vacuumControlSchema, cameraTile, cameraVideo, cameraControls, cameraViewer,
@@ -839,7 +858,7 @@ export const compositionNodeSchema: z.ZodType<CompositionNode> = z.lazy(() => z.
   shapeNode, symbolPart,
   object({ ...node, type: z.literal('repeat'), props: repeatProps, children: z.array(compositionNodeSchema).min(1).max(2) }),
   chartNode, gaugeNode,
-  dialNode, arcTrackNode, avatarNode,
+  dialNode, arcTrackNode, avatarNode, dialControlNode,
 ]));
 export function compositionChildren(node: CompositionNode): CompositionNode[] {
   return node.type === 'tile-grid' || node.type === 'overlay' || node.type === 'stack' || node.type === 'repeat' || node.type === 'section' || node.type === 'status-rail' || node.type === 'room-section' || node.type === 'paged-row' ? node.children

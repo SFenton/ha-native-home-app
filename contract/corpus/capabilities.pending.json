@@ -6,6 +6,8 @@
   "sh.chart@1",
   "sh.choice-icons@1",
   "sh.countdown@1",
+  "sh.dial-control@1",
+  "sh.dial-text-place@1",
   "sh.dial@1",
   "sh.duration-format@1",
   "sh.entity-time@1",

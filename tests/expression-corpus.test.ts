@@ -9,7 +9,7 @@ import type { Operand, Predicate } from '../src/shared/composition/expression';
 import { layoutStack } from '../src/shared/composition/stack-layout';
 import { answerChart } from './chart-corpus';
 import { layoutGauge, type GaugeInput } from '../src/shared/composition/gauge-math';
-import { answerArc, answerDial } from './dial-corpus';
+import { answerArc, answerDial, answerDialCtl } from './dial-corpus';
 import type { Json } from '../src/shared/types';
 
 /**
@@ -21,17 +21,19 @@ type Subject = Record<string, any>;
 interface Case {
   format: number; name: string; note: string; subject: Subject;
   env: { reads?: Record<string, ReadResult>; /** What `readRaw` gives per source id; a source not listed has no entity. */ raw?: Record<string, ReadResult>; /** What `readChanged` gives per source id (`last-changed`); a source not listed has no entity. */ changed?: Record<string, ReadResult>; viewer?: Environment['viewer']; clock?: Environment['clock']; item?: Json; index?: number; params?: Record<string, Json>; flow?: boolean;
+    /** What `control` reads: the one value being sent, and each stopper's value of a dial control. */ controlValue?: Json; controlValues?: Record<string, Json>;
     /** The locale the date styles are pinned to; the Studio draws `en_US` only and the app uses its formatters for others. */ locale?: string; undrawnSymbols?: string[] };
   expected: Record<string, any>;
 }
 /** The kinds of subject a case can have: each is answered by one function of the shared evaluator. */
-const subjectKinds = ['operand', 'condition', 'fill', 'symbol', 'text', 'badge', 'enabled', 'faces', 'action', 'asks', 'progress', 'tab', 'tone', 'stack', 'chart', 'gauge', 'dial', 'arc'] as const;
+const subjectKinds = ['operand', 'condition', 'fill', 'symbol', 'text', 'badge', 'enabled', 'faces', 'action', 'asks', 'progress', 'tab', 'tone', 'stack', 'chart', 'gauge', 'dial', 'arc', 'dialctl'] as const;
 const files = readdirSync(directory).filter(name => name.endsWith('.json')).sort();
 const cases: Case[] = files.map(name => JSON.parse(readFileSync(path.join(directory, name), 'utf8')));
 const environmentOf = (entry: Case): Environment => ({
   read: (sourceId, segments) => entry.env.reads?.[`${sourceId}/${segments.join('/')}`] ?? { status: 'unavailable' },
   readRaw: sourceId => entry.env.raw?.[sourceId] ?? { status: 'unavailable' },
   readChanged: sourceId => entry.env.changed?.[sourceId] ?? { status: 'unavailable' },
+  controlValue: entry.env.controlValue, controlValues: entry.env.controlValues,
   viewer: entry.env.viewer, clock: entry.env.clock, item: entry.env.item, index: entry.env.index, flow: entry.env.flow,
   hasSymbol: entry.env.undrawnSymbols ? name => !entry.env.undrawnSymbols!.includes(name) : undefined,
   params: entry.env.params ? { get: name => entry.env.params![name] } : undefined,
@@ -61,6 +63,7 @@ function answer(entry: Case, env: Environment): unknown {
   if (subject.gauge) return { gauge: layoutGauge(subject.gauge as GaugeInput) };
   if (subject.dial) return { dial: answerDial(subject.dial) };
   if (subject.arc) return { arc: answerArc(subject.arc) };
+  if (subject.dialctl) return { dialctl: answerDialCtl(subject.dialctl) };
   if (subject.progress) return { progress: tileProgress(subject.progress as Operand, env) };
   if (subject.tab) return { tab: tabOnShow(subject.tab.tabs, subject.tab.requested, subject.tab.fallback, env) };
   return { asks: asksFirst(subject.asks.when as Predicate | undefined, env) };

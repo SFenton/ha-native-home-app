@@ -46,6 +46,8 @@ export interface Environment {
   readChanged?(sourceId: string): ReadResult;
   /** The new value of the control that sent the action being resolved. */
   controlValue?: Json;
+  /** The new value of each stopper of a dial control, by stopper id: what `control` with a `stopper` reads (`sh.dial-control@1`). */
+  controlValues?: Readonly<Record<string, Json>>;
   /**
    * The clock `clock` and `date` use; absent means they are unavailable. `now-second` reads the same `now`: a host that ticks once a second (the
    * preview, the app) gives it seconds that move, and a host that does not gives the minute's.
@@ -137,7 +139,10 @@ export function evaluateOperand(operand: Operand, env: Environment): ReadResult 
 function operandResult(operand: Operand, env: Environment): ReadResult {
   switch (operand.type) {
     case 'literal': return value(operand.value);
-    case 'control': return env.controlValue === undefined ? unavailable : value(env.controlValue);
+    case 'control': {
+      const sent = operand.stopper === undefined ? env.controlValue : env.controlValues?.[operand.stopper];
+      return sent === undefined ? unavailable : value(sent);
+    }
     case 'viewer': {
       if (!env.viewer) return loading;
       const field = env.viewer[operand.field];

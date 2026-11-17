@@ -81,9 +81,10 @@ const pathId = (path: EditorPath) => JSON.stringify(path);
 /**
  * Node types the document still carries but the Studio no longer shows or edits: the app owns the behaviour. Today that is the
  * notification-permission banner ("Get door and camera alerts"), which the app turns on by default. The contract keeps the type,
- * so an existing draft that has one still validates, compiles, saves and publishes unchanged.
+ * so an existing draft that has one still validates, compiles, saves and publishes unchanged. The dial control (`sh.dial-control@1`) is listed too until its
+ * editor and simulator dial land (SD3): the contract and corpus come first, so no Studio surface draws or adds one yet.
  */
-export const hiddenNodeTypes: readonly string[] = ['notification-permission-banner'];
+export const hiddenNodeTypes: readonly string[] = ['notification-permission-banner', 'dial-control'];
 /** Whether the Studio leaves this node out of the canvas, the selection index and the properties. */
 export const isHiddenNode = (node: { type: string }): boolean => hiddenNodeTypes.includes(node.type);
 
