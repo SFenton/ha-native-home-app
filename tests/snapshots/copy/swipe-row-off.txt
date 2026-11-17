@@ -1,0 +1,26 @@
+Hall Lights
+Light group tile · Swipe › Swipe
+Title
+Entity
+light.demo_tc_plain
+State Words
+Default
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Swipe to Adjust
+Off
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+Swipe to Adjust, Off
+tc-light-plain
+Copy ID

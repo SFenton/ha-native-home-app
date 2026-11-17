@@ -1,0 +1,25 @@
+Lamp Row
+Template · Sample Detail
+Entity
+switch.demo_lamp
+Width
+Automatic
+Half
+Full
+Lamp Row
+Template · Used in 2 places
+Advanced
+ID
+Spacing
+Token
+Presented by
+None
+
+[names]
+More
+Close
+Settings
+Lamp Row, template, used in 2 places
+demo-body
+Copy ID
+Add Presented by

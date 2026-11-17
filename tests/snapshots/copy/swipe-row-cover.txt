@@ -1,0 +1,76 @@
+Blinds
+State tile · Swipe › Swipe
+Title
+Subtitle
+None
+Icon
+blinds.horizontal.open
+Entity
+Active when
+From the style
+Filled when
+From the style
+Error when
+From the style
+Progress
+Choose
+A number from 0 to 1. Nothing is drawn while it is None.
+Buttons
+Add Button
+Icon color
+None
+Button icon color
+None
+In a taller cell
+None
+Badge
+None
+Width
+Automatic
+2 columns
+3 columns
+4 columns
+States
+Style
+Blind
+Show state
+Closed
+Resting. A tap says Open.
+Icon
+From the style
+Words
+Indicator
+From the style
+No arc while this state has an action.
+Color
+From the style
+Behavior
+Only show when
+Always
+Only enabled when
+Always
+Opens
+Nothing
+When tapped
+Set by the style
+Swipe to Adjust
+Cover Position
+Advanced
+ID
+Set by the app: how it is drawn, the unavailable look, axis, commit, the motion between states, the 1 second minimum for an in-progress look, haptics and what VoiceOver announces.
+
+[names]
+More
+Close
+Add Subtitle
+Active when: From the style.
+Filled when: From the style.
+Error when: From the style.
+Add Icon color
+Add Button icon color
+Add In a taller cell
+Only show when: Always.
+Only enabled when: Always.
+Swipe to Adjust, Cover Position
+tc-cover
+Copy ID

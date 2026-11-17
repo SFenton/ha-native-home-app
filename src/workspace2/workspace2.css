@@ -1,0 +1,740 @@
+/* The 2.0 workspace chrome. Every colour comes from the --w2-* tokens set by useStudioTheme from Home Assistant's theme
+   (spec section 11); nothing here is a hex palette. Selectors start with .w2-scope so they beat the global element rules in styles.css. */
+.w2 { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--w2-bg); overflow: hidden; }
+.w2[hidden] { display: none; }
+.w2-scope { font-family: var(--w2-font, system-ui, sans-serif); font-size: 13px; font-weight: 400; line-height: 1.4; color: var(--w2-ink-card, inherit); }
+.w2-scope *, .w2-scope *::before, .w2-scope *::after { box-sizing: border-box; }
+.w2 { color: var(--w2-ink); }
+.w2-scope :focus-visible { outline: 2px solid var(--w2-primary); outline-offset: 2px; }
+.w2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Controls: undo the global button and input styling inside the new workspace. */
+.w2-scope button:where(:not(.w2-stage *)) { font: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--w2-line); border-radius: 8px; background: transparent; color: var(--w2-ink-card); cursor: pointer; }
+.w2-scope button:where(:not(.w2-stage *)):hover:not(:disabled) { background: var(--w2-hover); border-color: var(--w2-line); }
+.w2-scope button:where(:not(.w2-stage *)):disabled { opacity: .5; cursor: not-allowed; }
+.w2-scope button.w2-primary, .w2-scope button.w2-primary:hover:not(:disabled) { background: var(--w2-primary-fill); border-color: var(--w2-primary-fill); color: var(--w2-on-primary); font-weight: 600; }
+.w2-scope button.w2-primary:disabled { background: var(--w2-field); border-color: var(--w2-line); color: var(--w2-muted); opacity: 1; }
+.w2-scope .w2-icon-button { width: 32px; padding: 0; border-color: transparent; }
+.w2-scope input:not([type=checkbox]):not([type=radio]):where(:not(.w2-stage *)), .w2-scope select:where(:not(.w2-stage *)), .w2-scope textarea:where(:not(.w2-stage *)) { font: inherit; width: 100%; min-width: 0; min-height: 32px; padding: 6px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--w2-field); color: var(--w2-ink-card); }
+.w2-scope textarea:where(:not(.w2-stage *)) { min-height: 84px; resize: vertical; }
+.w2-scope input:focus, .w2-scope select:where(:not(.w2-stage *)):focus, .w2-scope textarea:where(:not(.w2-stage *)):focus { border-color: var(--w2-primary); }
+.w2-scope input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--w2-primary); }
+.w2-scope input[type=checkbox][role=switch] { appearance: none; width: 40px; height: 24px; border-radius: 12px; background: var(--w2-field); border: 1px solid var(--w2-line); position: relative; transition: background .15s; flex-shrink: 0; }
+.w2-scope input[type=checkbox][role=switch]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--w2-muted); transition: transform .15s, background .15s; }
+.w2-scope input[type=checkbox][role=switch]:checked { background: var(--w2-primary); border-color: var(--w2-primary); }
+.w2-scope input[type=checkbox][role=switch]:checked::after { transform: translateX(16px); background: var(--w2-on-primary); }
+.w2-scope code:where(:not(.w2-stage *)) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+@media (pointer: coarse) {
+  .w2-scope button:where(:not(.w2-stage *)), .w2-scope input:not([type=checkbox]):not([type=radio]):where(:not(.w2-stage *)), .w2-scope select:where(:not(.w2-stage *)) { min-height: 44px; }
+  .w2-scope .w2-icon-button { width: 44px; }
+  .w2-scope .w2-segment-pill button, .w2-scope .w2-segment button { min-height: 44px !important; }
+  .w2-scope input[type=checkbox][role=switch] { min-height: 0; height: 28px; width: 48px; }
+  .w2-scope input[type=checkbox][role=switch]::after { width: 22px; height: 22px; }
+  .w2-scope input[type=checkbox][role=switch]:checked::after { transform: translateX(20px); }
+  .w2-switch-row, .w2-menu-item, .w2-list-row, .w2-page-row, .w2-check-row, .w2-link-row { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .w2-scope * { transition: none !important; animation: none !important; } }
+
+/* Top bar */
+.w2-topbar { flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 12px; background: var(--w2-card); border-bottom: 1px solid var(--w2-line); position: relative; z-index: 2; }
+.w2-narrow .w2-topbar { height: 52px; gap: 4px; padding: 0 6px; flex-wrap: nowrap; }
+.w2-wordmark { font-weight: 700; font-size: 15px; letter-spacing: -.01em; padding-inline: 4px; white-space: nowrap; }
+.w2-page-button { max-width: 240px; }
+.w2-page-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Rule 2 (studio-ux2, F3 and F5): wide, three groups in a grid and nothing placed over another. The middle group sits in the middle while
+   the outer ones leave room for it, and gives way to them when they do not (the columns are never narrower than their content). */
+.w2-wide .w2-topbar { display: grid; grid-template-columns: minmax(min-content, 1fr) auto minmax(min-content, 1fr); gap: 12px; }
+.w2-leading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.w2-narrow .w2-leading { display: contents; }
+.w2-center { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.w2-trailing { margin-inline-start: auto; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.w2-segment-pill { display: inline-flex; padding: 2px; background: var(--w2-field); border-radius: 10px; gap: 2px; }
+.w2-scope .w2-segment-pill button { border: 0; min-height: 28px; border-radius: 8px; padding: 0 14px; }
+.w2-scope .w2-segment-pill button[aria-pressed=true], .w2-scope .w2-segment-pill button[aria-checked=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
+.w2-window-button { font-variant-numeric: tabular-nums; }
+.w2-status-narrow { margin-inline-start: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 0 7px; flex: 0 1 auto; }
+.w2-narrow .w2-page-button { flex: 1 1 auto; max-width: none; min-width: 96px; justify-content: flex-start; padding: 0 8px; }
+.w2-narrow .w2-trailing { flex: none; margin-inline-start: 0; }
+/* The page name takes the room the status tag gives up: "Draft · Saved" reads "Saved" on a phone (TopBar). */
+.w2-narrow .w2-status-narrow { flex: none; overflow: visible; }
+.w2-tag { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--w2-field); color: var(--w2-ink-card); }
+.w2-scope button.w2-tag-button { border: 0; min-height: 22px; padding: 0 9px; border-radius: 11px; }
+.w2-tag-success { color: var(--w2-ok-text); background: color-mix(in srgb, var(--w2-ok) 16%, var(--w2-card)); }
+.w2-tag-warning { color: var(--w2-warn-text); background: color-mix(in srgb, var(--w2-warn) 16%, var(--w2-card)); }
+.w2-tag-error { color: var(--w2-err-text); background: color-mix(in srgb, var(--w2-err) 14%, var(--w2-card)); }
+
+/* Canvas */
+.w2-canvas { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; overflow: hidden; }
+.w2-stage { position: absolute; inset: 0; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 24px; transition: padding-inline-end .15s; background: var(--w2-bg); }
+.w2-wide .w2-stage { padding-inline-end: 80px; }
+.w2-narrow .w2-stage { padding: 0; }
+.w2-checks-slot { position: absolute; left: 16px; bottom: 16px; z-index: 1; }
+/* Below the preview's safe area (62 px at iPhone size), so it never sits on the Dynamic Island or the status bar. */
+.w2-narrow .w2-checks-slot { top: 68px; bottom: auto; left: 50%; transform: translateX(-50%); }
+.w2-pill { border-radius: 16px; min-height: 32px; background: var(--w2-card); box-shadow: var(--w2-shadow); }
+.w2-scope .w2-pill-note, .w2-scope .w2-pill-note:hover:not(:disabled) { background: var(--w2-ink); color: var(--w2-bg); border-color: var(--w2-ink); font-weight: 600; }
+.w2-scope .w2-pill-error { color: var(--w2-err-text); border-color: var(--w2-err); }
+.w2-bottombar { flex: none; display: flex; justify-content: center; align-items: center; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: var(--w2-card); border-top: 1px solid var(--w2-line); }
+.w2-state { margin: auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 340px; padding: 24px; position: absolute; inset: 0; justify-content: center; }
+.w2-state h2 { margin: 0; font-size: 18px; }
+.w2-state p { margin: 0; }
+.w2-state-reason { color: var(--w2-muted); }
+.w2-device-outline { width: 160px; height: 320px; border: 2px dashed var(--w2-line); border-radius: 28px; }
+
+/* Popups, menus, sheets, dialogs */
+.w2-positioner { z-index: 30; }
+.w2-popover, .w2-menu { background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: var(--w2-radius); box-shadow: var(--w2-shadow); color: var(--w2-ink-card); max-height: min(80vh, 640px); overflow: auto; }
+.w2-popover { padding: 8px; }
+.w2-pages-pop { padding: 8px 0 0; }
+.w2-menu { padding: 6px; min-width: 220px; }
+.w2-menu-item { display: flex; align-items: center; min-height: 36px; padding: 0 10px; border-radius: 6px; cursor: default; user-select: none; outline: 0; }
+.w2-menu-item[data-highlighted] { background: var(--w2-hover); }
+.w2-menu-item[data-disabled] { opacity: .45; }
+.w2-menu-item[data-checked] { font-weight: 600; }
+/* Declared after the 36 px base so it wins: every Base UI menu row is 44 px under a coarse pointer. */
+@media (pointer: coarse) { .w2-menu-item { min-height: 44px; } }
+.w2-menu-name { font-weight: 600; }
+.w2-project-menu { max-height: calc(100dvh - 72px); }
+.w2-danger-item { color: var(--w2-err-text); }
+.w2-menu-sep { height: 1px; margin: 6px 0; background: var(--w2-line); border: 0; }
+.w2-menu-note { padding: 6px 10px; color: var(--w2-muted); font-size: 12px; }
+.w2-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 20; opacity: calc(1 - var(--drawer-swipe-progress, 0)); transition: opacity .2s; }
+.w2-backdrop[data-starting-style], .w2-backdrop[data-ending-style] { opacity: 0; }
+.w2-dialog-viewport { position: fixed; inset: 0; display: grid; place-items: center; z-index: 25; padding: 16px; }
+.w2-dialog { background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: var(--w2-radius); box-shadow: var(--w2-shadow); width: min(560px, 100%); max-height: min(86vh, 760px); display: flex; flex-direction: column; color: var(--w2-ink-card); }
+.w2-dialog-s { width: min(420px, 100%); }
+.w2-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px 16px; }
+.w2-dialog-head h2 { margin: 0; font-size: 16px; }
+.w2-dialog-body { overflow: auto; padding: 4px 16px 16px; }
+.w2-dialog-text { margin: 0; padding: 0 16px 12px; color: var(--w2-ink-card); }
+.w2-dialog-body > .w2-dialog-text, .w2-dialog-text:only-child { padding: 0; }
+.w2-dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--w2-line); }
+.w2-sheet-viewport, .w2-props-viewport { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; z-index: 22; }
+.w2-props-viewport { pointer-events: none; z-index: 12; }
+.w2-sheet { width: 100%; max-height: 92dvh; background: var(--w2-card); border-top: 1px solid var(--w2-line); border-radius: 16px 16px 0 0; box-shadow: var(--w2-shadow); display: flex; flex-direction: column; color: var(--w2-ink-card); transition: transform .35s cubic-bezier(.32,.72,0,1); transform: translateY(var(--drawer-swipe-movement-y, 0px)); }
+.w2-sheet[data-starting-style], .w2-sheet[data-ending-style] { transform: translateY(100%); }
+.w2-sheet-full { height: 92dvh; }
+.w2-props-sheet { pointer-events: auto; height: 100dvh; max-height: calc(100dvh - 8px); transform: translateY(calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px))); touch-action: none; }
+.w2-props-sheet[data-starting-style], .w2-props-sheet[data-ending-style] { transform: translateY(100%); }
+.w2-grabber { flex: none; width: 36px; height: 5px; border-radius: 3px; background: var(--w2-line); margin: 8px auto 4px; }
+.w2-sheet-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom); touch-action: pan-y; }
+/* The sheet is as tall as the screen and slid down to its snap point, so its content ends below the fold: pad by the hidden part (set from the snap in Workspace2) so the last row scrolls into view. */
+.w2-props-content { padding-bottom: calc(var(--w2-sheet-hidden, 0px) + 16px); }
+.w2-sheet-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px 8px; }
+.w2-sheet-title { margin: 0; font-size: 17px; padding: 4px 16px; }
+.w2-sheet-bar .w2-sheet-title { padding: 0; }
+
+/* Properties */
+.w2-props-head { display: flex; align-items: flex-start; gap: 10px; padding: 14px 8px 8px 16px; }
+.w2-props-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--w2-selected); color: var(--w2-link); display: grid; place-items: center; flex: none; }
+.w2-props-titles { flex: 1; min-width: 0; }
+.w2-props-titles h2 { margin: 0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-props-titles p { margin: 2px 0 0; color: var(--w2-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-props-tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.w2-props-body { padding: 4px 0 16px; }
+.w2-notice { margin: 4px 16px; padding: 8px 10px; border-radius: 8px; color: var(--w2-err-text); background: color-mix(in srgb, var(--w2-err) 12%, var(--w2-card)); white-space: pre-wrap; }
+.w2-pushed-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 8px 8px; position: sticky; top: 0; background: var(--w2-card); z-index: 1; border-bottom: 1px solid var(--w2-line); }
+.w2-pushed-head h2 { margin: 0; font-size: 15px; text-align: center; }
+.w2-scope .w2-back { justify-self: start; border-color: transparent; color: var(--w2-link); padding: 0 8px 0 4px; max-width: 140px; overflow: hidden; }
+.w2-pushed-body { padding: 8px 0 16px; }
+.w2-group { padding: 4px 16px 8px; }
+.w2-group + .w2-group { border-top: 1px solid var(--w2-line); padding-top: 12px; }
+.w2-group-title { margin: 8px 0 6px; font-size: 12px; font-weight: 600; color: var(--w2-muted); }
+/* Rule 1 (studio-ux2, F4): one label column and one value column on every properties surface.
+   A label sits 16 px in, is 104 px wide (120 px in a dialog, whose body is inset 16 px too) and is 12 px from its value, so values start at
+   132 px (148 px in a dialog) and fill to 16 px from the trailing edge; controls are 36 px tall (44 px on a coarse pointer), radius 8. */
+.w2-scope { --w2-label-w: 104px; --w2-label-gap: 12px; --w2-value-h: 36px; --w2-row-h: calc(var(--w2-value-h) + 12px); }
+.w2-scope.w2-dialog { --w2-label-w: 120px; }
+@media (pointer: coarse) { .w2-scope { --w2-value-h: 44px; } }
+.w2-row { margin: 0; min-height: var(--w2-row-h); display: flex; flex-direction: column; justify-content: center; }
+.w2-row .field, .w2-form .field { display: grid; grid-template-columns: var(--w2-label-w) minmax(0, 1fr); align-items: center; column-gap: var(--w2-label-gap); margin: 0; min-height: var(--w2-row-h); }
+.w2-scope .field > span:first-child, .w2-scope .checkbox-field > span, .w2-row-label { font-size: 13px; font-weight: 400; color: var(--w2-muted); line-height: 1.3; }
+.w2-scope .field > small { grid-column: 2; color: var(--w2-err-text); font-size: 12px; }
+.w2-scope .field:has(textarea) { grid-template-columns: 1fr; row-gap: 4px; padding: 6px 0; }
+.w2-scope .field input, .w2-scope .field select, .w2-scope .field textarea { font-size: 13px; padding: 6px 10px; color: var(--w2-ink-card); border-color: transparent; background: var(--w2-field); }
+.w2-scope .field input, .w2-scope .field select { height: var(--w2-value-h); min-height: var(--w2-value-h); }
+.w2-scope .field input:focus, .w2-scope .field select:focus { border-color: var(--w2-primary); }
+/* The one menu field: filled, a chevron, words ending in an ellipsis before it. */
+.w2-scope button.w2-select { width: 100%; min-width: 0; height: var(--w2-value-h); min-height: var(--w2-value-h); justify-content: space-between; gap: 8px; padding: 0 10px; font-size: 13px; text-align: start; background: var(--w2-field); border-color: transparent; border-radius: 8px; }
+.w2-scope button.w2-select:focus-visible { outline-offset: 0; }
+.w2-select-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.w2-select-icon { flex: none; display: inline-flex; color: var(--w2-muted); }
+.w2-select-pop { min-width: var(--anchor-width); max-width: min(360px, calc(100vw - 24px)); }
+.w2-scope .w2-select-item { position: relative; padding-inline-start: 28px; }
+.w2-select-check { position: absolute; inset-inline-start: 10px; display: inline-flex; }
+.w2-scope .checkbox-field { display: grid; grid-template-columns: var(--w2-label-w) minmax(0, 1fr); align-items: center; column-gap: var(--w2-label-gap); min-height: var(--w2-row-h); margin: 0; }
+.w2-scope .checkbox-field > input { grid-column: 2; grid-row: 1; justify-self: end; }
+.w2-scope .checkbox-field > span { grid-column: 1; grid-row: 1; }
+.w2-scope fieldset, .w2-scope .composition-fieldset { border: 0; border-radius: 0; background: transparent; padding: 0; margin: 0; min-width: 0; }
+.w2-scope .composition-fieldset legend { padding: 6px 0; color: var(--w2-muted); font-weight: 600; font-size: 12px; }
+.w2-scope .composition-fieldset .composition-fieldset { margin-inline-start: 8px; padding-inline-start: 10px; border-inline-start: 2px solid var(--w2-line); }
+.w2-scope .composition-item { border: 0; border-top: 1px solid var(--w2-line); padding: 6px 0; }
+.w2-scope .composition-item > summary { font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.w2-scope .composition-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.w2-scope .add-button { width: 100%; border: 1px dashed var(--w2-line); border-radius: 8px; background: transparent; color: var(--w2-link); min-height: var(--w2-value-h); font-size: 13px; }
+.w2-scope .composition-policy { display: none; }
+.w2-scope .w2-subform { min-width: 0; }
+.w2-scope .w2-subform .w2-subform { margin-inline-start: 8px; padding-inline-start: 10px; border-inline-start: 2px solid var(--w2-line); }
+.w2-scope .field-note { color: var(--w2-muted); font-size: 12px; margin: 4px 0; }
+.w2-switch-row, .w2-segment, .w2-about-row, .w2-row-segment { display: flex; align-items: center; gap: var(--w2-label-gap); min-height: var(--w2-row-h); }
+/* A row that opens something (and an optional value not yet set, which reads "None"): label, summary left-aligned, chevron where a picker's sits. */
+.w2-scope .w2-disclosure-head, .w2-scope .w2-add-row { display: grid; grid-template-columns: var(--w2-label-w) minmax(0, 1fr) auto; align-items: center; column-gap: var(--w2-label-gap); min-height: var(--w2-row-h); width: 100%; padding: 0 10px 0 0; border: 0; border-radius: 8px; text-align: start; justify-content: stretch; }
+.w2-row-label { flex: none; width: var(--w2-label-w); }
+.w2-scope .w2-switch-row .w2-row-label, .w2-scope .w2-row-segment .w2-row-label { width: var(--w2-label-w); }
+.w2-row-segment .w2-segment-field { flex: 1; min-width: 0; }
+/* Width is Half / Full: a segment filling the value column. */
+.w2-scope .w2-segment-field { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; height: var(--w2-value-h); background: var(--w2-field); border-radius: 8px; }
+.w2-scope .w2-segment-field button { min-height: 0; height: 100%; border: 0; border-radius: 6px; padding: 0 8px; }
+.w2-scope .w2-segment-field button[aria-pressed=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
+.w2-summary { flex: 1; min-width: 0; color: var(--w2-ink-card); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.w2-disclosure[data-open] { background: transparent; }
+.w2-disclosure-body { padding: 4px 0 8px 8px; border-inline-start: 2px solid var(--w2-line); margin-inline-start: 4px; padding-inline-start: 10px; }
+.w2-switch-row { justify-content: space-between; }
+.w2-scope .w2-segment { flex-wrap: wrap; }
+.w2-scope .w2-segment button { min-height: 32px; flex: 1; }
+.w2-scope .w2-segment button[aria-pressed=true] { background: var(--w2-selected); border-color: var(--w2-primary); font-weight: 600; }
+.w2-scope .w2-remove { align-self: flex-end; margin: 0 0 6px; font-size: 12px; min-height: 28px; border-color: transparent; color: var(--w2-err-text); }
+@media (pointer: coarse) { .w2-scope .w2-remove { min-height: 44px; min-width: 44px; } }
+.w2-caption { margin: 2px 0 8px; font-size: 12px; color: var(--w2-muted); }
+/* studio-ux2 L-small (G4): the ID row is the standard grid, label then one read-only field with the ID and a Copy glyph. */
+.w2-id-row { display: grid; grid-template-columns: var(--w2-label-w) minmax(0, 1fr); align-items: center; column-gap: var(--w2-label-gap); min-height: var(--w2-row-h); }
+.w2-id-field { display: flex; align-items: center; min-width: 0; height: var(--w2-value-h); border: 1px solid var(--w2-line); border-radius: 8px; padding-inline-start: 10px; }
+.w2-id-field code { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; user-select: all; color: var(--w2-ink-card); }
+.w2-scope .w2-id-copy { flex: none; width: var(--w2-value-h); height: calc(var(--w2-value-h) - 2px); min-height: 0; padding: 0; border: 0; background: transparent; color: var(--w2-muted); }
+.w2-link-row, .w2-list-row, .w2-page-row, .w2-check-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; justify-content: flex-start; border: 0 !important; padding: 8px 12px; min-height: 48px; }
+.w2-scope .w2-list-row { padding-inline: 16px; border-radius: 0; }
+.w2-list, .w2-pages ul, .w2-checks ul, .w2-move-list, .w2-tab-list, .w2-history, .w2-activity { list-style: none; margin: 0; padding: 0; }
+.w2-pages ul ul { margin: 0; }
+.w2-list + .w2-list { border-top: 1px solid var(--w2-line); }
+.w2-advanced-row { margin-top: 4px; }
+.w2-page-text { display: flex; flex-direction: column; min-width: 0; flex: 1; align-items: flex-start; }
+.w2-page-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.w2-page-via { color: var(--w2-muted); font-size: 12px; }
+.w2-page-row[data-current] { background: var(--w2-selected); }
+.w2-search { display: flex; align-items: center; gap: 8px; margin: 4px 12px 8px; padding: 0 10px; background: var(--w2-field); border-radius: 8px; color: var(--w2-muted); }
+.w2-scope .w2-search input { background: transparent; border: 0; padding-inline: 0; outline: 0; }
+.w2-search:focus-within { outline: 2px solid var(--w2-primary); }
+.w2-pages-scroll { overflow: auto; max-height: min(60vh, 520px); padding-bottom: 8px; }
+.w2-narrow .w2-pages-scroll { max-height: none; }
+.w2-pages .w2-group-title { padding-inline: 16px; }
+.w2-empty, .w2-empty-block { display: flex; align-items: center; gap: 8px; color: var(--w2-muted); padding: 12px 16px; margin: 0; }
+.w2-checks { padding: 4px 0 8px; min-width: 300px; }
+.w2-checks .w2-group-title { padding-inline: 12px; }
+.w2-check-text { flex: 1; }
+.w2-tone-error { color: var(--w2-err-text); flex: none; }
+.w2-tone-warning { color: var(--w2-warn-text); flex: none; }
+.w2-save-failure { padding: 8px 12px; border-radius: 8px; margin: 4px 8px; background: color-mix(in srgb, var(--w2-err) 12%, var(--w2-card)); color: var(--w2-err-text); }
+.w2-save-failure p { margin: 0 0 8px; display: flex; gap: 6px; }
+.w2-tab-row { display: flex; align-items: center; }
+.w2-scope .w2-tab-open { flex: 1; min-width: 0; border: 0; justify-content: flex-start; min-height: 48px; text-align: start; }
+.w2-tabs-panel { padding: 0 16px; }
+.w2-tabs-add { padding: 8px 0; }
+.w2-scope .w2-danger { color: var(--w2-err-text); }
+.w2-wallpaper { padding: 8px 16px; display: flex; flex-direction: column; gap: 10px; }
+.w2-thumb { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--w2-field); display: grid; place-items: center; font-size: 11px; color: var(--w2-muted); text-align: center; }
+.w2-wallpaper-actions, .w2-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.w2-error-text { color: var(--w2-err-text); margin: 4px 0; }
+.w2-pre { white-space: pre-wrap; font-family: inherit; }
+.w2-code { font-family: ui-monospace, Menlo, monospace !important; font-size: 12px !important; min-height: 160px; }
+.w2-code-tall { min-height: 50vh; }
+.w2-history li, .w2-activity li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; border-bottom: 1px solid var(--w2-line); }
+.w2-history-text { display: flex; flex-direction: column; }
+.w2-history-text time { color: var(--w2-muted); font-size: 12px; }
+.w2-project-sheet { padding-bottom: 16px; }
+.w2-ha-line { padding: 8px 16px; }
+.w2-menu-list { list-style: none; margin: 0; padding: 0; }
+.w2-form { padding: 4px 0; }
+.w2-dialog-body .w2-form { padding: 0; }
+.field-leaf { min-width: 0; }
+.w2-toast-viewport { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 40; width: min(320px, 90vw); pointer-events: none; display: flex; justify-content: center; }
+.w2-narrow ~ .w2-toast-viewport { bottom: 84px; }
+.w2-toast { background: var(--w2-ink); color: var(--w2-bg); border-radius: 10px; padding: 10px 16px; font-weight: 600; box-shadow: var(--w2-shadow); transition: opacity .2s, transform .2s; }
+.w2-toast[data-starting-style], .w2-toast[data-ending-style] { opacity: 0; transform: translateY(8px); }
+
+
+/* The selected tile's handle (wide): drawn into the preview's slot, so it uses its own look, not the chrome's. */
+.w2-handle { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: #fff; color: #1c1c1e; box-shadow: 0 1px 6px rgba(0,0,0,.35); transform: scale(var(--w2-handle-scale, 1)); transform-origin: top right; }
+.w2-handle button { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.w2-handle button:hover, .w2-handle button[aria-expanded=true] { background: rgba(0,0,0,.1); }
+.w2-handle button:focus-visible { outline: 2px solid var(--studio-selection, #03a9f4); outline-offset: 1px; }
+.w2-handle-grip { cursor: grab !important; touch-action: none; user-select: none; }
+@media (pointer: coarse) {
+  .w2-handle button { width: 44px; height: 44px; }
+  /* The remaining small controls: the status tag, the Tabs heading button and a target chip's remove. */
+  .w2-scope button.w2-tag-button { min-height: 44px; min-width: 44px; }
+  .w2-scope .w2-chip-remove { min-height: 44px; width: 44px; margin-block: -12px; }
+}
+
+/* This Page (spec 5.3) */
+.w2-pages-views { margin: 0 12px 8px; }
+.w2-this-page-list { list-style: none; margin: 0; padding: 0; overflow: auto; }
+.w2-this-row { display: flex; align-items: center; min-height: 32px; border-radius: 8px; }
+.w2-this-row[data-current] { background: var(--w2-selected); }
+.w2-this-grip { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: none; color: inherit; touch-action: none; cursor: grab; }
+.w2-this-main { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-height: 32px; border: 0; background: none; color: inherit; text-align: start; padding: 0 8px; }
+.w2-this-main .w2-page-title { flex: 0 1 auto; min-width: 0; }
+/* Outline rows (Pages, This Page): left-aligned, 16 to 20 px per level, no boxes, 32 px tall (44 px on a coarse pointer), names ending in an ellipsis inside the panel. */
+.w2-scope .w2-page-row { min-height: 32px; padding-block: 2px; padding-inline-end: 8px; }
+.w2-page-item .w2-icon-button { flex: none; }
+@media (pointer: coarse) { .w2-this-row, .w2-this-main, .w2-this-grip, .w2-scope .w2-page-row { min-height: 44px; } .w2-this-grip { width: 44px; height: 44px; } }
+.w2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.w2-pushed-head .w2-done { justify-self: end; min-width: 64px; }
+.w2-chip-static { display: inline-flex; padding: 2px 8px; border-radius: 10px; background: var(--w2-selected); font-size: 12px; }
+
+/* Move To…: a search field over the places, grouped by page or sheet */
+.w2-scope .w2-move input.w2-move-search[type=search] { display: block; margin: 8px 12px; width: calc(100% - 24px); box-sizing: border-box; }
+.w2-move .w2-group-title { padding-inline: 12px; }
+.w2-move .w2-link-row { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding-block: 6px; }
+.w2-scope .w2-pill[hidden] { display: none; }
+
+/* Rule 3 (studio-ux2, F19): the simulator rail. A column to the right of the device, or a row under the preview on a phone. */
+.w2-rail-slot { position: absolute; transform: translateY(-50%); z-index: 1; }
+.w2-rail { display: flex; align-items: center; gap: 2px; padding: 6px; background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: 22px; box-shadow: var(--w2-shadow); }
+.w2-rail[data-orientation=vertical] { flex-direction: column; }
+.w2-scope .w2-rail .w2-icon-button { width: 36px; height: 36px; min-height: 36px; border-radius: 18px; }
+.w2-scope .w2-rail .w2-icon-button[aria-pressed=true] { background: var(--w2-selected); color: var(--w2-link); }
+.w2-scope .w2-rail .w2-icon-button:disabled { opacity: .35; }
+.w2-rail-sep { flex: none; background: var(--w2-line); }
+.w2-rail[data-orientation=vertical] .w2-rail-sep { width: 20px; height: 1px; margin: 3px 0; }
+.w2-rail[data-orientation=horizontal] .w2-rail-sep { width: 1px; height: 20px; margin: 0 3px; }
+.w2-rail-under { flex: none; display: flex; justify-content: center; padding: 6px 12px; background: var(--w2-card); border-top: 1px solid var(--w2-line); }
+.w2-rail-under .w2-rail { border: 0; box-shadow: none; padding: 0; }
+@media (pointer: coarse) { .w2-scope .w2-rail .w2-icon-button { width: 44px; height: 44px; min-height: 44px; border-radius: 22px; } }
+/* A coarse pointer: the segment's buttons are the targets, so they are 44 px and the frame grows around them. */
+@media (pointer: coarse) { .w2-scope .w2-segment-field { height: auto; } .w2-scope .w2-segment-field button { min-height: 44px; height: 44px; } }
+
+/* ===== L-wide (studio-ux2): the library rail and panel, the inspector column, the device glide ===== */
+.w2-body { flex: 1; min-height: 0; display: flex; position: relative; overflow: hidden; }
+/* The rail and the docked panel are one surface: one background, no line between them, one hairline against the canvas. */
+.w2-lib { flex: none; position: relative; width: var(--w2-left); background: var(--w2-card); z-index: 3; }
+.w2-lib::after { content: ''; position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: 1px; background: var(--w2-line); z-index: 4; pointer-events: none; }
+.w2-lib[data-tier=flyout]::after { display: none; }
+.w2-lib-rail { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; width: 64px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; background: var(--w2-card); border: 0; }
+.w2-scope .w2-lib-rail-button { width: 58px; height: 52px; min-height: 52px; padding: 0; flex-direction: column; gap: 2px; border: 0; border-radius: 12px; color: var(--w2-muted); }
+.w2-scope .w2-lib-rail-button[aria-pressed=true], .w2-scope .w2-lib-rail-button[aria-pressed=true]:hover:not(:disabled) { background: var(--w2-selected); color: var(--w2-link); font-weight: 600; }
+.w2-lib-glyph { display: inline-flex; }
+/* "Components" at 10 px is 61 px wide, three more than the 58 px button: the label's box is the rail's 64 px (it spills 3 px each side of the pill), so no label is clipped. */
+.w2-lib-label { display: block; width: 64px; margin-inline: -3px; text-align: center; font-size: 10px; letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+@media (pointer: coarse) { .w2-scope .w2-lib-rail-button { height: 56px; min-height: 56px; } }
+
+.w2-lib-panel { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; background: var(--w2-card); color: var(--w2-ink-card); overflow: hidden;
+  transform: translateX(-100%); transition: transform .2s cubic-bezier(.32,.72,0,1); will-change: transform; }
+.w2-lib-panel[data-open] { transform: none; }
+.w2-lib-panel[data-tier=docked] { inset-inline-start: 64px; width: 272px; z-index: 1; }
+.w2-lib-panel[data-tier=flyout] { inset-inline-start: 0; width: 300px; z-index: 3; transition-duration: .25s; border-inline-end: 1px solid var(--w2-line); }
+.w2-lib-panel[data-tier=flyout][data-open] { box-shadow: 8px 0 30px rgba(0,0,0,.22); }
+.w2-lib-head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 44px; padding-inline: 12px 6px; }
+.w2-lib-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.w2-lib-tabs { height: 56px; padding-inline: 4px; }
+.w2-lib-tabs .w2-icon-button { flex: none; }
+.w2-lib-tabs [role=tablist] { display: flex; gap: 0; min-width: 0; }
+.w2-scope .w2-lib-tabs [role=tab] { height: 44px; min-width: 44px; padding: 0 8px; flex: 0 1 auto; border: 0; border-radius: 10px; color: var(--w2-muted); }
+.w2-scope .w2-lib-tabs [role=tab][aria-selected=true] { background: var(--w2-selected); color: var(--w2-link); font-weight: 600; }
+.w2-lib-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.w2-lib-body .w2-pages, .w2-palette { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.w2-lib-body .w2-search { height: 36px; border-radius: 18px; margin: 10px 12px 6px; flex: none; }
+.w2-lib[data-tier=flyout] .w2-search, .w2-lib-panel[data-tier=flyout] .w2-search { height: 44px; border-radius: 22px; }
+.w2-lib-body .w2-pages-scroll, .w2-lib-scroll { flex: 1; min-height: 0; max-height: none; overflow: auto; }
+.w2-lib-foot { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 52px; padding: 8px 12px; border-top: 1px solid var(--w2-line); }
+.w2-lib-panel[data-tier=flyout] .w2-page-row, .w2-lib-panel[data-tier=flyout] .w2-this-main { min-height: 44px; }
+.w2-tree { border-inline-start: 0; }
+.w2-tree .w2-this-page-list { margin: 0; }
+.w2-palette-grid { list-style: none; margin: 0; padding: 4px 12px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.w2-scope .w2-palette-cell { width: 100%; min-height: 64px; height: 64px; flex-direction: column; gap: 4px; padding: 4px; font-size: 12px; text-align: center; border-radius: 12px; background: var(--w2-field); border-color: transparent; touch-action: none; }
+.w2-palette-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.w2-lib-hint { flex: none; margin: 0; padding: 12px; min-height: 52px; border-top: 1px solid var(--w2-line); color: var(--w2-muted); font-size: 12px; }
+
+.w2-inspector-slot { flex: none; position: relative; width: var(--w2-right); z-index: 2; }
+.w2-inspector { position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: var(--w2-inspector-w); overflow: auto; background: var(--w2-card); border-inline-start: 1px solid var(--w2-line);
+  transform: translateX(100%); transition: transform .2s cubic-bezier(.32,.72,0,1); will-change: transform; }
+.w2-inspector[data-open] { transform: none; }
+[dir=rtl] .w2-lib-panel { transform: translateX(100%); }
+[dir=rtl] .w2-lib-panel[data-open], [dir=rtl] .w2-inspector[data-open] { transform: none; }
+[dir=rtl] .w2-inspector { transform: translateX(-100%); }
+
+/* The simulator rail goes under the device on a canvas under 420 px: the stage keeps 66 px for it and the rail sits centred on the device. */
+.w2-canvas[data-rail=under] .w2-stage { padding-inline-end: 24px; padding-block-end: 66px; }
+.w2-wide .w2-rail-slot { transition: left .2s cubic-bezier(.32,.72,0,1), top .2s cubic-bezier(.32,.72,0,1); }
+.w2-rail-slot[data-under] { transform: translateX(-50%); }
+.w2-scope .w2-pill-away { visibility: hidden; pointer-events: none; }
+
+/* Reduce Motion: no sliding or scaling; a 120 ms fade (the rules above name `transform`, so they are replaced, not added to). */
+@media (prefers-reduced-motion: reduce) {
+  .w2-scope .w2-lib-panel, .w2-scope .w2-inspector { transform: none !important; opacity: 0; transition: opacity .12s linear !important; will-change: auto; }
+  .w2-scope .w2-lib-panel[data-open], .w2-scope .w2-inspector[data-open] { opacity: 1; }
+  .w2-scope .w2-rail-slot { transition: none !important; }
+}
+
+/* The tree under the page on show (the Pages and Modals panels): the rows of "This Page", styled as part of the list. */
+.w2-scope .w2-this-grip { border: 0; padding: 0; min-height: 32px; width: 32px; background: none; color: var(--w2-muted); }
+.w2-scope .w2-this-main { border: 0; background: none; justify-content: flex-start; padding: 0 8px; min-height: 32px; text-align: start; border-radius: 8px; }
+.w2-scope .w2-this-main:hover:not(:disabled) { background: var(--w2-hover); }
+.w2-tree { padding-block: 2px 6px; }
+@media (pointer: coarse) { .w2-scope .w2-this-grip { min-height: 44px; width: 44px; } .w2-scope .w2-this-main { min-height: 44px; } }
+
+/* studio-ux2 L-small (G13): the Use notice on the Components and Controls palettes. */
+.w2-lib-notice { flex: none; display: grid; grid-template-columns: auto 1fr; gap: 8px 8px; align-items: start; margin: 4px 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--w2-field); font-size: 13px; color: var(--w2-ink-card); }
+.w2-lib-notice svg { margin-top: 2px; color: var(--w2-muted); }
+.w2-lib-notice p { margin: 0; }
+.w2-lib-notice button { grid-column: 2; justify-self: start; min-height: 32px; }
+@media (pointer: coarse) { .w2-lib-notice button { min-height: 44px; } }
+.w2-scope .w2-palette-cell[aria-disabled=true] { opacity: .4; cursor: default; }
+
+/* ---- L-phone (studio-ux2 picks 3A and 4): the phone's two bars with fixed slots, and the one-level "This Page" sheet. ---- */
+/* Top bar: 52 px plus the top safe area, 6 px side padding, 4 px between slots. Slot 1 fills what is left (96 px at least); Undo, Redo and
+   More are 44 x 44 and Publish 44 high and about 84 wide. A slot never moves and nothing sits over another. */
+.w2-scope.w2-narrow .w2-topbar { height: calc(52px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0; gap: 4px; }
+.w2-page-slot { position: relative; flex: 1 1 0; min-width: 96px; height: 44px; }
+.w2-scope .w2-page-slot .w2-page-button { width: 100%; height: 44px; max-width: none; justify-content: flex-start; gap: 8px; padding: 0 8px; border-color: transparent; }
+.w2-page-name { flex: 0 1 auto; min-width: 0; padding-bottom: 15px; font-size: 15px; font-weight: 600; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The status line sits under the page's name and is a status, not a button: presses go through it to the page button. */
+.w2-page-status { position: absolute; left: 36px; right: 28px; top: 23px; font-size: 11px; line-height: 15px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.w2-page-status[data-tone=error] { color: var(--w2-err-text); font-weight: 600; }
+.w2-scope.w2-narrow .w2-topbar .w2-icon-button { flex: none; width: 44px; height: 44px; min-height: 44px; padding: 0; }
+.w2-scope.w2-narrow .w2-topbar .w2-slot-publish { flex: none; height: 44px; min-height: 44px; min-width: 84px; padding: 0 16px; border-radius: 22px; }
+.w2-slot-more { position: relative; }
+.w2-more-dot { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--w2-err); box-shadow: 0 0 0 2px var(--w2-card); }
+
+/* Bottom bar: 52 px plus the safe area (8 px at least), 12 px side padding. Edit and Use lead, This Page and Add trail. */
+.w2-scope.w2-narrow .w2-bottombar { justify-content: flex-start; gap: 8px; padding: 4px 12px calc(4px + max(8px, env(safe-area-inset-bottom))); min-height: calc(52px + max(8px, env(safe-area-inset-bottom))); }
+/* The segment is 44 px high end to end so each half is a 44 px target; a 2 px transparent border keeps the drawn pill inset. */
+.w2-bottombar .w2-segment-pill { flex: none; width: 132px; height: 44px; padding: 0; border-radius: 22px; margin-inline-end: auto; }
+.w2-scope .w2-bottombar .w2-segment-pill button { flex: 1; min-height: 44px !important; padding: 0 8px; border: 2px solid transparent; background-clip: padding-box; border-radius: 22px; }
+.w2-scope .w2-bottombar .w2-bottom-page, .w2-scope .w2-bottombar .w2-bottom-add { flex: none; height: 44px; min-height: 44px; padding: 0 14px; border-radius: 22px; font-weight: 600; }
+.w2-scope .w2-bottombar .w2-bottom-page { background: var(--w2-field); border-color: transparent; }
+.w2-scope .w2-bottombar .w2-bottom-page:disabled, .w2-scope .w2-bottombar .w2-bottom-add:disabled { opacity: .4; }
+/* A wider font (Linux and Android system fonts) must not push Add off the bar: This Page gives way first, its name ending in an ellipsis,
+   the way the top bar's page name does. It never goes under its 44 px glyph. */
+.w2-scope .w2-bottombar .w2-bottom-page { flex: 0 1 auto; min-width: 44px; overflow: hidden; }
+.w2-bottom-page svg { flex: none; }
+.w2-bottom-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 359px) {
+  .w2-bottom-label { display: none; }
+  .w2-scope .w2-bottombar .w2-bottom-page { width: 44px; padding: 0; }
+}
+
+/* This Page, one level at a time: the sheet's header has a Back, the level's name over its breadcrumb, and Done. */
+.w2-level-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.w2-level-content > .w2-pushed { flex: 1; min-height: 0; overflow: auto; }
+.w2-level-head { flex: none; display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; min-height: 56px; border-bottom: 1px solid var(--w2-line); }
+.w2-level-lead { display: flex; justify-content: flex-start; padding-inline-start: 4px; }
+.w2-level-trail { display: flex; justify-content: flex-end; padding-inline-end: 8px; }
+.w2-scope .w2-level-back { color: var(--w2-link); }
+.w2-scope .w2-level-done { border-color: transparent; color: var(--w2-link); font-weight: 600; min-width: 44px; padding: 0 8px; }
+.w2-level-titles { min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.w2-level-title-text { margin: 0; max-width: 100%; font-size: 17px; font-weight: 600; line-height: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-crumbs { display: flex; align-items: center; justify-content: center; max-width: 100%; height: 28px; font-size: 12px; color: var(--w2-muted); white-space: nowrap; }
+.w2-crumb-item { display: inline-flex; align-items: center; flex: none; min-width: 0; }
+.w2-crumb-item[data-last] { flex: 0 1 auto; overflow: hidden; }
+.w2-crumb-text { overflow: hidden; text-overflow: ellipsis; }
+.w2-scope .w2-crumb { min-width: 44px; min-height: 44px; margin-block: -8px; padding: 0 4px; border: 0; border-radius: 6px; font-size: 12px; color: var(--w2-muted); overflow: hidden; }
+.w2-scope .w2-crumb-item[data-last] .w2-crumb { min-width: 0; }
+.w2-crumb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-scope .w2-crumb-more { min-width: 44px; }
+.w2-crumb-sep { padding-inline: 2px; }
+.w2-level-scroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.w2-level-view[data-direction=forward] { animation: w2-level-forward .2s cubic-bezier(.32,.72,0,1); }
+.w2-level-view[data-direction=back] { animation: w2-level-back .2s cubic-bezier(.32,.72,0,1); }
+@keyframes w2-level-forward { from { transform: translateX(32px); } to { transform: none; } }
+@keyframes w2-level-back { from { transform: translateX(-32px); } to { transform: none; } }
+@keyframes w2-level-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .w2-scope .w2-level-view[data-direction] { animation: w2-level-fade .12s linear !important; } }
+.w2-level-list { list-style: none; margin: 0; padding: 0; }
+.w2-level-empty { min-height: 56px; }
+.w2-level-row { display: flex; align-items: center; min-height: 56px; border-bottom: 1px solid var(--w2-line); }
+.w2-level-row[data-current] { background: var(--w2-selected); }
+.w2-scope .w2-level-main { flex: 1 1 auto; min-width: 0; min-height: 56px; justify-content: flex-start; gap: 14px; padding: 0 0 0 16px; border: 0; border-radius: 0; background: none; text-align: start; }
+.w2-scope .w2-level-main:hover:not(:disabled) { background: var(--w2-hover); }
+.w2-level-glyph { flex: none; width: 20px; display: grid; place-items: center; color: var(--w2-muted); }
+.w2-level-text { display: flex; flex-direction: column; min-width: 0; }
+.w2-level-title { font-size: 15px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-level-context { font-size: 12px; line-height: 16px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-scope .w2-level-more, .w2-scope .w2-level-grip { flex: none; width: 44px; height: 44px; min-height: 44px; padding: 0; border-color: transparent; color: var(--w2-muted); }
+.w2-scope .w2-level-grip { border: 0; background: none; touch-action: none; cursor: grab; }
+.w2-level-chevron { flex: none; width: 28px; display: grid; place-items: center; color: var(--w2-muted); }
+.w2-level-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 4px 12px calc(4px + env(safe-area-inset-bottom) + var(--w2-sheet-hidden, 0px)); border-top: 1px solid var(--w2-line); }
+.w2-scope .w2-level-foot button { flex: none; height: 44px; min-height: 44px; padding: 0 18px; border-radius: 22px; font-weight: 600; }
+.w2-scope .w2-level-foot .w2-level-settings { background: var(--w2-field); border-color: transparent; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
+
+/* expr: the condition field, the value field, the token line, the result line and Try Values (studio-expr spec, L-expr-ui). Colors come from the --w2-* tokens only. */
+.w2-expr-fieldrow { display: grid; grid-template-columns: var(--w2-label-w, 104px) minmax(0, 1fr); align-items: center; column-gap: var(--w2-label-gap, 12px); min-height: var(--w2-row-h, 48px); padding: 6px 0; }
+.w2-expr-fieldrow[data-has-condition] { min-height: 60px; }
+.w2-expr-fieldrow .w2-row-label { overflow-wrap: anywhere; }
+.w2-expr-problem { grid-column: 2; margin: 4px 0 0; }
+.w2-scope button.w2-expr-fieldbtn { justify-content: flex-start; width: 100%; min-width: 0; min-height: var(--w2-value-h, 36px); padding: 4px 8px 4px 10px; text-align: start; background: var(--w2-field); border-color: transparent; border-radius: 8px; gap: 10px; }
+.w2-scope button.w2-expr-fieldbtn[data-two-line] { min-height: 48px; }
+.w2-scope button.w2-expr-fieldbtn[data-problem] { box-shadow: 0 0 0 2px var(--w2-err); }
+.w2-scope button.w2-expr-fieldbtn > svg:last-child { margin-inline-start: auto; flex: none; }
+.w2-expr-fieldtext { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.w2-expr-line1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.w2-expr-none { color: var(--w2-muted); font-weight: 400; }
+.w2-expr-line2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--w2-muted); font-weight: 400; }
+.w2-expr-faceglyph { flex: none; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; }
+.w2-marker { flex: none; }
+.w2-marker[data-marker=check], .w2-expr-result[data-marker=check] .w2-marker { color: var(--w2-ok); }
+.w2-marker[data-marker=ring], .w2-expr-result[data-marker=ring] .w2-marker { color: var(--w2-muted); }
+.w2-marker[data-marker=unknown], .w2-expr-result[data-marker=unknown] .w2-marker { color: var(--w2-warn); }
+.w2-marker[data-marker=problem], .w2-expr-result[data-marker=problem] .w2-marker { color: var(--w2-err); }
+.w2-expr-valuerow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 4px; }
+.w2-expr-valuerow > .w2-picker-row { grid-column: 1 / -1; }
+.w2-expr-valuerow > .w2-picker-row:first-child:not(:only-child) { grid-column: 1; }
+.w2-scope button.w2-expr-valuebtn { width: 28px; min-width: 28px; min-height: 36px; padding: 0; color: var(--w2-muted); border-color: transparent; background: transparent; }
+.w2-expr-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; background: var(--w2-field); border-radius: 10px; }
+.w2-scope .w2-expr-seg button { min-height: 32px; border-color: transparent; border-radius: 8px; padding: 0 6px; font-size: 13px; }
+.w2-scope .w2-expr-seg button[aria-checked=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
+.w2-scope .w2-expr-seg button[data-dimmed] { color: var(--w2-muted); }
+.w2-expr-editor { display: flex; flex-direction: column; gap: 8px; }
+.w2-expr-grouplabel { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--w2-muted); }
+.w2-expr-simple, .w2-expr-leaf, .w2-expr-readrow { display: flex; flex-direction: column; gap: 8px; }
+.w2-expr-control { min-width: 0; }
+.w2-expr-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.w2-expr-number { display: flex; align-items: center; gap: 6px; }
+.w2-expr-unit { color: var(--w2-muted); }
+.w2-expr-group { display: flex; flex-direction: column; gap: 6px; }
+.w2-expr-nested { margin-inline-start: 12px; padding-inline-start: 10px; border-inline-start: 2px solid var(--w2-primary); }
+.w2-expr-grouphead { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.w2-expr-modepick { width: 92px; flex: none; }
+.w2-expr-ofthese { flex: 1 1 auto; color: var(--w2-muted); }
+.w2-expr-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.w2-expr-rowhead { display: flex; align-items: center; gap: 4px; }
+.w2-scope button.w2-expr-rowbtn { flex: 1 1 auto; min-width: 0; min-height: 40px; justify-content: flex-start; gap: 8px; border-color: transparent; text-align: start; padding: 0 8px; }
+.w2-scope button.w2-expr-grouprow { background: var(--w2-field); }
+.w2-expr-sentence { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-expr-open { display: flex; flex-direction: column; gap: 8px; padding: 8px; border: 1px solid var(--w2-line); border-radius: 8px; }
+.w2-expr-opentitle { margin: 0; font-size: 13px; font-weight: 600; }
+.w2-expr-addrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.w2-expr-addrow > .w2-picker-row { flex: 0 0 auto; min-height: 0; width: auto; }
+.w2-expr-addrow .w2-picker-button { width: auto; min-height: 32px; height: 32px; padding: 0 12px; border: 1px solid var(--w2-line); background: transparent; border-radius: 16px; }
+.w2-expr-addrow .w2-picker-button > svg { display: none; }
+.w2-scope button.w2-expr-add { min-height: 32px; border-radius: 16px; }
+.w2-expr-result { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.w2-expr-result-text { flex: 1 1 auto; min-width: 0; }
+.w2-expr-datatag { flex: none; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: color-mix(in srgb, var(--w2-ok) 16%, var(--w2-card)); color: var(--w2-ok-text); }
+.w2-expr-datatag[data-tag=Demo], .w2-expr-datatag[data-tag=Sample] { background: var(--w2-field); color: var(--w2-muted); }
+.w2-expr-datatag[data-tag=Test] { background: color-mix(in srgb, var(--w2-warn) 20%, var(--w2-card)); color: var(--w2-warn-text); }
+.w2-expr-foldhead { display: flex; width: 100%; justify-content: space-between; border-color: transparent; }
+.w2-expr-chev[data-open] { transform: rotate(90deg); }
+.w2-expr-try-body { display: flex; flex-direction: column; gap: 8px; }
+.w2-expr-tryline { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; }
+.w2-expr-tryline[data-overridden] { background: color-mix(in srgb, var(--w2-warn) 16%, var(--w2-card)); font-weight: 600; }
+.w2-expr-muted { color: var(--w2-muted); }
+.w2-pill-test { display: inline-flex; align-items: center; padding: 0 12px; margin-inline-start: 8px; color: var(--w2-warn-text); font-weight: 600; }
+.w2-expr-rulelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.w2-expr-rulelist > li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; min-height: 56px; border-radius: 8px; position: relative; }
+.w2-expr-rulelist > li[data-used] { background: color-mix(in srgb, var(--w2-ok) 14%, var(--w2-card)); }
+.w2-expr-rulelist > li[data-waiting] { background: color-mix(in srgb, var(--w2-warn) 14%, var(--w2-card)); }
+.w2-expr-rulelist > li[data-drop-before]::before { content: ''; position: absolute; inset-inline: 0; top: -1px; height: 2px; background: var(--w2-primary); }
+.w2-expr-rulelist > li[data-lifted] { box-shadow: var(--w2-shadow); }
+.w2-scope button.w2-expr-grip { min-height: 44px; width: 24px; padding: 0; border: 0; color: var(--w2-muted); touch-action: none; cursor: grab; }
+.w2-expr-grip-gap { width: 24px; }
+.w2-scope button.w2-expr-rulebtn { display: flex; justify-content: flex-start; gap: 8px; min-height: 56px; min-width: 0; border-color: transparent; text-align: start; padding: 0 4px; }
+.w2-expr-ruletext { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.w2-expr-num { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--w2-muted); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.w2-expr-num[data-filled] { background: var(--w2-ok); border-color: var(--w2-ok); color: var(--w2-card); }
+.w2-expr-num-none { border-style: dashed; }
+.w2-expr-tag { flex: none; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--w2-field); }
+.w2-expr-tag[data-tone=used] { color: var(--w2-ok-text); background: color-mix(in srgb, var(--w2-ok) 20%, var(--w2-card)); }
+.w2-expr-tag[data-tone=waiting] { color: var(--w2-warn-text); background: color-mix(in srgb, var(--w2-warn) 20%, var(--w2-card)); }
+.w2-expr-looksum { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+.w2-expr-swatch { display: inline-block; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--w2-line); }
+.w2-expr-swatch[data-standard] { background: repeating-linear-gradient(45deg, var(--w2-field), var(--w2-field) 3px, var(--w2-card) 3px, var(--w2-card) 6px); }
+.w2-expr-pagehead { display: flex; justify-content: space-between; align-items: center; }
+.w2-token-field { display: flex; flex-direction: column; gap: 4px; }
+.w2-token-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px; }
+.w2-token-row > .w2-picker-row { width: 36px; min-height: 36px; }
+.w2-token-row .w2-picker-button { width: 36px; min-height: 36px; padding: 0; justify-content: center; }
+.w2-token-row .w2-picker-face { justify-content: center; }
+@media (pointer: coarse) { .w2-token-row > .w2-picker-row { width: 44px; min-height: 44px; } .w2-token-row .w2-picker-button { width: 44px; min-height: 44px; } }
+.w2-token-row .w2-picker-button > svg:last-child { display: none; }
+.w2-token-line { min-height: 36px; max-height: 84px; overflow-y: auto; padding: 5px 10px; border-radius: 8px; background: var(--w2-field); border: 1px solid transparent; line-height: 24px; overflow-wrap: anywhere; white-space: pre-wrap; outline: none; }
+.w2-token-line:focus { border-color: var(--w2-primary); }
+.w2-token { display: inline-block; height: 24px; line-height: 24px; padding: 0 6px; margin: 0 1px; border-radius: 6px; background: color-mix(in srgb, var(--w2-primary) 18%, var(--w2-card)); font-weight: 600; cursor: pointer; user-select: all; }
+.w2-token[data-selected] { outline: 2px solid var(--w2-primary); }
+.w2-expr-stepper { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; gap: 4px; }
+.w2-scope button.w2-expr-wording, .w2-scope button.w2-expr-remove { justify-content: flex-start; border-color: transparent; }
+.w2-scope button.w2-expr-remove, .w2-scope button.w2-expr-removerule { color: var(--w2-err-text); }
+.w2-expr-picker { display: flex; flex-direction: column; gap: 6px; min-width: 260px; }
+.w2-expr-picklist { list-style: none; margin: 0; padding: 0; }
+.w2-scope button.w2-expr-pickrow { width: 100%; justify-content: flex-start; border-color: transparent; text-align: start; }
+@media (pointer: coarse) {
+  .w2-scope button.w2-expr-fieldbtn { min-height: 48px; }
+  .w2-scope button.w2-expr-valuebtn { width: 44px; min-width: 44px; min-height: 44px; }
+  .w2-scope .w2-expr-seg button { min-height: 44px; min-width: 44px; }
+  .w2-scope .w2-expr-chips button { min-width: 44px; min-height: 44px; }
+  .w2-scope button.w2-expr-rowbtn, .w2-scope button.w2-expr-pickrow { min-height: 44px; }
+  .w2-scope button.w2-expr-add, .w2-expr-addrow .w2-picker-button { min-height: 44px; height: 44px; }
+  .w2-scope .w2-expr-more { min-width: 44px; min-height: 44px; }
+  .w2-token { height: 32px; line-height: 32px; }
+  .w2-scope button.w2-expr-valuebtn, .w2-expr-more { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .w2-expr-chev, .w2-expr-rulelist > li { transition: none; } }
+.w2-menu-item.w2-expr-radio { display: flex; gap: 8px; align-items: center; }
+.w2-expr-check { width: 16px; display: inline-flex; }
+
+/* A page pushed from inside an editor sits in the pushed body, which carries no inset of its own outside a dialog. */
+.w2-pushed-body > .w2-expr-page, .w2-pushed-body > .w2-expr-rulepage, .w2-pushed-body > .w2-token-settings { padding: 0 16px; }
+.w2-editor-body .w2-pushed-body > .w2-expr-page, .w2-editor-body .w2-pushed-body > .w2-expr-rulepage, .w2-editor-body .w2-pushed-body > .w2-token-settings { padding: 0; }
+
+/* lib3: tree (studio-ux2 L-tax, L-tree): the library's header, the level list and the row. Design values from build/design/studio-lib3/spec.md. */
+.w2-lib-level-head { height: 56px; gap: 4px; padding-inline: 12px 6px; justify-content: flex-start; }
+.w2-lib-level-head:not([data-root]) { padding-inline-start: 4px; }
+.w2-lib-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.w2-lib-title { margin: 0; max-width: 100%; font-size: 15px; font-weight: 600; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-lib-sub { margin: 0; max-width: 100%; font-size: 12px; line-height: 16px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-lib-titles .w2-crumbs { height: 20px; justify-content: flex-start; margin-block: -2px; }
+.w2-scope .w2-lib-titles .w2-crumb { min-height: 20px; min-width: 0; margin-block: 0; }
+.w2-lib-level-head .w2-icon-button { flex: none; width: 32px; height: 32px; min-height: 32px; }
+.w2-lib-panel[data-tier=flyout] .w2-lib-level-head { height: 52px; }
+.w2-lib-flyout-head { height: 56px; padding-inline: 8px 6px; gap: 6px; }
+.w2-scope .w2-lib-picker { flex: 1; min-width: 0; height: 44px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--w2-field); color: var(--w2-ink-card); font-weight: 600; justify-content: flex-start; }
+.w2-lib-picker span { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-lib-pick { display: flex; align-items: center; gap: 10px; }
+.w2-lib-pick .w2-lib-check { margin-inline-start: auto; color: var(--w2-link); }
+
+.w2-tree-host .w2-pages-scroll { scrollbar-gutter: stable; padding-inline: 6px; }
+.w2-tree-list { padding-block: 2px; }
+.w2-tree-row { display: flex; align-items: center; min-height: 32px; height: 32px; border-radius: 8px; outline-offset: -2px; cursor: default; font-size: 14px; color: var(--w2-ink-card); }
+.w2-tree-row:hover { background: var(--w2-hover); }
+.w2-tree-row[data-selected] { background: var(--w2-selected); font-weight: 600; }
+.w2-tree-row[aria-current=page] .w2-tree-title { font-weight: 600; }
+.w2-tree-row[data-selected] .w2-tree-icon { color: var(--w2-link); }
+.w2-tree-row[data-dragging] { opacity: .45; }
+.w2-tree-slot { flex: none; width: 20px; height: 100%; display: grid; place-items: center; }
+.w2-scope .w2-tree-disclosure { width: 20px; height: 32px; min-height: 32px; padding: 0; border: 0; background: none; display: grid; place-items: center; color: var(--w2-muted); }
+.w2-tree-triangle { width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 6px solid currentColor; transition: transform .12s linear; }
+[aria-expanded=true] > .w2-tree-triangle { transform: rotate(90deg); }
+.w2-tree-icon { flex: none; width: 24px; height: 24px; display: grid; place-items: center; color: var(--w2-muted); }
+.w2-tree-row[data-muted] .w2-tree-title { color: var(--w2-muted); }
+.w2-tree-row[data-type=shared-area] .w2-tree-icon { color: var(--w2-link); }
+.w2-tree-title { flex: 1 1 auto; min-width: 0; margin-inline-start: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-tree-row .w2-tag { flex: none; height: 20px; }
+.w2-tree-count { flex: none; margin-inline: 6px; font-size: 12px; color: var(--w2-muted); font-weight: 400; }
+.w2-tree-more, .w2-tree-handle-slot { flex: none; width: 28px; height: 28px; display: grid; place-items: center; opacity: .6; }
+.w2-tree-row:hover .w2-tree-more, .w2-tree-row:hover .w2-tree-handle-slot, .w2-tree-row:focus-within .w2-tree-more, .w2-tree-row:focus-within .w2-tree-handle-slot,
+.w2-tree-row[data-selected] .w2-tree-more, .w2-tree-row[data-selected] .w2-tree-handle-slot { opacity: 1; }
+.w2-scope .w2-tree-more .w2-icon-button, .w2-scope .w2-tree-handle { width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; background: none; display: grid; place-items: center; color: var(--w2-muted); border-radius: 6px; }
+.w2-scope .w2-tree-handle { cursor: grab; touch-action: none; }
+.w2-scope .w2-tree-more .w2-icon-button:disabled, .w2-scope .w2-tree-handle:disabled { cursor: default; opacity: .6; }
+.w2-tree-group { margin: 6px 0 2px; height: 28px; padding: 0; }
+.w2-scope .w2-tree-group-button { display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; min-height: 28px; padding: 0 6px; border: 0; background: none; color: var(--w2-muted); font-size: 12px; font-weight: 600; justify-content: flex-start; }
+.w2-tree-group-button svg { transform: rotate(-90deg); transition: transform .12s linear; }
+.w2-tree-group-button svg[data-open] { transform: none; }
+.w2-tree-group-button .w2-tree-count { margin-inline-start: auto; margin-inline-end: 0; font-weight: 400; }
+.w2-tree-hit { height: auto; min-height: 44px; padding-block: 4px; }
+.w2-tree-text { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-inline-start: 6px; }
+.w2-tree-text .w2-tree-title { margin-inline-start: 0; }
+.w2-tree-path { font-size: 12px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-tree-note { margin: 8px 12px; font-size: 12px; color: var(--w2-muted); }
+.w2-tree-note button { min-height: 28px; }
+.w2-crumbs[data-align=start] { justify-content: flex-start; }
+@media (pointer: coarse) {
+  .w2-tree-row { min-height: 44px; height: 44px; font-size: 15px; }
+  .w2-tree-slot { width: 32px; }
+  /* Whatever the font or scrollbar (a classic one takes 15 px), the title keeps 64 px; the tags and the gaps give way before it does. */
+  .w2-tree-title { min-width: 64px; margin-inline-start: 2px; }
+  .w2-tree-count { margin-inline: 2px 0; }
+  .w2-tree-host .w2-pages-scroll { scrollbar-width: thin; }
+  .w2-tree-row .w2-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .w2-scope .w2-tree-disclosure { width: 32px; height: 44px; min-height: 44px; }
+  .w2-tree-more, .w2-tree-handle-slot { width: 44px; height: 44px; }
+  .w2-scope .w2-tree-more .w2-icon-button, .w2-scope .w2-tree-handle { width: 44px; height: 44px; min-height: 44px; }
+  .w2-lib-level-head .w2-icon-button { width: 44px; height: 44px; min-height: 44px; }
+  .w2-tree-group, .w2-scope .w2-tree-group-button { height: 44px; min-height: 44px; }
+}
+
+/* lib3: the phone Pages sheet's four-part segment (L-tax): Tabs, Pages, Sheets, Modals, equal widths, 44 px high. */
+.w2-pages-scope { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin: 0 16px 8px; padding: 2px; background: var(--w2-field); border-radius: 10px; }
+.w2-scope .w2-pages-scope button { min-height: 44px; border: 0; border-radius: 8px; padding: 0 4px; font-size: 14px; background: none; color: var(--w2-ink-card); min-width: 0; }
+.w2-scope .w2-pages-scope button[aria-pressed=true] { background: var(--w2-card); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
+
+/* List icons (studio-ux2 lib3, L-icons): the popover on a library row, and the dot on a row that carries the person's own icon. */
+.w2-licon-popup { width: 260px; padding: 8px 0 10px; overflow: hidden; display: flex; flex-direction: column; }
+.w2-licon-title { margin: 0; padding: 4px 14px 6px; font-size: 13px; font-weight: 600; }
+.w2-licon-grid { display: grid; grid-template-columns: repeat(6, 36px); gap: 2px; justify-content: center; max-height: 216px; overflow-y: auto; padding: 2px 6px; }
+.w2-licon-grid .w2-empty { grid-column: 1 / -1; }
+.w2-licon-cell { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--w2-ink-card); }
+.w2-licon-cell:hover { background: var(--w2-hover); }
+.w2-licon-cell[aria-pressed=true] { background: var(--w2-selected); color: var(--w2-link); }
+.w2-licon-note { margin: 6px 14px 4px; }
+.w2-licon-foot { padding: 0 14px; display: flex; justify-content: flex-end; }
+@media (pointer: coarse) { .w2-licon-grid { grid-template-columns: repeat(6, 44px); } .w2-licon-cell { width: 44px; height: 44px; } .w2-licon-popup { width: 308px; } }
+.w2-tree-icon { position: relative; }
+.w2-tree-icon[data-chosen]::after { content: ''; position: absolute; right: 0; bottom: 1px; width: 6px; height: 6px; border-radius: 50%; background: var(--w2-link); }
+
+/* linked: saved components. The edit question, the inspector line, the Saved group and the tree tag. */
+.w2-linked-actions { display: grid; gap: 8px; padding: 4px 16px 16px; }
+.w2-linked-actions button { width: 100%; min-height: 40px; }
+.w2-linked-actions button.w2-tonal { background: var(--w2-selected); border-color: var(--w2-selected); color: var(--w2-ink-card); font-weight: 600; }
+@media (pointer: coarse) { .w2-linked-actions button { min-height: 44px; } }
+.w2-linked-question:focus { outline: none; }
+.w2-linked-question .w2-dialog-head h2 { overflow-wrap: anywhere; }
+@media (max-width: 599px) { .w2-dialog-s.w2-linked-question { width: calc(100vw - 48px); } }
+.w2-field-error { margin: 6px 0 0; color: var(--w2-error, #b3261e); font-size: 13px; }
+.w2-linked-line { display: flex; gap: 10px; align-items: flex-start; margin: 0 16px 8px; padding: 8px 10px; border-radius: 10px; background: var(--w2-selected); color: var(--w2-ink-card); }
+.w2-linked-line svg { flex: none; margin-top: 2px; color: var(--w2-link); }
+.w2-linked-line div { display: grid; gap: 1px; font-size: 13px; }
+.w2-linked-line span { color: var(--w2-muted); font-size: 12px; }
+.w2-link-tag { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; flex: none; background: color-mix(in srgb, var(--w2-link) 16%, transparent); color: var(--w2-link); }
+
+/* saved components */
+.w2-palette-group { display: grid; gap: 4px; }
+.w2-saved-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.w2-saved-row { display: flex; align-items: center; gap: 4px; min-height: 48px; }
+.w2-saved-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 8px; background: none; border: 0; border-radius: 10px; text-align: start; color: inherit; font: inherit; cursor: pointer; }
+.w2-saved-main[aria-disabled] { opacity: 0.4; cursor: default; }
+.w2-saved-glyph { display: inline-flex; flex: none; }
+.w2-saved-text { display: grid; min-width: 0; }
+.w2-saved-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-saved-uses { font-size: 12px; opacity: 0.7; }
+.w2-saved-more { width: 28px; height: 28px; flex: none; }
+.w2-saved-rename { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px; }
+.w2-saved-rename input { flex: 1; min-width: 0; min-height: 36px; }
+.w2-uses-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.w2-uses-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+@media (pointer: coarse) { .w2-saved-row, .w2-saved-main { min-height: 56px; } .w2-saved-more { width: 44px; height: 44px; } }
+
+/* component parameters */
+.w2-param-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 2px; }
+.w2-param-row { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.w2-param-text { flex: 1; min-width: 0; display: grid; }
+.w2-param-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-param-where { font-size: 12px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-param-add { min-height: 36px; }
+.w2-param-form { display: grid; gap: 8px; }
+.w2-param-field { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 8px; }
+.w2-param-field select, .w2-param-field input { min-height: 36px; min-width: 0; }
+.w2-param-actions { display: flex; gap: 8px; justify-content: flex-end; }
+@media (pointer: coarse) { .w2-param-add, .w2-param-field select, .w2-param-field input { min-height: 44px; } }
+
+/* templates: the template row of a placed template, the per-place line, the openable parameter rows */
+.w2-scope .w2-template-row { grid-template-columns: minmax(0, 1fr) auto; min-height: 56px; padding-inline: 0 10px; }
+.w2-template-text { display: grid; min-width: 0; }
+.w2-template-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--w2-ink-card); font-weight: 600; }
+.w2-template-sub { font-size: 12px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-template-note { margin: 0 0 6px; font-size: 12px; color: var(--w2-muted); }
+.w2-per-place { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: -4px 0 6px; }
+.w2-per-place .w2-caption { margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.w2-per-place-button { min-height: 32px; padding: 0 4px; background: none; border: 0; color: var(--w2-link); font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; }
+.w2-per-place-button:disabled { opacity: 0.4; cursor: default; }
+.w2-param-item { list-style: none; }
+.w2-scope .w2-param-head { width: 100%; background: none; border: 0; text-align: start; color: inherit; font: inherit; cursor: pointer; border-radius: 8px; padding-inline: 0 4px; }
+.w2-param-open { display: grid; gap: 6px; padding: 0 0 8px; }
+.w2-param-open .w2-caption { margin: 0; }
+.w2-add-templates { display: grid; gap: 4px; }
+@media (pointer: coarse) { .w2-per-place-button { min-height: 44px; min-width: 44px; } .w2-scope .w2-template-row { min-height: 56px; } }
+
+.w2-toast-action { margin-left: 12px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; min-height: 44px; min-width: 44px; cursor: pointer; }
+.w2-toast:has(.w2-toast-action) { pointer-events: auto; }
+.w2-tag-warning.w2-tab-empty { margin-left: 4px; }
+.w2-tab-sub { font-size: 12px; opacity: .7; }
+.w2-segment-dim { opacity: .45; }
+.w2-row-segment { flex-wrap: wrap; }
+.w2-overlay-slot { min-height: 120px; display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--w2-line, currentColor); border-radius: 12px; margin: 8px; text-align: center; }
+.w2-position-picker { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 132px; height: 88px; place-items: center; border: 1px solid var(--w2-line, currentColor); border-radius: 8px; margin: 8px 16px; }
+.w2-position-point { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid currentColor; background: transparent; padding: 0; cursor: pointer; }
+.w2-position-point[aria-checked="true"] { background: var(--w2-accent, currentColor); }
+@media (pointer: coarse) { .w2-position-picker { width: 172px; height: 128px; } .w2-position-point { width: 44px; height: 44px; } }
+
+/* Group by State (`sh.grid-state-groups@1`): a card per group on its page. */
+.w2-scope .w2-group-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--w2-separator, rgba(128, 128, 128, .25)); }
+.w2-scope .w2-group-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; }

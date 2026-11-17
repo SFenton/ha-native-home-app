@@ -1,0 +1,2 @@
+Group by State
+Tiles sit under a heading for their state. Off unless you turn it on.

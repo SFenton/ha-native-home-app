@@ -1,0 +1,13 @@
+Swipe to Adjust
+Adjusts
+Brightness
+Range
+0 to 100%
+Tick Every
+Haptic Ticks
+Level Band
+The light source sends the call.
+A drag sends one call when you let go. Haptics are felt on a device only. Switch to Use to try the drag. The preview cannot show haptics, VoiceOver, or how the app settles a swipe against paging, scrolling and the back swipe.
+
+[names]
+10

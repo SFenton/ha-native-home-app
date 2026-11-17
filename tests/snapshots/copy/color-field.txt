@@ -1,0 +1,24 @@
+Fill
+#E8A33D
+Fill
+Colors
+Saved Colors
+Custom Color…
+Opens the system color picker
+Save Color
+Standard
+
+[names]
+Red
+Orange
+Amber
+Green
+Teal
+Light Blue
+Indigo
+Purple
+Pink
+Brown
+Gray
+White
+Save current color

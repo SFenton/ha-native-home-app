@@ -1,0 +1,18 @@
+When tapped
+Ask First
+Ask first
+Title
+Message
+Button
+Cancel
+Cancel
+The app always says Cancel.
+Red button
+Turn Off Guest Room?
+Cancel
+Turn Off
+
+[names]
+Optional
+Fixed
+A picture of the alert

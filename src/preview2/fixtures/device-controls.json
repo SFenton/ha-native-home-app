@@ -1,0 +1,4616 @@
+{
+ "document": {
+  "schemaVersion": "2.0",
+  "id": "device-controls-demo",
+  "name": "Synthetic device controls",
+  "theme": {
+   "appearance": "dark",
+   "tokens": "canonical@1",
+   "typography": "dynamic-type@1",
+   "background": {
+    "type": "solid",
+    "token": "shell-base@1"
+   }
+  },
+  "navigation": {
+   "initialPageId": "page-settings",
+   "initialTabId": null,
+   "initialArguments": {},
+   "tabs": [],
+   "policy": {
+    "type": "canonical-shell@1",
+    "tabSwitch": "preserve-cut@1",
+    "reselect": "pop-root-then-scroll@1",
+    "stackMotion": "canonical-stack@1",
+    "restoration": "scene@1",
+    "selectionWhileModal": "reject"
+   },
+   "chrome": {
+    "groups": [
+     {
+      "id": "menu",
+      "placement": "leading",
+      "horizontal": "separate-circles@1",
+      "vertical": "shared@1",
+      "items": [
+       {
+        "id": "menu-button",
+        "type": "shell-menu",
+        "label": "Sections",
+        "visibility": "root-when-menu-available",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "line.3.horizontal",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "pages": [
+   {
+    "id": "page-settings",
+    "title": "Settings",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "gearshape",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [
+     {
+      "id": "sec-pref",
+      "title": "Appearance",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Appearance",
+       "footer": "How soft the house photo behind every page is.",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "set-background-blur",
+        "title": "Background Blur",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "background-blur",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-reset-background-blur",
+        "title": "Reset to Default",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "reset-background-blur",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-app-badge",
+        "title": "Show count on app icon",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "app-badge",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-app-icon-choice-navySky",
+        "title": "Navy + Sky",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "app-icon-choice",
+         "item": "navySky",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "app.fill",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-app-icon-choice-tealMint",
+        "title": "Teal + Mint",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "app-icon-choice",
+         "item": "tealMint",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "app.fill",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-app-icon-choice-plumLilac",
+        "title": "Plum + Lilac",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "app-icon-choice",
+         "item": "plumLilac",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "app.fill",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-app-version",
+        "title": "Version",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-preferences",
+         "kind": "app-version",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sec-house",
+      "title": "Household",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Household",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "set-household-toggle-input_boolean-demo_auto_lock",
+        "title": "Front Door Auto-Lock",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "household-toggle",
+         "item": "input_boolean.demo_auto_lock",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "lock.shield",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-household-toggle-input_boolean-demo_garage_close",
+        "title": "Garage Auto-Close",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "household-toggle",
+         "item": "input_boolean.demo_garage_close",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "door.garage.closed",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-household-recovery-power-recovery",
+        "title": "Attempt to turn power back on",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "household-recovery",
+         "item": "power-recovery",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "bolt.fill",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-household-read-only-sensor-demo_charge",
+        "title": "Charge Status",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "household-read-only",
+         "item": "sensor.demo_charge",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "ev.charger",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-household-relay-warning",
+        "title": "Guest Room Wall Control",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "household-relay-warning",
+         "item": "",
+         "subtitle": "Guest mode is active. Turning off Relay Control Mode keeps the room on direct wall control."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-presence-room-switch-demo_room_presence",
+        "title": "Living Room",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "presence-room",
+         "item": "switch.demo_room_presence",
+         "subtitle": "",
+         "destination": {
+          "type": "push",
+          "pageId": "page-lights",
+          "arguments": {},
+          "origin": "sender",
+          "duplicate": "reuse-nearest"
+         }
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "lightbulb",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-presence-choice-switch-demo_room_presence-enabled",
+        "title": "Enable Presence-Based Lighting",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "presence-choice",
+         "item": "switch.demo_room_presence/enabled",
+         "subtitle": "Presence and occupancy can control the lights."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "lightbulb",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-presence-choice-switch-demo_room_presence-disabled",
+        "title": "Disable Presence-Based Lighting",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-household",
+         "kind": "presence-choice",
+         "item": "switch.demo_room_presence/disabled",
+         "subtitle": "The lights stay as you set them."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "lightbulb",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sec-away",
+      "title": "Away",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Away",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "set-away-status",
+        "title": "Household Away",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "away-status",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-vacation-status",
+        "title": "Vacation Mode",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "vacation-status",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-vacation-toggle",
+        "title": "Vacation Mode",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "vacation-toggle",
+         "item": "",
+         "subtitle": "",
+         "destination": {
+          "type": "present",
+          "modalId": "modal-demo",
+          "arguments": {},
+          "ifPresented": "reject"
+         }
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "airplane",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-vacation-check-input_boolean-demo_check_sprinklers",
+        "title": "Turn off outdoor sprinklers",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "vacation-check",
+         "item": "input_boolean.demo_check_sprinklers",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-vacation-check-input_boolean-demo_check_garage",
+        "title": "Lock the garage",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "vacation-check",
+         "item": "input_boolean.demo_check_garage",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-vacation-dates",
+        "title": "Vacation Dates",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "vacation-dates",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-vacation-confirm",
+        "title": "Enable Vacation Mode",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "vacation-confirm",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-solo-toggle",
+        "title": "Solo Trip",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "solo-toggle",
+         "item": "",
+         "subtitle": "",
+         "destination": {
+          "type": "present",
+          "modalId": "modal-demo",
+          "arguments": {},
+          "ifPresented": "reject"
+         }
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "suitcase",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-solo-traveler-resident_1",
+        "title": "Alex",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "solo-traveler",
+         "item": "resident_1",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "person",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-solo-dates",
+        "title": "Trip Dates",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "solo-dates",
+         "item": "",
+         "subtitle": "Choose when you leave and when you return."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-solo-return",
+        "title": "Returns",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "solo-return",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-solo-confirm",
+        "title": "Schedule",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "solo-confirm",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-away-restore-keep_current",
+        "title": "Keep Current Settings",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "away-restore",
+         "item": "keep_current",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "checkmark.circle",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-away-restore-restore_saved",
+        "title": "Restore Saved Settings",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-away",
+         "kind": "away-restore",
+         "item": "restore_saved",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "arrow.counterclockwise",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sec-fb",
+      "title": "Feedback",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Feedback",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "set-feedback-field-title",
+        "title": "Title",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-feedback",
+         "kind": "feedback-field",
+         "item": "title",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-feedback-field-description",
+        "title": "Description",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-feedback",
+         "kind": "feedback-field",
+         "item": "description",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-feedback-media",
+        "title": "Attach Media",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-feedback",
+         "kind": "feedback-media",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-feedback-status",
+        "title": "Status",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-feedback",
+         "kind": "feedback-status",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-feedback-submit",
+        "title": "Submit",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-feedback",
+         "kind": "feedback-submit",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-feedback-stop",
+        "title": "Stop Sending",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-feedback",
+         "kind": "feedback-stop",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sec-prof",
+      "title": "Profile",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Profile",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "set-profile-person-resident_1",
+        "title": "Alex",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "profile-person",
+         "item": "resident_1",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "person",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-profile-people",
+        "title": "People at Home",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "profile-people",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-location-account",
+        "title": "Location",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "location-account",
+         "item": "",
+         "subtitle": "Share Location",
+         "destination": {
+          "type": "push",
+          "pageId": "page-lights",
+          "arguments": {},
+          "origin": "sender",
+          "duplicate": "reuse-nearest"
+         }
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "location",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-location-status",
+        "title": "Location Access",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "location-status",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-location-action",
+        "title": "Continue",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "location-action",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "location",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-ha-value-address",
+        "title": "Address",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "ha-value",
+         "item": "address",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-ha-value-connection",
+        "title": "Connection",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "ha-value",
+         "item": "connection",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-ha-value-role",
+        "title": "Role",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "ha-value",
+         "item": "role",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-ha-settings",
+        "title": "Home Assistant",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "ha-settings",
+         "item": "",
+         "subtitle": "Server, account and version."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "house",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-ha-web-settings",
+        "title": "Settings",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "ha-web",
+         "item": "settings",
+         "subtitle": "Devices, integrations, automations and system."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-sign-out",
+        "title": "Sign Out",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-profile",
+         "kind": "sign-out",
+         "item": "",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "rectangle.portrait.and.arrow.right",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sec-perf",
+      "title": "Performance",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Performance",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "set-performance-recording",
+        "title": "Record Telemetry",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-performance",
+         "kind": "performance-recording",
+         "item": "",
+         "subtitle": "Nothing leaves the device unless you export it."
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-performance-action-refresh",
+        "title": "Refresh",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-performance",
+         "kind": "performance-action",
+         "item": "refresh",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       },
+       {
+        "id": "set-performance-action-reset",
+        "title": "Reset",
+        "type": "settings-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-settings-performance",
+         "kind": "performance-action",
+         "item": "reset",
+         "subtitle": ""
+        },
+        "icon": {
+         "type": "sf-symbol",
+         "name": "gearshape",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "page-vacuum",
+    "title": "Vacuum",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "robotic.vacuum",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [
+     {
+      "id": "vac-card",
+      "title": "Main Floor",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "card",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "robotic.vacuum",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        },
+        "commands": [
+         "start_pause",
+         "dock"
+        ],
+        "destination": {
+         "type": "present",
+         "modalId": "modal-demo",
+         "arguments": {},
+         "ifPresented": "reject"
+        }
+       }
+      }
+     },
+     {
+      "id": "vac-map",
+      "title": "Map",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "map",
+        "overlay": "rooms",
+        "height": 300,
+        "runtimeHeight": 460,
+        "label": "Main Floor map",
+        "loadingText": "Loading map",
+        "unavailableText": "Map unavailable",
+        "locate": true
+       }
+      }
+     },
+     {
+      "id": "vac-stats",
+      "title": "Status tiles",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 3,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "vac-status",
+        "title": "Status",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "status",
+          "metric": "status"
+         }
+        }
+       },
+       {
+        "id": "vac-battery",
+        "title": "Battery",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "status",
+          "metric": "battery"
+         }
+        }
+       },
+       {
+        "id": "vac-dock",
+        "title": "Dock",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "status",
+          "metric": "dock"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "vac-notices",
+      "title": "Notices",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "notices"
+       }
+      }
+     },
+     {
+      "id": "vac-report",
+      "title": "Cleaning Report",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "report",
+        "destination": {
+         "type": "push",
+         "pageId": "page-lights",
+         "arguments": {},
+         "origin": "sender",
+         "duplicate": "reuse-nearest"
+        }
+       }
+      }
+     },
+     {
+      "id": "vac-target",
+      "title": "Selected Rooms",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "target",
+        "mode": "rooms",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "square.grid.2x2",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        },
+        "destination": {
+         "type": "push",
+         "pageId": "page-lights",
+         "arguments": {},
+         "origin": "sender",
+         "duplicate": "reuse-nearest"
+        }
+       }
+      }
+     },
+     {
+      "id": "vac-rooms",
+      "title": "Rooms",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 2,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "vac-choice-k",
+        "title": "Kitchen",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "choice",
+          "entityId": "input_boolean.demo_zone_kitchen",
+          "selection": "rooms"
+         }
+        }
+       },
+       {
+        "id": "vac-choice-l",
+        "title": "Living Room",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "choice",
+          "entityId": "input_boolean.demo_zone_living",
+          "selection": "rooms"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "vac-settings",
+      "title": "Cleaning",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "settings",
+        "rows": [
+         {
+          "role": "mode",
+          "title": "Mode",
+          "hint": "Choose mode"
+         },
+         {
+          "role": "fan",
+          "title": "Fan",
+          "hint": "Choose fan"
+         },
+         {
+          "role": "water",
+          "title": "Water",
+          "hint": "Choose water"
+         },
+         {
+          "role": "passes",
+          "title": "Passes",
+          "hint": "Choose passes"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "id": "vac-cmds",
+      "title": "Commands",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 2,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "vac-clean",
+        "title": "Clean",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "command",
+          "command": "clean",
+          "icon": {
+           "type": "sf-symbol",
+           "name": "play",
+           "rendering": "canonical",
+           "unavailable": "reject"
+          }
+         }
+        }
+       },
+       {
+        "id": "vac-dockcmd",
+        "title": "Dock",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "command",
+          "command": "dock",
+          "icon": {
+           "type": "sf-symbol",
+           "name": "house",
+           "rendering": "canonical",
+           "unavailable": "reject"
+          }
+         }
+        }
+       },
+       {
+        "id": "vac-stop",
+        "title": "Stop",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "command",
+          "command": "stop",
+          "icon": {
+           "type": "sf-symbol",
+           "name": "stop.fill",
+           "rendering": "canonical",
+           "unavailable": "reject"
+          }
+         }
+        }
+       },
+       {
+        "id": "vac-pause",
+        "title": "Pause",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "command",
+          "command": "pause",
+          "icon": {
+           "type": "sf-symbol",
+           "name": "pause.fill",
+           "rendering": "canonical",
+           "unavailable": "reject"
+          }
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "vac-clear",
+      "title": "Clear Area",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "clear-area",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "xmark.circle",
+         "rendering": "canonical",
+         "unavailable": "reject"
+        }
+       }
+      }
+     },
+     {
+      "id": "vac-cons",
+      "title": "Consumables",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Consumables",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "vac-brush",
+        "title": "Main Brush",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "consumable",
+          "entityId": "sensor.demo_main_brush"
+         }
+        }
+       },
+       {
+        "id": "vac-filter",
+        "title": "Filter",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "consumable",
+          "entityId": "sensor.demo_filter"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "vac-auto",
+      "title": "Auto-Clean",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Auto-Clean",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "vac-auto-list",
+        "title": "Auto-Clean",
+        "type": "vacuum-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-vacuum",
+         "primitive": {
+          "kind": "auto-clean"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "vac-outcomes",
+      "title": "Cleaning Outcome",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "outcomes"
+       }
+      }
+     },
+     {
+      "id": "vac-editor",
+      "title": "Select Cleaning Area",
+      "type": "vacuum-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-vacuum",
+       "primitive": {
+        "kind": "area-editor",
+        "height": 420,
+        "onUse": {
+         "type": "back"
+        },
+        "discardLabel": "Discard Area",
+        "onDiscard": {
+         "type": "back"
+        }
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "page-lights",
+    "title": "Custom Lights",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "lightbulb",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [
+     {
+      "id": "lt-top",
+      "title": "Front Yard",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Front Yard",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "lt-manual",
+        "title": "Manually Control Front Yard Lights",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "manual"
+        }
+       },
+       {
+        "id": "lt-mode",
+        "title": "Lighting Mode",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "mode"
+        }
+       }
+      ]
+     },
+     {
+      "id": "lt-left",
+      "title": "Left Door Light",
+      "type": "custom-light-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-lights",
+       "kind": "brightness",
+       "entityId": "light.demo_left",
+       "action": {
+        "type": "present",
+        "modalId": "modal-demo",
+        "arguments": {},
+        "ifPresented": "reject"
+       }
+      }
+     },
+     {
+      "id": "lt-right",
+      "title": "Right Door Light",
+      "type": "custom-light-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-lights",
+       "kind": "brightness",
+       "entityId": "light.demo_right",
+       "action": {
+        "type": "present",
+        "modalId": "modal-demo",
+        "arguments": {},
+        "ifPresented": "reject"
+       }
+      }
+     },
+     {
+      "id": "lt-b1",
+      "title": "Bollard 1",
+      "type": "custom-light-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-lights",
+       "kind": "brightness",
+       "entityId": "light.demo_bollard_1"
+      }
+     },
+     {
+      "id": "lt-b2",
+      "title": "Bollard 2 (off)",
+      "type": "custom-light-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-lights",
+       "kind": "brightness",
+       "entityId": "light.demo_bollard_2"
+      }
+     },
+     {
+      "id": "lt-missing",
+      "title": "Bollard 3 (no data)",
+      "type": "custom-light-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-lights",
+       "kind": "brightness",
+       "entityId": "light.demo_missing"
+      }
+     },
+     {
+      "id": "lt-sheet",
+      "title": "Light sheet",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Light sheet",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "lt-color",
+        "title": "Color",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "color",
+         "entityId": "light.demo_left"
+        }
+       },
+       {
+        "id": "lt-reset",
+        "title": "Reset to Warm White",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "reset",
+         "entityId": "light.demo_left"
+        }
+       },
+       {
+        "id": "lt-apply",
+        "title": "Apply to All Lights",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "apply-all",
+         "entityId": "light.demo_left",
+         "confirmation": {
+          "title": "Apply Color to All Lights?",
+          "message": "This changes the configured device.",
+          "confirmLabel": "Apply",
+          "cancelLabel": "Cancel"
+         }
+        }
+       },
+       {
+        "id": "lt-resetall",
+        "title": "Reset All Lights",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "reset-all",
+         "confirmation": {
+          "title": "Reset All Lights?",
+          "message": "This changes the configured device.",
+          "confirmLabel": "Reset",
+          "cancelLabel": "Cancel"
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "lt-copy",
+      "title": "Copy Color From",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 3,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "lt-c1",
+        "title": "Left Door Light",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "copy-color",
+         "entityId": "light.demo_left",
+         "copySourceId": "light.demo_left"
+        }
+       },
+       {
+        "id": "lt-c2",
+        "title": "Right Door Light",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "copy-color",
+         "entityId": "light.demo_left",
+         "copySourceId": "light.demo_right"
+        }
+       },
+       {
+        "id": "lt-c3",
+        "title": "Bollard 2",
+        "type": "custom-light-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-lights",
+         "kind": "copy-color",
+         "entityId": "light.demo_left",
+         "copySourceId": "light.demo_bollard_2"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "page-climate",
+    "title": "Climate",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "thermometer.medium",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [
+     {
+      "id": "cl-dial",
+      "title": "Whole Home",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-whole",
+       "kind": "dial",
+       "dial": {
+        "minimum": 45,
+        "maximum": 95,
+        "step": 0.5,
+        "unit": "\u00b0F",
+        "size": "page"
+       }
+      }
+     },
+     {
+      "id": "cl-dial-range",
+      "title": "Range Home",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-range",
+       "kind": "dial",
+       "dial": {
+        "minimum": 45,
+        "maximum": 95,
+        "step": 0.5,
+        "unit": "\u00b0F",
+        "size": "modal"
+       }
+      }
+     },
+     {
+      "id": "cl-hub",
+      "title": "Thermostat Hub",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-whole",
+       "kind": "hub",
+       "hub": {
+        "modeLabel": "Mode",
+        "fanLabel": "Fan",
+        "modes": [
+         {
+          "value": "off",
+          "label": "Off",
+          "icon": "thermometer.medium",
+          "detail": ""
+         },
+         {
+          "value": "heat",
+          "label": "Heat",
+          "icon": "thermometer.medium",
+          "detail": ""
+         },
+         {
+          "value": "cool",
+          "label": "Cool",
+          "icon": "thermometer.medium",
+          "detail": ""
+         },
+         {
+          "value": "heat_cool",
+          "label": "Auto",
+          "icon": "thermometer.medium",
+          "detail": ""
+         }
+        ],
+        "fans": [
+         {
+          "value": "auto",
+          "label": "Auto",
+          "icon": "thermometer.medium",
+          "detail": ""
+         },
+         {
+          "value": "on",
+          "label": "On",
+          "icon": "thermometer.medium",
+          "detail": ""
+         }
+        ]
+       }
+      }
+     },
+     {
+      "id": "cl-mode",
+      "title": "Mode",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-whole",
+       "kind": "mode",
+       "choices": [
+        {
+         "value": "off",
+         "label": "Off",
+         "icon": "thermometer.medium",
+         "detail": ""
+        },
+        {
+         "value": "heat",
+         "label": "Heat",
+         "icon": "thermometer.medium",
+         "detail": ""
+        },
+        {
+         "value": "cool",
+         "label": "Cool",
+         "icon": "thermometer.medium",
+         "detail": ""
+        },
+        {
+         "value": "heat_cool",
+         "label": "Auto",
+         "icon": "thermometer.medium",
+         "detail": ""
+        }
+       ]
+      }
+     },
+     {
+      "id": "cl-fan",
+      "title": "Fan",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-whole",
+       "kind": "fan",
+       "choices": [
+        {
+         "value": "auto",
+         "label": "Auto",
+         "icon": "thermometer.medium",
+         "detail": ""
+        },
+        {
+         "value": "on",
+         "label": "On",
+         "icon": "thermometer.medium",
+         "detail": ""
+        }
+       ]
+      }
+     },
+     {
+      "id": "cl-preset",
+      "title": "Preset",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-whole",
+       "kind": "preset",
+       "choices": [
+        {
+         "value": "home",
+         "label": "Home",
+         "icon": "thermometer.medium",
+         "detail": ""
+        },
+        {
+         "value": "away",
+         "label": "Away",
+         "icon": "thermometer.medium",
+         "detail": ""
+        },
+        {
+         "value": "sleep",
+         "label": "Sleep",
+         "icon": "thermometer.medium",
+         "detail": ""
+        }
+       ]
+      }
+     },
+     {
+      "id": "cl-options",
+      "title": "Eco Mode Critical Tracking",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-select",
+       "kind": "options",
+       "choices": [
+        {
+         "value": "Do Not Track Critical",
+         "label": "Do Not Track Critical",
+         "icon": "thermometer.medium",
+         "detail": "No temperature-only protection."
+        },
+        {
+         "value": "Track Select Critical",
+         "label": "Track Select Critical",
+         "icon": "thermometer.medium",
+         "detail": "Protect the rooms you choose."
+        }
+       ]
+      }
+     },
+     {
+      "id": "cl-switches",
+      "title": "Switches",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Switches",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "cl-toggle",
+        "title": "Auto Setpoint Adjustments",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "thermometer.medium",
+         "hint": "Allow Predictive Comfort to adjust the target.",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-switch",
+         "kind": "toggle"
+        }
+       },
+       {
+        "id": "cl-explicit",
+        "title": "Predictive Comfort",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "thermometer.medium",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-switch",
+         "kind": "explicit-switch",
+         "status": {
+          "projection": "state",
+          "unit": "\u00b0F",
+          "states": [
+           {
+            "state": "on",
+            "text": "On"
+           },
+           {
+            "state": "off",
+            "text": "Off"
+           }
+          ],
+          "fallbackText": "Unknown"
+         }
+        }
+       },
+       {
+        "id": "cl-check",
+        "title": "Living Room",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "thermometer.medium",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-switch",
+         "kind": "check"
+        }
+       }
+      ]
+     },
+     {
+      "id": "cl-notice",
+      "title": "Away Mode",
+      "type": "climate-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "icon": "thermometer.medium",
+       "hint": "",
+       "loadingText": "Loading",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't Respond",
+       "sourceId": "demo-climate-home",
+       "kind": "notice",
+       "notice": {
+        "useEffectiveMode": true,
+        "isWarning": false,
+        "awayText": "Away Mode Active. The room may be cooler or warmer than your targets to save energy.",
+        "vacationText": "Vacation Mode Active. The house holds its wider comfort range.",
+        "unknownText": "Away Mode status is not available right now.",
+        "unavailableModeText": "Unavailable",
+        "reasonFallback": "No reason given",
+        "separator": " "
+       }
+      }
+     },
+     {
+      "id": "cl-status",
+      "title": "Status",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Status",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "cl-st-state",
+        "title": "Mode",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "thermometer.medium",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-whole",
+         "kind": "status",
+         "status": {
+          "projection": "state",
+          "unit": "\u00b0F",
+          "states": [],
+          "fallbackText": "Unknown"
+         }
+        }
+       },
+       {
+        "id": "cl-st-temp",
+        "title": "Indoor",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "thermometer.medium",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-whole",
+         "kind": "status",
+         "status": {
+          "projection": "indoor",
+          "unit": "\u00b0F",
+          "states": [],
+          "fallbackText": "Unknown"
+         },
+         "presentation": "metric"
+        }
+       },
+       {
+        "id": "cl-st-head",
+        "title": "Recommendation",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "thermometer.medium",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-whole",
+         "kind": "status",
+         "status": {
+          "projection": "recommendation",
+          "unit": "\u00b0F",
+          "states": [],
+          "fallbackText": "Hold current settings"
+         },
+         "presentation": "headline"
+        }
+       },
+       {
+        "id": "cl-link",
+        "title": "Eco Mode",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "leaf",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-select",
+         "kind": "link",
+         "status": {
+          "projection": "state",
+          "unit": "\u00b0F",
+          "states": [
+           {
+            "state": "Do Not Track Critical",
+            "text": "Do Not Track Critical"
+           }
+          ],
+          "fallbackText": "Unknown"
+         }
+        },
+        "action": {
+         "type": "push",
+         "pageId": "page-lights",
+         "arguments": {},
+         "origin": "sender",
+         "duplicate": "reuse-nearest"
+        }
+       }
+      ]
+     },
+     {
+      "id": "cl-rooms",
+      "title": "Rooms",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 2,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "cl-room1",
+        "title": "Living Room",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "sofa",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-room",
+         "kind": "room-tile",
+         "paletteIndex": 0
+        },
+        "action": {
+         "type": "push",
+         "pageId": "page-lights",
+         "arguments": {},
+         "origin": "sender",
+         "duplicate": "reuse-nearest"
+        }
+       },
+       {
+        "id": "cl-room2",
+        "title": "Office",
+        "type": "climate-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "icon": "desktopcomputer",
+         "hint": "",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable",
+         "errorText": "Didn't Respond",
+         "sourceId": "demo-climate-room2",
+         "kind": "room-tile",
+         "paletteIndex": 1
+        },
+        "action": {
+         "type": "push",
+         "pageId": "page-lights",
+         "arguments": {},
+         "origin": "sender",
+         "duplicate": "reuse-nearest"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "page-sprinklers",
+    "title": "Sprinklers",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "drop",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [
+     {
+      "id": "sp-card",
+      "title": "Front Yard",
+      "type": "sprinkler-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-sprinkler",
+       "kind": "card",
+       "action": {
+        "type": "present",
+        "modalId": "modal-demo",
+        "arguments": {},
+        "ifPresented": "reject"
+       }
+      }
+     },
+     {
+      "id": "sp-status",
+      "title": "Status",
+      "type": "sprinkler-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-sprinkler",
+       "kind": "status"
+      }
+     },
+     {
+      "id": "sp-go",
+      "title": "Water Now",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Water Now",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "sp-zone",
+        "title": "Water Now",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "zone",
+         "action": {
+          "type": "push",
+          "pageId": "page-sprinklers-water",
+          "arguments": {},
+          "origin": "sender",
+          "duplicate": "reuse-nearest"
+         },
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-program",
+        "title": "Schedule",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "program",
+         "action": {
+          "type": "push",
+          "pageId": "page-sprinklers-water",
+          "arguments": {},
+          "origin": "sender",
+          "duplicate": "reuse-nearest"
+         },
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-rain",
+        "title": "Rain Delay",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "rain-delay"
+        }
+       },
+       {
+        "id": "sp-smart",
+        "title": "Smart Watering",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "smart-watering"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sp-blocker",
+      "title": "Watering",
+      "type": "sprinkler-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "sourceId": "demo-sprinkler",
+       "kind": "water-blocker"
+      }
+     },
+     {
+      "id": "sp-water",
+      "title": "Water",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Water",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "sp-duration",
+        "title": "Duration",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "duration",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-presets",
+        "title": "Minutes",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "presets",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-start",
+        "title": "Start Watering",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "start",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-stop",
+        "title": "Stop Watering",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "stop"
+        }
+       }
+      ]
+     },
+     {
+      "id": "sp-sched",
+      "title": "Schedule",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Schedule",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "sp-enabled",
+        "title": "Enabled",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "program-enabled",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-days",
+        "title": "Days",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "days",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-times",
+        "title": "Start Times",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "times",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-budget",
+        "title": "Watering Budget",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "budget",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-run",
+        "title": "Run Program",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "start-program",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-apply",
+        "title": "Apply",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "apply",
+         "zone": 0
+        }
+       },
+       {
+        "id": "sp-reload",
+        "title": "Reload",
+        "type": "sprinkler-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "sourceId": "demo-sprinkler",
+         "kind": "reload",
+         "zone": 0
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "page-sprinklers-water",
+    "title": "Water Now",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "gearshape",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": []
+   },
+   {
+    "id": "page-remote",
+    "title": "Remote",
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "icon": {
+     "type": "sf-symbol",
+     "name": "tv",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "m"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "m"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "m"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [
+     {
+      "id": "rm-pad",
+      "title": "Pad",
+      "type": "remote-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "kind": "keys",
+       "layout": "pad",
+       "label": "Streaming box",
+       "keys": [
+        {
+         "position": 0,
+         "slot": "back",
+         "label": "Back",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "arrowtriangle.down.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 90,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 1,
+         "slot": "up",
+         "label": "Up",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "chevron.up",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 2,
+         "slot": "power",
+         "label": "Power",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "power",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 3,
+         "slot": "left",
+         "label": "Left",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "chevron.left",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 4,
+         "slot": "select",
+         "label": "Select",
+         "icon": {
+          "type": "none"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 5,
+         "slot": "right",
+         "label": "Right",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "chevron.right",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 6,
+         "slot": "home",
+         "label": "Home",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "circle.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 7,
+         "slot": "down",
+         "label": "Down",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "chevron.down",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 8,
+         "slot": "keyboard",
+         "label": "Text",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "keyboard",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        }
+       ]
+      },
+      "binding": {
+       "sourceId": "demo-remote"
+      },
+      "feedback": {
+       "loadingText": "Reading",
+       "errorText": "Command rejected"
+      }
+     },
+     {
+      "id": "rm-vol",
+      "title": "Speaker Volume",
+      "type": "remote-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "kind": "volume",
+       "keys": [
+        {
+         "position": 0,
+         "slot": "volume-mute",
+         "label": "Mute",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "speaker.slash.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 1,
+         "slot": "volume-down",
+         "label": "Volume Down",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "speaker.minus.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 2,
+         "slot": "volume-up",
+         "label": "Volume Up",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "speaker.plus.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        }
+       ],
+       "unavailableText": "Unavailable",
+       "errorText": "Command rejected"
+      },
+      "binding": {
+       "sourceId": "demo-remote"
+      },
+      "feedback": {
+       "loadingText": "Reading",
+       "errorText": "Command rejected"
+      }
+     },
+     {
+      "id": "rm-transport",
+      "title": "Playback",
+      "type": "remote-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "kind": "keys",
+       "layout": "transport",
+       "label": "Playback",
+       "keys": [
+        {
+         "position": 0,
+         "slot": "pause",
+         "label": "Pause",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "pause.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        },
+        {
+         "position": 1,
+         "slot": "play",
+         "label": "Play",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "play.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "rotation": 0,
+         "activeText": "On",
+         "inactiveText": "Off"
+        }
+       ]
+      },
+      "binding": {
+       "sourceId": "demo-remote"
+      },
+      "feedback": {
+       "loadingText": "Reading",
+       "errorText": "Command rejected"
+      }
+     },
+     {
+      "id": "rm-kb",
+      "title": "Keyboard",
+      "type": "remote-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "kind": "keyboard",
+       "label": "Text",
+       "placeholder": "Enter text",
+       "sendLabel": "Send",
+       "cancelLabel": "Cancel",
+       "errorText": "Couldn't send text."
+      },
+      "binding": {
+       "sourceId": "demo-remote"
+      },
+      "feedback": {
+       "loadingText": "Reading",
+       "errorText": "Command rejected"
+      }
+     },
+     {
+      "id": "rm-apps",
+      "title": "Apps",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 2,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "rm-app1",
+        "title": "Plex",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "app",
+         "key": "Plex",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "play.rectangle",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "artwork": "none",
+         "whiteBackground": false,
+         "activeText": "Selected"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       },
+       {
+        "id": "rm-app2",
+        "title": "Netflix",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "app",
+         "key": "Netflix",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "play.rectangle",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "artwork": "none",
+         "whiteBackground": false,
+         "activeText": "Selected"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       }
+      ]
+     },
+     {
+      "id": "rm-devices",
+      "title": "Devices",
+      "layout": {
+       "span": 1
+      },
+      "type": "tile-grid",
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 2,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "rm-dev-tile",
+        "title": "Game PC",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "device",
+         "key": "Game PC",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "desktopcomputer",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "states": [],
+         "fallbackText": "Unknown",
+         "unavailableText": "Unavailable",
+         "presentation": "tile",
+         "family": "power"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       },
+       {
+        "id": "rm-dev-row",
+        "title": "Game PC row",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "device",
+         "key": "Game PC",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "desktopcomputer",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "states": [],
+         "fallbackText": "Unknown",
+         "unavailableText": "Unavailable",
+         "presentation": "row"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       }
+      ]
+     },
+     {
+      "id": "rm-hue",
+      "title": "Light Sync",
+      "layout": {
+       "span": 1
+      },
+      "type": "section",
+      "props": {
+       "header": "Light Sync",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": true,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "rm-hue-power",
+        "title": "Power",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "hue-toggle",
+         "target": "power",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "power",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "onText": "On",
+         "offText": "Off",
+         "unavailableText": "Unavailable"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       },
+       {
+        "id": "rm-hue-mode",
+        "title": "Mode",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "hue-choice",
+         "target": "mode",
+         "options": [
+          {
+           "value": "video",
+           "label": "Video"
+          },
+          {
+           "value": "music",
+           "label": "Music"
+          },
+          {
+           "value": "game",
+           "label": "Game"
+          }
+         ],
+         "unavailableText": "Unavailable"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       },
+       {
+        "id": "rm-hue-bright",
+        "title": "Brightness",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "hue-brightness",
+         "unavailableText": "Unavailable"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       },
+       {
+        "id": "rm-hue-in",
+        "title": "HDMI 1",
+        "type": "remote-control",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "kind": "hue-input",
+         "option": "HDMI 1",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "cable.connector",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         },
+         "selectedText": "Selected",
+         "connectedText": "Connected",
+         "disconnectedText": "Disconnected",
+         "unavailableText": "Unavailable"
+        },
+        "binding": {
+         "sourceId": "demo-remote"
+        },
+        "feedback": {
+         "loadingText": "Reading",
+         "errorText": "Command rejected"
+        }
+       }
+      ]
+     },
+     {
+      "id": "rm-card",
+      "title": "Demo Media Player",
+      "type": "remote-control",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "kind": "card",
+       "key": "card-shield",
+       "icon": {
+        "type": "sf-symbol",
+        "name": "tv",
+        "rendering": "canonical",
+        "unavailable": "reject"
+       },
+       "states": [],
+       "fallbackText": "Unknown",
+       "unavailableText": "Unavailable",
+       "errorText": "Didn't respond",
+       "action": {
+        "type": "present",
+        "modalId": "modal-demo",
+        "arguments": {},
+        "ifPresented": "reject"
+       },
+       "actions": [
+        {
+         "slot": "power",
+         "label": "Power",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "power",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         }
+        },
+        {
+         "slot": "play",
+         "label": "Play",
+         "icon": {
+          "type": "sf-symbol",
+          "name": "play.fill",
+          "rendering": "canonical",
+          "unavailable": "reject"
+         }
+        }
+       ],
+       "showsVolume": false,
+       "volumeLabel": "Volume"
+      },
+      "binding": {
+       "sourceId": "demo-remote"
+      },
+      "feedback": {
+       "loadingText": "Reading",
+       "errorText": "Command rejected"
+      }
+     }
+    ]
+   }
+  ],
+  "modals": [
+   {
+    "id": "modal-demo",
+    "title": "Details",
+    "icon": {
+     "type": "sf-symbol",
+     "name": "slider.horizontal.3",
+     "rendering": "canonical",
+     "unavailable": "reject"
+    },
+    "parameters": {},
+    "toolbar": {
+     "type": "replace",
+     "groups": []
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "l"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "l"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "xl"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "components": [],
+    "presentation": {
+     "type": "sheet",
+     "width": "form",
+     "height": {
+      "type": "full"
+     },
+     "appearance": "system",
+     "placement": "canonical-sheet@1",
+     "grabber": "canonical",
+     "navigation": "local-stack@1",
+     "close": {
+      "type": "close",
+      "visibility": "root-only",
+      "placement": "trailing",
+      "rail": "keep-horizontal-when-allowed",
+      "guard": {
+       "type": "none"
+      }
+     }
+    }
+   }
+  ],
+  "dataSources": [
+   {
+    "id": "demo-settings-household",
+    "kind": "model",
+    "model": "settings-provider@1",
+    "inputs": {
+     "providerId": "demo-household",
+     "domain": "household"
+    }
+   },
+   {
+    "id": "demo-settings-away",
+    "kind": "model",
+    "model": "settings-provider@1",
+    "inputs": {
+     "providerId": "demo-away",
+     "domain": "away"
+    }
+   },
+   {
+    "id": "demo-settings-preferences",
+    "kind": "model",
+    "model": "settings-provider@1",
+    "inputs": {
+     "providerId": "demo-preferences",
+     "domain": "preferences"
+    }
+   },
+   {
+    "id": "demo-settings-feedback",
+    "kind": "model",
+    "model": "settings-provider@1",
+    "inputs": {
+     "providerId": "demo-feedback",
+     "domain": "feedback"
+    }
+   },
+   {
+    "id": "demo-settings-profile",
+    "kind": "model",
+    "model": "settings-provider@1",
+    "inputs": {
+     "providerId": "demo-profile",
+     "domain": "profile"
+    }
+   },
+   {
+    "id": "demo-settings-performance",
+    "kind": "model",
+    "model": "settings-provider@1",
+    "inputs": {
+     "providerId": "demo-performance",
+     "domain": "performance"
+    }
+   },
+   {
+    "id": "demo-vacuum",
+    "kind": "model",
+    "model": "vacuum@1",
+    "inputs": {
+     "title": "Main Floor Robot Vacuum",
+     "entityId": "vacuum.demo_robot",
+     "batteryEntityId": "sensor.demo_robot_battery",
+     "cleanScript": "script.demo_clean",
+     "errorEntityId": "sensor.demo_robot_error",
+     "passesEntityId": "input_select.demo_robot_passes",
+     "statusEntityId": "sensor.demo_robot_status",
+     "statusFlagEntityId": "input_text.demo_robot_flag",
+     "vacuumMapId": "demo_robot",
+     "mapRoomSelection": true,
+     "mapRotationDegrees": 0,
+     "mapScale": 1,
+     "modeEntityId": "select.demo_robot_mode",
+     "fanEntityId": "select.demo_robot_fan",
+     "waterEntityId": "select.demo_robot_water",
+     "dockControls": {
+      "cleanScript": "script.demo_dock_clean",
+      "dryScript": "script.demo_dock_dry",
+      "dockStatusEntityId": "sensor.demo_dock_status",
+      "mopAttachmentEntityId": "binary_sensor.demo_mop"
+     },
+     "consumables": [
+      {
+       "title": "Main Brush",
+       "entityId": "sensor.demo_main_brush",
+       "icon": "mdi:brush",
+       "kind": "duration"
+      },
+      {
+       "title": "Filter",
+       "entityId": "sensor.demo_filter",
+       "icon": "mdi:brush",
+       "kind": "duration"
+      }
+     ],
+     "autoCleanControl": {"title": "Auto-Clean", "entityId": "automation.demo_auto_clean", "kind": "automation"}, "autoCleanDisabledRooms": [
+      {
+       "title": "Kitchen",
+       "entityId": "switch.demo_skip_kitchen",
+       "icon": "mdi:sofa"
+      },
+      {
+       "title": "Studio",
+       "entityId": "switch.demo_skip_studio",
+       "icon": "mdi:sofa"
+      },
+      {
+       "title": "Media Room",
+       "entityId": "switch.demo_skip_media",
+       "icon": "mdi:sofa"
+      }
+     ],
+     "outcomeRoomNames": [
+      {
+       "roomId": "demo-kitchen",
+       "name": "Kitchen"
+      }
+     ],
+     "outcomeReconciliations": [
+      {
+       "roomId": "demo-kitchen",
+       "entityId": "input_text.demo_kitchen"
+      }
+     ],
+     "zoneDescription": [
+      "Synthetic rooms"
+     ],
+     "zones": [
+      {
+       "title": "Kitchen",
+       "entityId": "input_boolean.demo_zone_kitchen",
+       "icon": "mdi:sofa",
+       "mapName": "Kitchen"
+      },
+      {
+       "title": "Living Room",
+       "entityId": "input_boolean.demo_zone_living",
+       "icon": "mdi:sofa",
+       "mapName": "Living Room"
+      }
+     ]
+    }
+   },
+   {
+    "id": "demo-lights",
+    "kind": "model",
+    "model": "custom-lights@1",
+    "inputs": {
+     "sectionTitle": "Front Yard",
+     "manualTitle": "Manually Control Front Yard Lights",
+     "modeTitle": "Lighting Mode",
+     "manualEntityId": "input_boolean.demo_manual",
+     "modeEntityId": "input_select.demo_mode",
+     "groupEntityId": "light.demo_group",
+     "customMode": "Custom",
+     "fallbackModes": [
+      "Warm White",
+      "Holiday",
+      "Custom"
+     ],
+     "palettes": [
+      {
+       "mode": "Holiday",
+       "colors": [
+        {
+         "red": 255,
+         "green": 40,
+         "blue": 40
+        },
+        {
+         "red": 40,
+         "green": 200,
+         "blue": 80
+        }
+       ]
+      }
+     ],
+     "lights": [
+      {
+       "title": "Left Door Light",
+       "entityId": "light.demo_left"
+      },
+      {
+       "title": "Right Door Light",
+       "entityId": "light.demo_right"
+      },
+      {
+       "title": "Bollard 1",
+       "entityId": "light.demo_bollard_1"
+      },
+      {
+       "title": "Bollard 2",
+       "entityId": "light.demo_bollard_2"
+      }
+     ],
+     "resetKelvin": 2700,
+     "resetBrightness": 255,
+     "resetTransition": 1
+    }
+   },
+   {
+    "id": "demo-climate-whole",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "climate.demo_whole",
+     "rangeCommitEntityIds": [],
+     "sensorEntityId": "sensor.demo_whole_temp",
+     "occupancyEntityId": "binary_sensor.demo_whole_occ"
+    }
+   },
+   {
+    "id": "demo-climate-range",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "climate.demo_range",
+     "rangeCommitEntityIds": []
+    }
+   },
+   {
+    "id": "demo-climate-home",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "climate.demo_whole",
+     "rangeCommitEntityIds": [],
+     "homeAway": {
+      "modeEntityId": "sensor.demo_home_mode",
+      "reasonEntityId": "sensor.demo_home_reason",
+      "fallbackEntityId": "input_boolean.demo_home_away",
+      "vacationEntityId": "input_boolean.demo_vacation"
+     }
+    }
+   },
+   {
+    "id": "demo-climate-switch",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "switch.demo_predictive",
+     "rangeCommitEntityIds": []
+    }
+   },
+   {
+    "id": "demo-climate-select",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "select.demo_critical",
+     "rangeCommitEntityIds": []
+    }
+   },
+   {
+    "id": "demo-climate-room",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "climate.demo_whole",
+     "rangeCommitEntityIds": [],
+     "sensorEntityId": "sensor.demo_room_temp",
+     "occupancyEntityId": "binary_sensor.demo_room_occ"
+    }
+   },
+   {
+    "id": "demo-climate-room2",
+    "kind": "model",
+    "model": "climate@1",
+    "inputs": {
+     "entityId": "climate.demo_whole",
+     "rangeCommitEntityIds": [],
+     "sensorEntityId": "sensor.demo_room2_temp",
+     "occupancyEntityId": "binary_sensor.demo_room2_occ"
+    }
+   },
+   {
+    "id": "demo-sprinkler",
+    "kind": "model",
+    "model": "sprinkler-controller@1",
+    "inputs": {
+     "controller": {
+      "id": "demo-sprinkler",
+      "title": "Front Yard",
+      "batteryEntityId": "sensor.demo_sprinkler_battery",
+      "faultEntityId": "binary_sensor.demo_sprinkler_fault",
+      "hubConnectedEntityId": "binary_sensor.demo_sprinkler_hub",
+      "modeEntityId": "select.demo_sprinkler_mode",
+      "nextWateringEntityId": "sensor.demo_sprinkler_next",
+      "rainDelayEntityId": "switch.demo_sprinkler_rain",
+      "smartWateringEntityId": "switch.demo_sprinkler_smart",
+      "stateEntityId": "sensor.demo_sprinkler_state",
+      "zones": [
+       {
+        "valveEntityId": "valve.demo_zone_1",
+        "programEntityId": "switch.demo_program_1",
+        "historyEntityId": "sensor.demo_history_1"
+       }
+      ]
+     },
+     "lowBatteryPercent": 25,
+     "defaultStartTime": "07:00"
+    }
+   },
+   {
+    "id": "demo-provider",
+    "kind": "model",
+    "model": "media-remote-config@1",
+    "inputs": {
+     "id": "demo-provider",
+     "title": "Demo",
+     "roomTitle": "Room",
+     "remoteTitle": "Remote",
+     "mediaEntityId": "media_player.demo_unit",
+     "controlEntityId": "remote.demo_unit",
+     "volumeTitle": "Volume",
+     "volumeEntityId": "media_player.demo_unit",
+     "showVolumeWhenOff": false,
+     "hideKeyboardWhenOff": false,
+     "appSectionTitle": "Apps",
+     "optimisticEntityIds": [],
+     "liveChangeEntityIds": [],
+     "power": {
+      "label": "Power",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "power"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "up": {
+      "label": "Up",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "up"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "left": {
+      "label": "Left",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "left"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "select": {
+      "label": "Select",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "select"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "right": {
+      "label": "Right",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "right"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "down": {
+      "label": "Down",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "down"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "back": {
+      "label": "Back",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "back"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "home": {
+      "label": "Home",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "remote",
+         "service": "send_command",
+         "target": "remote.demo_unit",
+         "data": {
+          "command": "home"
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "pause": {
+      "label": "Pause",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "media_player",
+         "service": "media_pause",
+         "target": "media_player.demo_unit",
+         "data": {}
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "play": {
+      "label": "Play",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "media_player",
+         "service": "media_play",
+         "target": "media_player.demo_unit",
+         "data": {}
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "volumeDown": {
+      "label": "Volume down",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "media_player",
+         "service": "volume_down",
+         "target": "media_player.demo_unit",
+         "data": {}
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "volumeUp": {
+      "label": "Volume up",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "media_player",
+         "service": "volume_up",
+         "target": "media_player.demo_unit",
+         "data": {}
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "volumeMute": {
+      "label": "Mute",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "state",
+       "entityId": "media_player.demo_unit",
+       "cases": [
+        {
+         "states": [
+          "playing"
+         ],
+         "command": {
+          "type": "service",
+          "call": {
+           "domain": "media_player",
+           "service": "volume_mute",
+           "target": "media_player.demo_unit",
+           "data": {
+            "speakerdevice": [
+             "media_player.demo_unit"
+            ],
+            "is_volume_muted": true
+           }
+          },
+          "optimistic": []
+         }
+        }
+       ],
+       "otherwise": {
+        "type": "service",
+        "call": {
+         "domain": "media_player",
+         "service": "volume_mute",
+         "target": "media_player.demo_unit",
+         "data": {
+          "is_volume_muted": false
+         }
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "keyboard": {
+      "label": "Keyboard",
+      "icon": "mdi:remote",
+      "iconRotationDegrees": 0,
+      "action": {
+       "type": "command",
+       "command": {
+        "type": "service",
+        "call": {
+         "domain": "input_button",
+         "service": "press",
+         "target": "input_button.demo_keyboard",
+         "data": {}
+        },
+        "optimistic": []
+       }
+      }
+     },
+     "apps": [
+      {
+       "title": "Plex",
+       "action": {
+        "type": "command",
+        "command": {
+         "type": "service",
+         "call": {
+          "domain": "remote",
+          "service": "send_command",
+          "target": "remote.demo_unit",
+          "data": {
+           "command": "plex"
+          }
+         },
+         "optimistic": []
+        }
+       },
+       "whiteBackground": false,
+       "stateEntityId": "sensor.demo_app",
+       "activeStates": [
+        "Plex"
+       ]
+      },
+      {
+       "title": "Netflix",
+       "action": {
+        "type": "command",
+        "command": {
+         "type": "service",
+         "call": {
+          "domain": "remote",
+          "service": "send_command",
+          "target": "remote.demo_unit",
+          "data": {
+           "command": "netflix"
+          }
+         },
+         "optimistic": []
+        }
+       },
+       "whiteBackground": false,
+       "stateEntityId": "sensor.demo_app",
+       "activeStates": [
+        "Netflix"
+       ]
+      }
+     ],
+     "devices": [
+      {
+       "title": "Game PC",
+       "entityId": "sensor.demo_pc",
+       "icon": "mdi:desktop-tower",
+       "activeHoldResetEntityIds": [],
+       "activeStates": [
+        "on"
+       ],
+       "stateLabels": {
+        "on": "Running",
+        "off": "Off"
+       }
+      }
+     ],
+     "cards": [
+      {
+       "key": "card-shield",
+       "configuration": {
+        "title": "Demo Media Player",
+        "entityId": "media_player.demo_unit",
+        "icon": "mdi:remote-tv",
+        "activeHoldResetEntityIds": [],
+        "activeStates": [
+         "playing",
+         "on"
+        ],
+        "stateLabels": {
+         "playing": "Playing",
+         "on": "On",
+         "off": "Off"
+        }
+       }
+      }
+     ],
+     "lightSync": {
+      "powerEntityId": "switch.demo_hue_power",
+      "lightSyncEntityId": "switch.demo_hue_sync",
+      "syncModeEntityId": "select.demo_hue_mode",
+      "intensityEntityId": "select.demo_hue_intensity",
+      "brightnessEntityId": "number.demo_hue_brightness",
+      "hdmiInputEntityId": "select.demo_hue_input",
+      "hdmiStatusEntityIds": [
+       "binary_sensor.demo_hue_hdmi1"
+      ]
+     }
+    }
+   },
+   {
+    "id": "demo-remote",
+    "kind": "model",
+    "model": "media-remote@1",
+    "inputs": {
+     "providerId": "demo-provider"
+    }
+   }
+  ],
+  "variables": {},
+  "assets": [],
+  "liveActivities": []
+ }
+}

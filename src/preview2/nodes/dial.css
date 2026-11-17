@@ -1,0 +1,16 @@
+/* The dial and the arc track (`sh.dial@1`, `sh.arc-track@1`). Under `.sh-preview2` like the rest. Colours come from the document's inks. */
+.sh-preview2 {
+  .sh-dial { position: relative; width: 100%; min-width: 0; }
+  .sh-dial svg { display: block; overflow: visible; }
+  .sh-dial-ticks, .sh-dial-lit { fill: none; }
+  .sh-dial-lit { stroke-linecap: round; }
+  .sh-dial-letter { text-anchor: middle; dominant-baseline: central; font-weight: 600; font-family: ui-rounded, 'SF Pro Rounded', system-ui, sans-serif; }
+  .sh-dial-needle { transform-box: view-box; }
+  .sh-dial[data-animates=true] .sh-dial-needle { transition: transform .3s ease-out; }
+  .sh-dial-center { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: none; text-align: center; }
+  .sh-dial-center > * { margin: 0; }
+  .sh-arc { position: relative; width: 100%; min-width: 0; aspect-ratio: var(--arc-aspect); }
+  .sh-arc svg { display: block; overflow: visible; }
+  .sh-arc-curve, .sh-arc-horizon { fill: none; stroke-linecap: round; }
+  @media (prefers-reduced-motion: reduce) { .sh-dial .sh-dial-needle { transition: none !important; } }
+}

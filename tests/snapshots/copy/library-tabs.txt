@@ -1,0 +1,25 @@
+Tabs
+3 of 5 in the tab bar
+Home
+4
+Security
+5
+Climate
+4
+Tab
+Edit Tabs
+
+[names]
+Close
+Find a tab
+Show what is in Home
+More for Home
+Move Home
+Move
+Show what is in Security
+More for Security
+Move Security
+Show what is in Climate
+More for Climate
+Move Climate
+Add

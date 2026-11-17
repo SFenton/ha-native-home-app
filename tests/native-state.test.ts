@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HomeAssistantClient } from '../server/ha';
-import { nativeHomeSnapshot, readNativeSnapshot, type NativeHouseConfig } from '../server/native-home';
+import { draftTodoIds, nativeHomeSnapshot, readNativeSnapshot, type NativeHouseConfig } from '../server/native-home';
 
 const credentials = ['fixture-ha-private-token', 'fixture-studio-private-token'];
 const identity = { id: 'fixture-user', name: 'Authenticated fixture', is_owner: false, is_admin: true };
@@ -64,8 +63,8 @@ function transport(options: {
   }
   vi.stubGlobal('WebSocket', FakeSocket);
   const readStates = vi.fn(async () => states);
-  const snapshot = (signal = new AbortController().signal) =>
-    readNativeSnapshot('ws://fixture.invalid/api/websocket', credentials[0], signal, credentials, readStates);
+  const snapshot = (signal = new AbortController().signal, draftTodoLists?: ReadonlySet<string>) =>
+    readNativeSnapshot('ws://fixture.invalid/api/websocket', credentials[0], signal, credentials, readStates, draftTodoLists);
   return { snapshot, readStates, states, commands, sockets };
 }
 
@@ -96,6 +95,38 @@ describe('safe native control projections', () => {
     expect(snapshot.states.find(state => state.entityId === 'todo.unrelated')?.todoList).toBeUndefined();
     expect(JSON.stringify(snapshot)).not.toContain('untrusted-extra-field');
     expect(api.sockets.every(socket => socket.closed)).toBe(true);
+  });
+  it('reads the todo lists the draft names as well, and only those and the chores pages', async () => {
+    const house = envelope([]);
+    house.config.chores = { pages: [{ lists: [{ entityId: 'todo.demo_assigned' }] }] };
+    const api = transport({ house, states: [rawState('todo.demo_assigned', {}, '1'), rawState('todo.demo_draft_only', {}, '2'), rawState('todo.demo_unrelated', {}, '9')],
+      command(command, socket) {
+        if (command.type !== 'todo/item/list') return false;
+        socket.result(command, { items: [{ uid: `${command.entity_id}-1`, summary: 'Synthetic task', status: 'needs_action' }] }); return true;
+      } });
+    const snapshot = await api.snapshot(undefined, new Set(['todo.demo_draft_only', 'todo.demo_assigned']));
+    expect(api.commands.filter(command => command.type === 'todo/item/list').map(command => command.entity_id).sort()).toEqual(['todo.demo_assigned', 'todo.demo_draft_only']);
+    expect(snapshot.states.find(state => state.entityId === 'todo.demo_draft_only')?.todoList).toEqual({ status: 'ready', items: [{ uid: 'todo.demo_draft_only-1', summary: 'Synthetic task', status: 'needs_action' }] });
+    expect(snapshot.states.find(state => state.entityId === 'todo.demo_unrelated')).toBeUndefined();
+  });
+  it('keeps the cap of 64 across the chores pages and the draft together', async () => {
+    const house = envelope([]);
+    house.config.chores = { pages: [{ lists: Array.from({ length: 40 }, (_, index) => ({ entityId: `todo.demo_page_${index}` })) }] };
+    const api = transport({ house, states: [] });
+    const result = await api.snapshot(undefined, new Set(Array.from({ length: 30 }, (_, index) => `todo.demo_draft_${index}`)));
+    expect(result.warnings).toContain('Chores collection limit exceeded; no todo collections were read');
+    expect(api.commands.some(command => command.type === 'todo/item/list')).toBe(false);
+  });
+  it('names the draft todo lists from its todo-collection sources only', () => {
+    const list = (id: unknown) => ({ title: 'List', entityId: { type: 'literal', value: id }, hideCompleted: false, hideWhenNoOpenItems: false });
+    const document = { dataSources: [
+      { id: 'a', kind: 'model', model: 'todo-collection@1', inputs: { lists: [list('todo.demo_one'), list('todo.demo_two'), list('todo.demo_one'), list('sensor.demo_not_todo'), list('todo.Bad Id'), list(7)] } },
+      { id: 'b', kind: 'model', model: 'todo-counts@1', inputs: { lists: [list('todo.demo_counts_only')] } },
+      { id: 'c', kind: 'ha-entity', entityId: { type: 'literal', value: 'todo.demo_entity' } },
+    ] };
+    expect([...draftTodoIds(document)].sort()).toEqual(['todo.demo_one', 'todo.demo_two']);
+    expect(draftTodoIds(null).size).toBe(0);
+    expect(draftTodoIds({ dataSources: 'no' }).size).toBe(0);
   });
   it.each([
     { items: [{ uid: '1', summary: 'Fixture', status: 'unexpected' }] },
@@ -440,30 +471,5 @@ describe('native authenticated identity and bounded forecast reads', () => {
     expect(snapshot.states[0].temperature).toBe(0);
     expect(snapshot.warnings).toHaveLength(2);
     expect(fixture.sockets[0].closed).toBe(true);
-  });
-
-  it('uses the verified profile adapter and leaves no-HA sample behavior unchanged', async () => {
-    const fixture = transport();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(fixture.states)));
-    vi.stubGlobal('fetch', fetchMock);
-    const source = { id: 'profile', name: 'Profile', kind: 'native-home' as const, endpoint: 'house-profile', sample: { name: 'Editable sample' }, refreshSeconds: 30 };
-    const config = { production: false, port: 4800, host: '127.0.0.1', dataDir: 'unused', enableLiveActions: false };
-    const sample = new HomeAssistantClient(config);
-    const live = new HomeAssistantClient({ ...config, haUrl: 'http://fixture.invalid', haToken: credentials[0], authToken: credentials[1] });
-    try {
-      expect(await sample.data(source)).toEqual({ mode: 'sample', data: source.sample });
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect((await live.data(source)).data).toEqual({ id: identity.id, name: identity.name, isOwner: false, isAdmin: true, personEntityId: 'person.linked' });
-      expect(fetchMock).toHaveBeenCalledExactlyOnceWith('http://fixture.invalid/api/states', expect.objectContaining({ method: 'GET', redirect: 'error' }));
-    } finally { sample.close(); live.close(); }
-  });
-
-  it('fails the profile adapter explicitly when HA cannot identify its authenticated user', async () => {
-    const fixture = transport({ user: { ...identity, name: null } });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(fixture.states))));
-    const client = new HomeAssistantClient({ production: false, port: 4800, host: '127.0.0.1', dataDir: 'unused', enableLiveActions: false, haUrl: 'http://fixture.invalid', haToken: credentials[0] });
-    try {
-      await expect(client.data({ id: 'profile', name: 'Profile', kind: 'native-home', endpoint: 'house-profile', sample: {}, refreshSeconds: 30 })).rejects.toMatchObject({ status: 502 });
-    } finally { client.close(); }
   });
 });

@@ -1,0 +1,80 @@
+demo-second
+State tile · Sample Detail › Demo Row
+Linked to Lamp Row
+Used in 2 places. A change here asks first.
+Parameters (1)
+Entity
+Entity
+Add Parameter…
+Title
+Subtitle
+None
+Icon
+circle
+Entity
+Set Per Place
+Active when
+From the style
+Filled when
+From the style
+Error when
+From the style
+Progress
+Choose
+A number from 0 to 1. Nothing is drawn while it is None.
+Buttons
+Add Button
+Icon color
+None
+Button icon color
+None
+In a taller cell
+None
+Badge
+None
+Width
+Automatic
+2 columns
+3 columns
+4 columns
+States
+Style
+Switch
+Show state
+Off
+Resting. A tap does nothing.
+Icon
+From the style
+Words
+Indicator
+From the style
+Color
+From the style
+Behavior
+Only show when
+Always
+Only enabled when
+Always
+Opens
+Nothing
+When tapped
+Set by the style
+Swipe to Adjust
+Off
+Advanced
+
+[names]
+More
+Close
+Parameters
+Add Subtitle
+Set Per Place: Entity
+Active when: From the style.
+Filled when: From the style.
+Error when: From the style.
+Add Icon color
+Add Button icon color
+Add In a taller cell
+Only show when: Always.
+Only enabled when: Always.
+Swipe to Adjust, Off

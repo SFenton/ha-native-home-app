@@ -1,0 +1,50 @@
+[top bar]
+Home
+Saved
+Publish
+
+[names]
+Pages
+Undo
+Redo
+Project
+
+[top bar, two problems]
+Home
+2 Problems
+Publish
+
+[names]
+Pages
+Undo
+Redo
+Project
+
+[top bar, not saved]
+Home
+Not Saved
+Publish
+
+[names]
+Pages
+Undo
+Redo
+Project
+
+[bottom bar]
+Edit
+Use
+This Page
+Add
+
+[names]
+Mode
+
+[bottom bar, Use]
+Edit
+Use
+This Page
+Add
+
+[names]
+Mode

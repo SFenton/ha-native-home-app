@@ -1,0 +1,7 @@
+Start from Published?
+This draft has changes that are not published. Start from the layout your apps load now, or keep working on your draft. The draft is kept as a backup if you start over.
+Keep My Draft
+Start from Published
+
+[names]
+Close

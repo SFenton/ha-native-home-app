@@ -1,0 +1,27 @@
+States
+Home Assistant’s names, separated by commas.
+Means
+In Progress
+Lit
+Icon
+Default
+Words
+Indicator
+Default for In Progress
+No arc while this state has an action.
+Color
+Class Default
+Fill
+Fill
+#546E7A
+Fill differs in dark mode
+Without a fill the tile draws the face of its class.
+Words on fill
+White
+Needs a fill. Without one, the words keep the ink of the face.
+When tapped
+Tap
+Lock
+Tap: Lock. Taps come with the built-in style a copy was made from.
+Remove
+Unlocking

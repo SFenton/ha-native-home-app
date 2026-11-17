@@ -1,0 +1,77 @@
+Guests
+Tile grid · Home › Guests Staying Over
+Title
+Width
+Automatic
+Half
+Full
+Smallest tile
+Tile
+Tile dynamic type
+Section wide
+Columns
+Least columns
+None
+Equal row heights
+Short row
+Share
+Leading
+Fold
+Page
+Container
+Page: avoids the Duo’s hinge. Container: ignores it.
+Group by State
+Off
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Add Least columns
+Group by State, Off
+Only show when: Always.
+
+[advanced]
+Guests
+Tile grid · Home › Guests Staying Over
+Title
+Width
+Automatic
+Half
+Full
+Smallest tile
+Tile
+Tile dynamic type
+Section wide
+Columns
+Least columns
+None
+Equal row heights
+Short row
+Share
+Leading
+Fold
+Page
+Container
+Page: avoids the Duo’s hinge. Container: ignores it.
+Group by State
+Off
+Behavior
+Only show when
+Always
+Advanced
+ID
+Spacing
+Token
+
+[names]
+More
+Close
+Add Least columns
+Group by State, Off
+Only show when: Always.
+hc-home-guest-grid
+Copy ID

@@ -1,0 +1,426 @@
+/*
+ * The 2.0 preview. Everything is under `.sh-preview2`: its own dark tokens (kit.css values, `--fam-*` families and glass), the
+ * system font and `color-scheme: dark`. The only thing it reads from the Studio is `--studio-selection`, the ring colour.
+ * Written with CSS nesting so every rule outranks the Studio's global element rules (button, input, select).
+ */
+.sh-preview2 {
+  all: initial; box-sizing: border-box; display: block; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;
+  color-scheme: dark; color: #fff; font: 400 17px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  --ink: #fff; --ink-2: rgba(235, 235, 245, .85); --ink-3: rgba(235, 235, 245, .6); --action: #409CFF; --fill-action: #0071E3; --danger: #FF6961; --warn: #FFB340; --ok: #30D158;
+  --tile-bg: rgba(28, 28, 30, .66); --module: rgba(28, 28, 30, .66); --sep: rgba(255, 255, 255, .14); --press: rgba(255, 255, 255, .1);
+  --glass-bg: rgba(255, 255, 255, .13); --glass-border: rgba(255, 255, 255, .28); --glass-rim: rgba(255, 255, 255, .18); --glass-shadow: 0 6px 18px rgba(0, 0, 0, .22);
+  --fam-neutral-glyph: #8E8E93; --fam-lights-glyph: #FF9630; --fam-lights-fill: #7A4A00; --fam-occupancy-glyph: #5BD16A; --fam-occupancy-fill: #2A732E;
+  --fam-groceries-glyph: #E0916F; --fam-groceries-fill: #802200; --fam-chore-resident1-glyph: #8FA0FF; --fam-chore-resident1-fill: #0022CC;
+  --fam-chore-resident2-glyph: #FF8CF7; --fam-chore-resident2-fill: #B410AE; --fam-chore-unassigned-glyph: #FF8FBF; --fam-chore-unassigned-fill: #C2127A;
+  --fam-chore-home-glyph: #B98CFF; --fam-chore-home-fill: #6600CC;
+  --sh-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --sel: var(--studio-selection, #03a9f4); --ease-sheet: cubic-bezier(.32, .72, 0, 1); --ease-standard: cubic-bezier(.4, 0, .2, 1);
+
+  *, *::before, *::after { box-sizing: border-box; }
+  button, input, select, textarea { all: unset; box-sizing: border-box; font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+  button { cursor: pointer; } button:disabled { opacity: .4; cursor: default; }
+  :focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+  h1, h2, p { margin: 0; }
+
+  /* Frame: bezel or flat. The base `.device-model` look is replaced; its containment and pan rules still apply. */
+  .device-stage { margin: 0 auto; }
+  .device-model.sh-model { padding: 0; background: #000; box-shadow: none; border-radius: 0; }
+  .device-model.sh-model::before { display: none; }
+  /* The body is the model's ::before, so its four corners and a hinge strip (::after) can differ per window (`BodyFrame`); Preview2 sets the variables. */
+  .device-model.sh-bezel { --sh-bezel: 12px; --sh-outside: 0px; --sh-body-radius: 67px; --sh-screen-radius: 55px; padding: var(--sh-bezel) var(--sh-bezel) var(--sh-bezel) calc(var(--sh-bezel) + var(--sh-outside)); border-radius: 0; background: none; box-shadow: none; }
+  .device-model.sh-bezel::before { display: block; content: ''; position: absolute; inset: 0 0 0 var(--sh-outside); border: 0; border-radius: var(--sh-body-radius); background: #0b0b0d; box-shadow: 0 0 0 1px #3a3a3f, 0 0 0 3px #1c1c1f, 0 18px 40px rgba(0, 0, 0, .35); pointer-events: none; }
+  .device-model.sh-bezel[data-strip]::after { content: ''; position: absolute; left: 0; top: 50%; width: var(--sh-strip-w); height: var(--sh-strip-h); margin-top: calc(var(--sh-strip-h) / -2); border-radius: var(--sh-strip-r) 0 0 var(--sh-strip-r); background: #2c2c2c; box-shadow: inset 0 0 0 1px #7e7e7e; pointer-events: none; }
+  .device-model.sh-flat { border-radius: 24px 24px 0 0; overflow: hidden; }
+  .sh-layer { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; outline: none; user-select: none; -webkit-user-select: none; overscroll-behavior: contain; }
+  .device-model.sh-bezel .sh-layer { inset: var(--sh-bezel) var(--sh-bezel) var(--sh-bezel) calc(var(--sh-bezel) + var(--sh-outside)); border-radius: var(--sh-screen-radius); z-index: 1; }
+  .device-model[data-pan] .sh-layer { cursor: grab; }
+  .sh-layer input, .sh-layer textarea { user-select: text; -webkit-user-select: text; }
+  .sh-layer img { -webkit-user-drag: none; }
+  .sh-screen { position: absolute; inset: 0; background: #111723; isolation: isolate; text-align: left; overflow: hidden; }
+
+  /* Wallpaper: one still layer under every page, the base colour under the canonical scrim. */
+  .sh-wall { position: absolute; inset: 0; z-index: 0; background: radial-gradient(120% 60% at 20% 8%, #2c4262 0, transparent 60%), radial-gradient(90% 50% at 90% 80%, #3b2a22 0, transparent 70%), #111723; }
+  .sh-wall { overflow: hidden; }
+  .sh-wall-image { position: absolute; inset: -28px; background-size: cover; background-position: center; }
+  .sh-wall::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, .44) 0, rgba(0, 0, 0, .45) 28%, rgba(0, 0, 0, .46) 50%, rgba(0, 0, 0, .52) 75%, rgba(0, 0, 0, .64) 100%); }
+  .sh-status { position: absolute; inset: 0 0 auto 0; height: var(--sh-safe-top); z-index: 40; pointer-events: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 30px 12px; font: 600 17px/1 var(--sh-font); }
+  .sh-island { position: absolute; left: 50%; top: 11px; width: 120px; height: 34px; margin-left: -60px; border-radius: 17px; background: #000; }
+  .sh-battery { width: 26px; height: 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: linear-gradient(90deg, #fff 80%, transparent 80%); }
+
+  /* Pages */
+  .sh-deck { position: absolute; inset: 0; z-index: 1; transform-origin: 50% 0; transition: transform .45s var(--ease-sheet), border-radius .45s var(--ease-sheet); }
+  .sh-screen[data-covered] .sh-deck { transform: scale(.94) translateY(6px); border-radius: 28px; overflow: hidden; }
+  .sh-page { --bar-bottom: calc(var(--sh-safe-top) + 48px); --bottom-pad: 116px; position: absolute; inset: 0; --sh-progress: 0; --sh-ramp: 0px; }
+  .sh-page.sh-in-push { animation: sh-in-push .3s var(--ease-sheet) both; } .sh-page.sh-out-push { animation: sh-out-push .3s var(--ease-sheet) both; pointer-events: none; }
+  .sh-page.sh-in-pop { animation: sh-in-pop .3s var(--ease-sheet) both; } .sh-page.sh-out-pop { animation: sh-out-pop .3s var(--ease-sheet) both; pointer-events: none; }
+  .sh-scroll { position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding-top: var(--bar-bottom); padding-bottom: calc(var(--bottom-pad) + var(--sh-inset, 0px) + var(--sh-dock-h, 0px));
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent var(--bar-bottom), #000 calc(var(--bar-bottom) + var(--sh-ramp, 0px))); mask-image: linear-gradient(180deg, transparent 0, transparent var(--bar-bottom), #000 calc(var(--bar-bottom) + var(--sh-ramp, 0px))); }
+  .sh-scroll::-webkit-scrollbar { display: none; }
+  .sh-column { display: flex; flex-direction: column; gap: var(--gap, 12px); margin: 0 auto; padding: var(--pad-top, 0) var(--pad-trail, 16px) var(--pad-bottom, 0) var(--pad-lead, 16px); }
+  .sh-large-title { font: 700 34px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: .01em; padding: 8px 0 6px; transform-origin: left top;
+    opacity: calc(1 - var(--sh-progress, 0)); transform: translateY(calc(-8px * var(--sh-progress, 0))) scale(calc(1 - .15 * var(--sh-progress, 0))); }
+  .sh-empty { color: var(--ink-3); font-size: 15px; padding: 24px 0; text-align: center; }
+  .sh-header { position: absolute; inset: var(--sh-safe-top) 0 auto 0; height: 48px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; pointer-events: none; }
+  .sh-header > * { pointer-events: auto; }
+  .sh-bar-side { display: flex; gap: 8px; align-items: center; } .sh-trailing { margin-left: auto; }
+  .sh-inline-title { flex: 1; min-width: 0; font: 600 17px/1.2 var(--sh-font); opacity: var(--sh-progress, 0); transform: translateY(calc(4px * (1 - var(--sh-progress, 0)))); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; order: 1; }
+  .sh-trailing { order: 2; }
+  .sh-group { display: flex; gap: 8px; } .sh-shared { gap: 0; border-radius: 22px; background: var(--glass-bg); border: .5px solid var(--glass-border); backdrop-filter: blur(18px) saturate(1.5); }
+  .sh-shared .sh-circle { background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+  .sh-circle { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; position: relative; background: var(--glass-bg); border: .5px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); color: #fff; --ring-r: 999px; }
+
+  /* Nodes, selection and rules */
+  .sh-node { position: relative; min-width: 0; --ring-r: 28px; }
+  .sh-node[data-type=status-chip], .sh-node[data-type=room-chip], .sh-node[data-type=status-pill], .sh-node[data-type=primary-button] { --ring-r: 999px; }
+  .sh-node[data-type=section], .sh-node[data-type=room-section], .sh-node[data-type=tile-grid], .sh-node[data-type=status-rail], .sh-node[data-type=paged-row], .sh-node[data-type=local-tabs] { --ring-r: 16px; }
+  [data-selected] { position: relative; }
+  [data-selected]::after { content: ''; position: absolute; inset: -6px; border: 3px solid var(--sel); border-radius: var(--ring-r, 24px); box-shadow: 0 0 0 1px #fff; pointer-events: none; z-index: 6; }
+  .sh-sheet[data-selected]::after { inset: 0; border-radius: 38px 38px 0 0; }
+  .sh-add-slot { grid-column: 1 / -1; min-width: 0; display: flex; justify-content: center; }
+  .sh-add-slot:empty { display: none; }
+  .sh-handle-slot { position: absolute; top: -20px; right: -6px; min-width: 88px; height: 32px; z-index: 7; display: flex; justify-content: flex-end; align-items: center; }
+  .sh-handle-slot:empty { pointer-events: none; }
+  .sh-node[data-hidden] { outline: 1.5px dashed rgba(255, 255, 255, .55); outline-offset: 2px; border-radius: 22px; }
+  .sh-node[data-hidden] > :not(.sh-tag):not(.sh-handle-slot) { opacity: .45; }
+  .sh-tag { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 9px; border-radius: 11px; background: rgba(60, 60, 67, .9); border: .5px solid rgba(255, 255, 255, .28); color: #fff; font: 600 12px/1 var(--sh-font); white-space: nowrap; }
+  .sh-tag-rule { position: absolute; top: 6px; left: 6px; z-index: 4; }
+  .sh-placeholder { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 4px; min-height: 104px; padding: 14px; border-radius: 22px; border: 1.5px dashed rgba(255, 255, 255, .35); background: rgba(28, 28, 30, .4); }
+  .sh-placeholder-title { font-weight: 600; } .sh-placeholder-type { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-3); }
+
+  /* Layout nodes */
+  .sh-grid { display: grid; gap: var(--gap, 12px); grid-template-columns: repeat(auto-fill, minmax(max(var(--min, 150px), calc((100% - (var(--max, 2) - 1) * var(--gap, 12px)) / var(--max, 2))), 1fr)); }
+  .sh-grid[data-equal] { grid-auto-rows: 1fr; }
+  .sh-section { display: flex; flex-direction: column; gap: 8px; }
+  .sh-section-header { font: 700 22px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; padding-top: 6px; }
+  /* A group heading of a grid grouped by state (`sh.grid-state-groups@1`): the section heading in the grid's own flow, a whole row wide; 8 pt above it in a sheet, none on a page. */
+  .sh-grid-heading { margin: 0; padding-top: 0; font-size: 20px; color: var(--ink); overflow-wrap: anywhere; }
+  .sh-sheet .sh-grid-heading { padding-top: 8px; }
+  .sh-section-footer { color: var(--ink-3); font-size: 13px; }
+  .sh-section-body { display: flex; flex-direction: column; gap: var(--gap, 12px); }
+  .sh-section-module-list .sh-section-body { gap: 0; border-radius: 26px; background: var(--module); overflow: hidden; }
+  .sh-section-module-list .sh-node + .sh-node > .sh-row { border-top: .5px solid var(--sep); }
+  .sh-rail { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 9px 16px; margin: -7px -16px; }
+  .sh-rail .sh-node { flex: none; }
+  .sh-paged-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .sh-paged-track > .sh-node { flex: 0 0 calc((100% - 12px * (var(--per, 2) - 1)) / var(--per, 2)); scroll-snap-align: start; }
+  /* Edit: a thin scroll bar under every row that scrolls sideways (`HorizontalScroller`), so a mouse can reach what overflows. Drawn
+     over the row's own padding, so the layout is the one Use draws; Use keeps the app's look and has no bar. */
+  .sh-hscroll { position: relative; display: flow-root; }
+  .sh-hbar { position: absolute; left: 0; right: 0; bottom: -7px; height: 8px; z-index: 6; touch-action: none; }
+  .sh-hscroll[data-kind=paged] .sh-hbar { bottom: -9px; }
+  .sh-hbar[data-idle] { visibility: hidden; pointer-events: none; }
+  .sh-hbar::before { content: ''; position: absolute; inset: 2px 0; border-radius: 2px; background: rgba(255, 255, 255, .12); pointer-events: none; }
+  .sh-hbar-thumb { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; background: rgba(255, 255, 255, .55); cursor: grab; }
+  .sh-hbar-thumb:hover, .sh-hbar-thumb:active { background: rgba(255, 255, 255, .85); }
+  .sh-dots { display: flex; justify-content: center; gap: 6px; padding: 8px 0 0; } .sh-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .3); } .sh-dots i[data-on] { background: #fff; }
+  .sh-local-tabs { display: flex; flex-direction: column; gap: 12px; } .sh-local-tab-body { display: flex; flex-direction: column; gap: var(--gap, 12px); }
+  .sh-segments { display: inline-flex; padding: 2px; border-radius: 9px; background: rgba(118, 118, 128, .24); gap: 2px; }
+  .sh-local-tabs > .sh-segments { display: flex; }
+  .sh-segments button { flex: 1; min-height: 32px; padding: 0 12px; border-radius: 7px; text-align: center; font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .sh-segments button[aria-selected=true], .sh-segments button[aria-checked=true] { background: #fff; color: #000; font-weight: 600; }
+  .sh-segments button[data-selected]::after { inset: -3px; border-radius: 10px; }
+
+  /* Tiles, chips, rows */
+  .sh-tile { position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; width: 100%; min-height: 104px; padding: 14px; border-radius: 22px; text-align: left; color: var(--ink);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 46%, rgba(255, 255, 255, .08)), var(--tile-bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); overflow: hidden; }
+  .sh-tile.sh-lit { background: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 46%, rgba(255, 255, 255, .08)), var(--fill, var(--tile-bg)); }
+  .sh-tile-glyph { color: var(--glyph, var(--fam-neutral-glyph)); margin-bottom: auto; display: inline-flex; }
+  /* The default tile ink (`sh.tile-ink-default@1`, `build/design/sim-fidelity-contract.md`, section 1): on a dark face (idle, tinted, warning) an icon with no colour of its own
+     and the state line draw the primary ink (white on a page and in a dark sheet, black in a light sheet). A lit or filled face, an error, an unavailable tile and an authored
+     tint keep theirs; the title, the chevron and the accessory ink are not touched. `data-ink="muted"` on the preview root draws the ink of an app that predates the id, and is what the gate `tile-ink-gate.ts` sets while it is off. */
+  .sh-tile { --fam-neutral-glyph: var(--ink); }
+  .sh-tile:not(.sh-lit):not(.sh-dark-ink):not([data-error]):not(.sh-unavailable):not([data-disabled]) .sh-tile-line { color: var(--ink); }
+  .sh-tile.sh-unavailable { --fam-neutral-glyph: #8E8E93; } .sh-tile.sh-unavailable .sh-tile-glyph { opacity: .5; }
+  .sh-sheet:not([data-appearance=dark]) .sh-tile.sh-unavailable { --fam-neutral-glyph: #818186; }
+  &[data-ink=muted] .sh-tile { --fam-neutral-glyph: #8E8E93; } &[data-ink=muted] .sh-sheet:not([data-appearance=dark]) .sh-tile { --fam-neutral-glyph: #818186; }
+  .sh-dv-lighttile[data-off]:not([data-state=unavailable]) .sh-row-copy > span:last-child { opacity: 1; }
+  &[data-ink=muted] .sh-dv-lighttile[data-off]:not([data-state=unavailable]) .sh-row-copy > span:last-child { opacity: .8; }
+  &[data-ink=muted] .sh-tile:not(.sh-lit):not(.sh-dark-ink):not([data-error]):not(.sh-unavailable):not([data-disabled]) .sh-tile-line { color: var(--ink-2); }
+  .sh-tile-title { font-size: 17px; font-weight: 600; line-height: 1.2; } .sh-tile-line { font-size: 13px; color: var(--ink-2); }
+  /* The app's chevron: trailing edge, vertically centred, 12 pt in, with 20 pt kept clear for the words (`GlassTileFace.chevronReserve`). */
+  .sh-tile-chevron { position: absolute; top: 50%; transform: translateY(-50%); right: 12px; opacity: .8; color: var(--ink-2); }
+  .sh-tile:has(> .sh-tile-chevron) { padding-right: 34px; }
+    &[data-mode=use] .sh-pressable:active { opacity: .8; }
+  .sh-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 4px 16px 4px 12px; border-radius: 24px; background: var(--tile-bg); color: var(--ink); font-size: 15px; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+  .sh-tile.sh-dark-ink .sh-tile-title, .sh-tile.sh-dark-ink .sh-tile-line { color: #1c1c1e; } .sh-tile.sh-dark-ink .sh-tile-glyph { color: #1c1c1e; }
+  .sh-chip-glyph { color: var(--glyph, #fff); display: inline-flex; } .sh-chip strong { font-weight: 600; } .sh-chip span:not(.sh-chip-glyph) { color: var(--ink-2); }
+  .sh-chip-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; text-align: left; } .sh-chip-text strong { color: var(--ink); } .sh-chip-text span { font-size: 13px; } .sh-chip-text span:empty { display: none; }
+  .sh-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 14px; border-radius: 18px; background: var(--module); }
+  .sh-pill span { color: var(--ink-2); font-size: 13px; }
+  .sh-tone-ok, .sh-tone-success { color: var(--ok); } .sh-tone-warning { color: var(--warn); } .sh-tone-danger { color: var(--danger); } .sh-tone-active { color: var(--action); } .sh-tone-unavailable { color: var(--ink-3); }
+  .sh-info { padding: 14px 16px; border-radius: 22px; background: var(--module); font-size: 15px; } .sh-info.sh-tone-success { color: var(--ink); box-shadow: inset 3px 0 0 var(--ok); }
+  .sh-text { color: var(--ink); } .sh-text-headline { font-weight: 600; } .sh-text-caption1 { font-size: 12px; color: var(--ink-2); } .sh-text-subheadline { font-size: 15px; color: var(--ink-2); }
+  .sh-text-footnote { font-size: 13px; color: var(--ink-2); } .sh-text-section-title { font: 700 22px/1.2 -apple-system, system-ui, sans-serif; }
+  .sh-text[data-state=loading], [data-state=loading] { opacity: .5; }
+  .sh-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 16px; background: var(--module); border-radius: 22px; text-align: left; }
+  .sh-section-module-list .sh-row { border-radius: 0; background: none; }
+  .sh-row-glyph { color: var(--action); display: inline-flex; } .sh-row-copy { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .sh-row-primary { flex: 1; font-size: 17px; } .sh-row-copy .sh-row-primary { flex: none; } .sh-row-secondary { font-size: 13px; color: var(--ink-3); } .sh-row-value { color: var(--ink-2); }
+  .sh-row > svg:last-child { color: var(--ink-3); }
+  .sh-primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; padding: 0 20px; border-radius: 25px; background: var(--fill-action); font-weight: 600; width: 100%; }
+  .sh-account { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: 20px; } .sh-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--fill-action); display: inline-flex; align-items: center; justify-content: center; font: 600 24px/1 var(--sh-font); }
+  .sh-control { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 16px; border-radius: 22px; background: var(--module); } .sh-control[data-state=unavailable] { opacity: .6; }
+  /* The row's parts (`sh.bound-row-parts@1`): the glyph takes its tint, and the metrics are the app's row styles (`UKRowStyle`): module 52 (60 with a subtitle) and a 24 point glyph column, form 44 and 28. */
+  .sh-control .sh-row-glyph { color: var(--glyph, var(--action)); }
+  .sh-control[data-metrics=module] { min-height: 52px; gap: 14px; } .sh-control[data-metrics=module]:has(.sh-row-secondary) { min-height: 60px; } .sh-control[data-metrics=module] .sh-row-glyph { width: 24px; justify-content: center; }
+  .sh-control[data-metrics=form] { min-height: 44px; padding-block: 4px; gap: 12px; } .sh-control[data-metrics=form] .sh-row-glyph { width: 28px; justify-content: center; }
+  .sh-control:has(.sh-control-failure) { flex-wrap: wrap; } .sh-control-failure { flex: 1 0 100%; font-size: 13px; color: var(--danger, #ff453a); }
+  /* The check face (`sh.check-face@1`): one checkbox row, a circle the size of the title in the leading slot. */
+  .sh-control-check { min-height: 44px; padding: 11px 16px; } .sh-control-check > button { display: flex; align-items: center; gap: 14px; flex: 1; text-align: left; min-height: 24px; }
+  .sh-control-check .sh-check-circle { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ink-3); color: #fff; box-sizing: border-box; }
+  .sh-control-check[data-checked] .sh-check-circle { background: var(--check, var(--action)); border-color: var(--check, var(--action)); }
+  .sh-control-check[data-disabled] > button { opacity: .5; }
+  .sh-switch { flex: none; position: relative; width: 51px; height: 31px; border-radius: 16px; background: rgba(120, 120, 128, .32); transition: background .2s; }
+  .sh-switch span { position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .25); transition: transform .2s; }
+  .sh-switch[aria-checked=true] { background: var(--ok); } .sh-switch[aria-checked=true] span { transform: translateX(20px); }
+  .sh-stepper { display: inline-flex; align-items: center; gap: 4px; } .sh-stepper button { width: 36px; height: 32px; border-radius: 8px; background: rgba(118, 118, 128, .24); display: inline-flex; align-items: center; justify-content: center; } .sh-stepper output { min-width: 40px; text-align: center; }
+  .sh-slider { flex: 1; accent-color: var(--action); appearance: auto; height: 28px; } .sh-select, .sh-field { padding: 6px 10px; border-radius: 8px; background: rgba(118, 118, 128, .24); min-width: 120px; }
+  .sh-mini-button { padding: 6px 14px; border-radius: 16px; background: var(--fill-action); font-weight: 600; font-size: 15px; }
+
+  /* Tab bar */
+  .sh-tabbar { position: absolute; left: 21px; right: 21px; bottom: 22px; height: 62px; z-index: 20; display: flex; gap: 2px; padding: 4px; border-radius: 31px; background: var(--glass-bg); border: .5px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); }
+  .sh-tab { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 27px; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, .72); --ring-r: 999px; }
+  .sh-tab[data-active] { background: rgba(255, 255, 255, .17); color: var(--action); } .sh-tab[data-hidden] { opacity: .45; outline: 1.5px dashed rgba(255, 255, 255, .55); }
+
+  /* Sheets: ground follows the browser's appearance, dark when the sheet says so */
+  .sh-sheet-layer { position: absolute; inset: 0; z-index: 30; display: flex; align-items: flex-end; --sh-sheet-top: max(calc(var(--sh-safe-top) - 8px), 12px); }
+  .sh-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .4); }
+  .sh-sheet { --sheet-ground: #F2F2F7; --sheet-cell: #fff; --ink: #000; --ink-2: rgba(60, 60, 67, .76); --ink-3: rgba(60, 60, 67, .6); --tile-bg: #fff; --module: #fff; --sep: rgba(60, 60, 67, .29); --action: #0066CC; --bar-bottom: 0px; --bottom-pad: calc(var(--sh-safe-bottom) + 24px);
+    position: relative; width: 100%; display: flex; flex-direction: column; max-height: calc(100% - var(--sh-sheet-top)); background: var(--sheet-ground); color: var(--ink); color-scheme: light; border-radius: 38px 38px 0 0; overflow: hidden; box-shadow: 0 -4px 30px rgba(0, 0, 0, .25); }
+  .sh-sheet[data-appearance=dark] { --sheet-ground: #1C1C1E; --sheet-cell: #2C2C2E; --ink: #fff; --ink-2: rgba(235, 235, 245, .85); --ink-3: rgba(235, 235, 245, .6); --tile-bg: #2C2C2E; --module: #2C2C2E; --sep: rgba(255, 255, 255, .14); --action: #409CFF; color-scheme: dark; }
+  @media (prefers-color-scheme: dark) { .sh-sheet { --sheet-ground: #1C1C1E; --sheet-cell: #2C2C2E; --ink: #fff; --ink-2: rgba(235, 235, 245, .85); --ink-3: rgba(235, 235, 245, .6); --tile-bg: #2C2C2E; --module: #2C2C2E; --sep: rgba(255, 255, 255, .14); --action: #409CFF; color-scheme: dark; } }
+  /* The Studio's Appearance setting is Light: a `system` sheet stays light under a dark browser (the media rule above would darken it). */
+  .sh-sheet[data-appearance=light] { --sheet-ground: #F2F2F7; --sheet-cell: #fff; --ink: #000; --ink-2: rgba(60, 60, 67, .76); --ink-3: rgba(60, 60, 67, .6); --tile-bg: #fff; --module: #fff; --sep: rgba(60, 60, 67, .29); --action: #0066CC; color-scheme: light; }
+  /* A state tile with a fill keeps its white ink on a light sheet (a lowered door tile): the sheet's ink rule would blacken it. */
+  .sh-sheet .sh-state-tile[class*=sh-fill-ink-] .sh-tile-title, .sh-sheet .sh-state-tile[class*=sh-fill-ink-] .sh-tile-glyph { color: #fff; }
+  .sh-sheet-layer[data-placement=bottom] { justify-content: center; } .sh-sheet-layer[data-placement=bottom] .sh-sheet { width: var(--sheet-w, 100%); }
+  .sh-sheet-layer[data-placement=bottom] .sh-sheet[data-fills-height] { height: calc(100% - var(--sh-sheet-top)); }
+  /* The Duo landscape: the leading half, inset 8 pt from the leading, top and bottom edges, the app's own placement. */
+  .sh-sheet-layer[data-placement=leading] { align-items: flex-start; justify-content: flex-start; padding: 8px; }
+  .sh-sheet-layer[data-placement=leading] .sh-sheet { width: var(--sheet-w); height: var(--sheet-h); max-height: none; border-radius: 38px; }
+  /* A form or page sheet on iPad: centred, rounded all round, the form at 580 x 660 at most. */
+  .sh-sheet-layer[data-placement=center] { align-items: center; justify-content: center; padding: var(--sh-sheet-top) 0 12px; }
+  .sh-sheet-layer[data-placement=center] .sh-sheet { width: var(--sheet-w); max-height: min(var(--sheet-max-h, 100%), 100%); border-radius: 38px; }
+  .sh-sheet-layer[data-placement=center] .sh-sheet[data-height=full] { height: min(var(--sheet-max-h, 100%), 100%); }
+  .sh-sheet[data-height=full] { height: calc(100% - var(--sh-sheet-top)); } .sh-sheet-layer[data-placement] .sh-sheet[data-full-screen], .sh-sheet[data-full-screen] { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+  .sh-sheet[data-animate] { animation: sh-sheet-in .35s var(--ease-sheet) both; }
+  .sh-sheet-layer[data-top] .sh-dim { animation: sh-fade .3s ease-out both; }
+  .sh-grabber { flex: none; align-self: center; width: 36px; height: 5px; margin-top: 5px; border-radius: 3px; background: rgba(128, 128, 128, .5); }
+  .sh-sheet-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 6px 16px; }
+  .sh-sheet-title { flex: 1; text-align: center; font: 600 17px/1.2 var(--sh-font); order: 1; } .sh-sheet-bar .sh-bar-side { min-width: 44px; } .sh-sheet-bar .sh-trailing { order: 2; justify-content: flex-end; }
+  .sh-sheet .sh-circle { background: rgba(118, 118, 128, .24); border: 0; box-shadow: none; backdrop-filter: none; color: var(--ink); }
+  .sh-sheet .sh-scroll { position: relative; inset: auto; flex: 1 1 auto; min-height: 0; padding-top: 4px; mask-image: none; -webkit-mask-image: none; }
+  .sh-sheet .sh-text, .sh-sheet .sh-tile, .sh-sheet .sh-chip, .sh-sheet .sh-row, .sh-sheet .sh-control { color: var(--ink); }
+  .sh-sheet .sh-section-header { color: var(--ink); }
+
+  /* The app's Reduce Motion cross-fades a push, a pop and a sheet in 0.2 s. The Studio's own reduced-motion rule switches every
+     animation off with !important, which would leave the old page drawn under the new one until the timer; this fade outranks it. */
+  @media (prefers-reduced-motion: reduce) {
+    .sh-page.sh-in-push, .sh-page.sh-in-pop, .sh-sheet[data-animate] { animation: sh-fade .2s ease-out both !important; }
+    .sh-page.sh-out-push, .sh-page.sh-out-pop { animation: sh-fade-out .2s ease-out both !important; }
+    .sh-deck { transition: none; } .sh-switch, .sh-switch span { transition: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) { .sh-scroll { --sh-ramp: 0px !important; } .sh-circle, .sh-tabbar { backdrop-filter: none; background: #2c2c2e; } }
+
+  /* Windows: two panes for a columns page, the fold, the flyout and the rail (spec 5.9). */
+  .sh-deck.sh-columns { display: flex; }
+  .sh-pane { position: relative; flex: none; height: 100%; overflow: hidden; }
+  .sh-band { flex: none; height: 100%; background: rgba(255, 255, 255, .1); }
+  .sh-band[data-hinge] { background: rgba(0, 0, 0, .35); }
+  .sh-empty-pane { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 24px; text-align: center; color: var(--ink-3); font-size: 15px; }
+  .sh-fold { position: absolute; z-index: 45; pointer-events: none; background: repeating-linear-gradient(45deg, rgba(0, 0, 0, .55) 0 6px, rgba(40, 40, 44, .55) 6px 12px); box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .25); }
+  .sh-fold[data-axis=vertical] { top: 0; bottom: 0; } .sh-fold[data-axis=horizontal] { left: 0; right: 0; }
+  /* The Duo's rail is the trailing vertical bar (`duo.md`): the deck keeps the window's leading edge and the fold stays in window coordinates. */
+  .sh-screen[data-rail] .sh-deck { right: var(--sh-rail); }
+  /* The rail (`ui-rail` in the kit): from the status strip down, the header group on top, the tabs in a rounded pill at the bottom. */
+  .sh-rail-bar { position: absolute; top: var(--sh-safe-top); bottom: 0; right: 0; width: var(--sh-rail); z-index: 20; display: flex; flex-direction: column; align-items: center; padding: 8px 0 22px; gap: 16px; pointer-events: none; }
+  .sh-rail-bar > * { pointer-events: auto; } .sh-rail-grow { flex: 1; pointer-events: none !important; }
+  .sh-rail-group { flex: none; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 22px; }
+  .sh-rail-circles { flex: none; flex-direction: column; align-items: center; gap: 12px; }
+  .sh-screen[data-rail] .sh-tabbar { position: static; width: 64px; height: auto; flex: none; flex-direction: column; padding: 6px 4px; border-radius: 28px; gap: 2px; }
+  .sh-screen[data-rail] .sh-tab { flex: none; width: 56px; height: 56px; border-radius: 24px; }
+  /* In the vertical bar the title is a fixed 24 pt semibold inline title in the header row: there at rest, never collapsing (header-edge-fade R7 (6)). */
+  .sh-header[data-vertical] { gap: 0; } .sh-header[data-vertical] .sh-inline-title { font-size: 24px; opacity: 1; transform: none; margin-left: 4px; } .sh-header[data-vertical] .sh-bar-side:not(:empty) + .sh-inline-title { margin-left: 8px; }
+  .sh-flyout-layer { position: absolute; inset: 0; z-index: 50; pointer-events: none; }
+  .sh-flyout-layer[data-open] { pointer-events: auto; }
+  .sh-flyout-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .32); opacity: 0; transition: opacity .25s ease-out; }
+  .sh-flyout-layer[data-open] .sh-flyout-scrim { opacity: 1; }
+  /* The navigation drawer (`UKNavigationFlyout`): full height, flush to the leading edge, trailing corners 22, the blur running under the status strip; the dim above covers the strip too. */
+  .sh-flyout { position: absolute; top: 0; bottom: 0; left: 0; width: min(300px, 80%); display: flex; flex-direction: column; gap: 4px; padding: calc(var(--sh-safe-top) + 8px) 8px calc(var(--sh-safe-bottom) + 8px); border-radius: 0 22px 22px 0; background: var(--glass-bg); border: .5px solid var(--glass-border); border-left: 0;
+    box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); transform: translateX(-102%); transition: transform .3s var(--ease-sheet); }
+  .sh-flyout-heading { margin: 0; padding: 8px 16px 4px; font: 700 22px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+  .sh-flyout-layer[data-open] .sh-flyout { transform: none; }
+  /* Beside a tab bar (the iPhone) the flyout is mounted only while open, so it slides in by keyframes and out by the transition. */
+  .sh-flyout-layer[data-beside][data-open] .sh-flyout { animation: sh-flyout-in .3s var(--ease-sheet); }
+  .sh-flyout-layer[data-beside][data-open] .sh-flyout-scrim { animation: sh-scrim-in .25s ease-out; }
+  .sh-flyout .sh-tab { flex: none; flex-direction: row; justify-content: flex-start; gap: 12px; height: 48px; padding: 0 16px; font-size: 17px; }
+  .sh-screen[data-short-bar] .sh-status { padding: 0 30px 3px; font-size: 13px; align-items: center; }
+  .sh-screen[data-flyout] .sh-page { --bottom-pad: 32px; }
+  @media (prefers-reduced-motion: reduce) { .sh-flyout, .sh-flyout-scrim { transition: none; animation: none !important; } }
+
+  /* Panels, security, rooms, cameras and records (nodes/panels). Tokens only; sheets re-map --module, --ink and --tile-bg. */
+  .sh-state-message { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 32px; text-align: center; }
+  .sh-state-glyph { color: var(--ink-3); display: inline-flex; margin-bottom: 4px; } .sh-state-title { font: 700 22px/1.2 var(--sh-font); } .sh-state-text { color: var(--ink-2); font-size: 17px; }
+  .sh-alarm { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 16px 12px 12px; border-radius: 26px; background: var(--module); color: var(--ink); overflow: hidden; }
+  .sh-alarm[data-triggered]::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--wash); opacity: .42; pointer-events: none; }
+  .sh-alarm-head { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+  .sh-alarm-badge { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #636366; color: #fff; } .sh-alarm-badge[data-dim] svg { opacity: .5; }
+  .sh-alarm-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .sh-alarm-copy strong { font: 700 22px/1.2 var(--sh-font); } .sh-alarm-copy span { font-size: 15px; color: var(--ink-2); }
+  .sh-alarm-modes { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; grid-auto-rows: 1fr; }
+  .sh-alarm-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 64px; padding: 8px 4px; border-radius: 16px; background: rgba(118, 118, 128, .24); font-size: 13px; font-weight: 600; text-align: center; }
+  .sh-alarm-mode[data-dim] svg { opacity: .5; }
+  .sh-alarm-mode[data-chosen] { background: linear-gradient(180deg, rgba(255, 255, 255, .16), transparent 46%, rgba(0, 0, 0, .1)), var(--fill); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22); color: #fff; }
+  .sh-tile[data-error] .sh-tile-line { color: var(--danger); }
+  .sh-wx { color: #fff; } .sh-wx-card, .sh-wx-highlights { padding: 16px; border-radius: 26px; background: var(--module); } .sh-wx-card { display: flex; flex-direction: column; gap: 12px; }
+  .sh-wx hr { border: 0; height: 1px; margin: 0; background: rgba(255, 255, 255, .14); }
+  .sh-wx-head { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; } .sh-wx-lead { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .sh-wx-label { font-size: 17px; font-weight: 600; } .sh-wx-temp { flex: none; display: flex; align-items: center; gap: 8px; color: rgba(235, 235, 245, .6); }
+  .sh-wx-num, .sh-wx-hero-num { color: #fff; font: 200 64px/1.12 -apple-system, "SF Pro Display", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .sh-wx-title { font-size: 15px; font-weight: 600; color: rgba(235, 235, 245, .6); } .sh-wx-brief { font-size: 15px; line-height: 1.3; } .sh-wx-brief[data-pending] { color: rgba(235, 235, 245, .6); }
+  .sh-wx-hero { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 0; }
+  .sh-wx-hours { display: flex; } .sh-wx-hour { flex: 1; min-width: 0; min-height: 72px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-block: 4px; }
+  .sh-wx-hour i, .sh-wx-day i { display: block; background: rgba(255, 255, 255, .18); border-radius: 99px; } .sh-wx-hour i:nth-child(1) { width: 28px; height: 8px; } .sh-wx-hour i:nth-child(2) { width: 22px; height: 22px; border-radius: 50%; } .sh-wx-hour i:nth-child(3) { width: 24px; height: 8px; }
+  .sh-wx-days { display: flex; flex-direction: column; gap: 12px; } .sh-wx-day { display: flex; align-items: center; gap: 12px; } .sh-wx-day i:nth-child(1) { width: 44px; height: 8px; } .sh-wx-day i:nth-child(2) { width: 22px; height: 22px; border-radius: 50%; } .sh-wx-day i:nth-child(3) { flex: 1; height: 8px; }
+  .sh-wx-highlights { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; background: none; padding: 0; }
+  .sh-wx-high { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-height: 104px; padding: 14px; border-radius: 22px; background: var(--module); } .sh-wx-high-name { font-size: 13px; font-weight: 600; color: rgba(235, 235, 245, .6); } .sh-wx-high i { width: 56%; height: 10px; border-radius: 99px; background: rgba(255, 255, 255, .18); }
+  .sh-room-grid .sh-tile { min-height: 150px; } .sh-anchored { justify-content: space-between; } .sh-two-lines { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sh-device { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 22px; background: var(--module); } .sh-device-title { font-size: 17px; font-weight: 600; } .sh-device-footnote { font-size: 13px; color: var(--ink-3); }
+  .sh-device .sh-segments { display: flex; } .sh-device .sh-segments > [role=radio] { flex: 1; min-height: 32px; display: grid; place-items: center; padding: 0 8px; font-size: 13px; font-weight: 500; } .sh-weekdays { gap: 0; }
+  .sh-device .sh-primary-button { min-height: 44px; } .sh-switch[role=switch][aria-checked=false] { display: block; }
+  .sh-dial { position: relative; margin: 0 auto; color: var(--ink); display: grid; place-items: center; } .sh-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sh-dial-value { font: 200 44px/1 -apple-system, "SF Pro Display", system-ui, sans-serif; } .sh-dial-title { font-size: 13px; color: var(--ink-3); }
+  .sh-secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 22px; background: rgba(118, 118, 128, .24); font-weight: 600; width: 100%; }
+  .sh-primary-button.sh-destructive { background: var(--danger); color: #000; } .sh-field-box { display: block; min-height: 40px; border-radius: 10px; background: rgba(118, 118, 128, .24); } .sh-field-tall { min-height: 88px; } .sh-field-attach { min-height: 56px; border: 1.5px dashed var(--sep); background: none; }
+  .sh-cam-viewer { display: flex; flex-direction: column; gap: 12px; }
+  .sh-cam-poster { position: relative; aspect-ratio: 4 / 3; width: 100%; border-radius: 22px; overflow: hidden; background: linear-gradient(160deg, #2a3342, #151a23); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+  .sh-cam-mark { position: absolute; inset: 0; margin: auto; opacity: .3; color: #fff; }
+  .sh-cam-name { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 99px; background: rgba(0, 0, 0, .75); color: #fff; font: 600 12px/1.25 var(--sh-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-cam-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .6); }
+  .sh-cam-state { position: absolute; top: 8px; right: 8px; padding: 2px 8px; border-radius: 99px; background: rgba(0, 0, 0, .55); color: #fff; font: 600 11px/1.3 var(--sh-font); }
+  .sh-cam-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* The camera card (`CameraTile.aspectRatio`, 1 : 0.78): the picture alone; the name sits over it. */
+  .sh-cam-tile { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
+  .sh-cam-picture { position: relative; aspect-ratio: 1 / .78; width: 100%; border-radius: 22px; overflow: hidden; background: linear-gradient(160deg, #2a3342, #151a23); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+  .sh-cam-controls { display: flex; justify-content: center; gap: 24px; padding: 4px 0; color: #fff; } .sh-cam-control { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 72px; }
+  .sh-cam-circle { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: #2C2C2E; color: var(--action); } .sh-cam-control[data-tint=danger] .sh-cam-circle { color: var(--danger); } .sh-cam-label { font-size: 13px; font-weight: 500; }
+  .sh-skel { display: block; height: 10px; border-radius: 99px; background: rgba(128, 128, 128, .28); } .sh-skel-disc { flex: none; width: 28px; height: 28px; border-radius: 50%; } .sh-skel-ring { flex: none; width: 24px; height: 24px; border-radius: 50%; background: none; border: 2px solid rgba(128, 128, 128, .4); }
+  .sh-skel-row .sh-row-copy { gap: 8px; } .sh-collection { display: flex; flex-direction: column; gap: 12px; }
+  /* A to-do list: a heading and a module of task rows, each with the open ring (a filled disc with a check when done). */
+  .sh-todo-section { display: flex; flex-direction: column; gap: 8px; }
+  .sh-todo-ring { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ink-3); color: #fff; box-sizing: border-box; }
+  .sh-todo-row[data-done] .sh-todo-ring { background: var(--action); border-color: var(--action); } .sh-todo-row[data-done] .sh-row-primary { color: var(--ink-3); text-decoration: line-through; }
+  .sh-recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; } .sh-carousel { display: flex; gap: 12px; overflow: hidden; } .sh-carousel > .sh-recipe-card { flex: 0 0 160px; }
+  .sh-recipe-card { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-radius: 22px; background: var(--module); overflow: hidden; } .sh-recipe-card .sh-skel { margin-left: 12px; }
+  .sh-recipe-image, .sh-recipe-hero { display: grid; place-items: center; aspect-ratio: 4 / 3; background: rgba(128, 128, 128, .2); color: var(--ink-3); } .sh-recipe-hero { border-radius: 22px; }
+  .sh-bedroom-links { display: flex; gap: 12px; } .sh-bedroom-links > * { flex: 1; }
+  .sh-form { display: flex; flex-direction: column; gap: 16px; } .sh-form-row { justify-content: space-between; } .sh-form-row .sh-field-box, .sh-form-row .sh-segments { flex: 1; max-width: 55%; }
+  /* The pinned action bar: over the page's bottom edge, above the floating tab bar (22 + 62 + 6 = 90 pt up), else on the bottom safe area. */
+  .sh-screen { --sh-dock-bottom: max(12px, calc(var(--sh-safe-bottom) - 8px)); }
+  .sh-screen:not([data-rail]):not([data-flyout]) { --sh-dock-bottom: 90px; }
+  .sh-sheet { --sh-dock-bottom: 12px; }
+  /* The bottom tab bar's slot: on the safe edge (above the app's tab bar on a page, the sheet's own bottom safe inset in a sheet), outside the scroller. */
+  .sh-screen { --sh-tabs-bottom: var(--sh-dock-bottom); }
+  .sh-sheet-layer { --sh-tabs-bottom: var(--sheet-safe, 0px); }
+  .sh-tab-dock { position: absolute; left: 0; right: 0; bottom: var(--sh-tabs-bottom, 0px); z-index: 9; pointer-events: none; }
+  .sh-tab-dock:empty { display: none; }
+  /* The slot owns its whole rectangle, the 16 pt and 8 pt around the capsule included, so a tap in the gap reaches the bar and never the rows under it (`UKPinnedBarViewController`). */
+  .sh-tab-slot { padding: 8px 16px; pointer-events: auto; }
+  .sh-scroll[data-tabs-docked] { --bottom-pad: var(--sh-tabs-bottom, 0px); padding-bottom: calc(var(--bottom-pad) + var(--sh-inset, 0px) + var(--sh-dock-h, 0px) + var(--sh-tabs-h, 0px)); }
+  .sh-dock { position: absolute; left: 0; right: 0; bottom: var(--sh-dock-bottom); padding: 0 16px 8px; z-index: 10; pointer-events: none; }
+  .sh-dock > * { pointer-events: auto; }
+  .sh-dock .sh-pinned:not(:has(.sh-fab-search)) { justify-content: flex-end; }
+  .sh-dock:has(.sh-pinned-form) { padding: 12px 16px; background: var(--glass-bg); border: .5px solid var(--glass-border); border-radius: 22px; backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); left: 8px; right: 8px; }
+  .sh-pinned { display: flex; align-items: center; gap: 12px; } .sh-pinned-form { flex-direction: column; align-items: stretch; }
+  .sh-fab-capsule, .sh-fab-circle, .sh-fab-search { display: inline-flex; align-items: center; gap: 8px; height: 52px; border-radius: 26px; background: var(--glass-bg); border: .5px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(18px) saturate(1.5); font-weight: 600; }
+  .sh-fab-capsule { padding: 0 20px; } .sh-fab-prominent { background: var(--fill-action); } .sh-fab-circle { width: 52px; justify-content: center; } .sh-fab-search { flex: 1; padding: 0 16px; color: var(--ink-2); font-weight: 400; }
+}
+
+/*
+ * Keyframes are not allowed inside a nested rule: the browser drops them, which left every slide, sheet rise and fade
+ * without a motion. They live here at the top level; the names are global, so they all start with `sh-`.
+ */
+@keyframes sh-in-push { from { transform: translateX(100%); } to { transform: none; } } @keyframes sh-out-push { from { transform: none; } to { transform: translateX(-100%); } }
+@keyframes sh-in-pop { from { transform: translateX(-100%); } to { transform: none; } } @keyframes sh-out-pop { from { transform: none; } to { transform: translateX(100%); } }
+@keyframes sh-sheet-in { from { transform: translateY(100%); } to { transform: none; } } @keyframes sh-fade { from { opacity: 0; } to { opacity: 1; } } @keyframes sh-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sh-flyout-in { from { transform: translateX(-120%); } }
+@keyframes sh-scrim-in { from { opacity: 0; } }
+
+/* The alert before an action that asks first (studio-ux2, pick 5). 270 pt wide over a 42% dim; 150 ms fade. */
+.sh-preview2 {
+  .sh-alert-scrim { position: absolute; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .42); animation: sh-alert-in 150ms ease-out both; text-align: center; }
+  .sh-alert-scrim:not([data-live]) { pointer-events: none; }
+  .sh-alert-scrim[data-leaving] { animation: sh-alert-out 150ms ease-in both; }
+  .sh-alert-box { width: 270px; max-width: calc(100% - 32px); border-radius: 14px; overflow: hidden; background: rgba(44, 44, 46, .96); color: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, .4); }
+  .sh-alert-text { padding: 20px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .sh-alert-title { font: 600 17px/1.25 var(--sh-font); overflow-wrap: anywhere; }
+  .sh-alert-message { font: 400 13px/1.3 var(--sh-font); color: var(--ink-2); overflow-wrap: anywhere; }
+  .sh-alert-buttons { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--sep); }
+  .sh-alert-button { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 8px; font: 400 17px/1.2 var(--sh-font); color: var(--action); text-align: center; overflow-wrap: anywhere; }
+  .sh-alert-button + .sh-alert-button { border-inline-start: 1px solid var(--sep); }
+  .sh-alert-confirm { font-weight: 600; background: var(--fill-action); color: #fff; }
+  .sh-alert-confirm[data-destructive] { background: #D70015; color: #fff; }
+}
+@keyframes sh-alert-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sh-alert-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sh-preview2 .sh-alert-scrim, .sh-preview2 .sh-alert-scrim[data-leaving] { animation: none; } }
+
+/* A state tile (`state-styled-tile.md`): the class tints the face, the indicator plays on it; the arc stands in the disc's place. */
+.sh-preview2 .sh-state-tile.sh-class-warning { --glyph: var(--warn); } .sh-preview2 .sh-state-tile.sh-class-error { --glyph: var(--danger); }
+.sh-preview2 .sh-state-tile.sh-class-in-progress .sh-tile-glyph { color: var(--action); } .sh-preview2 .sh-state-tile.sh-class-unknown { opacity: .6; }
+.sh-preview2 .sh-state-tile .sh-tile-glyph { transition: opacity .2s ease-out; }
+.sh-preview2 .sh-state-tile.sh-effect-arc-spinner .sh-tile-glyph { opacity: 0; }
+.sh-preview2 .sh-state-arc { position: absolute; top: 14px; left: 14px; width: 24px; height: 24px; border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, .25); border-top-color: var(--action); animation: sh-spin 1s linear infinite; }
+.sh-preview2 .sh-effect-pulse .sh-tile-glyph { animation: sh-pulse 1.4s ease-in-out infinite; } .sh-preview2 .sh-effect-breathe .sh-tile-glyph { animation: sh-breathe 3s ease-in-out infinite; }
+.sh-preview2 .sh-effect-bounce .sh-tile-glyph { animation: sh-bounce 1.2s ease-in-out infinite; } .sh-preview2 .sh-effect-wiggle .sh-tile-glyph { animation: sh-wiggle 1.2s ease-in-out infinite; }
+@keyframes sh-spin { to { transform: rotate(360deg); } } @keyframes sh-pulse { 50% { opacity: .35; } } @keyframes sh-breathe { 50% { transform: scale(1.12); opacity: .8; } }
+@keyframes sh-bounce { 50% { transform: translateY(-4px); } } @keyframes sh-wiggle { 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sh-preview2 .sh-state-arc { animation-duration: 2s; }
+  .sh-preview2 .sh-effect-pulse .sh-tile-glyph, .sh-preview2 .sh-effect-breathe .sh-tile-glyph, .sh-preview2 .sh-effect-bounce .sh-tile-glyph, .sh-preview2 .sh-effect-wiggle .sh-tile-glyph { animation: none; }
+}
+
+/* asks: badges, a disabled control and the filled tile face (`sh.badges@1`, `sh.enabled-when@1`, `sh.tile-look@1`) */
+.sh-preview2 .sh-badge { position: absolute; top: 6px; inset-inline-end: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #D70015; color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; box-sizing: border-box; pointer-events: none; font-variant-numeric: tabular-nums; }
+.sh-preview2 .sh-tile, .sh-preview2 .sh-circle, .sh-preview2 .sh-tab-glyph { position: relative; }
+.sh-preview2 .sh-tab-glyph { display: inline-flex; }
+.sh-preview2 .sh-chip .sh-badge { position: static; margin-inline-start: 2px; flex: none; }
+.sh-preview2 .sh-circle .sh-badge { top: -2px; inset-inline-end: -2px; }
+.sh-preview2 .sh-tab-glyph .sh-badge { top: -6px; inset-inline-end: -12px; }
+.sh-preview2 [data-disabled] { opacity: .4; cursor: default; }
+.sh-preview2 button[data-disabled] { pointer-events: none; }
+.sh-preview2 .sh-state-tile.sh-filled { background: var(--fam-lights-fill, var(--tile-bg)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22); }
+.sh-preview2 .sh-state-tile.sh-filled .sh-tile-title, .sh-preview2 .sh-state-tile.sh-filled .sh-tile-line { color: #fff; }
+/* sh.tile-ink@1: the icon's own color (also over the in-progress accent), not applied while unavailable, when the icon is the default grey at 50% (`UKGlassTileView` disables the tile, `UKGlassTileFaceView` dims it); the words on a fill are white, or white at 92% (`soft`). */
+.sh-preview2 .sh-tile.sh-glyph-tinted .sh-tile-glyph { color: var(--glyph); }
+.sh-preview2 .sh-state-tile.sh-class-unknown .sh-tile-glyph { opacity: .5; }
+/* cellFit fill (the default): in a grid of equal rows a state tile stretches to its cell. */
+.sh-preview2 .sh-grid[data-equal] > .sh-node > .sh-tile-parts:not([data-cell-fit=natural]) { height: 100%; display: flex; flex-direction: column; }
+.sh-preview2 .sh-grid[data-equal] > .sh-node > .sh-tile-parts:not([data-cell-fit=natural]) > .sh-tile { flex: 1 1 auto; }
+.sh-preview2 .sh-grid[data-equal] > .sh-node > .sh-state-tile:not(.sh-cell-natural) { height: 100%; box-sizing: border-box; }
+/* cellFit natural: the tile keeps its own height at the top of a taller cell (the row is still as tall as its tallest cell). */
+.sh-preview2 .sh-node:has(> .sh-cell-natural), .sh-preview2 .sh-node:has(> .sh-tile-parts[data-cell-fit=natural]) { align-self: start; }
+.sh-preview2 .sh-state-tile.sh-fill-ink-white .sh-tile-line { color: #fff; }
+.sh-preview2 .sh-state-tile.sh-fill-ink-soft .sh-tile-line { color: rgba(255, 255, 255, .92); }
+
+/* list states (studio-ux2, L-data): what "Show state" draws for a List */
+.sh-list-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 16px; text-align: center; }
+.sh-list-state-title { font-weight: 600; font-size: 17px; }
+.sh-list-empty-message { margin: 0; font-size: 15px; opacity: .7; }
+.sh-list-footnote { margin: 4px 0 0; font-size: 13px; opacity: .7; text-align: center; }
+.sh-list-retry { font-weight: 600; text-decoration: underline; }
+
+/* linked: the root of a use of a saved component carries a round badge that keeps its size at any zoom (`--sh-zoom` is the device's scale). */
+.sh-preview2 .sh-node[data-linked] > .sh-link-badge { position: absolute; z-index: 6; top: -12px; inset-inline-start: -12px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
+  background: rgba(250, 250, 250, .96); color: #1b1b1d; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transform: scale(calc(1 / var(--sh-zoom, 1))); transform-origin: center; }
+
+/* Lane fidtiles (task sim-fidelity): the lit faces of the app's tiles (`TileFaceStyle`, `LitTile`, `TileFaceInk`). Kept apart from the panels' rules above. */
+.sh-preview2 .sh-tile.sh-lit.sh-lit-warm { background: linear-gradient(180deg, #FFF3DE, #FFE2B2), #EADBC4; color: #1C1C1E; }
+.sh-preview2 .sh-tile.sh-lit-warm .sh-tile-title { color: #1C1C1E; } .sh-preview2 .sh-tile.sh-lit-warm .sh-tile-line { color: rgba(28, 28, 30, .85); }
+.sh-preview2 .sh-tile.sh-lit-warm .sh-tile-glyph { color: #D97A00; } .sh-preview2 .sh-tile.sh-lit-warm .sh-tile-chevron { color: rgba(28, 28, 30, .85); }
+.sh-preview2 .sh-tile.sh-lit-filled .sh-tile-title, .sh-preview2 .sh-tile.sh-colored .sh-tile-title { color: #fff; }
+.sh-preview2 .sh-tile.sh-lit-filled .sh-tile-line, .sh-preview2 .sh-tile.sh-colored .sh-tile-line { color: rgba(255, 255, 255, .85); }
+.sh-preview2 .sh-tile.sh-lit-filled .sh-tile-glyph, .sh-preview2 .sh-tile.sh-colored .sh-tile-glyph { color: #fff; }
+/* The power disc of a lit light tile is the dark disc of the brightness tile (`UKGlassTileView` on the lit face). */
+.sh-preview2 .sh-tile-parts:has(> .sh-lit-warm) .sh-tile-disc { background: #1C1C1E; color: #fff; }

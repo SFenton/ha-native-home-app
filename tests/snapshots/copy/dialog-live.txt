@@ -1,0 +1,33 @@
+Dryer
+Add Activity
+Camera notifications
+Front door
+Add Camera
+
+[first row]
+Live Activities
+Dryer
+Job ID
+Matches the job’s tag without “job.”.
+Title
+Glyph
+Fan
+Dishwasher
+Dryer
+Washer
+Vacuum
+Hot flash
+Generic
+Tint
+Engine
+Neutral
+Air
+Cleaning
+Water
+Cooling
+Advanced
+ID
+Remove Activity
+
+[names]
+IDs cannot be changed.

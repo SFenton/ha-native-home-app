@@ -1,0 +1,49 @@
+Group by State
+Title
+On
+Off
+Unavailable
+Move Up
+Move Down
+Remove Group
+Title
+On
+Off
+Unavailable
+Move Up
+Move Down
+Remove Group
+Title
+On
+Off
+Unavailable
+Move Up
+Move Down
+Remove Group
+Add Group
+Every state is in a group.
+Tiles sit under a heading for their state. A group with no tiles is not shown.
+Tiles keep the grid’s order inside a group.
+
+[names]
+Title of group 1
+On in On
+Off in On
+Unavailable in On
+Move On Up
+Move On Down
+Remove On
+Title of group 2
+On in Off
+Off in Off
+Unavailable in Off
+Move Off Up
+Move Off Down
+Remove Off
+Title of group 3
+On in Unavailable
+Off in Unavailable
+Unavailable in Unavailable
+Move Unavailable Up
+Move Unavailable Down
+Remove Unavailable

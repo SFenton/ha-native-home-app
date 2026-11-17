@@ -1,0 +1,29 @@
+.w2-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; min-height: 0; }
+.w2-add-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.w2-add-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.w2-add-segment { align-self: stretch; }
+.w2-add-segment button { flex: 1; }
+.w2-add-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; overflow-y: auto; max-height: 340px; }
+.w2-scope button.w2-add-tile { justify-content: flex-start; gap: 10px; min-height: 52px; padding: 6px 10px; text-align: start; background: var(--w2-field); border-color: transparent; }
+.w2-scope .w2-add-pop { width: 360px; max-width: calc(100vw - 24px); padding: 0; }
+.w2-add-sheet { height: 60dvh; }
+.w2-scope button.w2-add-slot { width: 100%; min-height: 36px; margin: 2px 0; border: 1.5px dashed var(--w2-primary); border-radius: 12px; background: color-mix(in srgb, var(--w2-primary) 8%, transparent); color: var(--w2-primary); font-weight: 600; }
+.w2-scope button.w2-add-after { width: 28px; min-height: 28px; height: 28px; padding: 0; }
+@media (pointer: coarse) { .w2-scope button.w2-add-slot { min-height: 44px; } .w2-scope button.w2-add-tile { min-height: 56px; } }
+.w2-scope .sh-add-slot > button.w2-add-slot { font: 600 14px/1.2 system-ui, sans-serif; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 36px; margin: 2px 0; padding: 0 12px; border: 1.5px dashed #03a9f4; border-radius: 12px; background: rgba(3, 169, 244, .1); color: #03a9f4; cursor: pointer; }
+.w2-scope .sh-add-slot > button.w2-add-slot:focus-visible { outline: 2px solid #03a9f4; outline-offset: 2px; }
+@media (pointer: coarse) { .w2-scope .sh-add-slot > button.w2-add-slot { min-height: 44px; } }
+.w2-bottombar { gap: 12px; }
+.w2-scope button.w2-bottom-add { min-height: 36px; padding: 0 16px; border-radius: 18px; background: var(--w2-primary-fill); border-color: var(--w2-primary-fill); color: var(--w2-on-primary); font-weight: 600; }
+@media (pointer: coarse) { .w2-scope button.w2-bottom-add { min-height: 44px; } }
+.sh-add-slot { align-self: start; }
+.w2-scope .sh-add-slot > button.w2-add-slot { height: 36px; }
+@media (pointer: coarse) { .w2-scope .sh-add-slot > button.w2-add-slot { height: 44px; } }
+
+/* "What should this tile do?" (F13): one choice per row, its name over a line saying what it does. */
+.w2-add-question { margin: 0; font-size: 15px; font-weight: 600; }
+.w2-add-choices { display: flex; flex-direction: column; gap: 8px; }
+.w2-scope button.w2-add-choice { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; width: 100%; }
+.w2-add-choice-name { font-weight: 600; }
+.w2-add-choice-detail { color: var(--w2-muted); font-size: 12px; text-align: start; }
+.w2-scope button.w2-add-back { align-self: flex-start; border-color: transparent; color: var(--w2-link); }

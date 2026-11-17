@@ -1,0 +1,7 @@
+List Icon
+Only the Studio shows this icon. The app does not change.
+Use Default
+
+[names]
+Find an icon
+Icons

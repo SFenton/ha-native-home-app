@@ -1,0 +1,31 @@
+/* The chart and the linear gauge (`sh.chart@1`, `sh.linear-gauge@1`). Under `.sh-preview2` like the rest. Colours come from the document's inks. */
+.sh-preview2 {
+  .sh-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+  .sh-chart { display: block; width: 100%; min-width: 0; color: var(--chart-label, var(--ink-3)); }
+  .sh-chart-visual { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 4px; row-gap: 4px; align-items: start; }
+  .sh-chart-axis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: calc(12px * var(--sh-text-scale, 1)); line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .sh-chart-ylabel { white-space: nowrap; }
+  .sh-chart-plot { position: relative; min-width: 0; }
+  .sh-chart-plot svg { display: block; overflow: visible; }
+  .sh-chart-grid { fill: var(--chart-grid, var(--sep)); }
+  .sh-chart-bar { fill: var(--chart-tint); }
+  .sh-chart-bar-unknown { fill: var(--chart-unknown, color-mix(in srgb, var(--ink) 18%, transparent)); }
+  .sh-chart-line { fill: none; stroke: var(--chart-tint); stroke-linecap: round; stroke-linejoin: round; }
+  .sh-chart-area { fill: var(--chart-tint); fill-opacity: .3; stroke: none; }
+  .sh-chart-dot { fill: var(--chart-tint); }
+  .sh-chart-xlabels { grid-column: 2; position: relative; height: calc(15px * var(--sh-text-scale, 1)); font-size: calc(12px * var(--sh-text-scale, 1)); line-height: 1.2; }
+  .sh-chart-xlabel { position: absolute; top: 0; white-space: nowrap; visibility: hidden; }
+  .sh-chart-xlabel[data-shown] { visibility: visible; }
+  .sh-chart-empty-text { margin: 0; padding: 12px 0; font-size: 15px; color: var(--ink-3); }
+}
+.sh-preview2 {
+  .sh-gauge { position: relative; width: 100%; min-width: 0; height: var(--gauge-height, 12px); }
+  .sh-gauge-span, .sh-gauge-marker { position: absolute; }
+  .sh-gauge-span { top: 0; height: 100%; }
+  .sh-gauge-marker { border-radius: 50%; }
+  .sh-gauge[data-animates=true] .sh-gauge-span, .sh-gauge[data-animates=true] .sh-gauge-marker { transition: left .3s ease-in-out, width .3s ease-in-out; }
+  @media (prefers-reduced-motion: reduce) { .sh-gauge .sh-gauge-span, .sh-gauge .sh-gauge-marker { transition: none !important; } }
+  /* A chart and a rail have no width of their own: in a stack they take the whole cross axis (a column) or the room left (a row), not the nothing a shrink-wrapped box would give them. */
+  .sh-stack-body[data-axis=vertical] > .sh-node[data-type=chart], .sh-stack-body[data-axis=vertical] > .sh-node[data-type=linear-gauge] { align-self: stretch; }
+  .sh-stack-body[data-axis=horizontal] > .sh-node[data-type=chart], .sh-stack-body[data-axis=horizontal] > .sh-node[data-type=linear-gauge] { flex: 1 1 0; }
+}

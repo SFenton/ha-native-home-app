@@ -1,0 +1,37 @@
+Status
+Status rail · Home
+Title
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Status
+Status rail · Home
+Title
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+hc-status-rail
+Copy ID

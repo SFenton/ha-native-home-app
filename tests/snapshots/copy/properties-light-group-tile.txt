@@ -1,0 +1,51 @@
+Demo Room 1 Lights
+Light group tile · Demo Room 1 Lights › Lights
+Title
+Entity
+light.demo_entity_307
+State Words
+Default
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Swipe to Adjust
+Off
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+Swipe to Adjust, Off
+
+[advanced]
+Demo Room 1 Lights
+Light group tile · Demo Room 1 Lights › Lights
+Title
+Entity
+light.demo_entity_307
+State Words
+Default
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Swipe to Adjust
+Off
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+Swipe to Adjust, Off
+hc-lights-demo-room-1-item-0
+Copy ID

@@ -1,0 +1,87 @@
+Demo Device 1
+Room overview tile · Demo Room 1 Climate › Temperature Sensors
+Title
+Icon
+Thermometer
+Entity
+Home status · climate
+State Words
+Default
+Width
+Automatic
+Half
+Full
+Badge
+None
+By state
+None
+Icon color
+None
+Fill
+Standard
+Announce changes
+None
+Value change
+Hide contact subtitle
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Icon value: Fixed
+Add Icon color
+Fill value: Fixed
+Only show when: Always.
+
+[advanced]
+Demo Device 1
+Room overview tile · Demo Room 1 Climate › Temperature Sensors
+Title
+Icon
+Thermometer
+Entity
+Home status · climate
+State Words
+Default
+Width
+Automatic
+Half
+Full
+Badge
+None
+By state
+None
+Icon color
+None
+Fill
+Standard
+Announce changes
+None
+Value change
+Hide contact subtitle
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Advanced
+ID
+Power
+None
+Set by the app: how it is drawn, the unavailable look.
+
+[names]
+More
+Close
+Icon value: Fixed
+Add Icon color
+Fill value: Fixed
+Only show when: Always.
+hc-climate-demo-room-1-item-0
+Copy ID
+Add Power

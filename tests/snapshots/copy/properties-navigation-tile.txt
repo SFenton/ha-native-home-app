@@ -1,0 +1,88 @@
+Room Thermostats
+Navigation tile · Climate › Advanced Controls
+Title
+Subtitle
+Icon
+Thermometer
+Width
+Automatic
+Half
+Full
+Color
+Neutral
+Lights
+Groceries
+Chore resident 1
+Chore resident 2
+Chore unassigned
+Chore home
+Badge
+None
+Selected
+Navigation path
+None
+Behavior
+When tapped
+Opens Advanced Controls
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Subtitle value: Fixed
+Only show when: Always.
+
+[advanced]
+Room Thermostats
+Navigation tile · Climate › Advanced Controls
+Title
+Subtitle
+Icon
+Thermometer
+Width
+Automatic
+Half
+Full
+Color
+Neutral
+Lights
+Groceries
+Chore resident 1
+Chore resident 2
+Chore unassigned
+Chore home
+Badge
+None
+Selected
+Navigation path
+None
+Behavior
+When tapped
+Opens Advanced Controls
+Only show when
+Always
+Advanced
+ID
+Title from
+None
+Alarm
+None
+Room visibility
+None
+Presentation
+None
+Set by the app: how it is drawn, the unavailable look.
+
+[names]
+More
+Close
+Subtitle value: Fixed
+Only show when: Always.
+hc-open-rooms
+Copy ID
+Add Title from
+Add Alarm
+Add Room visibility
+Add Presentation

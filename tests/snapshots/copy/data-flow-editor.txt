@@ -1,0 +1,46 @@
+Chores
+Data Flow · Not Used
+Name
+Demo Data · 5 items
+Home Assistant sends changes as they happen. The Studio draws made-up items.
+Request
+Get data from
+A Live List
+Feed
+To-do Items
+Entity
+todo.example_chores
+Steps
+1
+Go Into
+Go into items
+6
+2
+Filter
+status is needs_action
+6 → 5
+Add Step
+Output
+Gives
+Rows
+Title
+summary
+Subtitle
+due
+Remove Subtitle
+Value
+None
+ID
+uid
+Up to
+Used by
+Nothing uses this Data Flow yet. Choose it in a List's “Rows from”, or pick its value in a text.
+
+[names]
+More
+Close
+Demo Data · 5 items. Home Assistant sends changes as they happen. The Studio draws made-up items.
+Step 1, Go Into, Go into items, 6
+More for step 1, Go Into
+Step 2, Filter, status is needs_action, 6 → 5
+More for step 2, Filter

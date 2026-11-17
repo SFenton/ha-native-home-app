@@ -1,0 +1,12 @@
+.w2-mc-section { display: flex; flex-direction: column; gap: 4px; padding-block: 4px; }
+.w2-mc-head { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.w2-mc-head strong { flex: 1; min-width: 0; font-size: 13px; }
+.w2-mc-count { color: var(--w2-muted); font-size: 12px; }
+.w2-mc-corner { color: var(--w2-muted); flex: none; }
+.w2-mc-symbol { display: inline-flex; width: 24px; justify-content: center; }
+.w2-mc-linked { margin-inline-start: 8px; text-transform: none; }
+.w2-mc-order { display: flex; align-items: center; gap: 8px; }
+.w2-mc-order > span { flex: 1; }
+.w2-mc-list > li[data-map-row] { grid-template-columns: 24px minmax(0, 1fr) auto; }
+.w2-mc-notice { color: var(--w2-muted); }
+@media (pointer: coarse) { .w2-mc-head .w2-icon-button, .w2-mc-order .w2-icon-button { min-width: 44px; min-height: 44px; } }

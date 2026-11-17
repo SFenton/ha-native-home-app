@@ -1,0 +1,8 @@
+{
+  "actions": [
+    { "cardKey": "page-card-0000000000000001", "scriptService": "demo_room_scene_one" },
+    { "cardKey": "page-card-0000000000000002", "scriptService": "demo_room_scene_two" },
+    { "cardKey": "room-card-0000000000000003", "scriptService": "demo_room_scene_one" },
+    { "cardKey": "room-card-0000000000000004", "scriptService": "demo_room_scene_two" }
+  ]
+}

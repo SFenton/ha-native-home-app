@@ -1,0 +1,47 @@
+Demo Camera
+Camera tile · Home › Cameras
+Title
+Entity
+camera.demo_entity_119
+Open hint
+Width
+Automatic
+Half
+Full
+Behavior
+When tapped
+Opens Demo Camera
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Demo Camera
+Camera tile · Home › Cameras
+Title
+Entity
+camera.demo_entity_119
+Open hint
+Width
+Automatic
+Half
+Full
+Behavior
+When tapped
+Opens Demo Camera
+Only show when
+Always
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+hc-camera-0-tile
+Copy ID

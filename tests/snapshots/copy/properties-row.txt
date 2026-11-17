@@ -1,0 +1,75 @@
+Summary
+Row · Demo Room 1 Lights
+Title
+Icon
+None
+Hc lights demo room 1 source · State
+Subtitle
+Value
+Loading text
+Unavailable text
+Width
+Automatic
+Half
+Full
+Accessory
+None
+Disclosure
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Only enabled when
+Always
+Advanced
+
+[names]
+More
+Close
+Add Icon
+Title: Hc lights demo room 1 source · State.
+Subtitle value: Fixed
+Value value: Fixed
+Only show when: Always.
+Only enabled when: Always.
+
+[advanced]
+Summary
+Row · Demo Room 1 Lights
+Title
+Icon
+None
+Hc lights demo room 1 source · State
+Subtitle
+Value
+Loading text
+Unavailable text
+Width
+Automatic
+Half
+Full
+Accessory
+None
+Disclosure
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Only enabled when
+Always
+Advanced
+ID
+
+[names]
+More
+Close
+Add Icon
+Title: Hc lights demo room 1 source · State.
+Subtitle value: Fixed
+Value value: Fixed
+Only show when: Always.
+Only enabled when: Always.
+hc-lights-demo-room-1-summary
+Copy ID

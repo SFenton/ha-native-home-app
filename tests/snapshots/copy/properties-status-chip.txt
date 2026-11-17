@@ -1,0 +1,78 @@
+Lights
+Status chip · Home › Status
+Title
+Icon
+Light bulb
+Entity
+Home status · lights
+Width
+Automatic
+Half
+Full
+Badge
+None
+By state
+1 state
+Icon color
+None
+Fill
+Standard
+Announce changes
+None
+Value change
+Behavior
+When tapped
+Opens Lights
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Icon value: Fixed
+Add Icon color
+Fill value: Fixed
+Only show when: Always.
+
+[advanced]
+Lights
+Status chip · Home › Status
+Title
+Icon
+Light bulb
+Entity
+Home status · lights
+Width
+Automatic
+Half
+Full
+Badge
+None
+By state
+1 state
+Icon color
+None
+Fill
+Standard
+Announce changes
+None
+Value change
+Behavior
+When tapped
+Opens Lights
+Only show when
+Always
+Advanced
+ID
+Set by the app: how it is drawn, the unavailable look.
+
+[names]
+More
+Close
+Icon value: Fixed
+Add Icon color
+Fill value: Fixed
+Only show when: Always.
+hc-chip-0
+Copy ID

@@ -1,0 +1,9 @@
+Modals
+0 modals
+No modals yet. A modal covers the whole screen.
+Modal
+
+[names]
+Close
+Find a modal
+Add

@@ -1,0 +1,7 @@
+Publish to the App?
+Revision 13 replaces revision 12. The app updates right away.
+Cancel
+Publish
+
+[names]
+Close

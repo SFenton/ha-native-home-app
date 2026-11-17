@@ -1,0 +1,89 @@
+Weather
+Weather · Home
+Title
+Entity
+Weather
+Loading text
+Empty message
+Stale text
+Error text
+Open text
+Width
+Automatic
+Half
+Full
+Panel
+Summary
+Hero
+Briefing
+Hourly
+Daily
+Highlights
+Modes
+3 items
+Starts with
+Condition
+Precipitation
+Wind
+Highlights
+None
+Hours, compact
+Hours, regular
+Behavior
+When tapped
+Opens Weather
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Weather
+Weather · Home
+Title
+Entity
+Weather
+Loading text
+Empty message
+Stale text
+Error text
+Open text
+Width
+Automatic
+Half
+Full
+Panel
+Summary
+Hero
+Briefing
+Hourly
+Daily
+Highlights
+Modes
+3 items
+Starts with
+Condition
+Precipitation
+Wind
+Highlights
+None
+Hours, compact
+Hours, regular
+Behavior
+When tapped
+Opens Weather
+Only show when
+Always
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+hc-weather-summary
+Copy ID

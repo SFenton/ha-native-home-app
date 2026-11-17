@@ -1,0 +1,37 @@
+Swipe to Adjust
+Adjusts
+Cover Position
+Custom
+Minimum
+Maximum
+Step
+Tick Every
+A haptic tick, and one VoiceOver step.
+Haptic Ticks
+Level Band
+Value Text
+Shows
+0%
+to
+100%
+.
+Name
+VoiceOver says “Swipe up or down to adjust
+position
+.”
+When You Let Go
+Calls cover.set_cover_position with position set to the value.
+Value
+From an entity
+Remove
+When you let go
+cover.set_cover_position
+Remove
+Swipe is the only way to set this here. Add a button or a details sheet.
+A drag sends one call when you let go. Haptics are felt on a device only. Switch to Use to try the drag. The preview cannot show haptics, VoiceOver, or how the app settles a swipe against paging, scrolling and the back swipe.
+
+[names]
+{value}
+Advanced
+Remove Value
+Remove When you let go

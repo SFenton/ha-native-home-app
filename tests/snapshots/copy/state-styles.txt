@@ -1,0 +1,24 @@
+Saved
+House lock
+Used by 1 tile
+New Style From an Entity…
+Built-In
+Garage door
+Used by 0 tiles
+Lock
+Used by 0 tiles
+Blind
+Used by 0 tiles
+Alarm
+Used by 0 tiles
+Robot
+Used by 0 tiles
+Detector
+Used by 0 tiles
+Notice
+Used by 0 tiles
+Switch
+Used by 0 tiles
+
+[names]
+More for House lock

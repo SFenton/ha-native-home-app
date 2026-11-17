@@ -1,0 +1,41 @@
+Lights
+Tile grid · Lights
+Title
+Width
+Automatic
+Half
+Full
+Smallest tile
+Tile
+Tile dynamic type
+Section wide
+Columns
+Least columns
+None
+Equal row heights
+Short row
+Share
+Leading
+Fold
+Page
+Container
+Page: avoids the Duo’s hinge. Container: ignores it.
+Group by State
+2 Groups
+Behavior
+Only show when
+Always
+Advanced
+ID
+Spacing
+Token
+Set by the app: by.
+
+[names]
+More
+Close
+Add Least columns
+Group by State, 2 Groups
+Only show when: Always.
+tc-groups-grid
+Copy ID

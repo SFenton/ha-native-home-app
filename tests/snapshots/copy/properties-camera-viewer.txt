@@ -1,0 +1,45 @@
+Demo Camera
+Camera viewer · Demo Camera
+Title
+Entity
+camera.demo_entity_119
+Controls
+3 items
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Demo Camera
+Camera viewer · Demo Camera
+Title
+Entity
+camera.demo_entity_119
+Controls
+3 items
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+hc-camera-0-viewer
+Copy ID

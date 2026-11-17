@@ -1,0 +1,43 @@
+/* Repeated Pieces (templates spec 5): the library level and the proposal. Rows and headers reuse the library's own classes. */
+.w2-repeats-level { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.w2-repeats-level .w2-lib-title:focus-visible { outline: none; }
+.w2-repeats-empty { padding: 16px; }
+.w2-repeats-empty-title { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.w2-repeats-empty p { margin: 0; color: var(--w2-muted); }
+.w2-repeats-note { margin: 4px 12px 0; font-size: 13px; color: var(--w2-muted); }
+.w2-repeats-list { padding-inline: 4px; }
+.w2-repeats-list .w2-saved-main, .w2-find-repeats { justify-content: flex-start; }
+.w2-repeats-list .w2-saved-main { border-color: transparent; background: none; }
+.w2-repeats-list .w2-saved-main[aria-current=true] { background: var(--w2-field); }
+.w2-find-repeats { border-color: transparent; }
+
+.w2-repeat-proposal { display: grid; gap: 12px; padding: 4px 16px 16px; }
+.w2-repeat-name { display: grid; gap: 4px; }
+.w2-repeat-name label { font-size: 12px; font-weight: 600; color: var(--w2-muted); }
+.w2-repeat-name input { min-height: 36px; }
+.w2-repeat-rows, .w2-repeat-places { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.w2-repeat-row-item { display: flex; align-items: flex-start; gap: 10px; min-height: 48px; padding: 4px 0; }
+.w2-repeat-row-item > input[type=checkbox] { flex: none; width: 20px; height: 20px; margin-top: 8px; }
+.w2-repeat-row-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.w2-repeat-label { min-height: 32px; }
+.w2-repeat-row-text .w2-caption { margin: 0; }
+.w2-repeat-place { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; text-align: start; }
+.w2-repeat-place[aria-current=true] { background: var(--w2-field); }
+.w2-repeat-shown { flex: none; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--w2-field); color: var(--w2-muted); }
+.w2-repeat-more { justify-self: start; min-height: 32px; background: none; border: 0; color: var(--w2-link); font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; }
+.w2-repeat-foot { display: grid; gap: 8px; padding-top: 4px; border-top: 1px solid var(--w2-line); }
+.w2-repeat-foot p { margin: 0; }
+.w2-repeat-foot .w2-primary[aria-disabled=true] { background: var(--w2-field); border-color: var(--w2-line); color: var(--w2-muted); cursor: default; }
+@media (pointer: coarse) { .w2-repeat-more { min-height: 44px; min-width: 44px; } .w2-repeat-row-item { min-height: 56px; } .w2-repeat-row-item > input[type=checkbox] { width: 24px; height: 24px; } .w2-repeat-label { min-height: 44px; } }
+
+/* The row at the foot of the Templates group. */
+.w2-find-repeats { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 8px; background: none; border: 0; border-radius: 10px; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.w2-find-repeats:hover { background: var(--w2-field); }
+.w2-find-repeats svg { flex: none; }
+.w2-find-repeats-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-find-repeats-count { flex: none; min-width: 24px; padding: 2px 8px; border-radius: 10px; text-align: center; font-size: 12px; background: var(--w2-field); color: var(--w2-muted); }
+@media (pointer: coarse) { .w2-find-repeats { min-height: 56px; } }
+
+/* The phone sheet: the part of the popup below the screen is padding, so the last row and Save as Template can scroll into view above it. */
+.w2-repeats-sheet .w2-pushed-body { padding-bottom: calc(var(--w2-sheet-hidden, 0px) + 16px); }
+.w2-repeats-sheet .w2-level-scroll { padding-bottom: calc(var(--w2-sheet-hidden, 0px) + 8px); }

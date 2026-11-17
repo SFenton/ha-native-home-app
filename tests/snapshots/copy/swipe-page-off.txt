@@ -1,0 +1,2 @@
+Swipe to Adjust
+Drag sideways on the tile to set a value. Off unless you turn it on.

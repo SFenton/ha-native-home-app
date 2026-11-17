@@ -1,0 +1,14 @@
+Repeated Pieces
+2 found in 5 places
+Tile grid, 3 tiles
+3 places
+Section, 3 tiles
+2 places
+
+[names]
+Back to Components
+Find in repeated pieces
+Repeated pieces
+Tile grid, 3 tiles. 3 places
+Section, 3 tiles. 2 places
+Properties

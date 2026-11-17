@@ -1,6 +1,6 @@
-node_modules/
+/node_modules
 dist/
-data/
+/data/
 .env
 .env.*
 !.env.example
@@ -8,3 +8,11 @@ data/
 test-results/
 playwright-report/
 .DS_Store
+dist-groups/
+
+# Per-checkout Vite dependency cache (see vite.config.ts)
+/.vite-cache/
+
+# House-specific values for maintenance scripts (see scripts/local-house.ts)
+.local/
+blob-report/

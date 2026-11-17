@@ -1,0 +1,18 @@
+[Rules]
+The first rule that's true is used.
+If
+Then
+Otherwise
+Add Rule
+Remove Rule
+Preview
+Live
+Used Now
+Waiting
+Do Nothing
+Duplicate
+Move Up
+Move Down
+The first rule that's true opens its tab.
+Every rule needs a condition.
+Test

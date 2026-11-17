@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test';
 const image = process.argv[2] ?? 'native-home-studio:check';
 const token = randomBytes(32).toString('hex');
 let container;
+let volume;
 let proxy;
 let browser;
 const docker = (...args) => execFileSync('docker', args, {
@@ -32,45 +33,70 @@ async function waitUntilReady(base) {
 }
 
 try {
-  container = docker('run', '--detach', '--rm', '--publish', '127.0.0.1::4800',
+  volume = docker('volume', 'create');
+  container = docker('run', '--detach', '--publish', '127.0.0.1::4800',
+    '--mount', `type=volume,source=${volume},target=/data`,
     '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
   const bindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   let base = `http://127.0.0.1:${bindings['4800/tcp'][0].HostPort}`;
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   await waitUntilReady(base);
 
-  assert.equal((await fetch(`${base}/api/draft`)).status, 401, 'Direct API access must require authentication');
+  assert.equal((await fetch(`${base}/native/api/draft`)).status, 401, 'Direct API access must require authentication');
   const signIn = await fetch(base);
   assert.equal(signIn.status, 401);
   assert.match(await signIn.text(), /Sign in/i);
   const page = await fetch(base, { headers });
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /Native Home Studio/);
+  assert.match(html, /S\+H Studio/);
   const asset = html.match(/src="(\.\/assets\/[^"]+\.js)"/)?.[1];
   assert.ok(asset, 'Built HTML must use relative asset paths for Ingress');
   assert.equal((await fetch(new URL(asset, `${base}/`), { headers })).status, 200);
 
-  const draft = await (await fetch(`${base}/api/draft`, { headers })).json();
-  draft.document.name = 'Container persistence check';
-  const savedResponse = await fetch(`${base}/api/draft`, {
+  const nativeDraft = await (await fetch(`${base}/native/api/draft`, { headers })).json();
+  assert.equal(nativeDraft.document.schemaVersion, '2.0');
+  nativeDraft.document.name = 'Native container persistence check';
+  const nativeValidation = await fetch(`${base}/native/api/validate`, {
+    method: 'POST', headers, body: JSON.stringify({ document: nativeDraft.document }),
+  });
+  assert.equal(nativeValidation.status, 200);
+  assert.equal((await nativeValidation.json()).valid, true);
+  const nativeSavedResponse = await fetch(`${base}/native/api/draft`, {
     method: 'PUT', headers,
-    body: JSON.stringify({ document: draft.document, expectedRevision: draft.revision }),
+    body: JSON.stringify({ document: nativeDraft.document, expectedRevision: nativeDraft.revision }),
   });
-  assert.equal(savedResponse.status, 200);
-  const saved = await savedResponse.json();
-  const publishedResponse = await fetch(`${base}/api/publish`, {
-    method: 'POST', headers, body: JSON.stringify({ expectedRevision: saved.revision }),
+  assert.equal(nativeSavedResponse.status, 200);
+  const nativeSaved = await nativeSavedResponse.json();
+  const nativePublishedResponse = await fetch(`${base}/native/api/publish`, {
+    method: 'POST', headers, body: JSON.stringify({ expectedRevision: nativeSaved.revision }),
   });
-  assert.equal(publishedResponse.status, 200);
-  const published = await publishedResponse.json();
+  assert.equal(nativePublishedResponse.status, 200);
+  const nativePublished = await nativePublishedResponse.json();
+  assert.deepEqual(nativePublished.document, nativeDraft.document);
+
   docker('restart', container);
   const restartedBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
   base = `http://127.0.0.1:${restartedBindings['4800/tcp'][0].HostPort}`;
   await waitUntilReady(base);
-  const restored = await (await fetch(`${base}/api/published`, { headers })).json();
-  assert.equal(restored.revision, published.revision);
-  assert.equal(restored.document.name, 'Container persistence check');
+  const restored = await (await fetch(`${base}/native/api/draft`, { headers })).json();
+  assert.equal(restored.revision, nativeSaved.revision);
+  assert.equal(restored.document.name, 'Native container persistence check');
+
+  docker('stop', '--time', '10', container);
+  docker('rm', container);
+  container = undefined;
+  container = docker('run', '--detach', '--publish', '127.0.0.1::4800',
+    '--mount', `type=volume,source=${volume},target=/data`,
+    '--env', 'STUDIO_AUTH_TOKEN', '--env', 'PORT=4800', image);
+  const replacementBindings = JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', container));
+  base = `http://127.0.0.1:${replacementBindings['4800/tcp'][0].HostPort}`;
+  await waitUntilReady(base);
+  const draftAfterReplacement = await (await fetch(`${base}/native/api/draft`, { headers })).json();
+  assert.equal(draftAfterReplacement.revision, nativeSaved.revision);
+  assert.deepEqual(draftAfterReplacement.document, nativeSaved.document);
+  const nativeAfterReplacement = await (await fetch(`${base}/native/api/published`, { headers })).json();
+  assert.deepEqual(nativeAfterReplacement, nativePublished, 'The publication must survive container replacement');
 
   const mount = '/api/hassio_ingress/studio-test/';
   const escapedRequests = [];
@@ -99,21 +125,23 @@ try {
   const browserErrors = [];
   tab.on('pageerror', error => browserErrors.push(error.message));
   await tab.goto(`http://127.0.0.1:${address.port}${mount}`);
-  await tab.getByLabel('Page title', { exact: true }).waitFor();
-  assert.equal(await tab.getByLabel('Page title', { exact: true }).inputValue(), restored.document.pages[0].title);
-  await tab.getByLabel('Page title', { exact: true }).fill('Ingress route check');
-  await tab.getByRole('button', { name: /^Save/ }).click();
-  await tab.getByText(/Draft saved/).first().waitFor();
-  const ingressDraft = await (await fetch(`${base}/api/draft`, { headers })).json();
-  assert.equal(ingressDraft.document.pages[0].title, 'Ingress route check');
+  await tab.getByRole('button', { name: 'Publish' }).waitFor();
+  await tab.locator('[data-preview-root]').first().waitFor();
+  const mountedNative = await fetch(`http://127.0.0.1:${address.port}${mount}native/api/published`);
+  assert.equal(mountedNative.status, 200);
+  assert.deepEqual(await mountedNative.json(), nativePublished);
   assert.deepEqual(browserErrors, []);
-  assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/')), []);
-  console.log('Production container: auth, assets, save/publish, restart persistence, and mounted-path browser routing passed.');
+  assert.deepEqual(escapedRequests.filter(url => url?.startsWith('/api/') || url?.startsWith('/native/')), []);
 } finally {
   await browser?.close();
   if (proxy) {
     proxy.closeAllConnections();
     await new Promise(resolve => proxy.close(resolve));
   }
-  if (container) docker('stop', '--time', '10', container);
+  if (container) {
+    docker('stop', '--time', '10', container);
+    docker('rm', container);
+  }
+  if (volume) docker('volume', 'rm', volume);
 }
+console.log('Production container: auth, save/publish, restart/replacement persistence, mounted-path routing, and cleanup passed.');

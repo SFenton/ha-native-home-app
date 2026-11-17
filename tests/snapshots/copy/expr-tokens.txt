@@ -1,0 +1,19 @@
+[Tokens]
+Insert a Value
+Value
+Wording for 0 and 1…
+Remove Value
+Try Values
+Reset to Live
+Unavailable
+Loading
+Test Values
+The simulator uses these until you close this page. Nothing is saved or sent to Home Assistant.
+Keep trailing zeros
+Shows exactly this many decimals: 72 reads 72.0.
+Capital letters
+As written
+Capitalize each word
+Capitalize after underscores
+A space or an underscore ends a word: wheel stuck reads Wheel Stuck.
+Only an underscore ends a word: heat_cool reads Heat Cool, and heat cool reads Heat cool.

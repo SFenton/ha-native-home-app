@@ -1,0 +1,26 @@
+Study Lights
+Light group tile · State Words › Authored words
+Title
+Entity
+light.demo_tc_lamp
+State Words
+4 Changed
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Swipe to Adjust
+Off
+Advanced
+ID
+
+[names]
+More
+Close
+Only show when: Always.
+Swipe to Adjust, Off
+tc-w2-lamp
+Copy ID
