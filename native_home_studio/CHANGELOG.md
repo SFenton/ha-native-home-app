@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Add the 2.0 workspace as the only Studio: structured editing of Native
+  compositions with a live device preview, navigation authoring, rules and
+  actions, an entity picker, data flows and Checks that name what to fix.
+- Publish the native app's server-driven layout into Home Assistant, with
+  generic actions and state styles, and refuse unsafe Host headers in local
+  development.
+- Release automatically: every push to `main` runs the checks, picks the next
+  version from the commits since the last tag, tags it and publishes the image.
+
 ## 0.2.1
 
 - First published Native UIKit workspace release, including the schema-2

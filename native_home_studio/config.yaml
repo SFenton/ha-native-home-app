@@ -1,12 +1,12 @@
-name: Native Home Studio
-version: 0.2.1
+name: S+H Studio
+version: 0.3.0
 slug: native_home_studio
 image: ghcr.io/sfenton/native-home-studio
 arch:
   - amd64
   - aarch64
 url: https://github.com/SFenton/ha-native-home-app
-description: Design, preview, validate, and publish Native Home configurations.
+description: Design and publish the S+H app layout.
 startup: application
 boot: auto
 stage: experimental
@@ -16,11 +16,9 @@ backup: cold
 ingress: true
 ingress_port: 4800
 panel_icon: mdi:cellphone-cog
-panel_title: Native Home Studio
+panel_title: S+H Studio
 panel_admin: true
 homeassistant_api: true
-environment:
-  STUDIO_READ_ENDPOINTS_FILE: ""
 ports:
   4800/tcp: null
 ports_description:
