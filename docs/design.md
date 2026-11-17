@@ -51,6 +51,16 @@ Four capability ids, all pending in the shipped app (`contract/corpus/capabiliti
 - **Spoken words.** `spoken` (`sh.badge-spoken@1`) is what VoiceOver says after the element's name: a tab reads "Chores, 12 overdue", a header button "Profile, 12 overdue". Empty or unavailable says the drawn text.
 - **Show at Most and Spoken As.** Studio-only settings that compile to the plain operands above, never published (no id). Show at Most N draws "N+" above N; Spoken As has a line for 1 and an Otherwise line, each holding `{Count}` for the whole number.
 
+## Dial control and the dial's text place
+
+Two pending ids (`sh.dial-control@1`, `sh.dial-text-place@1`; `contract/corpus/capabilities.pending.json`). Absent means today's dial, byte-identical.
+
+- **Words.** A person authoring a dial control sees **stopper** (never "operand", "predicate" or "handle id"), **Can Pass Each Other**, **Stop at Each Other** and **Stay Apart** (with a **Gap**), and **Lowest** and **Highest** for a stopper's limits. The inspector for the control is lane SD3; its labels already
+  use these words, and SD3 carries the rest.
+- **Text place** (`textAt` on the display dial). A "Text place" group in the dial's Look group with two rows, "Text centre down the height" (a share, 0 to 1) and "Then down by" (points, which do not scale with the text size). A dial that states neither is drawn as before; the preview draws the middle text at the stated place.
+  The barometer's place is half the height and 4 points, production's own.
+- **Hidden until its editor.** The dial control is not offered by Add and the preview does not draw it until SD3.
+
 ## Templates
 
 People see **Template**. The contract keeps its names (`componentLibrary`, `component-ref`, `sh.component-ref@1`) and so do the test ids. A template is linked: every

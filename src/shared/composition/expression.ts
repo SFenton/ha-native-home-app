@@ -68,7 +68,8 @@ export const mathArity: Record<typeof mathOperations[number], [number, number]> 
 export type Operand =
   | { type: 'literal'; value: Json }
   | { type: 'read'; from: { type: 'source'; sourceId: string; path: string[] }; as: 'string' | 'number' | 'boolean' | 'entity-id'; missing: 'unavailable' }
-  | { type: 'control' }
+  /** The value a control is sending. Inside a dial control's one call, `stopper` names which stopper's value (`sh.dial-control@1`). */
+  | { type: 'control'; stopper?: string }
   | { type: 'viewer'; field: 'userId' | 'isAdmin' | 'personEntityId' }
   | { type: 'format'; pattern: string; args: Record<string, Operand>; formats?: Record<string, FormatSpec> }
   // Reads of an entity that the plain `read` cannot give. Never inside a flow.
@@ -118,7 +119,7 @@ export const operandBase: z.ZodType<Operand> = z.lazy(() => z.discriminatedUnion
     type: z.literal('read'), from: object({ type: z.literal('source'), sourceId: id, path: sourcePath }),
     as: z.enum(['string', 'number', 'boolean', 'entity-id']), missing: z.literal('unavailable'),
   }),
-  object({ type: z.literal('control') }),
+  object({ type: z.literal('control'), stopper: id.optional() }),
   object({ type: z.literal('viewer'), field: z.enum(['userId', 'isAdmin', 'personEntityId']) }),
   object({
     type: z.literal('format'), pattern: z.string().max(2000), args: z.record(z.string(), operandBase),
@@ -224,7 +225,11 @@ class Checker implements ExpressionFacts {
   /** Nodes left for the condition being walked; unlimited for a document predicate, whose shipped limits are the operand ones. */
   private conditionBudget = Number.POSITIVE_INFINITY;
   /** `flow` is true inside a Data Flow, where `item` and `param` may stand and `control` may not. */
-  constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope) {}
+  /**
+   * `controlStoppers` is the stopper ids of a dial control's one call (`sh.dial-control@1`): there every `control` names one of them. `'any'` is the
+   * schema's own pass, which leaves that to the compiler. Absent, a `control` names none (a bound control, a swipe, or a stopper's own call).
+   */
+  constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope, private readonly controlStoppers?: readonly string[] | 'any') {}
   add(code: CompositionIssue['code'], pointer: string) { this.issues.push({ code, pointer }); }
   start(nodes: number) { this.budget = nodes; }
   beginCondition() { this.conditionBudget = MAX_CONDITION_NODES; }
@@ -246,6 +251,13 @@ class Checker implements ExpressionFacts {
       case 'control':
         if (!this.allowControl || this.flow) this.add('invalid_combination', pointer);
         this.usesControl = true;
+        if (value.stopper !== undefined) this.needs.add('dial-control');
+        if (this.controlStoppers !== 'any') {
+          // Inside a dial control's one call the stopper is required and must be one of the node's; anywhere else it may not stand.
+          if (this.controlStoppers === undefined) { if (value.stopper !== undefined) this.add('invalid_combination', at('stopper')); }
+          else if (value.stopper === undefined) this.add('invalid_combination', pointer);
+          else if (!this.controlStoppers.includes(value.stopper)) this.add('invalid_reference', at('stopper'));
+        }
         break;
       case 'viewer': break;
       case 'format': {
@@ -489,8 +501,8 @@ export function checkPredicate(value: Predicate, pointer: string, flow = false, 
   const checker = new Checker(false, flow, scope); checker.start(MAX_EXPRESSION_NODES); if (flow) checker.beginCondition(); checker.predicate(value, pointer, 1); return checker;
 }
 /** Checks one `call-service` action. */
-export function checkCallService(value: CallService, pointer: string, allowControl: boolean, scope?: ItemScope): ExpressionFacts {
-  const checker = new Checker(allowControl, false, scope); checker.call(value, pointer); return checker;
+export function checkCallService(value: CallService, pointer: string, allowControl: boolean, scope?: ItemScope, controlStoppers?: readonly string[] | 'any'): ExpressionFacts {
+  const checker = new Checker(allowControl, false, scope, controlStoppers); checker.call(value, pointer); return checker;
 }
 
 // MARK: Schemas with the parser's checks attached
@@ -508,7 +520,7 @@ function withChecks<T>(schema: z.ZodType<T>, run: (value: T) => ExpressionFacts)
 }
 export const operandSchema = withChecks(operandBase, value => checkOperand(value, '', true, false, 'lenient'));
 export const predicateSchema = withChecks(predicateBase, value => checkPredicate(value, '', false, 'lenient'));
-export const callServiceSchema = withChecks(callServiceBase, value => checkCallService(value, '', true, 'lenient'));
+export const callServiceSchema = withChecks(callServiceBase, value => checkCallService(value, '', true, 'lenient', 'any'));
 export const whenUnknownSchema = z.enum(whenUnknownPolicies);
 /** `enabledWhen` (`sh.enabled-when@1`): a condition and what to do while it cannot be answered. Both are required: never an implicit look. */
 export const enabledWhenSchema = object({ condition: predicateSchema, whenUnknown: z.enum(enabledUnknownPolicies) });

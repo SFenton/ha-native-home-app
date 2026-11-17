@@ -30,6 +30,7 @@ import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
 import { groupProblems } from './grid-groups';
 import { PIPELINE_LIMITS } from './pipeline/schema';
+import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 
 export const firstSliceCapabilities = [
@@ -879,6 +880,12 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       dialNumber(pointer.value, `${p}/props/pointer/value`);
       if (pointer.kind === 'tick' && pointer.outer <= pointer.inner) add('invalid_value', `${p}/props/pointer/outer`);
     }
+    if (item.props.textAt) {
+      // The place of the middle's block (`sh.dial-text-place@1`): it states a share or an offset, and there is a block to place.
+      require('dial-text-place');
+      if (item.props.textAt.share === undefined && item.props.textAt.offset === undefined) add('invalid_value', `${p}/props/textAt`);
+      if (!center) add('invalid_combination', `${p}/props/textAt`);
+    }
     labels?.items.forEach((label, index) => { if (label.needsValue && !pointer) add('invalid_combination', `${p}/props/labels/items/${index}/needsValue`); });
     center?.forEach((line, index) => {
       const at = `${p}/props/center/${index}`;
@@ -894,6 +901,48 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       binding(item.a11y.label, 'string', `${p}/a11y/label`);
       if (item.a11y.value) binding(item.a11y.value, 'string', `${p}/a11y/value`);
     }
+  }
+  /**
+   * `dial-control` (`sh.dial-control@1`): see `dial-control.ts` for the structural rules. Here the operands are walked: a stopper's value, a gap, a limit and the
+   * reading are numbers; every look and text follows its own rule; the dial's one call reads each stopper as `control` with a `stopper`, and a stopper's own call
+   * reads a bare `control`. A call that never reads the value would change nothing.
+   */
+  function dialControl(item: Extract<CompositionNode, { type: 'dial-control' }>, p: string) {
+    require('dial-control');
+    const { props } = item;
+    const spoken = [{ at: `/props/failureText`, text: props.failureText }];
+    props.stoppers.forEach((stopper, index) => { if (stopper.spokenValue !== undefined) spoken.push({ at: `/props/stoppers/${index}/spokenValue`, text: stopper.spokenValue }); });
+    for (const problem of dialControlProblems(item, spoken)) add(problem.code, `${p}${problem.at}`);
+    const ids = props.stoppers.map(stopper => stopper.id);
+    props.stoppers.forEach((stopper, index) => {
+      const at = `${p}/props/stoppers/${index}`;
+      dialNumber(stopper.value, `${at}/value`);
+      binding(stopper.label, 'string', `${at}/label`);
+      ruleSlot(stopper.ink, `${at}/ink`);
+      if (stopper.trailInk) ruleSlot(stopper.trailInk, `${at}/trailInk`);
+      if (stopper.trailInk && (stopper.trail === undefined || stopper.trail === 'none')) add('invalid_combination', `${at}/trailInk`);
+      if (stopper.limit?.min) dialNumber(stopper.limit.min, `${at}/limit/min`);
+      if (stopper.limit?.max) dialNumber(stopper.limit.max, `${at}/limit/max`);
+      if (stopper.action) {
+        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope);
+        require('call-service'); absorb(facts);
+        if (!facts.usesControl) add('invalid_combination', `${at}/action`);
+      }
+    });
+    if (item.action) {
+      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids);
+      require('call-service'); absorb(facts);
+      if (!facts.usesControl) add('invalid_combination', `${p}/action`);
+    }
+    if (props.between?.gap) dialNumber(props.between.gap, `${p}/props/between/gap`);
+    if (props.reading) { dialNumber(props.reading.value, `${p}/props/reading/value`); ruleSlot(props.reading.ink, `${p}/props/reading/ink`); }
+    const { top, caption } = props.center;
+    if (top) binding(top, 'string', `${p}/props/center/top`);
+    if (caption && caption !== 'stoppers') binding(caption, 'string', `${p}/props/center/caption`);
+    if (props.dimmedWhen) usePredicate(props.dimmedWhen, `${p}/props/dimmedWhen`);
+    enabled(item.enabledWhen, p);
+    binding(item.a11y.label, 'string', `${p}/a11y/label`);
+    if (item.a11y.value) binding(item.a11y.value, 'string', `${p}/a11y/value`);
   }
   /**
    * `arc-track` (`sh.arc-track@1`): the curve's three points and the horizon's two lie in the box; the marker and the progress come together; the progress is a
@@ -1477,6 +1526,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
         }
         case 'dial': dial(item, p); break;
         case 'arc-track': arcTrack(item, p); break;
+        case 'dial-control': dialControl(item, p); break;
         case 'stack': stack(item, p, depth); break;
         case 'repeat': repeat(item, p, depth); break;
         case 'shape': require('stack'); require('text-style'); break;

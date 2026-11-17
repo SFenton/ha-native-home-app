@@ -49,7 +49,15 @@ export interface DialInput {
   /** Flips the sweep for a right-to-left layout (`mirrors`) when `rtl`. */
   mirrors?: boolean;
   rtl?: boolean;
+  /** Where the block of lines in the middle stands (`sh.dial-text-place@1`); absent, or stating neither, it is centred on the ring. */
+  textAt?: DialTextPlace;
 }
+/**
+ * The place of the text in the middle (`sh.dial-text-place@1`): the centre of the block of lines stands `share` of the dial's height down (absent: the ring's
+ * `centerY`), then `offset` points further down (absent: 0). The offset is plain points: it does not scale with the text size, as the barometer's 4 points
+ * do not (`UKWeatherPressureGaugeView.layoutSubviews`: `top = (height - total) / 2 + 4`).
+ */
+export interface DialTextPlace { share?: number; offset?: number }
 /** A line from `(x1, y1)` to `(x2, y2)`, in points from the dial's top left. */
 export interface DialSegment { x1: number; y1: number; x2: number; y2: number }
 /** The parts of a dial, in points from its top left. A part that is not drawn is `null`. */
@@ -65,6 +73,8 @@ export interface DialLayout {
   flag: { x: number; y: number }[] | null;
   /** The pointer's share of the sweep, 0 to 1. */
   share: number | null;
+  /** Where the centre of the block of lines in the middle stands down the dial, in points from its top: `height * (textAt.share ?? centerY) + (textAt.offset ?? 0)`. */
+  textCenterY: number;
 }
 
 const round4 = (value: number) => Math.round(value * 10000) / 10000 + 0;
@@ -166,5 +176,6 @@ export function layoutDial(input: DialInput): DialLayout {
     const tip = at(angle, FLAG.tip);
     flag = [{ x: round4(tip.x), y: round4(tip.y) }, { x: round4(base.x + nx), y: round4(base.y + ny) }, { x: round4(base.x - nx), y: round4(base.y - ny) }];
   }
-  return { width: round4(width), height: round4(height), cx: round4(cx), cy: round4(cy), radius: round4(radius), ticks, lit, needle, labels, flag, share };
+  const textCenterY = height * (input.textAt?.share ?? centerY) + (input.textAt?.offset ?? 0);
+  return { width: round4(width), height: round4(height), cx: round4(cx), cy: round4(cy), radius: round4(radius), ticks, lit, needle, labels, flag, share, textCenterY: round4(textCenterY) };
 }

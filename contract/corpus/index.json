@@ -16799,6 +16799,1141 @@
         "code": "capability_manifest_mismatch",
         "pointer": "/capabilities"
       }
+    },
+    {
+      "file": "reject/pending-dialctl-one-stopper.json",
+      "outcome": "reject",
+      "note": "One stopper, one call: the smallest dial control. The call reads the stopper as `control` with its id.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-range-one-call.json",
+      "outcome": "reject",
+      "note": "A heat and cool range: two stoppers that stop at each other, and one call that reads each by its id.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-per-stopper-calls.json",
+      "outcome": "reject",
+      "note": "Two free stoppers, one call each: inside a stopper's own call a bare `control` is its value.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-gap-number.json",
+      "outcome": "reject",
+      "note": "Two stoppers that stay at least 2 apart.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-gap-read.json",
+      "outcome": "reject",
+      "note": "The least difference comes from an entity: a number read from its state.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-limit-number.json",
+      "outcome": "reject",
+      "note": "A stopper with a lowest and a highest, as numbers.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-limit-read.json",
+      "outcome": "reject",
+      "note": "A highest that another entity holds.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-value-read.json",
+      "outcome": "reject",
+      "note": "A stopper that follows an entity: its value is a number read from its state.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-ruled-ink.json",
+      "outcome": "reject",
+      "note": "A rim that follows a rule: orange while a read is above 75, else teal. The rules id and the conditions id are declared too.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/8",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-bands-and-ticks.json",
+      "outcome": "reject",
+      "note": "A coloured stretch of the range and dots every 5.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-dimmed-and-enabled.json",
+      "outcome": "reject",
+      "note": "Dimmed while a read is below 60, and enabled by a rule.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/8",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-range-2000-steps.json",
+      "outcome": "reject",
+      "note": "A range of exactly 2,000 steps is allowed: 0 to 580 by 0.29 (580 / 0.29 is 2000.0000000000002 in floating point).",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-sizes-and-mirrors.json",
+      "outcome": "reject",
+      "note": "The compact size, flipped in a right-to-left layout.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-center-text-bound.json",
+      "outcome": "reject",
+      "note": "The top line and the caption are authored text; the spoken name and value come from an entity.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-spoken-value.json",
+      "outcome": "reject",
+      "note": "A stopper says its value in words: `{value}` is the number.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dialctl-in-a-grid.json",
+      "outcome": "reject",
+      "note": "A dial control takes a width in a grid like any node.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/dialctl-call-form-mixed.json",
+      "outcome": "reject",
+      "note": "One call for the dial or one per stopper, never both: a stopper that has its own call beside the dial's refuses.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/action"
+      }
+    },
+    {
+      "file": "reject/dialctl-call-form-none.json",
+      "outcome": "reject",
+      "note": "A dial control sends something: no call at all is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/action"
+      }
+    },
+    {
+      "file": "reject/dialctl-call-form-partial.json",
+      "outcome": "reject",
+      "note": "Calls per stopper cover every stopper: the second has none.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/stoppers/1/action"
+      }
+    },
+    {
+      "file": "reject/dialctl-call-never-reads-control.json",
+      "outcome": "reject",
+      "note": "A call that never reads the value changes nothing.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/action"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-call-never-reads-control.json",
+      "outcome": "reject",
+      "note": "A stopper's own call reads its value too.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/action"
+      }
+    },
+    {
+      "file": "reject/dialctl-control-without-stopper.json",
+      "outcome": "reject",
+      "note": "In the dial's one call every `control` names its stopper: a bare one is ambiguous.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/action/data/fields/target_temp_high"
+      }
+    },
+    {
+      "file": "reject/dialctl-control-unknown-stopper.json",
+      "outcome": "reject",
+      "note": "The stopper a `control` names is one of the dial's.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_reference",
+        "pointer": "/document/pages/2/components/0/action/data/fields/target_temp_high/stopper"
+      }
+    },
+    {
+      "file": "reject/dialctl-control-stopper-in-stopper-call.json",
+      "outcome": "reject",
+      "note": "A stopper's own call reads a bare `control`; naming a stopper there is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/action/data/fields/target_temp_low/stopper"
+      }
+    },
+    {
+      "file": "reject/dialctl-control-stopper-outside-dial.json",
+      "outcome": "reject",
+      "note": "A `control` names a stopper only inside a dial control: a bound slider's call that does is refused at the `stopper` field.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/action/data/fields/percentage/stopper"
+      }
+    },
+    {
+      "file": "reject/dialctl-control-in-value.json",
+      "outcome": "reject",
+      "note": "A stopper's value is read from Home Assistant, not from the control itself.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/value"
+      }
+    },
+    {
+      "file": "reject/dialctl-stoppers-empty.json",
+      "outcome": "reject",
+      "note": "A dial control has one stopper at least.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/stoppers"
+      }
+    },
+    {
+      "file": "reject/dialctl-stoppers-over-2.json",
+      "outcome": "reject",
+      "note": "And two at most.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/stoppers"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-id-duplicate.json",
+      "outcome": "reject",
+      "note": "A stopper's id is its own.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "duplicate_id",
+        "pointer": "/document/pages/2/components/0/props/stoppers/1/id"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-id-reading.json",
+      "outcome": "reject",
+      "note": "`reading` names the reading in the middle: it is not a stopper's id.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/id"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-value-missing.json",
+      "outcome": "reject",
+      "note": "A stopper says where its value comes from.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/value"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-value-text.json",
+      "outcome": "reject",
+      "note": "A stopper's value is a number.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/value"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-label-missing.json",
+      "outcome": "reject",
+      "note": "A stopper has a name for VoiceOver.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/label"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-ink-missing.json",
+      "outcome": "reject",
+      "note": "A stopper says its rim's colour.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/ink"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-trail-ink-without-trail.json",
+      "outcome": "reject",
+      "note": "A trail colour with no trail has nothing to colour.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/trailInk"
+      }
+    },
+    {
+      "file": "reject/dialctl-stopper-trail-unknown.json",
+      "outcome": "reject",
+      "note": "The trails are none, from the start and to the end.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/trail"
+      }
+    },
+    {
+      "file": "reject/dialctl-spoken-value-unknown-token.json",
+      "outcome": "reject",
+      "note": "A stopper's spoken value holds `{value}` and no other token.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_reference",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/spokenValue"
+      }
+    },
+    {
+      "file": "reject/dialctl-failure-text-unclosed-token.json",
+      "outcome": "reject",
+      "note": "The failure line closes its token.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/failureText"
+      }
+    },
+    {
+      "file": "reject/dialctl-limit-empty.json",
+      "outcome": "reject",
+      "note": "A limit says a side.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/limit"
+      }
+    },
+    {
+      "file": "reject/dialctl-limit-min-not-below-max.json",
+      "outcome": "reject",
+      "note": "A literal lowest is below the highest.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/limit/max"
+      }
+    },
+    {
+      "file": "reject/dialctl-limit-text.json",
+      "outcome": "reject",
+      "note": "A limit is a number.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/pages/2/components/0/props/stoppers/0/limit/max"
+      }
+    },
+    {
+      "file": "reject/dialctl-between-missing.json",
+      "outcome": "reject",
+      "note": "Two stoppers say the rule between them.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/between"
+      }
+    },
+    {
+      "file": "reject/dialctl-between-with-one-stopper.json",
+      "outcome": "reject",
+      "note": "One stopper has nothing between.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/between"
+      }
+    },
+    {
+      "file": "reject/dialctl-between-rule-unknown.json",
+      "outcome": "reject",
+      "note": "The rules are free and stop: pushing the other along is not one.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/between/rule"
+      }
+    },
+    {
+      "file": "reject/dialctl-gap-with-free.json",
+      "outcome": "reject",
+      "note": "A gap is for stoppers that stop at each other.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/between/gap"
+      }
+    },
+    {
+      "file": "reject/dialctl-gap-negative.json",
+      "outcome": "reject",
+      "note": "A gap is 0 or more.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/between/gap"
+      }
+    },
+    {
+      "file": "reject/dialctl-gap-as-large-as-the-range.json",
+      "outcome": "reject",
+      "note": "A literal gap is under the range: 20 on a range of 20 leaves no room.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/between/gap"
+      }
+    },
+    {
+      "file": "reject/dialctl-gap-text.json",
+      "outcome": "reject",
+      "note": "A gap is a number.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/pages/2/components/0/props/between/gap"
+      }
+    },
+    {
+      "file": "reject/dialctl-range-max-not-above-min.json",
+      "outcome": "reject",
+      "note": "A range goes up.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/range/max"
+      }
+    },
+    {
+      "file": "reject/dialctl-range-over-2000-steps.json",
+      "outcome": "reject",
+      "note": "At most 2,000 steps: 0 to 100 by 0.04 is 2,500.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/range/step"
+      }
+    },
+    {
+      "file": "reject/dialctl-range-just-over-2000-steps.json",
+      "outcome": "reject",
+      "note": "The limit is exact, not rounded: 0 to 100.02 by 0.05 is 2,000.4 steps and is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/range/step"
+      }
+    },
+    {
+      "file": "reject/dialctl-range-step-below-0.01.json",
+      "outcome": "reject",
+      "note": "A step is at least 0.01.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/range/step"
+      }
+    },
+    {
+      "file": "reject/dialctl-range-step-missing.json",
+      "outcome": "reject",
+      "note": "A range says its step.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/range/step"
+      }
+    },
+    {
+      "file": "reject/dialctl-sweep-authored.json",
+      "outcome": "reject",
+      "note": "The ring is fixed: 270 degrees from 135. It has no sweep to author.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/sweep"
+      }
+    },
+    {
+      "file": "reject/dialctl-size-unknown.json",
+      "outcome": "reject",
+      "note": "The sizes are page, modal and compact.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/size"
+      }
+    },
+    {
+      "file": "reject/dialctl-ticks-61-dots.json",
+      "outcome": "reject",
+      "note": "A ring draws at most 60 dots: 0 to 60 by 1 is 61.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/ticks/every"
+      }
+    },
+    {
+      "file": "reject/dialctl-ticks-every-zero.json",
+      "outcome": "reject",
+      "note": "A tick has a distance.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/ticks/every"
+      }
+    },
+    {
+      "file": "reject/dialctl-bands-over-4.json",
+      "outcome": "reject",
+      "note": "At most four bands.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/bands"
+      }
+    },
+    {
+      "file": "reject/dialctl-band-not-forward.json",
+      "outcome": "reject",
+      "note": "A band runs forward.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/bands/0/to"
+      }
+    },
+    {
+      "file": "reject/dialctl-band-outside-range.json",
+      "outcome": "reject",
+      "note": "A band lies in the range.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/bands/0/to"
+      }
+    },
+    {
+      "file": "reject/dialctl-center-missing.json",
+      "outcome": "reject",
+      "note": "The middle says what it shows.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/center"
+      }
+    },
+    {
+      "file": "reject/dialctl-center-shows-unknown.json",
+      "outcome": "reject",
+      "note": "The large value shows the reading or one of the dial's stoppers.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_reference",
+        "pointer": "/document/pages/2/components/0/props/center/value/shows"
+      }
+    },
+    {
+      "file": "reject/dialctl-center-shows-reading-without-one.json",
+      "outcome": "reject",
+      "note": "The reading is shown only when there is one.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/center/value/shows"
+      }
+    },
+    {
+      "file": "reject/dialctl-center-fraction-digits-over-2.json",
+      "outcome": "reject",
+      "note": "The value has at most two decimals.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/center/value/fractionDigits"
+      }
+    },
+    {
+      "file": "reject/dialctl-unavailable-text-missing.json",
+      "outcome": "reject",
+      "note": "A dial control says its unavailable words.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/unavailableText"
+      }
+    },
+    {
+      "file": "reject/dialctl-a11y-missing.json",
+      "outcome": "reject",
+      "note": "The readout is one element: it has a name.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/a11y"
+      }
+    },
+    {
+      "file": "reject/dialctl-props-extra-field.json",
+      "outcome": "reject",
+      "note": "A dial control has its own fields only.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/glow"
+      }
+    },
+    {
+      "file": "reject/dialctl-has-no-children.json",
+      "outcome": "reject",
+      "note": "A dial control holds no nodes.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/children"
+      }
+    },
+    {
+      "file": "reject/dialctl-mirrors-text.json",
+      "outcome": "reject",
+      "note": "Flipping is a yes or no.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/mirrors"
+      }
+    },
+    {
+      "file": "reject/dialctl-reading-ink-missing.json",
+      "outcome": "reject",
+      "note": "The reading says its colour.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/reading/ink"
+      }
+    },
+    {
+      "file": "reject/dialctl-dimmed-when-bad-condition.json",
+      "outcome": "reject",
+      "note": "A condition is a known kind.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-control@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/dimmedWhen/type"
+      }
+    },
+    {
+      "file": "reject/pending-dial-text-place-share-and-offset.json",
+      "outcome": "reject",
+      "note": "The barometer's place: the block's centre half way down the height, then 4 points lower.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dial-text-place-offset-only.json",
+      "outcome": "reject",
+      "note": "An offset alone: the ring's centre, then 4 points lower.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dial-text-place-share-only.json",
+      "outcome": "reject",
+      "note": "A share alone: half way down, no offset.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-dial-text-place-negative-offset.json",
+      "outcome": "reject",
+      "note": "An offset may go up.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/dial-text-place-states-neither.json",
+      "outcome": "reject",
+      "note": "A place states a share or an offset: an empty one says nothing.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/textAt"
+      }
+    },
+    {
+      "file": "reject/dial-text-place-share-over-1.json",
+      "outcome": "reject",
+      "note": "A share of the height is 0 to 1.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/textAt/share"
+      }
+    },
+    {
+      "file": "reject/dial-text-place-offset-over-64.json",
+      "outcome": "reject",
+      "note": "An offset is at most 64 points either way.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/textAt/offset"
+      }
+    },
+    {
+      "file": "reject/dial-text-place-without-center-text.json",
+      "outcome": "reject",
+      "note": "A place needs lines to place.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/props/textAt"
+      }
+    },
+    {
+      "file": "reject/dial-text-place-extra-field.json",
+      "outcome": "reject",
+      "note": "A place has its own fields only.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/textAt/align"
+      }
+    },
+    {
+      "file": "reject/dial-text-place-offset-text.json",
+      "outcome": "reject",
+      "note": "An offset is a number.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.dial-text-place@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/textAt/offset"
+      }
     }
   ]
 }

@@ -43,7 +43,7 @@ export function DialNode({ node }: { node: NodeOf<'dial'> }) {
   const input: DialInput = {
     width, aspect: props.aspect, centerY: props.centerY, sweep: props.sweep, scale: props.scale, ticks: props.ticks,
     pointer: props.pointer ? { ...props.pointer, value } : undefined,
-    labels: props.labels?.items, flag: props.flag, mirrors: props.mirrors, rtl,
+    labels: props.labels?.items, flag: props.flag, mirrors: props.mirrors, rtl, textAt: props.textAt,
   };
   const layout = layoutDial(input);
   const turn = useTurn(layout.needle ? layout.needle.rotation : null, isFullTurn(props.sweep));
@@ -73,7 +73,7 @@ export function DialNode({ node }: { node: NodeOf<'dial'> }) {
       </g>}
       {layout.labels.map(item => <text key={`${item.text}-${item.x}-${item.y}`} className="sh-dial-letter" x={item.x} y={item.y} fontSize={item.fontSize} style={{ fill: letterInk }}>{item.text}</text>)}
     </svg>
-    {props.center && <div className="sh-dial-center" style={{ left: layout.cx, top: layout.cy }} aria-hidden="true">
+    {props.center && <div className="sh-dial-center" style={{ left: layout.cx, top: layout.textCenterY }} aria-hidden="true">
       {props.center.map((line, index) => <TextNode key={index} node={{ id: `${node.id}-center-${index}`, title: 'Center', type: 'text', layout: { span: 1 }, props: line }}/>)}
     </div>}
   </div>;

@@ -1,4 +1,8 @@
 import { layoutDial, dialShare, nextTurn, normalizeDegrees, shortestTurn, type DialInput, type DialScale, type DialSweep } from '../src/shared/composition/dial-math';
+import {
+  adjustStopper, dialControlState, moveStopper, nearestStopper, ringAngle, snapToStep, stopBounds, tickValues,
+  type DialControlInput, type DialControlRange, type SnapMode,
+} from '../src/shared/composition/dial-control-math';
 import { arcProgress, curvePoint, layoutArc, type ArcInput } from '../src/shared/composition/arc-track-math';
 
 /**
@@ -34,5 +38,25 @@ export function answerArc(subject: Subject): Record<string, unknown> {
     case 'progress': return { t: arcProgress(subject.value, subject.scale) };
     case 'point': { const [x, y] = curvePoint(subject.curve, subject.t); return { x: Math.round(x * 1e4) / 1e4 + 0, y: Math.round(y * 1e4) / 1e4 + 0 }; }
     default: throw new Error(`unknown arc op ${subject.op}`);
+  }
+}
+
+/**
+ * The answers the dial control arithmetic gives for an evaluation case's `dialctl` subject (`contract/corpus/evaluation/dialctl-*.json`): one `op` and its
+ * inputs. A stopper with no value is `value: null`; a limit side or a gap that is authored and cannot be read is `null`, one that is not authored is absent.
+ */
+export function answerDialCtl(subject: Subject): Record<string, unknown> {
+  const input = subject.input as DialControlInput;
+  switch (subject.op) {
+    case 'state': return { state: dialControlState(input) };
+    case 'bounds': return { bounds: stopBounds(input, subject.id) };
+    case 'move': return { move: moveStopper(input, subject.id, subject.raw) };
+    case 'adjust': return { value: adjustStopper(input, subject.id, subject.direction) };
+    case 'nearest': return { id: nearestStopper(input, subject.raw) };
+    case 'snap': return { value: snapToStep(subject.range as DialControlRange, subject.value, (subject.mode ?? 'nearest') as SnapMode) };
+    case 'ticks': return { values: tickValues(subject.range as DialControlRange, subject.every) };
+    case 'tick-count': return { count: tickValues(subject.range as DialControlRange, subject.every).length };
+    case 'angle': return { degrees: ringAngle(subject.range as DialControlRange, subject.value, Boolean(subject.mirrored)) };
+    default: throw new Error(`unknown dialctl op ${subject.op}`);
   }
 }
