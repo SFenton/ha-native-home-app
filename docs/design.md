@@ -42,6 +42,15 @@ Four capability ids, all pending in the shipped app (`contract/corpus/capabiliti
 - **Tile ink** (`sh.tile-ink-default@1`, no field). Every compiled document declares it: an idle tile's icon with no colour of its own and its state line draw the primary ink; lit, filled, unavailable and tinted faces keep theirs. A publication made before it lists no such id and stays valid (`legacyManifest`). `?ink=muted` on the harness draws the old grey for evidence.
 - **Group by State** (`sh.grid-state-groups@1`, `props.groups` on a tile grid). A row in the grid's Look group opens a page: a switch (preset: On, then Off holding Off and Unavailable), a card for each group with Title, three boxes (On, Off, Unavailable), Move Up, Move Down, Remove Group, and Add Group. A state is in one group; one to three groups; an empty group is not drawn. The preview groups by the face each tile draws, in one grid with full-row headings; a regroup slides at 0.35 s only after the person's action, a house change moves with no animation, and Reduce Motion fades the moved tile.
 
+## Profile Icon and badges
+
+Four capability ids, all pending in the shipped app (`contract/corpus/capabilities.pending.json`); each is declared only by a document that uses it, and a document that uses none compiles byte-identical. The contract is in `docs/native-composition.md` ("Profile Icon and badges").
+
+- **Profile Icon.** The header's Profile button (`sh.shell-profile@1`, `profile { look, badge }` on the `shell-header` item) and the `avatar` node (`sh.avatar@1`). The preview draws the initials disc in the standard blue, never a photo: the first letter of the first two words of the person's name, upper-cased; no name, or `look: symbol`, draws the person symbol. A header with no `profile` block draws the disc too, as the app does; the block only chooses the look and adds a badge. The disc is 44 pt in the header, 36 pt (Row) or 84 pt (Large) as a node.
+- **Badges.** One look everywhere: a red capsule (0xD93025, white bold text, 4.77 to 1) at the top trailing corner, drawn for a number other than 0 or a text that is not empty, at most four characters. None, 0, empty and unavailable draw nothing; while a source loads it keeps its last text. A capsule on a circle (a header button, the Profile disc, a Profile Icon) sits with its centre on the 45 degree point of the edge, so its offset is worked out from the circle's size.
+- **Spoken words.** `spoken` (`sh.badge-spoken@1`) is what VoiceOver says after the element's name: a tab reads "Chores, 12 overdue", a header button "Profile, 12 overdue". Empty or unavailable says the drawn text.
+- **Show at Most and Spoken As.** Studio-only settings that compile to the plain operands above, never published (no id). Show at Most N draws "N+" above N; Spoken As has a line for 1 and an Otherwise line, each holding `{Count}` for the whole number.
+
 ## Templates
 
 People see **Template**. The contract keeps its names (`componentLibrary`, `component-ref`, `sh.component-ref@1`) and so do the test ids. A template is linked: every

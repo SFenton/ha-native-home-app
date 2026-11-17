@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { demoHouse } from '../src/preview2/demo-house';
-import { emptyOverlay } from '../src/preview2/projections';
+import { emptyOverlay, houseFrom } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props } from '../src/preview2/Preview2';
 import { withPose } from '../src/preview2';
 import { inVerticalBar } from '../src/preview2/split';
@@ -88,13 +88,19 @@ describe('the Duo rail', () => {
     expect(container.querySelector('.sh-fold')).toBeNull();
   });
 
-  it('draws the Profile as the person symbol in the rail and as the header circle elsewhere', () => {
-    const rail = mount(withChrome(), duoFolded);
-    const profile = rail.container.querySelector('.sh-rail-group button[aria-label=Profile]')!;
-    expect(profile.querySelector('svg')).not.toBeNull();
+  it('draws the initials disc in the rail as in the header, with or without a profile block; only look symbol draws the symbol', () => {
+    const profileIn = (document: CompositionDocument, window: Preview2Props['window'], where: string) => mount(document, window, { house: houseFrom({ states: [{ entityId: 'person.demo_alex', name: 'Alex Demo', state: 'home' }] as never, currentUser: { id: 'u1', name: 'Alex', isOwner: false, isAdmin: false, personEntityId: 'person.demo_alex' } }) }).container.querySelector(`${where} button[aria-label=Profile]`)!;
+    const withProfile = (look: string) => withChrome().navigation.chrome.groups.map(group => ({ ...group, items: group.items.map(item => item.type === 'shell-header' ? { ...item, profile: { look } } : item) }));
+    const withLook = (look: string) => ({ ...withChrome(), navigation: { ...withChrome().navigation, chrome: { groups: withProfile(look) } } }) as unknown as CompositionDocument;
+    const rail = profileIn(withChrome(), duoFolded, '.sh-rail-group');
+    expect(rail.querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
     cleanup();
-    const header = mount(withChrome(), iphone).container.querySelector('.sh-header button[aria-label=Profile]')!;
-    expect(profile.innerHTML).not.toBe(header.innerHTML);
+    const header = profileIn(withChrome(), iphone, '.sh-header');
+    expect(header.querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
+    cleanup();
+    expect(profileIn(withLook('photo'), duoFolded, '.sh-rail-group').querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
+    cleanup();
+    expect(profileIn(withLook('symbol'), duoFolded, '.sh-rail-group').querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('symbol');
   });
 
   it('keeps the title in the header row of a pushed page, beside Back, and takes no menu there either', () => {

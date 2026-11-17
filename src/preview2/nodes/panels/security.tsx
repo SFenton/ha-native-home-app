@@ -3,7 +3,7 @@ import { convertDoorTile, DoorConversionError } from '../../../shared/compositio
 import { RenderCtx } from '../../render-context';
 import { StateTileNode } from '../tiles';
 import { lineStyle, useFoldedGrid } from '../useFoldedGrid';
-import { Glyph, rgb, useSourceRead, type NodeOf } from '../shared';
+import { Badge, Glyph, rgb, useBadge, useSourceRead, type NodeOf } from '../shared';
 
 /** The phase of a source as text: `ready`, `loading` or `unavailable`. */
 function usePhase(sourceId: string): 'ready' | 'loading' | 'unavailable' {
@@ -65,6 +65,7 @@ export function DoorTileNode({ node }: { node: NodeOf<'door-tile'> }) {
 /** The glass tile a door drew before it lowered: the state's colour and words, for a door with no source to lower from. */
 function PlainDoorTile({ node }: { node: NodeOf<'door-tile'> }) {
   const { props } = node;
+  const badge = useBadge(node.badge, `${node.id}/badge`);
   const phase = usePhase(props.sourceId), state = useStateText(props.sourceId);
   const match = phase === 'ready' ? props.states.find(item => item.state === state) : undefined;
   const appearance = match?.appearance ?? props.fallback;
@@ -73,6 +74,6 @@ function PlainDoorTile({ node }: { node: NodeOf<'door-tile'> }) {
   return <div className={`sh-tile ${match?.active ? 'sh-lit' : ''}`} role="group" aria-label={`${node.title}, ${line}`} data-error={match?.error ? '' : undefined}
     style={{ '--fill': fill, '--glyph': match?.active ? '#fff' : fill } as CSSProperties}>
     <span className="sh-tile-glyph"><Glyph symbol={appearance.icon} size={24}/></span>
-    <span className="sh-tile-title">{node.title}</span><span className="sh-tile-line">{line}</span>
+    <span className="sh-tile-title">{node.title}</span><span className="sh-tile-line">{line}</span><Badge badge={badge}/>
   </div>;
 }

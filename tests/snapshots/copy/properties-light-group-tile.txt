@@ -9,6 +9,8 @@ Width
 Automatic
 Half
 Full
+Badge
+None
 Behavior
 Only show when
 Always
@@ -34,6 +36,8 @@ Width
 Automatic
 Half
 Full
+Badge
+None
 Behavior
 Only show when
 Always

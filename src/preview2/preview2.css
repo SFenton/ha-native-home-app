@@ -382,11 +382,21 @@
 }
 
 /* asks: badges, a disabled control and the filled tile face (`sh.badges@1`, `sh.enabled-when@1`, `sh.tile-look@1`) */
-.sh-preview2 .sh-badge { position: absolute; top: 6px; inset-inline-end: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #D70015; color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; box-sizing: border-box; pointer-events: none; font-variant-numeric: tabular-nums; }
+.sh-preview2 .sh-badge { position: absolute; top: 6px; inset-inline-end: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #D93025; color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; box-sizing: border-box; pointer-events: none; font-variant-numeric: tabular-nums; }
 .sh-preview2 .sh-tile, .sh-preview2 .sh-circle, .sh-preview2 .sh-tab-glyph { position: relative; }
 .sh-preview2 .sh-tab-glyph { display: inline-flex; }
 .sh-preview2 .sh-chip .sh-badge { position: static; margin-inline-start: 2px; flex: none; }
-.sh-preview2 .sh-circle .sh-badge { top: -2px; inset-inline-end: -2px; }
+.sh-preview2 .sh-circle .sh-badge { top: -2px; inset-inline-end: -4px; min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; border-radius: 9px; }
+/* sh.badge-nodes@1: a settings row's capsule sits before the chevron, centred on the row; a light tile's sits in its corner */
+.sh-preview2 .sh-settings-link .sh-badge { position: static; margin-inline-start: auto; flex: none; }
+.sh-preview2 .sh-dv-lighttile, .sh-preview2 .sh-avatar-stage { position: relative; }
+/* sh.avatar@1 and the header's profile: the initials disc (the preview never draws a photo) */
+.sh-preview2 .sh-avatar-disc { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 600; line-height: 1; flex: none; box-sizing: border-box; font-family: var(--sh-font); }
+.sh-preview2 .sh-avatar-node { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; justify-content: center; background: none; border: 0; padding: 0; color: inherit; }
+.sh-preview2 .sh-avatar-stage { display: inline-flex; }
+.sh-preview2 .sh-avatar-stage .sh-badge { /* the capsule's centre sits where the disc's edge meets the 45 degree line: 0.146 of the size in from the corner */ top: calc(var(--disc) * .146 - 9px); inset-inline-end: calc(var(--disc) * .146 - 9px); min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; border-radius: 9px; }
+.sh-preview2 .sh-avatar-title { font-size: 15px; line-height: 20px; text-align: center; }
+.sh-preview2 .sh-circle .sh-avatar-disc { width: 44px; height: 44px; }
 .sh-preview2 .sh-tab-glyph .sh-badge { top: -6px; inset-inline-end: -12px; }
 .sh-preview2 [data-disabled] { opacity: .4; cursor: default; }
 .sh-preview2 button[data-disabled] { pointer-events: none; }

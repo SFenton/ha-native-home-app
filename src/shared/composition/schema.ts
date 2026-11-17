@@ -19,6 +19,9 @@ import { conditional, label, navigationAction, push, read, symbol, symbolSlot, t
 import { swipeSchema } from './tile-swipe';
 import { stateWordsSchema } from './state-words';
 import { gridGroupsSchema } from './grid-groups';
+import { avatarLooks, avatarPersonSchema, avatarSizes, badgeSchema, shellProfileSchema } from './profile-badges';
+
+export { badgeSchema };
 
 const object = z.strictObject;
 const id = identifierSchema;
@@ -39,8 +42,6 @@ const value = (maximum: number, blank: boolean) => z.discriminatedUnion('type', 
 ]);
 /** A color named by an entity's text, clamped to read; the fallback is required, never an implicit look (`sh.rules@1`). */
 const boundColor = <T extends z.ZodType>(fallback: T) => object({ type: z.literal('bound-color'), value: operandBase, fallback });
-/** A badge on a chip, a tile or a tab (`sh.badges@1`): none, or a value that is a number or text. A value of 0 draws no badge. */
-export const badgeSchema = z.discriminatedUnion('type', [object({ type: z.literal('none') }), object({ type: z.literal('value'), value: operandBase })]);
 const badgeField = { badge: badgeSchema.optional() };
 const domainAction = object({
   type: z.literal('domain'), sourceId: id, intent: z.literal('power.toggle'), feedback: z.literal('policy'),
@@ -105,6 +106,8 @@ const groups = z.array(object({
     object({
       id, type: z.literal('shell-header'), visibility: z.enum(['always', 'root-only']),
       quickLinksAction: compositionActionSchema, profileAction: compositionActionSchema,
+      /** The look and badge of the Profile button (`sh.shell-profile@1`); absent, the app draws what it draws today. */
+      profile: shellProfileSchema.optional(),
     }),
   ])).max(12),
 })).max(3);
@@ -131,6 +134,8 @@ const settingsLink = object({
   ...node, type: z.literal('settings-link'), icon: symbol,
   props: object({ subtitle: text(2000, true), hint: text(240).optional(), showsChevron: z.boolean() }),
   action: navigationAction,
+  /** A capsule before the chevron (`sh.badge-nodes@1`). */
+  ...badgeField,
 });
 const accountHeader = object({
   ...node, type: z.literal('account-header'),
@@ -160,6 +165,20 @@ const solidLook = z.discriminatedUnion('type', [solidFill, solidAppearance]);
 const fillSlot = z.discriminatedUnion('type', [standardFill, solidFill, solidAppearance, conditional(standardOrSolid), boundColor(standardOrSolid)]);
 /** The same for a slot with no standard look: an exact color or pair, a `conditional` of exact colors, or a `bound-color` whose fallback is exact. */
 const solidSlot = z.discriminatedUnion('type', [solidFill, solidAppearance, conditional(solidLook), boundColor(solidLook)]);
+/**
+ * A Profile Icon (`sh.avatar@1`): the disc of the signed-in person, or of one `person.*` entity, as a node. `title` is the VoiceOver label (and what a
+ * `large` icon draws under the disc). It may be blank, which says there is none; the compiler requires one when there is an `action`.
+ */
+const avatarNode = object({
+  ...node, title: text(240, true), type: z.literal('avatar'),
+  props: object({
+    person: avatarPersonSchema, size: z.enum(avatarSizes).optional(), look: z.enum(avatarLooks).optional(),
+    /** The disc's colour: the standard blue, or an exact colour that keeps white initials at 4.5 to 1. */
+    fill: z.discriminatedUnion('type', [standardFill, solidFill]).optional(),
+  }),
+  action: navigationAction.optional(),
+  ...badgeField,
+});
 /**
  * The text styles a node can name, the system's eleven (`sh.text-style@1`). The older six keep their spellings (`body`, `headline`, `caption1`,
  * `subheadline`, `footnote`); `section-title` is the module header look and stays beside them.
@@ -230,6 +249,7 @@ const doorTile = object({
     fallback: alarmAppearance, loadingText: title, unavailableText: title, hiddenText: title, errorText: title,
     sendingOpenText: title, sendingCloseText: title, openLabel: label, closeLabel: label, reverseLabel: label,
   }),
+  ...badgeField,
 });
 const alarmNavigation = object({
   sourceId: id, projection: z.literal('alarm-navigation@1'),
@@ -257,11 +277,11 @@ const roomCardProps = object({
 });
 const roomCard = object({
   ...node, type: z.literal('room-card'), icon: symbol,
-  binding: object({ sourceId: id, projection: z.literal('room-state@1') }), props: roomCardProps,
+  binding: object({ sourceId: id, projection: z.literal('room-state@1') }), props: roomCardProps, ...badgeField,
 });
 const roomChip = object({
   ...node, type: z.literal('room-chip'), icon: symbol,
-  binding: object({ sourceId: id, projection: z.literal('room-state@1') }), props: roomCardProps,
+  binding: object({ sourceId: id, projection: z.literal('room-state@1') }), props: roomCardProps, ...badgeField,
 });
 const roomNavigationGrid = object({
   ...node, type: z.literal('room-navigation-grid'),
@@ -296,6 +316,7 @@ const actionTile = object({
     powerLabels: object({ on: title, off: title }).optional(),
   }),
   action: domainAction,
+  ...badgeField,
 });
 /** One round button on a state tile (`sh.tile-parts@1`): its label is what VoiceOver reads and is never drawn. A `domain` action is refused by the compiler. */
 const tileDisc = object({
@@ -444,7 +465,7 @@ const lightGroupTile = object({ ...node, type: z.literal('light-group-tile'), pr
   /** Swipe to adjust brightness (`sh.tile-swipe@1`): off unless present. The light source owns the call. */
   swipe: swipeSchema.optional(),
   /** The words for its states (`sh.state-words@1`): on, off, unavailable and the level. */
-  words: stateWordsSchema.optional() }) });
+  words: stateWordsSchema.optional() }), ...badgeField });
 const weatherMode = z.enum(['condition', 'precipitation', 'wind']);
 const weatherPanel = object({
   ...node, type: z.literal('weather-panel'),
@@ -787,7 +808,7 @@ export type CompositionNode = ComponentRefNode | z.infer<typeof settingsControl>
   props: StackProps; action?: CompositionActionSlot; a11y?: StackA11y; children: CompositionNode[];
 } | z.infer<typeof shapeNode> | z.infer<typeof symbolPart> | RepeatNode
  | z.infer<typeof chartNode> | z.infer<typeof gaugeNode>
- | z.infer<typeof dialNode> | z.infer<typeof arcTrackNode>;
+ | z.infer<typeof dialNode> | z.infer<typeof arcTrackNode> | z.infer<typeof avatarNode>;
 export const compositionNodeSchema: z.ZodType<CompositionNode> = z.lazy(() => z.discriminatedUnion('type', [
   customLightControl, sprinklerControl,
   textNode, navigationTile, actionTile, stateTile, statusChip, roomOverviewTile, lightGroupTile, weatherPanel, alarmPanel, doorTile, settingsLink, roomCard, roomChip, roomNavigationGrid, roomDeviceControlSchema, bedroomControl, remoteNode, vacuumControlSchema, cameraTile, cameraVideo, cameraControls, cameraViewer,
@@ -818,7 +839,7 @@ export const compositionNodeSchema: z.ZodType<CompositionNode> = z.lazy(() => z.
   shapeNode, symbolPart,
   object({ ...node, type: z.literal('repeat'), props: repeatProps, children: z.array(compositionNodeSchema).min(1).max(2) }),
   chartNode, gaugeNode,
-  dialNode, arcTrackNode,
+  dialNode, arcTrackNode, avatarNode,
 ]));
 export function compositionChildren(node: CompositionNode): CompositionNode[] {
   return node.type === 'tile-grid' || node.type === 'overlay' || node.type === 'stack' || node.type === 'repeat' || node.type === 'section' || node.type === 'status-rail' || node.type === 'room-section' || node.type === 'paged-row' ? node.children

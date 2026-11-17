@@ -9,7 +9,7 @@ import { Face } from './tile-face';
 import { brightnessPercent, lightColor, unavailableText, useEntity, useSimulate, UseButton } from './device-shared';
 import { lightTileWidths } from './tile-minimum';
 import { tileFit } from './vacuum';
-import { familyStyle, Glyph, useSourceRead, type NodeOf } from './shared';
+import { Badge, familyStyle, Glyph, useBadge, useSourceRead, type BadgeFace, type NodeOf } from './shared';
 import { SwipeFrame, type SwipeSpec } from './swipe';
 import type { StateWords } from '../../shared/composition/state-words';
 import { lightLine } from '../state-words';
@@ -33,7 +33,7 @@ export function lightPercent(entity: NativeState | undefined): number {
  * under the name, a power disc and, when the tile opens details, the chevron. Off, it is the dark tile with "Off"; unavailable, dimmed.
  * The drag that sets the brightness is not drawn: the preview cannot drag.
  */
-export function BrightnessTile({ title, entity, open, swipe, words }: { title: string; entity: NativeState | undefined; open?: CompositionActionSlot; swipe?: SwipeSpec; /** The tile's own words for its states (`sh.state-words@1`). */ words?: StateWords }) {
+export function BrightnessTile({ title, entity, open, swipe, words, badge }: { title: string; /** The count in the corner (`sh.badge-nodes@1`). */ badge?: BadgeFace; entity: NativeState | undefined; open?: CompositionActionSlot; swipe?: SwipeSpec; /** The tile's own words for its states (`sh.state-words@1`). */ words?: StateWords }) {
   const send = useSimulate(), { run } = useRender();
   const dead = !entity || entity.state === 'unavailable' || entity.state === 'unknown';
   const live = !entity || entity.state !== 'on' ? 0 : lightPercent(entity), color = lightColor(entity) ?? warm;
@@ -47,6 +47,7 @@ export function BrightnessTile({ title, entity, open, swipe, words }: { title: s
       <span className="sh-row-copy"><strong>{title}</strong><span>{line}</span></span>
       <UseButton className="sh-dv-disc" label={`Power ${title}`} onPress={() => send(entity?.entityId, 'toggle')}><Power size={18}/></UseButton>
       {open ? <UseButton className="sh-dv-chev" label={`Open ${title}`} onPress={() => run(open)}><ChevronRight size={16}/></UseButton> : null}
+      <Badge badge={badge}/>
     </div>;
   };
   return swipe ? <SwipeFrame spec={swipe}>{shown => tile(shown)}</SwipeFrame> : tile();
@@ -62,6 +63,7 @@ export function LightGroupTileNode({ node }: { node: NodeOf<'light-group-tile'> 
   const send = useSimulate();
   const ref = useRef<HTMLDivElement>(null);
   const width = useElementWidth(ref);
+  const badge = useBadge(node.badge, `${node.id}/badge`);
   if (isDimmable(entity)) {
     const swipe = node.props.swipe;
     const spec: SwipeSpec | undefined = swipe ? {
@@ -69,13 +71,13 @@ export function LightGroupTileNode({ node }: { node: NodeOf<'light-group-tile'> 
       enabled: Boolean(entity) && entity!.state !== 'unavailable' && entity!.state !== 'unknown',
       commit: value => send(entity?.entityId, value <= 0 ? 'turn_off' : 'turn_on', value <= 0 ? undefined : { brightness_pct: value }),
     } : undefined;
-    return <BrightnessTile title={node.title} entity={entity} swipe={spec} words={node.props.words}/>;
+    return <BrightnessTile title={node.title} entity={entity} swipe={spec} words={node.props.words} badge={badge}/>;
   }
   const dead = !entity || entity.state === 'unavailable' || entity.state === 'unknown', on = entity?.state === 'on';
   const fit = tileFit(width, lightTileWidths(node.title, false));
   const line = lightLine(node.props.words, { dead, on, percent: 100, dims: false });
   return <div ref={ref} className="sh-tile-parts" data-fit={fit} style={{ '--reserve': `${fit === 'below' ? 14 : 44 + 22}px` } as CSSProperties}>
-    <Face icon={{ name: 'lightbulb' }} title={node.title} line={line} lit={on && !dead} unavailable={dead} className={on && !dead ? 'sh-lit-warm' : ''} style={familyStyle('lights')}/>
+    <Face icon={{ name: 'lightbulb' }} title={node.title} line={line} badge={badge} lit={on && !dead} unavailable={dead} className={on && !dead ? 'sh-lit-warm' : ''} style={familyStyle('lights')}/>
     <span className="sh-tile-discs"><UseButton className="sh-tile-disc" label={`${on ? 'Turn Off' : 'Turn On'} ${node.title}`} disabled={dead} style={dead ? { opacity: .35 } : undefined}
       onPress={() => send(entity?.entityId, on ? 'turn_off' : 'turn_on')}><Power size={18}/></UseButton></span>
   </div>;

@@ -45,7 +45,8 @@ export function ActionTileNode({ node }: { node: NodeOf<'action-tile'> }) {
   const state = useSourceText(node.binding.sourceId, 'Unavailable');
   const on = isTrue(useSourceRead(node.binding.sourceId, ['isOn']));
   const labels = node.props.powerLabels;
-  return <Face icon={node.icon} title={node.title} line={state.state === 'ready' && labels ? on ? labels.on : labels.off : state.text} action={node.action} lit={on} unavailable={state.state !== 'ready'} style={familyStyle(node.props.family)}/>;
+  const badge = useBadge(node.badge, `${node.id}/badge`);
+  return <Face icon={node.icon} title={node.title} line={state.state === 'ready' && labels ? on ? labels.on : labels.off : state.text} action={node.action} badge={badge} lit={on} unavailable={state.state !== 'ready'} style={familyStyle(node.props.family)}/>;
 }
 /**
  * `state-tile` (`sh.state-style@1`): a tile whose icon, words, indicator and colour come from a state style, resolved the way the
@@ -171,16 +172,18 @@ export function roomCardLine(props: NodeOf<'room-card'>['props'], entity: Native
 export function RoomCardNode({ node }: { node: NodeOf<'room-card'> }) {
   const look = useRoomLook(node.props, node.binding.sourceId, node.icon.name);
   const sources = useSourceEntities(node.props.subtitleSourceIds);
-  return <Face icon={node.icon} title={node.title} line={roomCardLine(node.props, look.entity, sources)} action={node.props.action} lit={look.lit} style={look.style} className={look.className}/>;
+  const badge = useBadge(node.badge, `${node.id}/badge`);
+  return <Face icon={node.icon} title={node.title} line={roomCardLine(node.props, look.entity, sources)} action={node.props.action} badge={badge} lit={look.lit} style={look.style} className={look.className}/>;
 }
 /** `room-chip`: the compact form of a room card. */
 export function RoomChipNode({ node }: { node: NodeOf<'room-chip'> }) {
   const line = useSourceText(node.props.subtitleSourceIds[0], '');
   const look = useRoomLook(node.props, node.binding.sourceId, node.icon.name);
+  const badge = useBadge(node.badge, `${node.id}/badge`);
   // The chip has no lit face of its own: the lights family fills it with its amber.
   const fill = (look.style as Record<string, string>)['--fill'] ?? (look.className === 'sh-lit-warm' ? families.lights.fill : undefined);
   return <Pressable action={node.props.action} className={`sh-chip ${node.props.action ? 'sh-pressable' : ''}`}
-    style={{ ...look.style, ...(fill ? { background: fill } : {}) }}><span className="sh-chip-glyph"><Glyph symbol={node.icon} size={18}/></span><span className="sh-chip-text"><strong>{node.title}</strong>{line.text && <span>{line.text}</span>}</span></Pressable>;
+    style={{ ...look.style, ...(fill ? { background: fill } : {}) }}><span className="sh-chip-glyph"><Glyph symbol={node.icon} size={18}/></span><span className="sh-chip-text"><strong>{node.title}</strong>{line.text && <span>{line.text}</span>}</span><Badge badge={badge}/></Pressable>;
 }
 /** The state a chip or overview tile shows: the matching `states` entry, else the fallback appearance. */
 function useAppearance(nodeId: string, props: NodeOf<'status-chip'>['props']) {
@@ -206,7 +209,7 @@ export function StatusChipNode({ node }: { node: NodeOf<'status-chip'> }) {
   return <Pressable action={node.action} className={`sh-chip ${node.action ? 'sh-pressable' : ''}`} style={{ ...(fill ? { background: fill } : {}), ...(glyph ? { '--glyph': glyph } : {}) } as CSSProperties}>
     <span className="sh-chip-glyph"><Glyph symbol={appearance.icon} size={16}/></span>
     <span className="sh-chip-text"><strong>{node.title}</strong><span data-state={loading ? 'loading' : undefined}>{text}</span></span>
-    <Badge text={badge}/>
+    <Badge badge={badge}/>
   </Pressable>;
 }
 /** The states a contact overview reads as "the contact sensors are fine to show quietly" (`UKServerUIPage` `hiddenSubtitle`). */

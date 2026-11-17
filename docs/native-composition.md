@@ -1137,7 +1137,7 @@ shipped id's cases are `accept/` files or plain `reject/` files; so is a case th
 | `conditional` fill | `navigation-tile.presentation.fill`, `room-card.stateColors[].fill` | `sh.rules@1` | cases hold literal fills, never clamped; a non-neutral navigation tile with a custom fill: `invalid_combination` at `/props/family` |
 | `bound-symbol { value, fallback }` | status appearance icon only | `sh.rules@1` | value text is a symbol name the app draws, else the fallback; elsewhere `unknown_variant` |
 | `fallback` on `expr` and `read` text | text slots | `sh.rules@1` | 1 to 16384 characters; drawn only when the value is unavailable, not while loading (loading keeps what was shown) |
-| Badge `none` or `value` | status chip, navigation tile, state tile, overview tile, navigation tab, header button | `sh.badges@1` | value kind is string or number (`binding_type` at `/badge/value`); None, empty text and 0 draw nothing; the shipped header button `none` needs no new capability |
+| Badge `none` or `value` | status chip, navigation tile, state tile, overview tile, navigation tab, header button (drawn: `sh.badge-nodes@1`, see Profile Icon and badges) | `sh.badges@1` | value kind is string or number (`binding_type` at `/badge/value`); None, empty text and 0 draw nothing; the shipped header button `none` needs no new capability |
 | `conditional` action | any action slot of a row, button, tile, header button, `rowAction` | `sh.action-rules@1` | 1 to 16 cases, `otherwise` an action or `none`, one level only; every case is checked like a plain action; a power action stays off a row or button, also inside a case |
 | `confirmation.when` | `additional` confirmation of a service call or power action | `sh.confirm-when@1` | the question is asked unless the answer is `no`, so an unknown answer asks; `policy` takes no `when` (`unknown_field`) |
 | `fallbackTabId` | `local-tabs` props | `sh.tab-fallback@1` | must name a tab of the container (`invalid_reference`); used when the stored choice names no tab |
@@ -1488,6 +1488,37 @@ A flow's date `progress` (WG-S2) is a number between 0 and 1 and so composes wit
 - **Preview.** SVG in points, from the measured width: the ticks as one path, the lit tick, the needle as a group turned by CSS (a 0.3 second glide, none under Reduce Motion), the letters as SVG text, the flag, the centre text as aria-hidden text over the centre; the arc as a curve, a horizon and a circle. All colours go through the ink slot.
 - **Editors.** Add offers **Dial** and **Arc** in Content, each as the smallest useful part in neutral greys (a 25-tick dial over 250 degrees with a lit tick at half; a dashed arc with a marker at half). The inspector is the schema's: Sweep, Value scale, Pointer (Kind, Value, ends, width, color), Ticks, Letters, Flag, Text in the middle, Size, Accessibility; Curve, Box, Progress, Line, Dashes, Horizon, Marker.
   Preview story: `/?preview2=1&fixture=wgdial&surface=page:page-wd-needle`.
+
+### Profile Icon and badges (lane pb-contract)
+
+Four pending ids. Each is declared only by a document that uses it, so a document that uses none compiles byte for byte as before
+(`tests/profile-badges.test.ts` holds this over the whole corpus). They are not in `capabilities.json` until the app ships them.
+
+| Id | What it adds | Rules and codes |
+|---|---|---|
+| `sh.shell-profile@1` | an optional `profile { look?, badge? }` on the `shell-header` item | `look` is `photo` (the default: the person's picture over the initials), `initials` or `symbol` (`unknown_variant` at `/profile/look`); `badge` is a badge (below); an empty block still needs the id; absent, the app draws what it draws today, the initials disc (the preview too; only `look: symbol` draws the person symbol) |
+| `sh.avatar@1` | the `avatar` node, "Profile Icon" in the Studio | `props.person` is `{type: "viewer"}` or `{type: "person", entityId}` where the id is `person.*` (`invalid_value` at `/props/person/entityId`, `limit_exceeded` over 255 characters); `size` is `row` (36 pt) or `large` (84 pt); `look` is `photo` or `initials` (a node has no `symbol`: `unknown_variant`); `fill` is `standard` (the action blue, 0 0.40 0.80) or a `solid-rgb` that keeps white initials at 4.5 to 1 (`invalid_value` at `/props/fill`; a pair is `unknown_variant`); an optional navigation `action` makes it a button, which needs a non-blank `title` (`missing_required` at `/title`); `title` may be blank, which says there is none and hides the disc from VoiceOver |
+| `sh.badge-spoken@1` | an optional `spoken` operand on a value badge | the words VoiceOver says after the element's name; must be text (`binding_type` at `/badge/spoken`); `none` takes none (`unknown_field`); empty or unavailable says the drawn text |
+| `sh.badge-nodes@1` | a `badge` on `action-tile`, `door-tile`, `light-group-tile`, `room-card`, `room-chip`, `settings-link` and `avatar`, and a drawn badge on a header `button` | the field's presence needs the id on the added kinds (even `none`); on a `button` only a badge that is not `none` does (the shipped `none` needs no id). A badge on a kind of this id, a Profile badge or a header button holds a text of at most four characters (counted as Unicode scalars, `[...text].length`; Swift `unicodeScalars.count`): a literal, or any literal a `choose` can give (`limit_exceeded` at `/badge/value`) |
+
+**One look.** A red capsule (0xD93025; white bold text is 4.77 to 1) in the top trailing corner, drawn when its value is a number other than 0 or a text that is not empty; `none`, 0, empty and unavailable draw nothing, and while loading it keeps its last text. The
+Studio's Preview draws the capsule at the positions of the proposal (a tab, a tile and a chip: its shipped rules; a header button, the Profile disc and the Profile Icon: its centre on the 45 degree point of the circle, 18 pt tall, 24 by 18 for "9+") and never draws a photo: the
+disc is the initials (the first letter of the first two words of the name, upper-cased; no letters or no name is the person symbol) in the standard fill.
+
+**Studio-only settings, never published.** A value badge may carry, in the draft only, **Show at Most** `cap` (a whole number from 1 to 999) and **Spoken As** `spokenOne` ("For 1", optional) and `spokenOther` ("Otherwise", needed when `spokenOne` is there), each line holding the token `{Count}` for the whole,
+uncapped number (any other brace is `invalid_value`). The compiler works them out before it derives capabilities (`profile-badges.ts`), so the published JSON, the corpus and the app see plain operands and the closed schema refuses the three keys in a publication (`unknown_field`):
+
+```
+cap N         value  = choose [ when compare(above, V, N) then "N+" ] otherwise format("{count}", count = V)     // both branches are text
+spokenOne     spoken = choose [ when compare(eq, V, 1) then <For 1> ] otherwise <Otherwise>                      // sh.badge-spoken@1
+spokenOther   spoken = format(<Otherwise with {Count} as {count}>, count = V)  (a literal when it has no token)  // sh.badge-spoken@1
+```
+
+The count `V` is the author's value, written once and copied into each place. A fault in it is reported once, at `<badge>/value/...`; a fault in what the setting wrote is reported at `cap`, `spokenOne` or `spokenOther`; a count too large for the expression budget (64 nodes) is a `limit_exceeded`.
+A count that cannot be read draws nothing, capped or not: a badge whose rule stalls with no source loading is unavailable (`resolveBadge`), and one whose source is still loading keeps what it showed. `compileCompositionDocument` returns the document as authored, with the capabilities of the worked-out form; `publishedBadges` gives the form a publication holds.
+The closed publication schema refuses a draft that holds the three keys.
+
+**Corpus.** `scripts/profile-badges-corpus.ts` (through `generate-expression-corpus.ts`): `pending-profile-badges-*` accepts and `profile-badges-*` refusals, and the `badge-cap-*` and `badge-spoken-*` evaluation cases (a badge answers `spoken` only when it has `spoken`). The shipped `badge-chrome-button` case declared only `sh.badges@1`; with a drawn badge it now declares `sh.badge-nodes@1` and is `reject/pending-badge-chrome-button.json` until the app ships the id.
 
 ### Linked components (`sh.component-ref@1`, lane L-linked)
 
