@@ -1,4 +1,5 @@
 import http from 'node:http';
+import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
@@ -9,6 +10,7 @@ import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCompositionDocument } from '../src/shared/composition/workspace';
+import { request as clientRequest } from '../src/api';
 import { createApp } from '../server/app';
 import { isLoopbackHost, loadConfig, localDevelopment, type ServerConfig } from '../server/config';
 import { readNativeHouseConfig } from '../server/native-home';
@@ -662,5 +664,63 @@ describe('Home Assistant services (read only)', () => {
   it('answers 503 without a Home Assistant connection', async () => {
     const { request } = await fixture({ authToken });
     expect((await request('/native/api/ha/services', 'GET', undefined, { Authorization: `Bearer ${authToken}` })).status).toBe(503);
+  });
+});
+
+describe('empty request bodies', () => {
+  /** Writes the raw bytes of a request to the server and returns the status code and the body. */
+  async function rawRequest(base: string, head: string[], tail = '') {
+    const { port } = new URL(base);
+    const socket = net.connect(Number(port), '127.0.0.1');
+    await once(socket, 'connect');
+    let text = '';
+    socket.on('data', (chunk) => { text += chunk.toString('latin1'); });
+    socket.write(`${head.join('\r\n')}\r\nConnection: close\r\n\r\n${tail}`);
+    await once(socket, 'close');
+    const [headers = '', ...rest] = text.split('\r\n\r\n');
+    const body = rest.join('\r\n\r\n');
+    return { status: Number(/^HTTP\/1\.1 (\d+)/.exec(headers)?.[1]), headers, body: /transfer-encoding: chunked/i.test(headers) ? body.replace(/^[0-9a-f]+\r\n/i, '').replace(/\r\n0\r\n\r\n$/, '') : body };
+  }
+
+  it('answers a GET with Content-Length: 0 and a JSON Content-Type, as Supervisor ingress forwards it', async () => {
+    const { base, store } = await fixture();
+    const response = await rawRequest(base, ['GET /native/api/draft HTTP/1.1', 'Host: 127.0.0.1', 'Content-Type: application/json', 'Content-Length: 0']);
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body).document).toEqual(store.native.getDraft().document);
+  });
+
+  it('answers a GET sent with chunked encoding and an empty body', async () => {
+    const { base, store } = await fixture();
+    const response = await rawRequest(base, ['GET /native/api/draft HTTP/1.1', 'Host: 127.0.0.1', 'Content-Type: application/json', 'Transfer-Encoding: chunked'], '0\r\n\r\n');
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body).document).toEqual(store.native.getDraft().document);
+  });
+
+  it('still rejects an empty JSON body on a write with that route\'s own error', async () => {
+    const { base, store, request } = await fixture();
+    const revision = store.native.getDraft().revision;
+    const put = await rawRequest(base, ['PUT /native/api/draft HTTP/1.1', 'Host: 127.0.0.1', 'Content-Type: application/json', 'Content-Length: 0']);
+    expect(put.status).toBe(400);
+    expect(JSON.parse(put.body).error).toBe('Invalid request');
+    const publish = await request('/native/api/ha/publish', 'POST', undefined, { 'Content-Type': 'application/json' });
+    expect(publish.status).toBe(400);
+    expect((await publish.json()).error).toBe('Invalid request');
+    for (const endpoint of ['/api/auth', '/native/api/auth']) {
+      const login = await request(endpoint, 'POST', undefined, { 'Content-Type': 'application/json' });
+      expect([endpoint, login.status]).toEqual([endpoint, 401]);
+      expect((await login.json()).error).toBe('Invalid authoring token');
+    }
+    expect(store.native.getDraft().revision).toBe(revision);
+  });
+
+  it('keeps the client from sending a Content-Type on a request without a body', async () => {
+    const calls: RequestInit[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => { calls.push(init); return new Response('{"ok":true}', { status: 200 }); }));
+    try {
+      await clientRequest('native/api/draft');
+      await clientRequest('native/api/draft', { method: 'PUT', body: '{}' });
+      await clientRequest('native/api/draft', { method: 'PUT', body: '{}', headers: { 'Content-Type': 'text/plain' } });
+    } finally { vi.unstubAllGlobals(); }
+    expect(calls.map((call) => new Headers(call.headers).get('content-type'))).toEqual([null, 'application/json', 'text/plain']);
   });
 });

@@ -93,8 +93,13 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     }
     next();
   });
-  app.use('/native/api', express.raw({ type: 'application/json', limit: MAX_COMPOSITION_ENVELOPE_BYTES }));
-  app.use(express.json({ limit: '1mb', strict: true }));
+  // A proxy such as Home Assistant ingress forwards a GET with `Content-Length: 0` and keeps the client's Content-Type, so a
+  // zero-length body is common and means "no body". Both parsers note it here and the middleware below leaves `req.body` undefined.
+  const emptyBodies = new WeakSet<object>();
+  const noteEmpty = (req: object, _res: unknown, buf: Buffer) => { if (buf.length === 0) emptyBodies.add(req); };
+  app.use('/native/api', express.raw({ type: 'application/json', limit: MAX_COMPOSITION_ENVELOPE_BYTES, verify: noteEmpty }));
+  app.use(express.json({ limit: '1mb', strict: true, verify: noteEmpty }));
+  app.use((req, _res, next) => { if (emptyBodies.has(req)) req.body = undefined; next(); });
   app.post(['/api/auth', '/native/api/auth'], (req, res) => {
     if (Buffer.isBuffer(req.body)) req.body = parseCompositionJSON(req.body);
     if (!config.authToken || typeof req.body?.token !== 'string' || !equalSecret(req.body.token, config.authToken)) { res.status(401).json({ error: 'Invalid authoring token' }); return; }
