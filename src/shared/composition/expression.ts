@@ -18,7 +18,8 @@ export const MAX_EXPRESSION_DEPTH = 8;
 export const MAX_EXPRESSION_NODES = 64;
 export const MAX_CALL_NODES = 128;
 export const callTargetKeys = ['entity_id', 'device_id', 'area_id', 'floor_id', 'label_id'] as const;
-export const mathOperations = ['add', 'subtract', 'multiply', 'divide', 'min', 'max', 'round', 'clamp', 'scale'] as const;
+/** The math operations; `truncate` (toward zero, 1 or 2 arguments) is `sh.math-truncate@1`. */
+export const mathOperations = ['add', 'subtract', 'multiply', 'divide', 'min', 'max', 'round', 'clamp', 'scale', 'truncate'] as const;
 export const compareOperations = ['eq', 'ne', 'above', 'below', 'before', 'after'] as const;
 export const parameterName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,31}$/);
 export const MAX_CONDITION_NODES = 32;
@@ -32,7 +33,18 @@ export const dateStyles = ['short-date', 'long-date', 'weekday-date', 'time', 'd
 /** The two date styles that need `sh.flow-extras@1`: the hour (`7 PM`) and the short weekday (`Mon`). */
 export const flowExtrasDateStyles: readonly DateStyle[] = ['hour', 'weekday'];
 /** The ways a `date` operand measures two moments: whole days between them, or how far the clock is from the first to the second (`sh.flow-extras@1`). */
-export const dateOperations = ['days-between', 'progress'] as const;
+export const dateOperations = ['days-between', 'progress', 'seconds-between'] as const;
+/** What a `clock` operand reads: today's date, the wall time now (to the minute's tick), or the wall time now to the second (`sh.countdown@1`, a 1 Hz tick). */
+export const clockParts = ['today', 'now', 'now-second'] as const;
+/**
+ * The styles of a duration `format` spec (`sh.duration-format@1`). The argument is a number of seconds (`unit` `minutes` on `compact` says minutes):
+ * `compact` `30m`, `1h 30m`; `clock` `05:00`, `01:00:00`; `minutes-seconds` `4:30`; `span` `1 hour`, `3 days`, `3 weeks`, `2 months`.
+ */
+export const durationStyles = ['compact', 'clock', 'minutes-seconds', 'span'] as const;
+/** The unit of a `compact` duration's number. */
+export const durationUnits = ['seconds', 'minutes'] as const;
+export type DurationStyle = typeof durationStyles[number];
+export type DurationUnit = typeof durationUnits[number];
 export type DateStyle = typeof dateStyles[number];
 /**
  * The cases a text format asks for: `title` capitalizes after each underscore (`sh.pipeline-operands@1`), `words` after each underscore and each space
@@ -44,10 +56,11 @@ export type TextCase = typeof textCases[number];
  * How one argument of a `format` operand is drawn: a number with at most six fraction digits (and, from `sh.pipeline-operands@1`, at least
  * `minimumFractionDigits` of them, so `72.0` keeps its zero), a date in one of the closed styles, or text with a capital on each word (`title`: `sh.pipeline-operands@1`; `words`: `sh.text-case-words@1`).
  */
-export type FormatSpec = { number: { maximumFractionDigits: number; minimumFractionDigits?: number } } | { date: { style: DateStyle } } | { text: { case: TextCase } };
+export type FormatSpec = { number: { maximumFractionDigits: number; minimumFractionDigits?: number } } | { date: { style: DateStyle } } | { text: { case: TextCase } }
+  | { duration: { style: DurationStyle; unit?: DurationUnit } };
 /** The number of arguments each math operation takes. */
 export const mathArity: Record<typeof mathOperations[number], [number, number]> = {
-  add: [2, 8], multiply: [2, 8], min: [2, 8], max: [2, 8], subtract: [2, 2], divide: [2, 2], round: [1, 2], clamp: [3, 3], scale: [5, 5],
+  add: [2, 8], multiply: [2, 8], min: [2, 8], max: [2, 8], subtract: [2, 2], divide: [2, 2], round: [1, 2], clamp: [3, 3], scale: [5, 5], truncate: [1, 2],
 };
 
 // MARK: Types
@@ -61,6 +74,8 @@ export type Operand =
   // Reads of an entity that the plain `read` cannot give. Never inside a flow.
   /** The state text of an `ha-entity` source exactly as Home Assistant reports it, `unknown` and `unavailable` included (`sh.raw-state@1`). */
   | { type: 'raw-state'; sourceId: string }
+  /** When the state of an `ha-entity` source last changed, as `YYYY-MM-DDTHH:MM:SS.sssZ` (`sh.entity-time@1`): text, or unavailable while the entity is. */
+  | { type: 'last-changed'; sourceId: string }
   /** How many items the list attribute of an `ha-entity` source holds (`sh.list-read@1`): a number. */
   | { type: 'list-count'; from: { type: 'source'; sourceId: string; path: string[] } }
   /** Whether the list attribute of an `ha-entity` source holds an item equal to `value` (`sh.list-read@1`): yes or no. */
@@ -72,7 +87,7 @@ export type Operand =
   // Flow variants, gated by `sh.pipeline-operands@1`; `item` and `param` stand only inside a flow (the compiler's rule).
   | { type: 'item'; path: string[] }
   | { type: 'param'; name: string }
-  | { type: 'clock'; part: 'today' | 'now' }
+  | { type: 'clock'; part: typeof clockParts[number] }
   | { type: 'date'; op: typeof dateOperations[number]; from: Operand; to: Operand }
   /** The 0-based position of the item a step or a repeat is looking at (`sh.repeat@1`). */
   | { type: 'index' }
@@ -111,9 +126,11 @@ export const operandBase: z.ZodType<Operand> = z.lazy(() => z.discriminatedUnion
       object({ number: object({ maximumFractionDigits: z.number().int().min(0).max(6), minimumFractionDigits: z.number().int().min(0).max(6).optional() }) }),
       object({ date: object({ style: z.enum(dateStyles) }) }),
       object({ text: object({ case: z.enum(textCases) }) }),
+      object({ duration: object({ style: z.enum(durationStyles), unit: z.enum(durationUnits).optional() }) }),
     ])).optional(),
   }),
   object({ type: z.literal('raw-state'), sourceId: id }),
+  object({ type: z.literal('last-changed'), sourceId: id }),
   object({ type: z.literal('list-count'), from: object({ type: z.literal('source'), sourceId: id, path: sourcePath }) }),
   object({ type: z.literal('list-includes'), from: object({ type: z.literal('source'), sourceId: id, path: sourcePath }), value: operandBase }),
   object({
@@ -126,7 +143,7 @@ export const operandBase: z.ZodType<Operand> = z.lazy(() => z.discriminatedUnion
   object({ type: z.literal('list'), items: z.array(operandBase).max(64) }),
   object({ type: z.literal('item'), path: z.array(z.string().max(64)).min(0).max(8) }),
   object({ type: z.literal('param'), name: parameterName }),
-  object({ type: z.literal('clock'), part: z.enum(['today', 'now']) }),
+  object({ type: z.literal('clock'), part: z.enum(clockParts) }),
   object({ type: z.literal('date'), op: z.enum(dateOperations), from: operandBase, to: operandBase }),
   object({ type: z.literal('index') }),
   object({
@@ -187,7 +204,7 @@ export interface ExpressionFacts {
   issues: CompositionIssue[];
   /** Sources named by a read or a predicate, for the compiler's reference checks. */
   references: { sourceId: string; path: string[]; pointer: string; kind: 'string' | 'number' | 'boolean' | 'entity-id' | undefined;
-    /** Set for `raw-state` and the list reads, which stand only on an `ha-entity` source; `list` also needs an attribute path. */ entityOnly?: 'raw' | 'list' }[];
+    /** Set for `raw-state`, `last-changed` and the list reads, which stand only on an `ha-entity` source; `list` also needs an attribute path. */ entityOnly?: 'raw' | 'changed' | 'list' }[];
   optimisticReferences: { sourceId: string; pointer: string }[];
   usedOperands: boolean;
   usesControl: boolean;
@@ -250,7 +267,13 @@ class Checker implements ExpressionFacts {
           if (!Object.hasOwn(value.args, key)) { this.add('invalid_reference', at('formats', key)); continue; }
           // A date style draws a date or a date and time: text. A kind that is known and is not text cannot be one. Title case draws text too.
           const spec = value.formats![key];
-          if ('date' in spec || 'text' in spec) {
+          if ('duration' in spec) {
+            // A duration draws a number of seconds (or minutes, for a compact one): text. `unit` only means something to `compact`.
+            this.needs.add('duration-format');
+            if (spec.duration.unit !== undefined && spec.duration.style !== 'compact') this.add('invalid_combination', at('formats', key, 'duration', 'unit'));
+            const kind = operandKind(value.args[key]);
+            if (kind !== undefined && kind !== 'number') this.add('binding_type', at('formats', key));
+          } else if ('date' in spec || 'text' in spec) {
             // `title` is the pipeline's; `words` stands alone under its own id.
             this.needs.add('text' in spec && spec.text.case === 'words' ? 'text-case-words' : 'pipeline-operands');
             if ('date' in spec && flowExtrasDateStyles.includes(spec.date.style)) this.needs.add('flow-extras');
@@ -268,6 +291,11 @@ class Checker implements ExpressionFacts {
         this.needs.add('raw-state');
         if (this.flow) this.add('invalid_combination', pointer);
         this.references.push({ sourceId: value.sourceId, path: ['state'], pointer, kind: undefined, entityOnly: 'raw' });
+        break;
+      case 'last-changed':
+        this.needs.add('entity-time');
+        if (this.flow) this.add('invalid_combination', pointer);
+        this.references.push({ sourceId: value.sourceId, path: ['state'], pointer, kind: undefined, entityOnly: 'changed' });
         break;
       case 'list-count': case 'list-includes':
         this.needs.add('list-read');
@@ -288,6 +316,7 @@ class Checker implements ExpressionFacts {
         break;
       case 'math': {
         const [low, high] = mathArity[value.op];
+        if (value.op === 'truncate') this.needs.add('math-truncate');
         if (value.args.length < low || value.args.length > high) this.add('invalid_combination', at('args'));
         value.args.forEach((arg, index) => this.operand(arg, at('args', index), depth + 1));
         break;
@@ -323,10 +352,15 @@ class Checker implements ExpressionFacts {
         this.needs.add('pipeline-operands');
         if (!this.flow) this.add('invalid_combination', pointer);
         break;
-      case 'clock': this.needs.add('pipeline-operands'); break;
+      case 'clock':
+        this.needs.add('pipeline-operands');
+        // The second clock is the page's own 1 Hz tick; a flow runs once on the minute clock it is given.
+        if (value.part === 'now-second') { this.needs.add('countdown'); if (this.flow) this.add('invalid_combination', pointer); }
+        break;
       case 'date':
         this.needs.add('pipeline-operands');
         if (value.op === 'progress') this.needs.add('flow-extras');
+        if (value.op === 'seconds-between') this.needs.add('countdown');
         this.operand(value.from, at('from'), depth + 1);
         this.operand(value.to, at('to'), depth + 1);
         break;
@@ -434,7 +468,7 @@ export function operandKind(value: Operand): 'string' | 'number' | 'boolean' | '
     case 'literal': return typeof value.value === 'string' ? 'string' : typeof value.value === 'number' ? 'number' : typeof value.value === 'boolean' ? 'boolean' : value.value === null ? undefined : 'structure';
     case 'read': return value.as === 'entity-id' ? 'string' : value.as;
     case 'viewer': return value.field === 'isAdmin' ? 'boolean' : 'string';
-    case 'format': case 'clock': case 'raw-state': return 'string';
+    case 'format': case 'clock': case 'raw-state': case 'last-changed': return 'string';
     case 'math': case 'date': case 'list-count': case 'index': return 'number';
     case 'list-includes': return 'boolean';
     case 'object': case 'list': return 'structure';

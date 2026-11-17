@@ -70,6 +70,15 @@ export function daysBetween(from: string, to: string, utcOffsetMinutes: number):
 }
 
 /**
+ * Whole seconds from the moment `from` to the moment `to` (`sh.countdown@1`, the `seconds-between` operation of a `date` operand): positive when `to` is later,
+ * both moved to the clock's wall like every date. `undefined` when either is not a date or a date and time. A date is midnight; a fraction of a second is dropped.
+ */
+export function secondsBetween(from: string, to: string, utcOffsetMinutes: number): number | undefined {
+  const a = wallTime(from, utcOffsetMinutes), b = wallTime(to, utcOffsetMinutes);
+  return a && b ? instant(b) - instant(a) : undefined;
+}
+
+/**
  * How far the clock has come from the moment `from` to the moment `to` (`sh.flow-extras@1`, the `progress` operation of a `date` operand): `0` at `from`,
  * `1` at `to`, clamped to that range, from the instants on the clock's wall time in whole seconds. `undefined` when either moment is not a date or a date
  * and time, when the clock does not parse, or when `to` is not after `from` (there is no span to measure).

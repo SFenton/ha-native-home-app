@@ -1,6 +1,7 @@
 import type { CompositionDocument, CallService } from '../shared/composition/schema';
 import { initialLocalValue, type LocalValue } from '../shared/composition/shell';
 import type { NativeCurrentUser, NativeState } from '../shared/native-state';
+import type { Clock } from '../shared/composition/pipeline/dates';
 import type { Json } from '../shared/types';
 import { projectDevice } from './device-state';
 import { projectPanelSource } from './projections-panels';
@@ -60,6 +61,8 @@ const attributeAliases: Record<string, keyof NativeState> = {
 /** A Home Assistant attribute from a flat `NativeState`, by its snake-case name. */
 export function attributeOf(entity: NativeState, name: string): Json | undefined {
   const field = attributeAliases[name] ?? snake(name);
+  // The time of last change is the `last-changed` operand's, never an attribute: the phone reads Home Assistant's attributes, which have none.
+  if (field === 'lastChanged') return undefined;
   const found = (entity as Record<string, unknown>)[field];
   return found === undefined ? undefined : found as Json;
 }
@@ -223,12 +226,13 @@ export function projectSource(source: Source, house: House, overlay: Overlay, en
  * the state text, `['attributes', name]` an attribute; a model read gives the field it names (`stateText`, `isOn`, `phase`,
  * `isActive` and so on). A source of a model phase 1 does not resolve reads as unavailable, or loading before the first read.
  */
-export function createEnvironment(document: Pick<CompositionDocument, 'dataSources'>, house: House, overlay: Overlay = emptyOverlay, control?: Json): Environment {
+export function createEnvironment(document: Pick<CompositionDocument, 'dataSources'>, house: House, overlay: Overlay = emptyOverlay, control?: Json, clock?: Clock): Environment {
   const sources = sourcesById(document.dataSources);
   const resolving = new Set<string>();
   const env: Environment = {
     viewer: house.viewer,
     controlValue: control,
+    clock,
     viewerPersonState: () => {
       const id = house.viewer?.personEntityId;
       if (!house.viewer) return loading;
@@ -237,6 +241,14 @@ export function createEnvironment(document: Pick<CompositionDocument, 'dataSourc
     },
     // The state as Home Assistant reports it, `unknown` and `unavailable` included; only a source with no entity at all is unavailable.
     readRaw(sourceId) { return sources.get(sourceId)?.kind === 'ha-entity' ? env.read(sourceId, ['state']) : unavailable; },
+    // When the state last changed (`last-changed`, `sh.entity-time@1`): the entity's own time, which only a live or sampled house carries.
+    readChanged(sourceId) {
+      if (sources.get(sourceId)?.kind !== 'ha-entity') return unavailable;
+      if (!house.states) return loading;
+      const id = env.read(sourceId, ['entityId']);
+      const found = id.status === 'value' && typeof id.value === 'string' ? shownEntity(house, overlay, id.value) : undefined;
+      return found?.lastChanged ? value(found.lastChanged) : unavailable;
+    },
     read(sourceId, path) {
       const source = sources.get(sourceId);
       if (!source) return unavailable;

@@ -43,10 +43,10 @@ export function ensureAppState(document: CompositionDocument, topic: AppStateTop
   return { document: { ...document, dataSources: [...document.dataSources, { id, kind: 'model', model: 'app-state@1', inputs: { topic } }] }, sourceId: id };
 }
 
-/** The attributes Home Assistant reports for an entity, by their snake-case names, for the "Read" pop-up. */
+/** The attributes Home Assistant reports for an entity, by their snake-case names, for the "Read" pop-up. The time of last change is no attribute: it is the `last-changed` operand ("Last Changed"). */
 export function knownAttributes(state: Record<string, unknown> | undefined): { name: string; value: string }[] {
   if (!state) return [];
-  const skip = new Set(['entityId', 'state', 'name', 'unit', 'icon', 'deviceClass']);
+  const skip = new Set(['entityId', 'state', 'name', 'unit', 'icon', 'deviceClass', 'lastChanged']);
   const snake = (key: string) => key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   return Object.entries(state).filter(([key, value]) => !skip.has(key) && value !== undefined && value !== null && typeof value !== 'function')
     .map(([key, value]) => ({ name: snake(key), value: Array.isArray(value) ? value.join(', ') : String(value) }));

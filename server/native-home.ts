@@ -34,6 +34,7 @@ const forecastSchema = z.object({
 const stateSchema = z.object({
   entityId: entityIdSchema,
   state: z.string().max(255),
+  lastChanged: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/).optional(),
   name: z.string().max(240),
   unit: z.string().max(80).optional(),
   icon: z.string().max(80).optional(),
@@ -357,6 +358,8 @@ export function projectNativeState(raw: unknown): NativeEntityState {
     entityId: raw.entity_id, state: raw.state,
     name: attributes.friendly_name ?? raw.entity_id,
   };
+  const lastChanged = lastChangedText(raw.last_changed);
+  if (lastChanged) projected.lastChanged = lastChanged;
   const fields = {
     unit_of_measurement: 'unit', icon: 'icon', device_class: 'deviceClass',
     brightness: 'brightness', temperature: 'temperature', current_temperature: 'currentTemperature',
@@ -442,6 +445,15 @@ export function nativeHomeSnapshot(houseConfig: NativeHouseConfig, rawStates: un
   }
   const snapshot: NativeHomeSnapshot = { mode: 'live', houseConfig, states };
   return validateSnapshot(snapshot, credentials);
+}
+
+/**
+ * When a state last changed, as `YYYY-MM-DDTHH:MM:SS.sssZ` (`sh.entity-time@1`). Home Assistant's REST states give an ISO text with microseconds and an offset;
+ * its entity stream gives epoch seconds. Anything else, or a moment that is not a date, is no time at all (the operand then reads unavailable).
+ */
+export function lastChangedText(value: unknown): string | undefined {
+  const date = typeof value === 'string' ? new Date(value) : typeof value === 'number' ? new Date(value * 1000) : undefined;
+  return date && Number.isFinite(date.getTime()) && date.getUTCFullYear() >= 1 && date.getUTCFullYear() <= 9999 ? date.toISOString() : undefined;
 }
 
 function projectFields(target: Record<string, unknown>, source: Record<string, unknown>, fields: Record<string, string>) {

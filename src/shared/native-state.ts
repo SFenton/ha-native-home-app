@@ -34,6 +34,8 @@ export type NativeTodoRead =
 export type NativeState = {
   entityId: string;
   state: string;
+  /** When the state last changed, `YYYY-MM-DDTHH:MM:SS.sssZ` (`last-changed`, `sh.entity-time@1`); absent when Home Assistant did not say. */
+  lastChanged?: string;
   name: string;
   unit?: string;
   icon?: string;

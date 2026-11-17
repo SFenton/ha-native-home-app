@@ -32,10 +32,12 @@ export interface TypeFacts {
   usesRules: boolean;
   /** Whether a step, a date style or a `date` operation of `sh.flow-extras@1` appears: the flow then needs it. */
   flowExtras: boolean;
+  /** The ids of the edge-logic operands a flow uses (`sh.countdown@1`, `sh.duration-format@1`, `sh.math-truncate@1`), by short name. */
+  edge: Set<string>;
   /** Whether an `index` operand appears: the flow then needs `sh.repeat@1`. */
   usesRepeat: boolean;
 }
-export const newFacts = (): TypeFacts => ({ issues: [], reads: [], paramRefs: [], newOperands: false, wordsCase: false, usesRules: false, flowExtras: false, usesRepeat: false });
+export const newFacts = (): TypeFacts => ({ issues: [], reads: [], paramRefs: [], newOperands: false, wordsCase: false, usesRules: false, flowExtras: false, usesRepeat: false, edge: new Set() });
 
 /** Where an operand stands: what it may read and what `item` means there. */
 export interface TypeScope {
@@ -114,6 +116,8 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
     }
     case 'clock':
       facts.newOperands = true;
+      // A flow runs once on the minute clock it is given: there is no second clock for it (`sh.countdown@1`).
+      if (operand.part === 'now-second') report(facts, 'invalid_combination', at);
       return text(operand.part === 'today' ? 'date' : 'date-time');
     case 'index':
       // The position of the item a step looks at (`sh.repeat@1`); a parameter or the request has no item.
@@ -126,6 +130,7 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
       expectKinds(facts, from, ['string'], join(at, 'from')); expectKinds(facts, to, ['string'], join(at, 'to'));
       // `progress` (`sh.flow-extras@1`): a fraction of the span, null when either moment or the clock is not a date.
       if (operand.op === 'progress') { facts.flowExtras = true; return orNull(NUMBER); }
+      if (operand.op === 'seconds-between') facts.edge.add('countdown');
       const dated = (shape: Shape) => !nullable(shape) && memberFormat(shape);
       return dated(from) && dated(to) ? INTEGER : orNull(INTEGER);
     }
@@ -152,7 +157,11 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
         const spec = operand.formats![name], where = join(join(at, 'formats'), name);
         if (!Object.hasOwn(operand.args, name)) report(facts, 'invalid_reference', where);
         else if ('text' in spec) { if (spec.text.case === 'title') facts.newOperands = true; else facts.wordsCase = true; expectKinds(facts, args.get(name)!, ['string'], where); }
-        else if ('date' in spec) {
+        else if ('duration' in spec) {
+          facts.edge.add('duration-format');
+          if (spec.duration.unit !== undefined && spec.duration.style !== 'compact') report(facts, 'invalid_combination', join(join(where, 'duration'), 'unit'));
+          expectKinds(facts, args.get(name)!, ['number'], where);
+        } else if ('date' in spec) {
           // A date style draws a date or a date and time, which is text; `hour` and `weekday` are `sh.flow-extras@1`'s.
           facts.newOperands = true;
           if (flowExtrasDateStyles.includes(spec.date.style)) facts.flowExtras = true;
@@ -176,8 +185,9 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
     }
     case 'math': {
       const [low, high] = mathArity[operand.op];
+      if (operand.op === 'truncate') facts.edge.add('math-truncate');
       if (operand.args.length < low || operand.args.length > high) report(facts, 'invalid_combination', join(at, 'args'));
-      let anyNull = ['divide', 'scale', 'clamp', 'round'].includes(operand.op);
+      let anyNull = ['divide', 'scale', 'clamp', 'round', 'truncate'].includes(operand.op);
       operand.args.forEach((arg, index) => {
         const shape = sub(arg, 'args', index);
         expectKinds(facts, shape, ['number'], join(join(at, 'args'), index));
@@ -195,7 +205,7 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
       }
       return objectOf(fields);
     }
-    case 'control': case 'raw-state': case 'list-count': case 'list-includes': report(facts, 'invalid_combination', at); return ANY;
+    case 'control': case 'raw-state': case 'last-changed': case 'list-count': case 'list-includes': report(facts, 'invalid_combination', at); return ANY;
     case 'choose': {
       facts.usesRules = true;
       if (!operand.cases.length || operand.cases.length > MAX_RULE_CASES) report(facts, 'limit_exceeded', join(at, 'cases'));

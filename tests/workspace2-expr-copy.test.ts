@@ -9,7 +9,7 @@ const pick = (...keys: (keyof typeof words)[]) => keys.map(key => String(words[k
 describe('the copy of the condition and value fields', () => {
   it('condition', async () => {
     const text = [
-      lines('Simple', pick('simple', 'logic', 'when', 'read', 'readAttribute', 'other', 'otherAttribute', 'ifUnknown', 'rawState', 'rawStateNote', 'itemCount', 'includes', 'item')),
+      lines('Simple', pick('simple', 'logic', 'when', 'read', 'readAttribute', 'other', 'otherAttribute', 'ifUnknown', 'rawState', 'rawStateNote', 'lastChanged', 'lastChangedNote', 'itemCount', 'includes', 'item')),
       lines('Comparisons', Object.values(comparisonWords)),
       lines('Policy', [...policyChoices.show, ...policyChoices.enable].map(item => item.label)),
       lines('Groups', [...Object.values(groupSentence), ...pick('all', 'any', 'none', 'addCondition', 'addGroup', 'moveIntoGroup', 'turnIntoSingle', 'removeCondition', 'removeGroup', 'compareWithValue')]),
@@ -26,6 +26,7 @@ describe('the copy of the condition and value fields', () => {
       lines('Modes', pick('fixed', 'fromEntity', 'rules', 'sameValue', 'customValue')),
       lines('From Entity', pick('from', 'read', 'homeAssistantSays', 'readAs', 'inTheApp', 'notAColor', 'noColor', 'noIcon', 'noColorNote', 'noIconNote', 'ifUnavailable', 'ifUnavailableNote')),
       lines('Dates', [words.dateShow, words.dateStyle, ...Object.values(words.dateStyles), words.dateNote]),
+      lines('Edge values', [...pick('pickRead', 'lastChangedValue', 'secondsUntil', 'secondsSince', 'nowSecond', 'nowSecondNote')]),
       lines('Places', pick('opensOn', 'firstTab', 'ifTabHidden', 'firstTabShown', 'oneAction', 'byRule', 'sortBy', 'ascending', 'descending', 'addSortField', 'removeSortField', 'fourSortFields', 'badgeZero')),
     ].join('\n');
     await expect(text).toMatchFileSnapshot(`${dir}/expr-value.txt`);
@@ -35,7 +36,7 @@ describe('the copy of the condition and value fields', () => {
     await expect(text).toMatchFileSnapshot(`${dir}/expr-rules.txt`);
   });
   it('tokens', async () => {
-    const text = lines('Tokens', [...pick('insertValue', 'value', 'wording01', 'removeValue', 'tryValues', 'resetToLive', 'unavailable', 'loading', 'testValues', 'tryNote', 'keepZeros', 'keepZerosNote', 'capitalize'), ...Object.values(words.textCaseChoices), ...Object.values(words.textCaseNotes)]);
+    const text = lines('Tokens', [...pick('insertValue', 'value', 'wording01', 'removeValue', 'tryValues', 'resetToLive', 'unavailable', 'loading', 'testValues', 'tryNote', 'keepZeros', 'keepZerosNote', 'capitalize', 'durationShow', 'durationNumber', 'durationUnit', 'durationNote', 'durationNoteMinutes', 'truncate', 'truncateNote'), ...Object.values(words.textCaseChoices), ...Object.values(words.textCaseNotes), ...Object.values(words.durationStyles), ...Object.values(words.durationUnits)]);
     await expect(text).toMatchFileSnapshot(`${dir}/expr-tokens.txt`);
   });
   it('problems', async () => {

@@ -38,7 +38,7 @@ export const readOf = (operand: Operand | undefined) => operand?.type === 'read'
 export function sourceOfOperand(operand: Operand | undefined): string | undefined {
   if (!operand) return undefined;
   if (operand.type === 'read') return operand.from.sourceId;
-  if (operand.type === 'raw-state') return operand.sourceId;
+  if (operand.type === 'raw-state' || operand.type === 'last-changed') return operand.sourceId;
   return operand.type === 'list-count' || operand.type === 'list-includes' ? operand.from.sourceId : undefined;
 }
 
@@ -47,11 +47,12 @@ export function sourceOfOperand(operand: Operand | undefined): string | undefine
  * What the Read pop-up of an entity holds, one choice per way to read it: its state, its raw state (Unknown and Unavailable told apart), an attribute,
  * the count of items in a list attribute, or whether a list attribute includes an item.
  */
-export type ReadChoice = 'state' | 'raw' | `a:${string}` | `c:${string}` | `i:${string}`;
+export type ReadChoice = 'state' | 'raw' | 'changed' | `a:${string}` | `c:${string}` | `i:${string}`;
 /** The choice an operand is, or undefined when it is not a read of an entity (or reads a path the pop-up has no word for). */
 export function readChoiceOf(operand: Operand | undefined): ReadChoice | undefined {
   if (!operand) return undefined;
   if (operand.type === 'raw-state') return 'raw';
+  if (operand.type === 'last-changed') return 'changed';
   if (operand.type === 'list-count' || operand.type === 'list-includes') {
     const { path } = operand.from;
     return path[0] === 'attributes' && path.length === 2 ? `${operand.type === 'list-count' ? 'c' : 'i'}:${path[1]}` : undefined;
@@ -64,6 +65,7 @@ export function readChoiceOf(operand: Operand | undefined): ReadChoice | undefin
 export function operandForChoice(sourceId: string, choice: ReadChoice, as: 'string' | 'number' | 'boolean' = 'string', needle = ''): Operand {
   const from = (path: string[]) => ({ type: 'source' as const, sourceId, path });
   if (choice === 'raw') return { type: 'raw-state', sourceId };
+  if (choice === 'changed') return { type: 'last-changed', sourceId };
   if (choice === 'state') return { type: 'read', from: from(['state']), as, missing: 'unavailable' };
   const name = choice.slice(2);
   if (choice.startsWith('c:')) return { type: 'list-count', from: from(['attributes', name]) };
@@ -75,9 +77,10 @@ export function operandForChoice(sourceId: string, choice: ReadChoice, as: 'stri
  * first one it does, with a starting value: Yes for an item in a list, 0 for a count, "unknown" for a raw state.
  */
 export function withLeft(leaf: Leaf, left: Operand): Leaf {
-  const kind = kindOf(left), allowed = comparisonsFor(kind);
+  const kind = kindOf(left), allowed = comparisonsFor(kind, left);
   if (left.type === 'raw-state') return { left, comparison: 'is', right: [lit('unknown')] };
   if (left.type === 'list-includes') return { left, comparison: 'is', right: [lit(true)] };
+  if (left.type === 'last-changed') return { left, comparison: 'is before', right: [] };
   if (left.type === 'list-count') return { left, comparison: 'is above', right: [lit(0)] };
   const comparison = allowed.includes(leaf.comparison) ? leaf.comparison : allowed[0];
   const numbers = comparison === 'is above' || comparison === 'is below';
@@ -108,13 +111,23 @@ export function operandName(operand: Operand, ctx: NameContext): string {
       const entity = entityOfSource(ctx, operand.sourceId);
       return `${entity ? ctx.entityName?.(entity) ?? entity : titleCase(operand.sourceId)} · raw state`;
     }
+    case 'last-changed': {
+      const entity = entityOfSource(ctx, operand.sourceId);
+      return `${entity ? ctx.entityName?.(entity) ?? entity : titleCase(operand.sourceId)} · last changed`;
+    }
     case 'list-count': case 'list-includes': {
       const { sourceId, path } = operand.from, entity = entityOfSource(ctx, sourceId), name = entity ? ctx.entityName?.(entity) ?? entity : titleCase(sourceId);
       const needle = operand.type === 'list-includes' ? operand.value.type === 'literal' ? ` ${String(operand.value.value)}` : ' a value' : '';
       return `${name} · ${path.at(-1) ?? ''} ${operand.type === 'list-count' ? 'count' : 'includes'}${needle}`;
     }
+    case 'date': {
+      // The seconds to a time (`sh.countdown@1`): until a moment from now, or since an entity's state changed.
+      if (operand.op === 'seconds-between' && operand.from.type === 'clock' && operand.from.part === 'now-second') return `Seconds until ${operandName(operand.to, ctx)}`;
+      if (operand.op === 'seconds-between' && operand.from.type === 'last-changed') return `Seconds since ${operandName(operand.from, ctx).replace(/ · last changed$/, '')} changed`;
+      return 'a value';
+    }
     case 'viewer': return 'The person using the app';
-    case 'clock': return operand.part === 'today' ? 'Today' : 'Now';
+    case 'clock': return operand.part === 'today' ? 'Today' : operand.part === 'now-second' ? 'Now, to the second' : 'Now';
     case 'item': return operand.path.join('.') || 'This item';
     case 'index': return 'Position';
     case 'param': return operand.name;
@@ -125,13 +138,15 @@ export function operandName(operand: Operand, ctx: NameContext): string {
 /** The kind of value an operand gives, in the words the comparisons follow. */
 export type ValueKind = 'text' | 'number' | 'yesno' | 'date';
 export function kindOf(operand: Operand, ctx?: NameContext): ValueKind {
-  if (operand.type === 'clock') return 'date';
+  if (operand.type === 'clock' || operand.type === 'last-changed') return 'date';
   if (operand.type === 'read' && ctx && operand.from.path.at(-1) === 'today' && ctx.document.dataSources.find(item => item.id === operand.from.sourceId)?.model === 'app-state@1') return 'date';
   const kind = operandKind(operand);
   return kind === 'number' ? 'number' : kind === 'boolean' ? 'yesno' : 'text';
 }
 /** The comparisons a value of a kind offers (spec "The comparison's choices follow the value's kind"). */
-export function comparisonsFor(kind: ValueKind): Comparison[] {
+export function comparisonsFor(kind: ValueKind, left?: Operand): Comparison[] {
+  // The time of last change has a moment too precise to equal a date: only before and after mean something.
+  if (left?.type === 'last-changed') return ['is before', 'is after'];
   switch (kind) {
     case 'number': return ['is', 'is not', 'is above', 'is below', 'has a value'];
     case 'yesno': return ['is'];
@@ -278,7 +293,8 @@ export function fitsSimple(predicate: Predicate | undefined, ctx: NameContext): 
   if (!leaf) return { fits: false, reason: predicate.type === 'viewer' || predicate.type === 'viewer-person' ? "Simple holds one entity and one comparison. This compares The person using the app, which Simple can't show." : words.simpleCustom };
   const isEntity = (id: string) => entityOfSource(ctx, id) !== undefined;
   const fixed = leaf.right.every(item => item.type === 'literal');
-  const comparable = ['is', 'is not', 'is one of', 'is not one of', 'is above', 'is below'].includes(leaf.comparison);
+  // An entity's Last Changed is the one date Simple draws: before or after a moment.
+  const comparable = ['is', 'is not', 'is one of', 'is not one of', 'is above', 'is below'].includes(leaf.comparison) || (leaf.left.type === 'last-changed' && (leaf.comparison === 'is before' || leaf.comparison === 'is after'));
   const leftSource = sourceOfOperand(leaf.left);
   if (leftSource === undefined || !isEntity(leftSource))
     return { fits: false, reason: `Simple holds one entity and one comparison. This compares ${operandName(leaf.left, ctx)}, which Simple can't show.` };
@@ -353,7 +369,7 @@ export function inputsOf(predicate: Predicate | undefined): { sourceId: string; 
   const found = new Map<string, { sourceId: string; path: string[] }>();
   const operand = (item: Operand): void => {
     if (item.type === 'read') found.set(`${item.from.sourceId}|${item.from.path.join('/')}`, { sourceId: item.from.sourceId, path: item.from.path });
-    else if (item.type === 'raw-state') found.set(`${item.sourceId}|state`, { sourceId: item.sourceId, path: ['state'] });
+    else if (item.type === 'raw-state' || item.type === 'last-changed') found.set(`${item.sourceId}|state`, { sourceId: item.sourceId, path: ['state'] });
     else if (item.type === 'list-count') found.set(`${item.from.sourceId}|${item.from.path.join('/')}`, { sourceId: item.from.sourceId, path: item.from.path });
     else if (item.type === 'list-includes') { found.set(`${item.from.sourceId}|${item.from.path.join('/')}`, { sourceId: item.from.sourceId, path: item.from.path }); operand(item.value); }
     else if (item.type === 'format') Object.values(item.args).forEach(operand);

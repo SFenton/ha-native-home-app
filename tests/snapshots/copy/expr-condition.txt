@@ -9,6 +9,8 @@ Other Attribute…
 If it can't tell
 Raw State
 Says Unknown or Unavailable when Home Assistant does, instead of not being able to tell.
+Last Changed
+When the state last changed. It is compared with a moment, so it is before or after one, never equal to a date.
 Number of Items
 Includes…
 Item

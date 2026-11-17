@@ -5,6 +5,7 @@ import { planAction } from './actions';
 import { AlertOverlay } from './AlertOverlay';
 import type { AlertSpec } from './alert';
 import { DeviceFrame, STAGE_PADDING, useAutoFit } from './DeviceFrame';
+import { usePreviewClock, useReadsSecondClock } from './clock';
 import { createEnvironment, localValue, type House, type Overlay } from './projections';
 import { buildDocumentIndex, type SelectionKey } from './model';
 import { currentSurface, initialNav, navigateTo, reduceNavigation, sameSurface, type NavState } from './navigation';
@@ -143,7 +144,9 @@ export default function Preview2(props: Preview2Props) {
   const resolvedHouse = house ?? loadingHouse;
   // The sources the places of a template own are read like any other (`previewSources`).
   const dataSources = useMemo(() => previewSources(document), [document.dataSources, document.pages, document.modals, document.componentLibrary]); // eslint-disable-line react-hooks/exhaustive-deps
-  const env = useMemo(() => createEnvironment({ dataSources }, resolvedHouse, overlay), [dataSources, resolvedHouse, overlay]);
+  // The clock `clock` and `date` operands read; it ticks once a second only while the document reads `now-second` (`sh.countdown@1`).
+  const clock = usePreviewClock(useReadsSecondClock(document));
+  const env = useMemo(() => createEnvironment({ dataSources }, resolvedHouse, overlay, undefined, clock), [dataSources, resolvedHouse, overlay, clock]);
   const localState = document.localState;
   const stateStyles = document.stateStyles;
   const library = useMemo(() => libraryById(document), [document.componentLibrary]);

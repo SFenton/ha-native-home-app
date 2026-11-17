@@ -1,4 +1,4 @@
-import type { DateStyle, FormatSpec, Operand, Predicate, TextCase } from '../../shared/composition/expression';
+import type { DateStyle, DurationStyle, DurationUnit, FormatSpec, Operand, Predicate, TextCase } from '../../shared/composition/expression';
 
 /**
  * The token line's pure logic (spec "The token line"): between a text slot and the parts the line shows (typed text and value tokens).
@@ -10,9 +10,16 @@ export interface Token {
   operand: Operand; digits?: number;
   /** Set (to the same count as `digits`, or fewer) when the number keeps its trailing zeros: 72 reads 72.0 (`minimumFractionDigits`). */
   minDigits?: number;
+  /** Set when the number drops its extra decimals instead of rounding (`sh.math-truncate@1`): written as `truncate(value, digits)`. Needs `digits`. */ truncate?: boolean;
   /** Set when the value is drawn as a date. */ dateStyle?: DateStyle;
+  /** Set when the number is drawn as a duration (`sh.duration-format@1`); `unit` is for the compact style. */ duration?: { style: DurationStyle; unit?: DurationUnit };
   /** Set when the text is drawn with capitals: `title` after each underscore (`heat_cool` reads Heat Cool), `words` after each underscore and space (`wheel stuck` reads Wheel Stuck). */ textCase?: TextCase;
 }
+/**
+ * The token a picked value starts as. A time of last change, or the clock to the second, is a moment: it starts drawn as a time ("Since 9:30 PM"), not as the raw
+ * time stamp; the Date Style choice changes it.
+ */
+export const newToken = (operand: Operand): Token => operand.type === 'last-changed' || (operand.type === 'clock' && operand.part === 'now-second') ? { operand, dateStyle: 'time' } : { operand };
 /** A piece of the line: typed text, or a value. */
 export type Part = { text: string } | { token: Token };
 
@@ -47,15 +54,16 @@ export function writeLine(parts: readonly Part[]): Operand {
   const line = tidy(parts);
   const tokens = line.filter((part): part is { token: Token } => 'token' in part);
   if (!tokens.length) return { type: 'literal', value: line.map(part => 'text' in part ? part.text : '').join('') };
-  if (line.length === 1 && tokens[0].token.operand.type === 'read' && tokens[0].token.operand.as === 'string' && tokens[0].token.digits === undefined && tokens[0].token.dateStyle === undefined && !tokens[0].token.textCase) return tokens[0].token.operand;
+  if (line.length === 1 && tokens[0].token.operand.type === 'read' && tokens[0].token.operand.as === 'string' && tokens[0].token.digits === undefined && tokens[0].token.dateStyle === undefined && !tokens[0].token.textCase && !tokens[0].token.duration) return tokens[0].token.operand;
   const args: Record<string, Operand> = {}, formats: Record<string, FormatSpec> = {};
   let pattern = '', index = 0;
   for (const part of line) {
     if ('text' in part) { pattern += part.text; continue; }
     const name = argName(index++);
-    args[name] = part.token.operand; pattern += `{${name}}`;
+    args[name] = part.token.truncate && part.token.digits !== undefined && !part.token.duration ? { type: 'math', op: 'truncate', args: [part.token.operand, { type: 'literal', value: part.token.digits }] } : part.token.operand; pattern += `{${name}}`;
     if (part.token.dateStyle !== undefined) formats[name] = { date: { style: part.token.dateStyle } };
     else if (part.token.textCase) formats[name] = { text: { case: part.token.textCase } };
+    else if (part.token.duration) formats[name] = { duration: part.token.duration };
     else if (part.token.digits !== undefined) formats[name] = { number: { maximumFractionDigits: part.token.digits, ...(part.token.minDigits !== undefined ? { minimumFractionDigits: part.token.minDigits } : {}) } };
   }
   return { type: 'format', pattern, args, ...(Object.keys(formats).length ? { formats } : {}) };
@@ -74,9 +82,11 @@ export function parseLine(operand: Operand): Part[] | undefined {
     parts.push({ text: rest.slice(0, open) });
     const name = rest.slice(open + 1, close), arg = operand.args[name];
     if (!arg) return undefined;
-    const spec = operand.formats?.[name], digits = spec && 'number' in spec ? spec.number.maximumFractionDigits : undefined, dateStyle = spec && 'date' in spec ? spec.date.style : undefined;
+    // `truncate(value, n)` under a number format of the same n is a token that cuts off.
+    const spec = operand.formats?.[name], cut = arg.type === 'math' && arg.op === 'truncate' && arg.args.length === 2 && arg.args[1].type === 'literal' && spec && 'number' in spec && spec.number.maximumFractionDigits === arg.args[1].value;
+    const digits = spec && 'number' in spec ? spec.number.maximumFractionDigits : undefined, dateStyle = spec && 'date' in spec ? spec.date.style : undefined;
     const minDigits = spec && 'number' in spec ? spec.number.minimumFractionDigits : undefined;
-    parts.push({ token: { operand: arg, ...(digits !== undefined ? { digits } : {}), ...(minDigits !== undefined ? { minDigits } : {}), ...(dateStyle !== undefined ? { dateStyle } : {}), ...(spec && 'text' in spec ? { textCase: spec.text.case } : {}) } });
+    parts.push({ token: { operand: cut ? (arg as Extract<Operand, { type: 'math' }>).args[0] : arg, ...(cut ? { truncate: true } : {}), ...(digits !== undefined ? { digits } : {}), ...(minDigits !== undefined ? { minDigits } : {}), ...(dateStyle !== undefined ? { dateStyle } : {}), ...(spec && 'text' in spec ? { textCase: spec.text.case } : {}), ...(spec && 'duration' in spec ? { duration: spec.duration } : {}) } });
     rest = rest.slice(close + 1);
   }
   parts.push({ text: rest });
