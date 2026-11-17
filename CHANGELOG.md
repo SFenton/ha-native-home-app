@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Studio loads the draft again when opened through Home Assistant.
+
 ## 0.3.0
 
 - Add the 2.0 workspace as the only Studio: structured editing of Native
