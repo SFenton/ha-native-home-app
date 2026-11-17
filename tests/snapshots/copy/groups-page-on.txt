@@ -1,0 +1,34 @@
+Group by State
+Title
+On
+Off
+Unavailable
+Move Up
+Move Down
+Remove Group
+Title
+On
+Off
+Unavailable
+Move Up
+Move Down
+Remove Group
+Add Group
+Tiles sit under a heading for their state. A group with no tiles is not shown.
+Tiles keep the grid’s order inside a group.
+
+[names]
+Title of group 1
+On in Lights On
+Off in Lights On
+Unavailable in Lights On
+Move Lights On Up
+Move Lights On Down
+Remove Lights On
+Title of group 2
+On in Lights Off
+Off in Lights Off
+Unavailable in Lights Off
+Move Lights Off Up
+Move Lights Off Down
+Remove Lights Off

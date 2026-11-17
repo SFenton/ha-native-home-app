@@ -1,0 +1,35 @@
+Study Lights
+Light group tile · State Words › Authored words
+Title
+Entity
+light.demo_tc_lamp
+State Words
+4 Changed
+When On
+When Off
+When Unavailable
+Level Text
+Shows 1% to 100% on a light that dims.
+An empty field uses the app’s word, shown in grey.
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Swipe to Adjust
+Off
+Advanced
+ID
+
+[names]
+More
+Close
+On
+Unavailable
+{value}%
+Only show when: Always.
+Swipe to Adjust, Off
+tc-w2-lamp
+Copy ID

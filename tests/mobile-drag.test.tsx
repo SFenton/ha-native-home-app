@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { DndContext, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MobileTouchSensor, useMobileDragGuard } from '../src/mobile-drag';
+import { MobileTouchSensor, useMobileDragGuard } from '../src/workspace2/dnd/mobile-drag';
 
 afterEach(cleanup);
 describe('mobile drag geometry guard', () => {

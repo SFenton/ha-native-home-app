@@ -1,0 +1,45 @@
+Lamp Row
+Template · Sample Detail
+Entity
+switch.demo_lamp
+Width
+Automatic
+Half
+Full
+Lamp Row
+Template · Used in 2 places
+A change here asks first.
+Title
+Header
+Footer
+Style
+Plain
+Module list
+Density
+Thin
+Dense
+Show icons
+Behavior
+Only show when
+Always
+Parameters (1)
+Entity
+Entity
+Add Parameter…
+Advanced
+ID
+Spacing
+Token
+Presented by
+None
+
+[names]
+More
+Close
+Settings
+Lamp Row, template, used in 2 places
+Only show when: Always.
+Parameters
+demo-body
+Copy ID
+Add Presented by

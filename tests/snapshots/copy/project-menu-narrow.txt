@@ -1,0 +1,25 @@
+Project
+Studio Appearance
+Follow System
+Home, Security, Climate and Camera
+Redo
+Repeated Pieces
+Window
+Checks
+Tabs
+Header Buttons
+Wallpaper
+State Styles
+Data
+Local State
+Links
+App Launch
+Live Activities
+Publish History
+Import…
+Export
+Edit as JSON…
+Activity
+About
+Help
+Home Assistant: not connected

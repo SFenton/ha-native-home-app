@@ -1,0 +1,14 @@
+Controls
+Switch to Edit to add controls.
+Switch to Edit
+Controls
+5
+Toggle
+Command
+Choice
+Button
+Settings link
+
+[names]
+Close
+Find in controls

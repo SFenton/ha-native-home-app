@@ -1,0 +1,34 @@
+Name
+Each place sets
+Text · 3 different · fills 1 field
+Text · 3 different · fills 1 field
+Entity · 3 different · fills 1 field
+Text · 3 different · fills 1 field
+Entity · 3 different · fills 1 field
+Text · 3 different · fills 1 field
+Entity · 3 different · fills 1 field
+Places (2 of 3)
+Home
+Page
+Shown
+Home
+Page
+Replaces 2 of 3 places. 1 differs in Columns, which a template cannot set.
+Save as Template
+
+[names]
+Title 1
+Label for Title 1
+Title 2
+Label for Title 2
+Entity 1
+Label for Entity 1
+Title 3
+Label for Title 3
+Entity 2
+Label for Entity 2
+Title 4
+Label for Title 4
+Entity 3
+Label for Entity 3
+Places

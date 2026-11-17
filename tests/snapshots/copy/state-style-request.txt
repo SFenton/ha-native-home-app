@@ -1,0 +1,37 @@
+Ignore taps for
+Seconds,
+0
+to
+60
+.
+Wait for an answer
+Seconds,
+1
+to
+120
+.
+Wait for the new state
+Seconds,
+0
+to
+600
+.
+Keep the error up
+Seconds,
+0
+to
+60
+.
+If it never arrives
+Go Back to the State
+Error words
+Sending words
+None.
+These words come with the style.
+Script
+Error timer
+The lifecycle asks for a script and an error timer that already exist in Home Assistant. The Studio checks that they exist and warns when one is missing. It installs nothing.
+
+[names]
+script.name
+timer.name

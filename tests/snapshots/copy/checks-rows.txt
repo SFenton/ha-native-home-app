@@ -1,0 +1,22 @@
+Problems
+Lights: ID “hc-chip-0” is used twice. Give one of them a different name.
+Security: ID “hc-chip-1” is used twice. Give one of them a different name.
+Climate: ID “hc-chip-2” is used twice. Give one of them a different name.
+Occupancy: ID “hc-chip-3” is used twice. Give one of them a different name.
+Contact Sensors: ID “hc-chip-4” is used twice. Give one of them a different name.
+Air Quality: ID “hc-chip-5” is used twice. Give one of them a different name.
+Status: ID “hc-status-rail” is used twice. Give one of them a different name.
+Weather: ID “hc-weather-summary” is used twice. Give one of them a different name.
+Demo Guests 1: ID “hc-home-guest-0” is used twice. Give one of them a different name.
+Demo Guests 2: ID “hc-home-guest-1” is used twice. Give one of them a different name.
+Guests: ID “hc-home-guest-grid” is used twice. Give one of them a different name.
+Guests Staying Over: ID “hc-home-guests” is used twice. Give one of them a different name.
+Conditional content: ID “hc-home-guests-visible” is used twice. Give one of them a different name.
+Demo Camera: ID “hc-camera-0-tile” is used twice. Give one of them a different name.
+Cameras: ID “hc-home-camera-grid” is used twice. Give one of them a different name.
+Cameras: ID “hc-home-cameras” is used twice. Give one of them a different name.
+Suggestions
+Security System has no way in.
+Security has no way in.
+Climate has no way in.
+Orphan has no way in.

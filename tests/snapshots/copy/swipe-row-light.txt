@@ -1,0 +1,27 @@
+Study Lights
+Light group tile · Swipe › Swipe
+Title
+Entity
+light.demo_tc_lamp
+State Words
+Default
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Swipe to Adjust
+Brightness
+Advanced
+ID
+Set by the app: axis, commit.
+
+[names]
+More
+Close
+Only show when: Always.
+Swipe to Adjust, Brightness
+tc-light-swipe
+Copy ID

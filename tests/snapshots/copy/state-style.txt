@@ -1,0 +1,80 @@
+Show state
+Locked
+Device
+iPhone
+Duo
+iPad
+Front lock
+Secured
+VoiceOver: “
+Front lock
+,
+Secured
+”
+Name
+Hidden words
+Shown instead of the state’s words while the screen is hidden, as in a screenshot.
+Copied from
+Lock
+Changes apply to
+1
+tile
+.
+States
+The first match wins.
+Locked
+Resting
+·
+Tap: Unlock
+Unlocked
+Resting
+·
+Tap: Lock
+Open
+Warning
+·
+Tap: Lock
+Locking
+In Progress
+·
+Tap: Unlock
+Unlocking, Opening
+In Progress
+·
+Tap: Lock
+Jammed
+Error
+·
+Tap: Lock
+Unavailable, Unknown
+Unavailable
+·
+Tap: Unlock
+Anything Else
+Unavailable
+·
+Tap: Unlock
+New state
+Add State
+After a tap
+Request
+
+[names]
+Preview
+Same as the state
+Move Locked up
+Move Locked down
+Move Unlocked up
+Move Unlocked down
+Move Open up
+Move Open down
+Move Locking up
+Move Locking down
+Move Unlocking up
+Move Unlocking down
+Move Jammed up
+Move Jammed down
+Move Unavailable up
+Move Unavailable down
+Name of the new state
+Home Assistant’s name, like charging

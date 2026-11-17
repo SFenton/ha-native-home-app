@@ -1,0 +1,35 @@
+Components
+Templates
+0
+No templates yet. Choose Save as Template from a component’s More menu.
+Layout
+7
+Section
+Tile grid
+Status rail
+Tabs
+Overlay
+Stack
+Repeat
+Tiles
+3
+Action tile
+Navigation tile
+State tile
+Content
+10
+Row
+Text
+Readout
+Map
+Symbol
+Shape
+Chart
+Gauge
+Dial
+Arc
+Drag onto the page, or click to add after the selection.
+
+[names]
+Close
+Find in components

@@ -1,0 +1,20 @@
+/* repeat (sh.repeat@1): a template drawn once for each record of a flow. */
+.sh-repeat { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sh-repeat-flow { display: flex; gap: var(--sh-repeat-gap, 8px); min-width: 0; }
+.sh-repeat-flow[data-axis='horizontal'] { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+.sh-repeat-flow[data-axis='vertical'] { flex-direction: column; }
+.sh-repeat-cell { min-width: 0; display: flex; flex-direction: column; }
+.sh-repeat-flow[data-axis='horizontal'] > .sh-repeat-cell { flex: 0 0 auto; }
+.sh-repeat-cell > .sh-node { grid-column: auto; }
+.sh-repeat-paged { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sh-repeat-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; min-width: 0; }
+.sh-repeat-track::-webkit-scrollbar { display: none; }
+.sh-repeat-page { flex: 0 0 100%; display: grid; scroll-snap-align: start; min-width: 0; }
+.sh-repeat-footer { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.sh-repeat-dots { display: flex; gap: 6px; }
+.sh-repeat-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.3; }
+.sh-repeat-dots i[data-current] { opacity: 0.9; }
+.sh-repeat-button { appearance: none; border: 0; background: transparent; color: inherit; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 22px; }
+.sh-repeat-button:disabled { opacity: 0.3; }
+.sh-repeat-word { font-size: 13px; opacity: 0.7; }
+.sh-repeat[data-placeholder] .sh-repeat-cell { opacity: 0.5; }

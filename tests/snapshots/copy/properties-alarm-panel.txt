@@ -1,0 +1,86 @@
+Security System
+Alarm panel · Security System
+Title
+Title
+Subtitle
+Icon
+Shield
+Entity
+alarm_control_panel.demo_entity_125
+Text
+Since prefix
+Loading text
+Unavailable text
+Hidden text
+Error text
+Pending text
+Message
+Doors and motion stop triggering the alarm.
+Confirm button label
+Width
+Automatic
+Half
+Full
+Modes
+4 items
+By state
+8 states
+Fill
+#546E7A
+Separator
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Security System
+Alarm panel · Security System
+Title
+Title
+Subtitle
+Icon
+Shield
+Entity
+alarm_control_panel.demo_entity_125
+Text
+Since prefix
+Loading text
+Unavailable text
+Hidden text
+Error text
+Pending text
+Message
+Doors and motion stop triggering the alarm.
+Confirm button label
+Width
+Automatic
+Half
+Full
+Modes
+4 items
+By state
+8 states
+Fill
+#546E7A
+Separator
+Behavior
+Only show when
+Always
+Advanced
+ID
+Triggered wash
+#D70015
+Set by the app: how it is drawn, the unavailable look, the Cancel button.
+
+[names]
+More
+Close
+Only show when: Always.
+hc-alarm-local-panel
+Copy ID

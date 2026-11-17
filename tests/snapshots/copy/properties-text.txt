@@ -1,0 +1,101 @@
+Shelf Description
+Text · Shelf
+Title
+Value
+Unavailable text
+Description unavailable
+Width
+Automatic
+Half
+Full
+Font
+None
+Color
+None
+Most lines
+None
+Alignment
+None
+When it does not fit
+None
+Style
+Large title
+Title
+Title
+Title
+Headline
+Body
+Callout
+Subheadline
+Footnote
+Caption
+Caption
+Section title
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Value value: Fixed
+Add Font
+Add Color
+Add Most lines
+Add Alignment
+Add When it does not fit
+Only show when: Always.
+
+[advanced]
+Shelf Description
+Text · Shelf
+Title
+Value
+Unavailable text
+Description unavailable
+Width
+Automatic
+Half
+Full
+Font
+None
+Color
+None
+Most lines
+None
+Alignment
+None
+When it does not fit
+None
+Style
+Large title
+Title
+Title
+Title
+Headline
+Body
+Callout
+Subheadline
+Footnote
+Caption
+Caption
+Section title
+Behavior
+Only show when
+Always
+Advanced
+ID
+
+[names]
+More
+Close
+Value value: Fixed
+Add Font
+Add Color
+Add Most lines
+Add Alignment
+Add When it does not fit
+Only show when: Always.
+node-shelf-copy
+Copy ID

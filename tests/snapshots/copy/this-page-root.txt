@@ -1,0 +1,25 @@
+This Page
+Home
+Done
+Status
+Status rail · 6 chips
+Weather
+Weather
+Conditional content
+Room section · 1 item
+Cameras
+Section · 1 item
+Add Here
+Page Settings
+
+[names]
+Path
+Items
+More for Status
+Move Status
+More for Weather
+Move Weather
+More for Conditional content
+Move Conditional content
+More for Cameras
+Move Cameras

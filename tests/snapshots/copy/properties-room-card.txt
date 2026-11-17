@@ -1,0 +1,124 @@
+Demo Window
+Room card · Climate › Contacts
+Title
+Icon
+window.vertical.open
+Entity
+binary_sensor.demo_entity_77
+Width
+Automatic
+Half
+Full
+Kind
+Air
+Appliance
+Climate
+Contact
+Fan
+Grill
+Humidifier
+Laundry
+Light
+Media
+Occupancy
+Power
+Vacuum
+Vent
+Wake light
+Show state
+Words by state
+None
+By state
+2 states
+Colors by state
+None
+Tint by mode
+None
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Add Colors by state
+Add Tint by mode
+Add When tapped
+Only show when: Always.
+
+[advanced]
+Demo Window
+Room card · Climate › Contacts
+Title
+Icon
+window.vertical.open
+Entity
+binary_sensor.demo_entity_77
+Width
+Automatic
+Half
+Full
+Kind
+Air
+Appliance
+Climate
+Contact
+Fan
+Grill
+Humidifier
+Laundry
+Light
+Media
+Occupancy
+Power
+Vacuum
+Vent
+Wake light
+Show state
+Words by state
+None
+By state
+2 states
+Colors by state
+None
+Tint by mode
+None
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Advanced
+ID
+Subtitle from
+None
+Active states
+2 states
+Disabled states
+None
+Power
+None
+Alternate
+None
+Chip sources
+None
+Personalization
+None
+Set by the app: how it is drawn, the unavailable look, what data it reads.
+
+[names]
+More
+Close
+Add Colors by state
+Add Tint by mode
+Add When tapped
+Only show when: Always.
+hc-open-contact-0
+Copy ID
+Add Power
+Add Alternate
+Add Chip sources
+Add Personalization

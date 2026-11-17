@@ -1,4 +1,4 @@
-import { entityIdSchema } from './schema';
+import { entityIdSchema } from './validation';
 
 // Swift ClimateConfig.Room derives these five IDs from the configured room title.
 export function nativeClimateRoomEntities(title: string) {

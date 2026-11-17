@@ -1,0 +1,23 @@
+/* Swipe to adjust (`sh.tile-swipe@1`): the frame, the band's motion and the bubble. Under `.sh-preview2` like the rest. */
+.sh-preview2 {
+  .sh-swipe { position: relative; min-width: 0; height: 100%; touch-action: pan-y; border-radius: 22px; }
+  .sh-swipe[data-swipe-tile]:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+  /* The lift: scale 1.03 with a deeper shadow; the dragged tile comes to the front. Reduce Motion keeps the shadow only. */
+  .sh-swipe[data-swiping] { z-index: 6; cursor: grabbing; transition: transform .2s var(--ease-standard), box-shadow .2s var(--ease-standard); transform: scale(1.03); box-shadow: 0 6px 12px rgba(0, 0, 0, .35); }
+  .sh-swipe:not([data-swiping]) { transition: transform .2s var(--ease-standard), box-shadow .2s var(--ease-standard); }
+  /* The band follows every sample with no animation; at rest a live change moves it on `quick`. */
+  .sh-swipe .sh-dv-lighttile-band, .sh-swipe .sh-swipe-band { transition: width .2s var(--ease-standard); }
+  .sh-swipe[data-swiping] .sh-dv-lighttile-band, .sh-swipe[data-swiping] .sh-swipe-band { transition: none; }
+  .sh-swipe-band { position: absolute; inset-block: 0; inset-inline-start: 0; width: calc(var(--share, 0) * 100%); background: rgba(255, 255, 255, .22); pointer-events: none; }
+  /* The bubble: a capsule in the sheet-cell dark with white text in both appearances, monospaced digits, hidden from VoiceOver. */
+  .sh-swipe-bubble { position: absolute; z-index: 7; display: grid; place-items: center; padding: 0 12px; border-radius: 999px; background: #2C2C2E; color: #fff; font: 600 15px/1 var(--sh-font); font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, .3); pointer-events: none; }
+  .sh-swipe[data-swiping] .sh-swipe-bubble { animation: sh-bubble-in .2s var(--ease-standard) both; }
+  .sh-grid[data-equal] > .sh-node > .sh-swipe > .sh-tile-parts:not([data-cell-fit=natural]) { height: 100%; display: flex; flex-direction: column; }
+  .sh-grid[data-equal] > .sh-node > .sh-swipe > .sh-tile-parts:not([data-cell-fit=natural]) > .sh-tile { flex: 1 1 auto; }
+  .sh-grid[data-equal] > .sh-node > .sh-swipe > .sh-state-tile:not(.sh-cell-natural) { height: 100%; box-sizing: border-box; }
+}
+@keyframes sh-bubble-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .sh-preview2 .sh-swipe[data-swiping] { transform: none; }
+  .sh-preview2 .sh-swipe .sh-dv-lighttile-band, .sh-preview2 .sh-swipe .sh-swipe-band { transition: none; }
+}

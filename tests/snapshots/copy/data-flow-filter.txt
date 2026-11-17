@@ -1,0 +1,37 @@
+Chores
+Filter
+Done
+Keep items when
+Simple
+Logic
+Field
+status
+is
+completed
+needs_action
+Result
+Keeps 5 of 6 items.
+Fields After This Step
+uid
+Text
+summary
+Text
+status
+Text · 2 Values
+due
+Text · Optional
+description
+Text · Optional
+Remove Step
+Cancel
+
+[names]
+Condition view
+Comparison
+Value
+Fields after this step
+uid, Text
+summary, Text
+status, Text · 2 Values
+due, Text · Optional
+description, Text · Optional

@@ -1,0 +1,31 @@
+Add to
+Home
+Cancel
+Tiles
+Entities
+Tile
+Tabs
+Overlay
+Stack
+Repeat
+Shape
+Symbol
+Chart
+Gauge
+Section
+Tile grid
+Dial
+Arc
+Status rail
+Row
+Button
+Text
+Settings link
+Command
+Choice
+Readout
+Map
+
+[names]
+Search tiles and entities
+Kind

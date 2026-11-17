@@ -1,0 +1,124 @@
+Thermostat sections
+Tabs · Advanced Controls
+Title
+Opens on
+First tab
+If that tab is hidden
+First Tab Shown
+Tabs ·
+3
+of 5
+Rooms
+Opens first
+Automation
+Tracking
+Add Tab
+Add Shared Area
+Add Tab Area
+Tab Bar
+Placement
+Top
+Bottom
+Labels
+Automatic
+Icons
+Titles
+Icons and Titles
+Width
+Automatic
+Half
+Full
+Show selector
+None
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Tabs
+Rooms, opens first
+Move Rooms up
+Move Rooms down
+Remove Rooms
+Move Automation up
+Move Automation down
+Remove Automation
+Move Tracking up
+Move Tracking down
+Remove Tracking
+Add Show selector
+Only show when: Always.
+
+[advanced]
+Thermostat sections
+Tabs · Advanced Controls
+Title
+Opens on
+First tab
+If that tab is hidden
+First Tab Shown
+Tabs ·
+3
+of 5
+Rooms
+Opens first
+Automation
+Tracking
+Add Tab
+Add Shared Area
+Add Tab Area
+Tab Bar
+Placement
+Top
+Bottom
+Labels
+Automatic
+Icons
+Titles
+Icons and Titles
+Width
+Automatic
+Half
+Full
+Show selector
+None
+Behavior
+Only show when
+Always
+Advanced
+ID
+State
+Choose a state
+hc-climate-tab
+Reset when shown
+None
+Scope
+None
+Keep the automatic tab
+None
+Set by the app: the page transition.
+
+[names]
+More
+Close
+Tabs
+Rooms, opens first
+Move Rooms up
+Move Rooms down
+Remove Rooms
+Move Automation up
+Move Automation down
+Remove Automation
+Move Tracking up
+Move Tracking down
+Remove Tracking
+Add Show selector
+Only show when: Always.
+hc-climate-tabs
+Copy ID
+Add Reset when shown
+Add Scope
+Add Keep the automatic tab

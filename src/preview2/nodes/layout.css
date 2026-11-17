@@ -1,0 +1,68 @@
+/* The tab container's areas, tab bar and the scope tag (`sh.tab-blocks@1`, `sh.tab-bar@1`). Under `.sh-preview2` like the rest. */
+.sh-preview2 {
+  .sh-area { position: relative; display: flex; flex-direction: column; gap: var(--gap, 12px); min-width: 0; }
+  .sh-area[data-hidden] > :not(.sh-tag):not(.sh-handle-slot):not(.sh-scope-tag) { opacity: .45; }
+  .sh-area-empty { display: grid; place-items: center; min-height: 44px; border: 1.5px dashed var(--ink-3); border-radius: 12px; color: var(--ink-3); font-size: 13px; }
+  .sh-scope-tag { position: absolute; top: -9px; left: 0; z-index: 8; display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: #fff; color: #000;
+    font-size: 11px; font-weight: 600; pointer-events: none; white-space: nowrap; }
+  .sh-area[data-selected]::after { border-radius: 14px; }
+
+  .sh-tab-bar button[data-form=icons-and-titles] { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; font-size: 11px; }
+  .sh-tab-bar button[data-form=icons] { display: grid; place-items: center; }
+  .sh-tab-bar .sh-seg-title { overflow: hidden; text-overflow: ellipsis; }
+  .sh-tab-menu { position: relative; display: flex; }
+  .sh-tab-menu > button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 0 14px; border-radius: 12px; background: rgba(118, 118, 128, .24); font-size: 15px; font-weight: 600; }
+  .sh-tab-menu [role=menu] { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; display: flex; flex-direction: column; padding: 4px; border-radius: 14px; background: rgba(44, 44, 46, .96); box-shadow: var(--glass-shadow); }
+  .sh-tab-menu [role=menuitemradio] { min-height: 44px; padding: 0 12px; text-align: left; border-radius: 10px; font-size: 15px; }
+  .sh-tab-menu [role=menuitemradio][aria-checked=true] { background: var(--press); font-weight: 600; }
+
+  /* Bottom: the glass capsule on the page's or sheet's bottom safe edge (`.sh-tab-dock`), 16 from the sides and 8 above the edge, 4 of glass around 44 point segments. */
+  .sh-tab-bar[data-placement=bottom] { display: flex; margin: 0 0 0; padding: 4px; border-radius: 28px; gap: 2px;
+    background: var(--glass-bg); backdrop-filter: blur(20px) saturate(1.6); box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-shadow); }
+  .sh-tab-bar[data-placement=bottom] button { min-height: 44px; border-radius: 24px; }
+  .sh-tab-bar[data-placement=bottom] button[data-form=icons-and-titles] { min-height: 56px; }
+  .sh-tab-bar.sh-tab-menu[data-placement=bottom] [role=menu] { top: auto; bottom: calc(100% + 4px); }
+  /* The bar only draws in flow until a page body gives it a slot; the slot is where the safe edge is. */
+  .sh-local-tabs[data-placement=bottom] > .sh-tab-bar { margin: 0 16px 8px; }
+  /* Under the bar the content fades into the surface, the scroll edge effect (`scrollView.bottomEdgeEffect = .soft`). */
+  .sh-tab-dock::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--sheet-ground, transparent) 70%); }
+}
+
+/* The overlay (`sh.overlay@1`). */
+.sh-preview2 {
+  .sh-overlay { position: relative; min-width: 0; }
+  .sh-overlay-base { min-width: 0; }
+  .sh-overlay-child { position: absolute; z-index: 5; --inset: 12px; max-width: calc(100% - 2 * var(--inset)); }
+  .sh-overlay-child .sh-node { display: block; }
+  .sh-overlay-child[data-anchor=top-leading] { inset-block-start: var(--inset); inset-inline-start: var(--inset); }
+  .sh-overlay-child[data-anchor=top-trailing] { inset-block-start: var(--inset); inset-inline-end: var(--inset); }
+  .sh-overlay-child[data-anchor=bottom-leading] { inset-block-end: var(--inset); inset-inline-start: var(--inset); }
+  .sh-overlay-child[data-anchor=bottom-trailing] { inset-block-end: var(--inset); inset-inline-end: var(--inset); }
+  .sh-overlay-child[data-anchor=center] { inset-block-start: 50%; inset-inline-start: 50%; translate: -50% -50%; }
+  .sh-overlay-child .sh-control[data-kind=button] { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%;
+    background: var(--glass-bg); box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-shadow); backdrop-filter: blur(20px) saturate(1.6); }
+  .sh-overlay-child .sh-control[data-kind=button] > .sh-row-primary, .sh-overlay-child .sh-control[data-kind=button] > .sh-row-value { display: none; }
+  .sh-overlay-child .sh-control[data-kind=button] .sh-mini-button { position: absolute; inset: 0; border-radius: 50%; font-size: 0; background: transparent; }
+  .sh-overlay-child .sh-primary-button { width: 44px; min-height: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 0; display: grid; place-items: center;
+    background: var(--glass-bg); box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-shadow); backdrop-filter: blur(20px) saturate(1.6); }
+  .sh-overlay-child .sh-pill { box-shadow: inset 0 0 0 1px var(--glass-border); backdrop-filter: blur(20px) saturate(1.6); }
+  .sh-overlay-empty { display: grid; place-items: center; min-height: 120px; border: 1.5px dashed var(--ink-3); border-radius: 16px; color: var(--ink-3); font-size: 15px; }
+}
+
+/* A state tile's parts: progress, buttons and a destination (`sh.tile-parts@1`). */
+.sh-preview2 {
+  .sh-tile-parts { position: relative; min-width: 0; }
+  .sh-tile-parts > .sh-tile { padding-inline-end: var(--reserve, 14px); min-height: 72px; justify-content: center; }
+  .sh-tile-progress { position: absolute; inset-block: 0; inset-inline-start: 0; width: calc(var(--progress, 0) * 100%); background: rgba(255, 255, 255, .16); pointer-events: none; }
+  .sh-tile-discs { position: absolute; inset-block: 0; inset-inline-end: 12px; display: flex; align-items: center; gap: 8px; }
+  .sh-tile-parts:has(> .sh-tile-chevron) > .sh-tile-discs { inset-inline-end: 34px; }
+  .sh-tile-parts > .sh-tile-chevron { position: absolute; top: 50%; translate: 0 -50%; inset-inline-end: 12px; opacity: .8; color: var(--ink-2); pointer-events: none; }
+  .sh-tile-disc { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .16); color: var(--disc-glyph, #fff); }
+  /* A filled face keeps its black 18% button with a white symbol, whatever the tint (`sh.tile-ink@1`). */
+  .sh-tile-parts[data-face=filled] .sh-tile-disc { background: rgba(0, 0, 0, .18); color: #fff; }
+  .sh-tile-disc[data-disabled] { opacity: .35; }
+  .sh-tile-parts[data-fit=ticker] .sh-tile-title, .sh-tile-parts[data-fit=ticker] .sh-tile-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-tile-parts[data-fit=below] > .sh-tile { border-end-start-radius: 0; border-end-end-radius: 0; }
+  .sh-tile-parts[data-fit=below] > .sh-tile-discs { position: static; padding: 0 14px 12px; border-end-start-radius: 22px; border-end-end-radius: 22px; background: var(--tile-bg); }
+  .sh-tile-parts[data-fit=below] > .sh-tile-chevron { top: 36px; }
+}

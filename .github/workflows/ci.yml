@@ -1,14 +1,16 @@
 name: Studio checks
 
 on:
-  push:
+  # Pushes to main are checked by release.yml, which calls this workflow.
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  studio:
+  checks:
+    name: checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,15 +19,98 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run scan:house
+      - run: npm run check:release
       - run: npm test
       - run: npm run build
+
+  # The browser specs share one dev server and data directory per run, so each shard is its own runner and keeps that
+  # isolation. Playwright shards by file (fullyParallel is off), so specs that rely on their own file's order stay together.
+  e2e:
+    name: e2e (${{ matrix.shard }}/8)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npx playwright test --shard=${{ matrix.shard }}/8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: browser-test-results
+          name: browser-test-results-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
+
+  e2e-report:
+    name: e2e report
+    needs: e2e
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+      - run: npx playwright merge-reports --reporter html ./all-blob-reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  container:
+    name: container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: docker build --tag native-home-studio:check .
       - run: node scripts/smoke-container.mjs
+
+  # The one required check keeps its old name. It passes only when every job it waits on succeeded.
+  studio:
+    name: studio
+    needs: [checks, e2e, container]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job must have succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = success ] || exit 1
+          done

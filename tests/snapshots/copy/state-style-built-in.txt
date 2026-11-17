@@ -1,0 +1,58 @@
+Show state
+Locked
+Device
+iPhone
+Duo
+iPad
+Lock
+Locked
+VoiceOver: “
+Lock
+,
+Locked
+”
+Built-in styles can’t be changed.
+Duplicate to Edit
+Name
+Hidden words
+Shown instead of the state’s words while the screen is hidden, as in a screenshot.
+States
+The first match wins.
+Locked
+Resting
+·
+Tap: Unlock
+Unlocked
+Resting
+·
+Tap: Lock
+Open
+Warning
+·
+Tap: Lock
+Locking
+In Progress
+·
+Tap: Unlock
+Unlocking, Opening
+In Progress
+·
+Tap: Lock
+Jammed
+Error
+·
+Tap: Lock
+Unavailable, Unknown
+Unavailable
+·
+Tap: Unlock
+Anything Else
+Unavailable
+·
+Tap: Unlock
+After a tap
+Request
+
+[names]
+Preview
+Same as the state

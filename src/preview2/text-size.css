@@ -1,0 +1,25 @@
+/* The simulated text size (the simulator rail's Smaller Text and Larger Text): content text is the app's default size times --sh-text-scale.
+   The status bar and the tab bar keep their size, as they do under Dynamic Type. Each size below is the one preview2.css gives the class. */
+.sh-preview2[data-text-scale] { font-size: calc(17px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-large-title { font-size: calc(34px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-empty { font-size: calc(15px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-inline-title { font-size: calc(17px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-tag { font-size: calc(12px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-section-header { font-size: calc(22px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-section-footer { font-size: calc(13px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-segments button { font-size: calc(13px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-tile-title { font-size: calc(17px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-tile-line { font-size: calc(13px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-chip { font-size: calc(15px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-pill span { font-size: calc(13px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-info { font-size: calc(15px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-text-caption1 { font-size: calc(12px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-text-subheadline { font-size: calc(15px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-text-footnote { font-size: calc(13px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-text-section-title { font-size: calc(22px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-row-primary { font-size: calc(17px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-row-secondary { font-size: calc(13px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-account { font-size: calc(20px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-mini-button { font-size: calc(15px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-empty-pane { font-size: calc(15px * var(--sh-text-scale, 1)); }
+.sh-preview2[data-text-scale] .sh-sheet-title { font-size: calc(17px * var(--sh-text-scale, 1)); }

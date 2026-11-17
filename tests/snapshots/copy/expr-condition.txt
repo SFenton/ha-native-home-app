@@ -1,0 +1,99 @@
+[Simple]
+Simple
+Logic
+When
+Read
+Read an Attribute…
+Other…
+Other Attribute…
+If it can't tell
+Raw State
+Says Unknown or Unavailable when Home Assistant does, instead of not being able to tell.
+Number of Items
+Includes…
+Item
+
+[Comparisons]
+is
+is not
+is one of
+is not one of
+is above
+is below
+is before
+is after
+has a value
+has no value
+
+[Policy]
+Show
+Hide
+Keep Last
+Enabled
+Disabled
+Keep Last
+
+[Groups]
+All of these are true
+Any of these are true
+None of these are true
+All
+Any
+None
++ Condition
++ Group
+Move Into a New Group
+Turn Into a Single Condition
+Remove Condition
+Remove Group
+Compare With a Value…
+
+[At rest]
+Always
+Never
+From the style
+Entity not found
+
+[Result]
+show: Shown now
+show: Hidden now
+enable: Enabled now
+enable: Disabled now
+active: Active now
+active: Not active now
+filled: Filled now
+filled: Not filled now
+error: Error now
+error: No error now
+ask: Asking now
+ask: Not asking now
+rule: True now
+rule: Not true now
+filter: True now
+filter: Not true now
+opens: True now
+opens: Not true now
+
+[Effects]
+show: shown / hidden / kept as it was
+enable: enabled / disabled / kept as it was
+active: not active / not active / not active
+filled: not filled / not filled / not filled
+error: not an error / not an error / not an error
+ask: not asking / not asking / not asking
+rule: not true / not true / not true
+filter: not true / not true / not true
+opens: not true / not true / not true
+
+[Notes]
+Custom condition
+Made outside this editor. It's kept as it is.
+Simple can't show a custom condition.
+Edit as JSON
+
+[Footer]
+Remove Condition
+Cancel
+Done
+Keep Editing
+Discard Changes

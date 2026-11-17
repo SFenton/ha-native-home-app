@@ -1,0 +1,18 @@
+Publisher ID
+Copy
+Document ID
+Copy
+Preview address
+Copy
+Capabilities
+Copy
+Manifest
+Copy
+Freeze a Local Revision
+
+[names]
+Copy Publisher ID
+Copy Document ID
+Copy Preview address
+Copy Capabilities
+Copy Manifest

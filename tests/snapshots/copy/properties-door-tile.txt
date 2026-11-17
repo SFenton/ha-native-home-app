@@ -1,0 +1,80 @@
+Demo Lock 1
+Door tile · Security › Doors
+Title
+Icon
+Lock
+Entity
+lock.demo_entity_406
+Text
+Loading text
+Unavailable text
+Hidden text
+Error text
+Opening text
+Closing text
+Open button label
+Close button label
+Reverse button label
+Width
+Automatic
+Half
+Full
+Kind
+Lock
+Garage
+By state
+5 states
+Fill
+#546E7A
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Demo Lock 1
+Door tile · Security › Doors
+Title
+Icon
+Lock
+Entity
+lock.demo_entity_406
+Text
+Loading text
+Unavailable text
+Hidden text
+Error text
+Opening text
+Closing text
+Open button label
+Close button label
+Reverse button label
+Width
+Automatic
+Half
+Full
+Kind
+Lock
+Garage
+By state
+5 states
+Fill
+#546E7A
+Behavior
+Only show when
+Always
+Advanced
+ID
+Set by the app: how it is drawn, the unavailable look.
+
+[names]
+More
+Close
+Only show when: Always.
+hc-door-1-tile
+Copy ID

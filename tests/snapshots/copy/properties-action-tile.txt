@@ -1,0 +1,64 @@
+Demo Guests 1
+Action tile · Home › Guests
+Title
+Icon
+Power
+Entity
+input_boolean.demo_entity_122
+On text
+Off text
+Width
+Automatic
+Half
+Full
+Color
+Neutral
+Lights
+Occupancy
+Behavior
+When tapped
+Turn On or Off · input_boolean.demo_entity_122
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Demo Guests 1
+Action tile · Home › Guests
+Title
+Icon
+Power
+Entity
+input_boolean.demo_entity_122
+On text
+Off text
+Width
+Automatic
+Half
+Full
+Color
+Neutral
+Lights
+Occupancy
+Behavior
+When tapped
+Turn On or Off · input_boolean.demo_entity_122
+Only show when
+Always
+Advanced
+ID
+Action order
+1 item
+Set by the app: how it is drawn, the unavailable look, what data it reads, tap action, state text, feedback.
+
+[names]
+More
+Close
+Only show when: Always.
+hc-home-guest-0
+Copy ID

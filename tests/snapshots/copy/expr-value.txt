@@ -1,0 +1,48 @@
+[Modes]
+Fixed
+From Entity
+Rules
+The same value every time.
+Custom value
+
+[From Entity]
+From
+Read
+Home Assistant says
+Read as
+In the app
+Not a color
+If there's no color
+If there's no icon
+Used when the entity is unavailable or its value isn't a color.
+Used when the entity is unavailable or its value isn't a symbol the app has.
+If unavailable
+Used while the value can't be read. Empty keeps the node's own unavailable text.
+
+[Dates]
+Date
+Style
+Short Date
+Long Date
+Weekday and Date
+Time
+Date and Time
+Relative
+Hour
+Weekday
+In the phone's language and region.
+
+[Places]
+Opens on
+First tab
+If that tab is hidden
+First Tab Shown
+One Action
+By Rule
+Sort by
+Ascending
+Descending
+Add Sort Field
+Remove Sort Field
+A list sorts by 4 fields at most.
+A value of 0 draws no badge.

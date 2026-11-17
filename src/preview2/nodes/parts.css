@@ -1,0 +1,38 @@
+/* Styled text, the stack and shape, and the symbol part (`sh.text-style@1`, `sh.stack@1`, `sh.symbol-part@1`). Under `.sh-preview2` like the rest. */
+.sh-preview2 {
+  .sh-text-large-title { font-size: calc(34px * var(--sh-text-scale, 1)); font-weight: 400; }
+  .sh-text-title1 { font-size: calc(28px * var(--sh-text-scale, 1)); }
+  .sh-text-title2 { font-size: calc(22px * var(--sh-text-scale, 1)); }
+  .sh-text-title3 { font-size: calc(20px * var(--sh-text-scale, 1)); }
+  .sh-text-callout { font-size: calc(16px * var(--sh-text-scale, 1)); }
+  .sh-text-caption2 { font-size: calc(11px * var(--sh-text-scale, 1)); color: var(--ink-2); }
+  .sh-text[data-overflow=truncate][data-lines="1"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-text[data-overflow=ticker] { overflow: hidden; white-space: nowrap; }
+  .sh-ticker { display: block; overflow: hidden; white-space: nowrap; }
+  .sh-ticker-line { display: inline-block; }
+  .sh-ticker[data-ticking] .sh-ticker-line { animation: sh-ticker var(--sh-ticker-seconds, 6s) linear infinite alternate; }
+  @keyframes sh-ticker { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(calc(-1 * var(--sh-ticker-distance, 0px))); } }
+  @media (prefers-reduced-motion: reduce) { .sh-ticker[data-ticking] .sh-ticker-line { animation: none; } .sh-ticker[data-ticking] { text-overflow: ellipsis; } }
+
+  .sh-stack { min-width: 0; width: 100%; }
+  .sh-stack-module { border-radius: 26px; background: var(--module); }
+  .sh-stack-module.sh-stack-dense { background: color-mix(in srgb, var(--module) 100%, transparent); }
+  button.sh-stack { display: block; text-align: start; }
+  .sh-stack-body { display: flex; min-width: 0; width: 100%; }
+  .sh-stack-body[data-axis=horizontal] { flex-direction: row; }
+  .sh-stack-body[data-axis=vertical] { flex-direction: column; }
+  .sh-stack-body > .sh-node { min-width: 0; }
+  .sh-stack-group { display: flex; min-width: 0; }
+  .sh-stack-group[data-grow] { flex: 1 1 0; }
+  .sh-stack-group > .sh-node { min-width: 0; }
+  .sh-stack-divider { flex: none; align-self: stretch; }
+  .sh-stack-body[data-axis=vertical] > .sh-stack-divider { align-self: stretch; }
+  .sh-shape { display: block; flex: none; }
+  .sh-symbol { display: inline-flex; flex: none; align-items: center; justify-content: center; }
+  .sh-symbol svg { width: 100%; height: 100%; }
+  .sh-symbol[data-rendering=multicolor] { color: var(--action); }
+  .sh-symbol[data-rendering=monochrome] { color: var(--ink); }
+}
+.sh-preview2 {
+  .sh-segments button.sh-segment-icon { display: grid; place-items: center; min-width: 44px; min-height: 32px; padding: 0 8px; }
+}

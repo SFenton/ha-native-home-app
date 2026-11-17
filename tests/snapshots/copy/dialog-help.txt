@@ -1,0 +1,14 @@
+The preview approximates iOS. Taps are simulated and never reach your devices.
+Keyboard shortcuts
+⌘S or Ctrl S
+Save the draft now
+Esc
+Select what holds the selected tile
+↑ ↓ on Move
+Move the tile one place
+Space or Enter on Move
+Pick up a tile, then drop it
+↑ ↓ after picking up
+Choose where it goes
+Esc while moving
+Put it back

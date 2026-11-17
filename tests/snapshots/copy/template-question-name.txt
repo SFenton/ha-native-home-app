@@ -1,0 +1,5 @@
+Save as New Template
+Name
+This one is linked to the new template. The other 4 places keep “Light Button” as it was.
+Cancel
+Save

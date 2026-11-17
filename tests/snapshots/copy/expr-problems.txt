@@ -1,0 +1,8 @@
+[Problems]
+Text can't contain { or }.
+16 values at most.
+16 rules at most.
+This condition is too large. Remove some conditions.
+Groups can go 6 deep.
+Enter a number.
+Choose Another

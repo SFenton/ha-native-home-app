@@ -1,0 +1,7 @@
+Publish to the App?
+Fix 2 problems to publish.
+Cancel
+Publish
+
+[names]
+Close

@@ -1,0 +1,13 @@
+Controls
+Controls
+5
+Toggle
+Command
+Choice
+Button
+Settings link
+Drag onto the page, or click to add after the selection.
+
+[names]
+Close
+Find in controls

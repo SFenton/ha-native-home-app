@@ -1,0 +1,62 @@
+Guests Staying Over
+Section · Home › Conditional content
+Title
+Header
+Footer
+Guest mode skips some away automations. Review security, climate, and auto-clean controls before leaving.
+Width
+Automatic
+Half
+Full
+Style
+Plain
+Module list
+Density
+Thin
+Dense
+Show icons
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
+
+[advanced]
+Guests Staying Over
+Section · Home › Conditional content
+Title
+Header
+Footer
+Guest mode skips some away automations. Review security, climate, and auto-clean controls before leaving.
+Width
+Automatic
+Half
+Full
+Style
+Plain
+Module list
+Density
+Thin
+Dense
+Show icons
+Behavior
+Only show when
+Always
+Advanced
+ID
+Spacing
+Token
+Presented by
+None
+
+[names]
+More
+Close
+Only show when: Always.
+hc-home-guests
+Copy ID
+Add Presented by

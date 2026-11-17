@@ -1,0 +1,32 @@
+Status
+Tabs
+›
+Home
+Lights
+Security
+Climate
+Occupancy
+Contact Sensors
+Air Quality
+Add Here
+Settings
+
+[names]
+Back to Home
+Path
+Close
+Find in Status
+More for Lights
+Move Lights
+Move
+More for Security
+Move Security
+More for Climate
+Move Climate
+More for Occupancy
+Move Occupancy
+More for Contact Sensors
+Move Contact Sensors
+More for Air Quality
+Move Air Quality
+Status Rail Settings

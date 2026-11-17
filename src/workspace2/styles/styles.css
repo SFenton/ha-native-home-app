@@ -1,0 +1,47 @@
+/* The States group and State Styles (studio-ux2, pick 7). Tokens only. */
+
+/* The class dot: colour and shape, so the class is never colour alone. */
+.w2-class-dot { flex: none; display: inline-block; width: 9px; height: 9px; background: var(--w2-muted); border-radius: 50%; }
+.w2-class-dot[data-class=in-progress] { background: var(--w2-primary); }
+.w2-class-dot[data-class=warning] { background: var(--w2-warn); border-radius: 2px; transform: rotate(45deg); }
+.w2-class-dot[data-class=error] { background: var(--w2-err); border-radius: 2px; }
+.w2-class-dot[data-class=unknown] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--w2-muted); }
+
+/* The States group */
+.w2-edited-dot { display: inline-block; width: 6px; height: 6px; margin-inline-end: 6px; border-radius: 50%; background: var(--w2-primary); vertical-align: middle; }
+.w2-layer-control { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.w2-layer-control > :first-child { flex: 1; min-width: 0; }
+.w2-scope button.w2-reset { flex: none; width: 32px; height: 32px; min-height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-color: transparent; color: var(--w2-muted); }
+.w2-states-buttons { flex-direction: row; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-start; }
+.w2-state-pop { min-width: 260px; }
+.w2-scope .w2-state-item { display: flex; align-items: center; gap: 8px; }
+.w2-state-class { margin-inline-start: auto; color: var(--w2-muted); font-size: 12px; }
+.w2-state-edited { color: var(--w2-primary); font-size: 11px; font-weight: 600; }
+.w2-state-group-label { padding: 8px 12px 4px; color: var(--w2-muted); font-size: 12px; font-weight: 600; }
+.w2-choice-text { display: flex; flex-direction: column; min-width: 0; }
+.w2-choice-note { color: var(--w2-muted); font-size: 11px; line-height: 1.3; }
+.w2-missing-style { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.w2-save-style { gap: 4px; }
+.w2-tap-row .w2-summary { flex: 1; }
+
+/* State Styles */
+.w2-styles-panel, .w2-style-page, .w2-rule-page, .w2-request-page, .w2-new-style-page { display: flex; flex-direction: column; gap: 4px; }
+.w2-style-list, .w2-state-rows, .w2-pending-words { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.w2-style-row, .w2-state-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.w2-style-row > .w2-link-row, .w2-state-row > .w2-link-row { flex: 1; min-width: 0; }
+.w2-style-text { display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: start; }
+.w2-lock { flex: none; color: var(--w2-muted); }
+.w2-style-rename { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; padding: 4px 12px; }
+.w2-new-style { margin-top: 4px; }
+.w2-style-locked { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.w2-style-stage { overflow: hidden; margin: 4px 0; }
+.w2-preview-box, .w2-style-frame { transform-origin: top left; }
+.sh-preview2.w2-style-frame { height: auto; min-height: 0; overflow: visible; pointer-events: none; }
+.w2-warn-line { color: var(--w2-warn-text); }
+.w2-ok-text { color: var(--w2-ok-text); }
+.w2-add-state { gap: 4px; }
+
+/* Reduce Motion stops the chrome's own animation; the simulator still draws the arc, at half speed, so a tile in progress is still one. */
+@media (prefers-reduced-motion: reduce) {
+  .w2-scope .sh-preview2 .sh-state-arc { animation: sh-spin 2s linear infinite !important; }
+}

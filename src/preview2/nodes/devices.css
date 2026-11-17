@@ -1,0 +1,138 @@
+/*
+ * The device controls: settings, vacuum, custom-light, climate, sprinkler and remote nodes. Same tokens as preview2.css
+ * (`--module`, `--action`, `--ok`, the tile finish); nested under `.sh-preview2` so each rule outranks the element resets.
+ */
+.sh-preview2 {
+  .sh-node[data-type=settings-control], .sh-node[data-type=custom-light-control], .sh-node[data-type=sprinkler-control], .sh-node[data-type=climate-control], .sh-node[data-type=vacuum-control], .sh-node[data-type=remote-control] { --ring-r: 22px; }
+  .sh-node[data-type=remote-control]:has(.sh-dv-key), .sh-node[data-type=vacuum-control]:has(.sh-dv-ctl) { --ring-r: 28px; }
+  .sh-dv-row[data-state=unavailable] { opacity: .65; }
+  /* A settings row never paints its name under its state: the name keeps its longest word, the state keeps its width (`item 16`). */
+  .sh-dv-row > .sh-row-copy { min-width: min-content; } .sh-dv-row > .sh-row-value { flex: none; white-space: nowrap; }
+  .sh-dv-stack { flex-wrap: wrap; row-gap: 6px; } .sh-dv-stack .sh-row-primary { flex: 1; } .sh-dv-wide { flex: 1 1 100%; width: 100%; }
+  textarea.sh-dv-wide { min-height: 72px; resize: none; display: block; white-space: pre-wrap; }
+  .sh-dv-center { justify-content: center; }
+  .sh-dv-check { color: var(--action); flex: none; } .sh-dv-off { color: var(--ink-3); flex: none; }
+  .sh-dv-selected .sh-row-primary { font-weight: 600; }
+  .sh-dv-accent-text { color: var(--action); }
+  .sh-dv-date { color: var(--action); font-size: 15px; }
+  .sh-dv-warning { color: var(--warn); align-items: flex-start; } .sh-dv-warning .sh-row-primary { color: var(--ink); } .sh-dv-warning svg { flex: none; margin-top: 2px; }
+  .sh-dv-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; font-size: 17px; }
+  .sh-dv-prominent { background: var(--fill-action); color: #fff; font-weight: 600; min-width: 140px; border-radius: 22px; }
+  .sh-dv-accent { color: var(--action); } .sh-dv-danger { color: var(--danger); }
+  .sh-dv-button:disabled { opacity: .4; }
+  .sh-dv-appicon { flex: none; width: 36px; height: 36px; border-radius: 9px; box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .25); }
+  .sh-dv-avatar { width: 36px; height: 36px; font-size: 15px; flex: none; } .sh-dv-people { display: inline-flex; gap: 4px; align-items: center; }
+  .sh-dv-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-radius: 22px; background: var(--module); }
+  .sh-dv-card[data-state=unavailable] { opacity: .65; }
+  .sh-dv-card .sh-segments { display: flex; flex-wrap: wrap; } .sh-dv-card .sh-segments button { flex: 1 1 auto; }
+  .sh-dv-list { display: flex; flex-direction: column; border-radius: 22px; background: var(--module); overflow: hidden; }
+  .sh-dv-list .sh-row { border-radius: 0; background: none; } .sh-dv-list .sh-row + .sh-row { border-top: .5px solid var(--sep); }
+  .sh-dv-options { display: flex; flex-direction: column; } .sh-dv-option { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; text-align: left; width: 100%; } .sh-dv-option + .sh-dv-option { border-top: .5px solid var(--sep); }
+  .sh-dv-hub { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 16px; border-radius: 32px; background: var(--glass-bg); border: .5px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(18px) saturate(1.5); }
+  .sh-dv-menus { display: inline-flex; gap: 8px; } .sh-dv-menu { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 16px; background: rgba(118, 118, 128, .24); font-size: 15px; color: var(--action); } .sh-dv-menu-value { white-space: nowrap; } button.sh-dv-menu { min-height: 44px; justify-content: center; text-align: left; } button.sh-dv-menu:disabled { opacity: .5; }
+  .sh-dv-headline { font-size: 20px; padding: 4px 0; } .sh-dv-paragraphs { display: flex; flex-direction: column; gap: 8px; } .sh-dv-paragraphs .sh-text { font-size: 15px; color: var(--ink-2); }
+  .sh-info[data-state=unavailable] { opacity: .65; } .sh-info[data-quiet] { color: var(--ink-3); }
+
+  /* Climate dial */
+  /* No card: the app's dial sits on the page or sheet ground (`UKThermostatDial`). */
+  .sh-dv-dial { position: relative; display: grid; justify-items: center; padding: 8px 0; }
+  .sh-dv-dial[data-state] { opacity: .65; } .sh-dv-dial svg { display: block; }
+  .sh-dv-track { stroke: rgba(120, 120, 128, .32); } .sh-dv-heat { stroke: #CD5401; } .sh-dv-cool { stroke: #2C8E98; } .sh-dv-handle { fill: #fff; stroke: #CD5401; filter: drop-shadow(0 4px 3px rgba(0, 0, 0, .2)); } .sh-dv-handle[data-handle=high] { stroke: #2C8E98; } .sh-dv-handle[data-status=idle] { stroke: var(--ink-2, rgba(255, 255, 255, .78)); }
+  .sh-dv-marker { stroke: #141414; fill: #CD5401; } .sh-dv-marker[data-status=idle] { fill: var(--ink-2, rgba(255, 255, 255, .78)); }
+  .sh-dv-dial-face { position: absolute; left: 0; right: 0; top: 8px; height: var(--dial-px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; pointer-events: none; }
+  .sh-dv-dial-face small { font-size: 15px; font-weight: 600; color: var(--ink-2); } .sh-dv-dial-face strong { font: 200 72px/1 -apple-system, system-ui, sans-serif; } .sh-dv-dial-face sup { font-size: 20px; font-weight: 600; vertical-align: top; margin-left: 2px; }
+  .sh-dv-dial-face span { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .sh-dv-dial-compact .sh-dv-dial-face strong { font-size: 48px; }
+  .sh-sheet .sh-dv-ctl { background: rgba(118, 118, 128, .24); color: var(--ink); }
+
+  /* Tiles: card face with discs, light band, status stats, status tile, action tile */
+  .sh-dv-card-tile { position: relative; display: flex; align-items: center; gap: 8px; min-height: 72px; padding: 8px 12px 8px 14px; border-radius: 24px; background: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 46%, rgba(255, 255, 255, .08)), var(--tile-bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+  .sh-dv-card-discs { display: flex; flex: none; gap: 12px; }
+  .sh-dv-card-tile[data-fit] .sh-row-copy strong, .sh-dv-card-tile[data-fit] .sh-row-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-dv-card-tile[data-fit=below] { display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .sh-dv-card-tile[data-fit=below] .sh-dv-card-discs { grid-column: 1 / -1; grid-row: 2; padding-left: 36px; }
+  .sh-dv-card-tile.sh-dv-lit { background: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 46%, rgba(255, 255, 255, .08)), #0B5F7F; }
+  .sh-dv-card-tile[data-state=unavailable] { opacity: .65; }
+  .sh-dv-card-face { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
+  .sh-dv-card-glyph { color: #8E8CFF; display: inline-flex; } .sh-dv-card-tile.sh-dv-lit .sh-dv-card-glyph { color: #fff; }
+  .sh-dv-card-face .sh-row-copy strong, .sh-dv-lighttile .sh-row-copy strong { font-size: 17px; font-weight: 600; } .sh-dv-card-face .sh-row-copy > span:last-child { font-size: 13px; color: var(--ink-2); }
+  .sh-dv-disc { flex: none; width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .16); color: #fff; }
+  .sh-dv-lighttile .sh-dv-disc { background: #1c1c1e; } .sh-dv-chev { flex: none; width: 24px; height: 44px; display: inline-flex; align-items: center; justify-content: center; opacity: .65; }
+  .sh-dv-lighttile { position: relative; display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 8px 12px 8px 14px; border-radius: 24px; overflow: hidden; background: #ECDFCB; color: #1c1c1e; }
+  .sh-dv-lighttile[data-off] { background: var(--tile-bg); color: var(--ink); } .sh-dv-lighttile[data-state=unavailable] { opacity: .65; }
+  .sh-dv-lighttile-band { position: absolute; inset: 0 auto 0 0; width: var(--level); background: var(--band); } .sh-dv-lighttile > :not(.sh-dv-lighttile-band) { position: relative; }
+  .sh-dv-lighttile .sh-row-copy { flex: 1; } .sh-dv-lighttile .sh-row-copy span { font-size: 13px; opacity: .8; } .sh-dv-lighttile-glyph { color: #D77A00; display: inline-flex; }
+  .sh-dv-swatch { flex: none; width: 44px; height: 24px; border-radius: 12px; } .sh-dv-well { flex: none; width: 30px; height: 30px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3); }
+  .sh-dv-copy { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; width: 88px; font-size: 12px; text-align: center; color: var(--ink-2); } .sh-dv-copy small { font-size: 12px; opacity: .8; }
+  .sh-dv-dot { width: 48px; height: 48px; border-radius: 50%; background: var(--warn); } .sh-dv-dot[data-off] { background: none; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+  .sh-dv-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 12px; padding: 14px 16px; border-radius: 22px; background: var(--module); }
+  .sh-dv-stat { display: flex; flex-direction: column; gap: 4px; } .sh-dv-stat span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); } .sh-dv-stat strong { font-size: 17px; }
+  .sh-dv-stat[data-tone=warn] svg { color: var(--warn); } .sh-dv-stat[data-tone=ok] svg { color: var(--ok); }
+  .sh-dv-status { min-height: 92px; } .sh-dv-status .sh-tile-line { order: 1; } .sh-dv-status .sh-tile-title { order: 2; } .sh-dv-ok { color: var(--ok); } .sh-dv-status[data-state=unavailable] { opacity: .65; }
+  .sh-dv-action { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; width: 100%; min-height: 84px; padding: 14px; border-radius: 22px; text-align: left; font-weight: 600; background: var(--tile-bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+  .sh-dv-action .sh-tile-glyph { margin-bottom: 0; } .sh-dv-danger-tile .sh-tile-glyph { color: var(--danger); }
+  .sh-dv-choice { display: block; width: 100%; } .sh-dv-choice-face { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 10px 14px; border-radius: 18px; background: var(--tile-bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+  .sh-dv-choice-face[data-on] { background: #1b4d83; }
+
+  /* Vacuum map */
+  .sh-dv-map { position: relative; height: var(--map-h, 300px); border-radius: 22px; background: var(--module); overflow: hidden; display: grid; place-items: center; }
+  .sh-dv-rooms { display: grid; grid-template-columns: 1.2fr .8fr 1.6fr 2.4fr; grid-template-rows: repeat(3, 1fr); gap: 2px; width: 78%; height: 86%; }
+  .sh-dv-rooms i { background: #4a525c; } .sh-dv-rooms i:nth-child(2n) { background: #3e454e; } .sh-dv-rooms i:nth-child(3n) { background: #59616c; } .sh-dv-rooms i:nth-child(1) { grid-row: span 2; } .sh-dv-rooms i:nth-child(4) { grid-column: span 2; }
+  .sh-dv-map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* Corner button groups: 44 pt buttons on a 44 pt pitch, 8 pt from the card's two edges, one glass shape for each group (a circle for one, a capsule for more). Leading and trailing swap in right to left. */
+  .sh-dv-ctl-layer { position: absolute; inset: 0; pointer-events: none; }
+  .sh-dv-ctl { position: absolute; z-index: 2; display: flex; pointer-events: auto; border-radius: 22px; overflow: hidden; background: var(--glass-bg); border: .5px solid var(--glass-border); color: #fff; }
+  .sh-dv-ctl[data-axis=row] { flex-direction: row; width: calc(var(--ctl-size) * var(--ctl-n)); height: var(--ctl-size); } .sh-dv-ctl[data-axis=column] { flex-direction: column; height: calc(var(--ctl-size) * var(--ctl-n)); width: var(--ctl-size); }
+  .sh-dv-ctl[data-corner^=top] { top: var(--ctl-inset); } .sh-dv-ctl[data-corner^=bottom] { bottom: var(--ctl-inset); }
+  .sh-dv-ctl[data-corner$=leading] { inset-inline-start: var(--ctl-inset); } .sh-dv-ctl[data-corner$=trailing] { inset-inline-end: var(--ctl-inset); }
+  .sh-dv-ctl-button { flex: none; width: var(--ctl-size, 44px); height: var(--ctl-size, 44px); display: inline-flex; align-items: center; justify-content: center; color: inherit; background: none; border: 0; padding: 0; }
+  .sh-dv-ctl-button[data-dimmed] { opacity: .45; } .sh-dv-ctl-button[data-ringed] { outline: 2px solid var(--action, #0A84FF); outline-offset: -3px; border-radius: 22px; }
+  .sh-dv-map-tag { position: absolute; bottom: 8px; right: 8px; } .sh-dv-map-tag[data-at=center] { right: auto; left: 50%; transform: translateX(-50%); }
+  .sh-dv-map-note { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .45); font-size: 15px; }
+  .sh-dv-area { position: absolute; inset: 22% 18% 26% 24%; border: 2px solid #fff; background: rgba(64, 156, 255, .25); } .sh-dv-area i { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+  .sh-dv-area i:nth-child(1) { top: -8px; left: -8px; } .sh-dv-area i:nth-child(2) { top: -8px; right: -8px; } .sh-dv-area i:nth-child(3) { bottom: -8px; left: -8px; } .sh-dv-area i:nth-child(4) { bottom: -8px; right: -8px; }
+  .sh-dv-editor { display: flex; flex-direction: column; gap: 8px; } .sh-dv-editor-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .sh-dv-updown { transform: rotate(90deg); }
+
+  /* Sprinkler */
+  .sh-dv-step { width: 36px; height: 32px; border-radius: 8px; background: rgba(118, 118, 128, .24); display: inline-flex; align-items: center; justify-content: center; }
+  .sh-dv-days { display: flex; justify-content: space-between; } .sh-dv-day span { display: inline-flex; width: 36px; height: 36px; border-radius: 50%; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; background: rgba(118, 118, 128, .24); color: var(--ink-2); }
+  .sh-dv-day span[data-on] { background: var(--fill-action); color: #fff; }
+
+  /* Remote */
+  .sh-dv-keys { display: grid; gap: 12px; padding: 14px; border-radius: 26px; background: var(--module); justify-items: center; } .sh-dv-keys[data-state=unavailable] { opacity: .65; }
+  .sh-dv-pad { grid-template-columns: repeat(3, 76px); justify-content: center; } .sh-dv-transport { display: flex; justify-content: space-between; padding: 12px 24px; }
+  .sh-dv-key { width: 76px; height: 76px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .1); color: #fff; } .sh-dv-transport .sh-dv-key { width: 56px; height: 56px; }
+  .sh-dv-key-on { background: rgba(255, 255, 255, .1); color: var(--ok); } .sh-dv-key-on > span { background: var(--ok); color: #000; border-radius: 50%; padding: 11px; }
+  .sh-dv-volume { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 22px; background: var(--module); } .sh-dv-volume[data-state=unavailable] { opacity: .65; }
+  .sh-dv-volume-head { display: flex; align-items: center; gap: 12px; } .sh-dv-volume-head strong { flex: 1; font-size: 20px; font-weight: 500; } .sh-dv-volume-slider { display: flex; align-items: center; gap: 12px; } .sh-dv-volume-slider .sh-slider { flex: 1; }
+  .sh-dv-bare { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; color: var(--ink); }
+  .sh-dv-app { min-height: 96px; }
+}
+
+/* The state tile (`sh.state-style@1`): the class tints the glyph, and the indicator layer is a pulse, a wiggle or an arc in the disc's place. */
+.sh-state-tile.sh-class-warning .sh-tile-glyph { color: var(--warn, #ff9f0a); }
+.sh-state-tile.sh-class-error .sh-tile-glyph { color: var(--danger); }
+.sh-state-tile.sh-class-unknown { opacity: .65; }
+.sh-state-tile.sh-effect-pulse .sh-tile-glyph { animation: sh-state-pulse 1.4s ease-in-out infinite; }
+.sh-state-tile.sh-effect-wiggle .sh-tile-glyph { animation: sh-state-wiggle .5s ease-in-out 2; }
+.sh-state-arc { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid currentColor; border-top-color: transparent; animation: sh-state-spin .9s linear infinite; }
+@keyframes sh-state-pulse { 50% { opacity: .45; } }
+@keyframes sh-state-wiggle { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes sh-state-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sh-state-tile .sh-tile-glyph, .sh-state-arc { animation: none; } }
+
+/* Pull-down menu (`PullDownMenu`): the system's menu card over a clear scrim, drawn into the screen's layer. */
+.sh-preview2 {
+  .sh-menu-scrim { position: absolute; inset: 0; z-index: 80; }
+  .sh-menu { position: absolute; z-index: 81; min-width: 180px; max-width: calc(100% - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 6px 0; border-radius: 14px; background: rgba(44, 44, 46, .94); backdrop-filter: blur(24px) saturate(1.6); box-shadow: 0 10px 34px rgba(0, 0, 0, .45), inset 0 0 0 .5px rgba(255, 255, 255, .16); color: #fff; animation: sh-menu-in 140ms ease-out both; transform-origin: top right; }
+  .sh-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 16px 0 10px; font: 400 17px/1.2 var(--sh-font); text-align: left; }
+  .sh-menu-item + .sh-menu-item { border-top: .5px solid var(--sep); }
+  .sh-menu-item:hover, .sh-menu-item:focus-visible { background: var(--press); outline: none; }
+  .sh-menu-check { display: inline-flex; width: 20px; justify-content: center; flex: none; }
+  .sh-dv-pulldown { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 44px; justify-content: flex-end; color: var(--action); font-size: 17px; text-align: right; }
+  .sh-dv-pulldown[aria-expanded=true] { opacity: .7; }
+  .sh-dv-pulldown:disabled { color: var(--ink-3); }
+}
+@keyframes sh-menu-in { from { opacity: 0; transform: scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .sh-preview2 .sh-menu { animation: none; } }

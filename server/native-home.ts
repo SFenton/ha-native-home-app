@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { assertJsonBounds, DocumentValidationError, entityIdSchema, jsonSchema } from '../src/shared/schema';
+import { assertJsonBounds, DocumentValidationError, entityIdSchema, jsonSchema } from '../src/shared/validation';
 import { nativeClimateRoomEntities } from '../src/shared/native-entities';
 import { nativeTodoItemSchema, nativeTodoReadSchema, choreRecord, choreRecords } from '../src/shared/native-chores';
 import type { NativeCurrentUser, NativeForecast, NativeSnapshot, NativeState } from '../src/shared/native-state';
@@ -322,7 +322,11 @@ function containsCredential(value: unknown, credentials: string[]): boolean {
   return false;
 }
 
-export function nativeHomeSnapshot(houseConfig: NativeHouseConfig, rawStates: unknown, credentials: string[]): NativeHomeSnapshot {
+/**
+ * Every entity id a house configuration names: the ids in its strings and keys, plus the climate rooms' own entities.
+ * Throws a 502 `HttpError` when the configuration is unsafe or too large.
+ */
+export function houseConfigReferences(houseConfig: Pick<NativeHouseConfig, 'config'>): Set<string> {
   const references = new Set<string>();
   inspectConfig(houseConfig.config, references);
   const climate = houseConfig.config.climate;
@@ -338,6 +342,94 @@ export function nativeHomeSnapshot(houseConfig: NativeHouseConfig, rawStates: un
     }
   }
   if (references.size > 1000) throw new HttpError(502, 'Native house configuration references more than 1000 entities');
+  return references;
+}
+
+/**
+ * Projects one Home Assistant state object (`{ entity_id, state, attributes }`, as REST or the entity stream gives it) to the
+ * fields the app reads. Throws a 502 `HttpError` for a malformed or out-of-bounds state.
+ */
+export function projectNativeState(raw: unknown): NativeEntityState {
+  if (!isRecord(raw) || typeof raw.entity_id !== 'string') throw new HttpError(502, 'Invalid Home Assistant state record');
+  if (!isRecord(raw.attributes)) throw new HttpError(502, 'Invalid Home Assistant state attributes');
+  const attributes = raw.attributes;
+  const projected: Record<string, unknown> = {
+    entityId: raw.entity_id, state: raw.state,
+    name: attributes.friendly_name ?? raw.entity_id,
+  };
+  const fields = {
+    unit_of_measurement: 'unit', icon: 'icon', device_class: 'deviceClass',
+    brightness: 'brightness', temperature: 'temperature', current_temperature: 'currentTemperature',
+    hvac_action: 'hvacAction', percentage: 'percentage', current_position: 'currentPosition',
+    volume_level: 'volumeLevel', is_volume_muted: 'isVolumeMuted',
+  };
+  for (const [source, target] of Object.entries(fields)) {
+    if (attributes[source] !== undefined && attributes[source] !== null) projected[target] = attributes[source];
+  }
+  projectFields(projected, attributes, { supported_features: 'supportedFeatures' });
+  const domain = raw.entity_id.split('.')[0];
+  if (domain === 'light') projectFields(projected, attributes, {
+    supported_color_modes: 'supportedColorModes', color_mode: 'colorMode', color_temp_kelvin: 'colorTempKelvin',
+    min_color_temp_kelvin: 'minColorTempKelvin', max_color_temp_kelvin: 'maxColorTempKelvin',
+    hs_color: 'hsColor', rgb_color: 'rgbColor', xy_color: 'xyColor', effect: 'effect', effect_list: 'effectList',
+  });
+  if (domain === 'climate') projectFields(projected, attributes, {
+    min_temp: 'minTemp', max_temp: 'maxTemp', target_temp_step: 'targetTempStep',
+    target_temp_high: 'targetTempHigh', target_temp_low: 'targetTempLow', hvac_modes: 'hvacModes',
+    preset_mode: 'presetMode', preset_modes: 'presetModes', fan_mode: 'fanMode', fan_modes: 'fanModes',
+    swing_mode: 'swingMode', swing_modes: 'swingModes', current_humidity: 'currentHumidity', humidity: 'targetHumidity',
+  });
+  if (domain === 'select' || domain === 'input_select') projectFields(projected, attributes, { options: 'options' });
+  if (domain === 'number' || domain === 'input_number') projectFields(projected, attributes, { min: 'min', max: 'max', step: 'step' });
+  if (domain === 'humidifier') projectFields(projected, attributes, {
+    current_humidity: 'currentHumidity', humidity: 'targetHumidity', min_humidity: 'minHumidity', max_humidity: 'maxHumidity',
+  });
+  if (domain === 'fan') projectFields(projected, attributes, {
+    percentage_step: 'percentageStep', preset_mode: 'presetMode', preset_modes: 'presetModes', direction: 'direction', oscillating: 'oscillating',
+  });
+  if (domain === 'cover') projectFields(projected, attributes, { current_tilt_position: 'currentTiltPosition' });
+  if (domain === 'media_player') projectFields(projected, attributes, {
+    media_title: 'mediaTitle', media_artist: 'mediaArtist', media_album_name: 'mediaAlbumName',
+    media_content_type: 'mediaContentType', media_duration: 'mediaDuration', media_position: 'mediaPosition',
+    media_position_updated_at: 'mediaPositionUpdatedAt', source: 'source', source_list: 'sourceList',
+    sound_mode: 'soundMode', sound_mode_list: 'soundModeList', repeat: 'repeat', shuffle: 'shuffle',
+  });
+  if (domain === 'vacuum') projectFields(projected, attributes, {
+    battery_level: 'batteryLevel', fan_speed: 'fanSpeed', fan_speed_list: 'fanSpeedList', status: 'status',
+  });
+  if (domain === 'weather') projectFields(projected, attributes, {
+    apparent_temperature: 'apparentTemperature', humidity: 'humidity', dew_point: 'dewPoint', pressure: 'pressure',
+    pressure_unit: 'pressureUnit', wind_speed: 'windSpeed', wind_gust_speed: 'windGustSpeed', wind_bearing: 'windBearing',
+    wind_speed_unit: 'windSpeedUnit', precipitation_unit: 'precipitationUnit', visibility: 'visibility',
+    visibility_unit: 'visibilityUnit', cloud_coverage: 'cloudCoverage', uv_index: 'uvIndex',
+  });
+  if (domain === 'weather' && projected.unit === undefined) projectFields(projected, attributes, { temperature_unit: 'unit' });
+  const parsed = stateSchema.safeParse(projected);
+  if (!parsed.success) throw new HttpError(502, 'Invalid projected Home Assistant state');
+  return parsed.data;
+}
+
+/**
+ * The todo list ids a draft names: every `lists[].entityId` of its `todo-collection@1` sources. The Studio reads these lists as well as the ones
+ * house configuration's chores pages name, so the sim draws the draft's own sections. Ids that are not `todo.` entities are left out.
+ */
+export function draftTodoIds(document: unknown): Set<string> {
+  const ids = new Set<string>();
+  const sources = isRecord(document) && Array.isArray(document.dataSources) ? document.dataSources : [];
+  for (const source of sources) {
+    if (!isRecord(source) || source.model !== 'todo-collection@1' || !isRecord(source.inputs) || !Array.isArray(source.inputs.lists)) continue;
+    for (const list of source.inputs.lists) {
+      const id = isRecord(list) && isRecord(list.entityId) ? list.entityId.value : undefined;
+      if (typeof id === 'string' && id.startsWith('todo.') && entityIdSchema.safeParse(id).success) ids.add(id);
+    }
+  }
+  return ids;
+}
+
+/** `extraReferences` are entity ids the draft names beyond house configuration's (its todo lists), so their states are carried too. */
+export function nativeHomeSnapshot(houseConfig: NativeHouseConfig, rawStates: unknown, credentials: string[], extraReferences: ReadonlySet<string> = new Set()): NativeHomeSnapshot {
+  const references = houseConfigReferences(houseConfig);
+  for (const id of extraReferences) references.add(id);
   if (!Array.isArray(rawStates)) throw new HttpError(502, 'Invalid Home Assistant states response');
   const states: NativeEntityState[] = [];
   const seen = new Set<string>();
@@ -346,62 +438,7 @@ export function nativeHomeSnapshot(houseConfig: NativeHouseConfig, rawStates: un
     if (!references.has(raw.entity_id)) continue;
     if (seen.has(raw.entity_id)) throw new HttpError(502, 'Home Assistant returned duplicate entity states');
     seen.add(raw.entity_id);
-    if (!isRecord(raw.attributes)) throw new HttpError(502, 'Invalid Home Assistant state attributes');
-    const attributes = raw.attributes;
-    const projected: Record<string, unknown> = {
-      entityId: raw.entity_id, state: raw.state,
-      name: attributes.friendly_name ?? raw.entity_id,
-    };
-    const fields = {
-      unit_of_measurement: 'unit', icon: 'icon', device_class: 'deviceClass',
-      brightness: 'brightness', temperature: 'temperature', current_temperature: 'currentTemperature',
-      hvac_action: 'hvacAction', percentage: 'percentage', current_position: 'currentPosition',
-      volume_level: 'volumeLevel', is_volume_muted: 'isVolumeMuted',
-    };
-    for (const [source, target] of Object.entries(fields)) {
-      if (attributes[source] !== undefined && attributes[source] !== null) projected[target] = attributes[source];
-    }
-    projectFields(projected, attributes, { supported_features: 'supportedFeatures' });
-    const domain = raw.entity_id.split('.')[0];
-    if (domain === 'light') projectFields(projected, attributes, {
-      supported_color_modes: 'supportedColorModes', color_mode: 'colorMode', color_temp_kelvin: 'colorTempKelvin',
-      min_color_temp_kelvin: 'minColorTempKelvin', max_color_temp_kelvin: 'maxColorTempKelvin',
-      hs_color: 'hsColor', rgb_color: 'rgbColor', xy_color: 'xyColor', effect: 'effect', effect_list: 'effectList',
-    });
-    if (domain === 'climate') projectFields(projected, attributes, {
-      min_temp: 'minTemp', max_temp: 'maxTemp', target_temp_step: 'targetTempStep',
-      target_temp_high: 'targetTempHigh', target_temp_low: 'targetTempLow', hvac_modes: 'hvacModes',
-      preset_mode: 'presetMode', preset_modes: 'presetModes', fan_mode: 'fanMode', fan_modes: 'fanModes',
-      swing_mode: 'swingMode', swing_modes: 'swingModes', current_humidity: 'currentHumidity', humidity: 'targetHumidity',
-    });
-    if (domain === 'select' || domain === 'input_select') projectFields(projected, attributes, { options: 'options' });
-    if (domain === 'number' || domain === 'input_number') projectFields(projected, attributes, { min: 'min', max: 'max', step: 'step' });
-    if (domain === 'humidifier') projectFields(projected, attributes, {
-      current_humidity: 'currentHumidity', humidity: 'targetHumidity', min_humidity: 'minHumidity', max_humidity: 'maxHumidity',
-    });
-    if (domain === 'fan') projectFields(projected, attributes, {
-      percentage_step: 'percentageStep', preset_mode: 'presetMode', preset_modes: 'presetModes', direction: 'direction', oscillating: 'oscillating',
-    });
-    if (domain === 'cover') projectFields(projected, attributes, { current_tilt_position: 'currentTiltPosition' });
-    if (domain === 'media_player') projectFields(projected, attributes, {
-      media_title: 'mediaTitle', media_artist: 'mediaArtist', media_album_name: 'mediaAlbumName',
-      media_content_type: 'mediaContentType', media_duration: 'mediaDuration', media_position: 'mediaPosition',
-      media_position_updated_at: 'mediaPositionUpdatedAt', source: 'source', source_list: 'sourceList',
-      sound_mode: 'soundMode', sound_mode_list: 'soundModeList', repeat: 'repeat', shuffle: 'shuffle',
-    });
-    if (domain === 'vacuum') projectFields(projected, attributes, {
-      battery_level: 'batteryLevel', fan_speed: 'fanSpeed', fan_speed_list: 'fanSpeedList', status: 'status',
-    });
-    if (domain === 'weather') projectFields(projected, attributes, {
-      apparent_temperature: 'apparentTemperature', humidity: 'humidity', dew_point: 'dewPoint', pressure: 'pressure',
-      pressure_unit: 'pressureUnit', wind_speed: 'windSpeed', wind_gust_speed: 'windGustSpeed', wind_bearing: 'windBearing',
-      wind_speed_unit: 'windSpeedUnit', precipitation_unit: 'precipitationUnit', visibility: 'visibility',
-      visibility_unit: 'visibilityUnit', cloud_coverage: 'cloudCoverage', uv_index: 'uvIndex',
-    });
-    if (domain === 'weather' && projected.unit === undefined) projectFields(projected, attributes, { temperature_unit: 'unit' });
-    const parsed = stateSchema.safeParse(projected);
-    if (!parsed.success) throw new HttpError(502, 'Invalid projected Home Assistant state');
-    states.push(parsed.data);
+    states.push(projectNativeState(raw));
   }
   const snapshot: NativeHomeSnapshot = { mode: 'live', houseConfig, states };
   return validateSnapshot(snapshot, credentials);
@@ -490,6 +527,8 @@ function todoItems(raw: unknown, credentials: string[]) {
 export async function readNativeSnapshot(
   url: string, token: string, signal: AbortSignal, credentials: string[],
   readStates: () => Promise<unknown>,
+  /** Todo lists the draft names (`draftTodoIds`), read in addition to the chores pages' lists; the cap of 64 covers both. */
+  extraTodoIds: ReadonlySet<string> = new Set(),
 ): Promise<NativeSnapshot> {
   if (signal.aborted) throw nativeHomeAbortError(signal);
   const session = new NativeReadSession(url, token, signal);
@@ -509,13 +548,14 @@ export async function readNativeSnapshot(
       readStates(),
       optional(async () => ({ value: await session.currentUser() }), 'Current user read unavailable'),
     ]);
-    const snapshot = nativeHomeSnapshot(houseConfig, rawStates, credentials);
+    const snapshot = nativeHomeSnapshot(houseConfig, rawStates, credentials, extraTodoIds);
     if (rawUser !== undefined) {
       snapshot.currentUser = await optional(async () => currentUser(rawUser.value, rawStates, credentials), 'Current user response was invalid or unsafe');
       if (!snapshot.currentUser) delete snapshot.currentUser;
     }
     const chores = choreRecord(houseConfig.config.chores);
     const todoIds = [...new Set([
+      ...extraTodoIds,
       ...choreRecords(chores.pages).flatMap(page => choreRecords(page.lists).map(list => list.entityId)),
       ...choreRecords(chores.people).flatMap(person => Object.values(choreRecord(person.summaryLists))),
     ].filter((id): id is string => typeof id === 'string' && id.startsWith('todo.') && entityIdSchema.safeParse(id).success))];
