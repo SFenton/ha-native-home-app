@@ -85,7 +85,7 @@ test('the question and the dialog are named for assistive technology', async ({ 
   await expect(page.getByTestId('linked-status')).toHaveAttribute('role', 'status');
 });
 
-test('a parameter is marked in the component and set at one place without changing the other', async ({ page }) => {
+test('a setting is chosen in the component and set at one place without changing the other', async ({ page }) => {
   test.skip(isPhone(page), 'A right-click needs a mouse');
   await openWorkspace(page);
   await chooseFromMenu(page, 'Demo Guests 1', 'Save as Template…');
@@ -94,19 +94,16 @@ test('a parameter is marked in the component and set at one place without changi
   await page.getByTestId('saved-row').getByRole('button').first().click();
   await expect(previewRoot(page).locator('.sh-link-badge')).toHaveCount(2);
   const panel = page.getByLabel('Properties');
-  const parameters = panel.getByTestId('component-parameters');
-  await parameters.getByRole('button', { name: 'Add Parameter…' }).click();
-  await parameters.getByLabel('Field').selectOption({ label: 'Title · Text' });
-  await parameters.getByLabel('Name').fill('label');
-  await parameters.getByRole('button', { name: 'Add', exact: true }).click();
+  await panel.getByRole('button', { name: 'Choose Fields…' }).click();
+  await panel.getByRole('checkbox', { name: 'Set Title per place' }).click();
   // The change is to a component two places use, so it asks first.
   const question = page.getByTestId('linked-question');
   await expect(question).toBeVisible();
   await question.getByRole('button', { name: 'Update Template' }).click();
   await expect(question).toHaveCount(0);
   const settings = panel.getByTestId('component-settings');
-  await expect(settings.getByRole('textbox', { name: 'Label' })).toBeVisible();
-  await settings.getByRole('textbox', { name: 'Label' }).fill('Side Door');
+  await expect(settings.getByRole('textbox', { name: 'Title' })).toBeVisible();
+  await settings.getByRole('textbox', { name: 'Title' }).fill('Side Door');
   await expect(previewRoot(page).getByText('Side Door', { exact: true })).toHaveCount(1);
   await snap(page, 'linked-parameter');
 });

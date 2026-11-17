@@ -146,9 +146,10 @@ function adoptFlows(document: CompositionDocument, body: CompositionNode): NonNu
 
 /** The arguments a new place starts with: each parameter's default, the value its first bound field holds in the body (or in the template's own source). */
 export function defaultArgs(entry: ComponentEntry): Record<string, string> | undefined {
-  if (!entry.params?.length) return undefined;
+  const strings = entry.params?.filter(param => param.kind !== 'value');
+  if (!strings?.length) return undefined;
   const args: Record<string, string> = {};
-  for (const param of entry.params) {
+  for (const param of strings) {
     const binding = entry.bindings?.find(item => item.param === param.name);
     const owner: unknown = binding?.nodeId !== undefined ? valueAtNode(entry.node, binding.nodeId) : ownedSources(entry).find(source => source.id === binding?.sourceId);
     const value = owner && binding ? readField(owner, binding.field) : undefined;
@@ -318,9 +319,9 @@ export function settleHeld(current: CompositionDocument, next: CompositionDocume
   for (const other of componentReferences(result)) {
     const was = before.get(other.ref.id);
     if (other.ref.componentId !== original || other.ref.id === refId || !was) continue;
-    const { args: changed, ...rest } = other.ref;
-    void changed;
-    result = replaceAt(result, other.path, was.args ? { ...rest, args: was.args } : rest);
+    const { args: changed, values: changedValues, ...rest } = other.ref;
+    void changed; void changedValues;
+    result = replaceAt(result, other.path, { ...rest, ...(was.args ? { args: was.args } : {}), ...(was.values ? { values: was.values } : {}) });
   }
   return [forked, result];
 }

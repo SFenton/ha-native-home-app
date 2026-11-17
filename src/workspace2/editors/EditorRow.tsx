@@ -81,7 +81,7 @@ export default function EditorRow({ label, summary, itemName, document, onApply,
   return <>
     {head ? head(start) : <button type="button" className="w2-disclosure-head" data-disclosure={path} data-field-path={path} onClick={start}><span className="w2-row-label">{label}</span><span className="w2-summary">{summary}</span>{tag}<ChevronRight size={16} aria-hidden/></button>}
     {wide && <Dialog.Root open onOpenChange={next => { if (!next && wide.tryLeave()) close(); }}>
-      <Dialog.Portal><Dialog.Backdrop className="w2-backdrop"/><Dialog.Viewport className="w2-dialog-viewport"><Dialog.Popup className="w2-scope w2-dialog w2-dialog-m w2-editor" aria-label={title}>
+      <Dialog.Portal><Dialog.Backdrop className="w2-backdrop"/><Dialog.Viewport className="w2-dialog-viewport"><Dialog.Popup data-modal className="w2-scope w2-dialog w2-dialog-m w2-editor" aria-label={title}>
         <header className="w2-dialog-head w2-editor-head">
           <Dialog.Close className="w2-icon-button" aria-label="Close"><X size={18} aria-hidden/></Dialog.Close>
           <Dialog.Title>{title}</Dialog.Title><span className="w2-editor-item">{itemName}</span>

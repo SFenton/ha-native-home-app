@@ -695,6 +695,12 @@ const componentRef = object({
   id, type: z.literal('component-ref'), componentId: id, layout: object({ span: integer(1, 4).optional() }),
   /** One argument per declared parameter, by parameter name (up to 16): the value each bound field takes in this use. */
   args: z.record(z.string().max(80), text(240)).optional(),
+  /**
+   * One JSON value per `value` parameter the use sets itself (`sh.component-values@1`), by parameter name (up to 16, each at most 8,192 bytes of canonical
+   * JSON): the value each field bound to that parameter takes. A parameter with no entry keeps the body's value; `null` removes the field in this use.
+   * `args` is unchanged and still holds the strings of the seven other kinds.
+   */
+  values: z.record(z.string().max(80), z.json()).optional(),
 });
 export type ComponentRefNode = z.infer<typeof componentRef>;
 
@@ -869,10 +875,17 @@ export function compositionChildren(node: CompositionNode): CompositionNode[] {
  * What a parameter of a saved component takes: an identifier of a data source, a page, a sheet or a local state field, a Home Assistant entity id
  * (`domain.object`), a plain string, or an SF Symbol name.
  */
-export const componentParamKinds = ['source-id', 'page-id', 'modal-id', 'entity-id', 'state-id', 'text', 'symbol'] as const;
+export const componentStringKinds = ['source-id', 'page-id', 'modal-id', 'entity-id', 'state-id', 'text', 'symbol'] as const;
+/** The kinds whose argument is one string, kept in a use's `args`. */
+export type ComponentStringKind = typeof componentStringKinds[number];
+/** Every kind a parameter takes: the seven string kinds, and `value` (`sh.component-values@1`), whose argument is any JSON in a use's `values`. */
+export const componentParamKinds = [...componentStringKinds, 'value'] as const;
 export type ComponentParamKind = typeof componentParamKinds[number];
-/** The most parameters, bindings and private sources one saved component declares. */
-export const COMPONENT_ENTRY_LIMITS = { params: 16, bindings: 128, sources: 8, flows: 8 } as const;
+/**
+ * The most parameters, bindings and private sources one saved component declares, and (`sh.component-values@1`) the most entries a use's `values`
+ * holds and the most bytes of canonical JSON one value takes.
+ */
+export const COMPONENT_ENTRY_LIMITS = { params: 16, bindings: 128, sources: 8, flows: 8, values: 16, valueBytes: 8192 } as const;
 /**
  * One saved component of the document's library (`sh.component-ref@1`). `node` is one node and everything inside it, written once and used by
  * reference. `params` name the per-use settings (each with an optional `label` the Studio shows instead of the name), and `bindings` say which field

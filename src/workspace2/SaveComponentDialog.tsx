@@ -30,7 +30,7 @@ function Body({ gate, document, node }: { gate: LinkedGate; document: Compositio
   useEffect(() => { const frame = window.requestAnimationFrame(() => { field.current?.focus(); field.current?.select(); }); return () => window.cancelAnimationFrame(frame); }, []);
   const taken = nameValid(name) && nameTaken(document, name);
   const ok = nameValid(name) && !taken;
-  return <Dialog.Popup className="w2-scope w2-dialog w2-dialog-s" data-testid="save-component" initialFocus={field}>
+  return <Dialog.Popup className="w2-scope w2-dialog w2-dialog-s" data-modal data-testid="save-component" initialFocus={field}>
     <header className="w2-dialog-head"><Dialog.Title>Save as Template</Dialog.Title><Dialog.Close className="w2-icon-button" aria-label="Close"><X size={18} aria-hidden/></Dialog.Close></header>
     <form onSubmit={event => { event.preventDefault(); if (ok) gate.confirmSave(name.trim()); }}>
       <div className="w2-dialog-body">

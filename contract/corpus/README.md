@@ -49,6 +49,12 @@ fill that is not a `solid-rgb`, a fill on a tile override, a rule that gives `un
 `state-styles/built-in.json` is the eight built-in styles as data: not a case, but a fixture the Studio and the
 app both test their own built-in data against.
 
+The `component-values-*` files (8 pending accepts, `reject/pending-component-values-*`, and 13 refused) cover `sh.component-values@1`, pending: a parameter of the kind
+`value` and a `values` key on a `component-ref` that holds any JSON for it (a colour, a rule, `null` to remove an optional field, a field the body lacks,
+a rule that names a private source), with the limits (16 entries, 8,192 bytes of canonical JSON each) and the refusals (overlapping bindings, an unknown
+key, a `values` entry for a string parameter, an `args` entry for a value parameter, `null` on a required field, a value of the wrong shape, a binding of
+`id`, a capability missing). They are written by `scripts/generate-component-corpus.ts`; do not edit them by hand.
+
 **Pending cases.** An envelope that declares a pending capability is refused by the app's shipped list at the first capability it does not
 list, before anything else (`unsupported_capability`, pointer `/capabilities/<n>`). Such a case lives in `reject/`, is marked `"pending": true`,
 and records that refusal as its `issue`, so the app's test already passes with no native change. A case the Studio compiles is named

@@ -206,15 +206,16 @@ test('the group, the form, the open template row and the questions fit at every 
     if (isPhone(page) && width !== 390) continue;
     await page.setViewportSize({ width, height });
     await expect(templateRow(page)).toBeVisible();
-    await templateRow(page).scrollIntoViewIfNeeded();
+    // A resize can redraw the panel while the row scrolls: try again on the new element.
+    await expect(async () => { await templateRow(page).scrollIntoViewIfNeeded({ timeout: 2000 }); }).toPass();
     await inside(templateRow(page), width, height, 'template row');
     await inside(panel(page).getByTestId('component-settings'), width, height, 'settings');
     if (await templateRow(page).getAttribute('aria-expanded') !== 'true') await templateRow(page).click();
     await inside(panel(page).getByTestId('component-parameters'), width, height, 'parameters');
-    // the edit question: Remove Parameter on a template of two places
+    // the edit question: Remove Setting on a template of two places
     const list = panel(page).getByTestId('component-parameters');
-    if (!(await list.getByRole('button', { name: 'Remove Parameter' }).count())) await list.getByRole('button', { name: /^Entity/ }).click();
-    await list.getByRole('button', { name: 'Remove Parameter' }).click();
+    if (!(await list.getByRole('button', { name: 'Remove Setting' }).count())) await list.getByRole('button', { name: /^Entity/ }).click();
+    await list.getByRole('button', { name: 'Remove Setting' }).click();
     const dialog = question(page);
     await expect(dialog).toBeVisible();
     const box = (await dialog.boundingBox())!;

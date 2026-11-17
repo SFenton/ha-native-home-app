@@ -151,7 +151,7 @@ describe('copy snapshots: the visible text of each surface (spec 10)', () => {
     resetTemplateFold();
     // A template of two state tiles (invented entities), placed twice; the first field set per place.
     const base = structuredClone(slice) as unknown as { pages: { id: string; components: unknown[] }[] } & CompositionDocument;
-    const lamp = (id: string) => ({ ...newStateTile('switch.demo_lamp', id, undefined, undefined)!, id });
+    const lamp = (id: string) => ({ ...newStateTile('switch.demo_lamp', id, undefined, undefined)!, id, title: id.replace(/(^|-)([a-z])/g, (_, dash: string, letter: string) => `${dash ? ' ' : ''}${letter.toUpperCase()}`) });
     base.pages[2].components = [{ id: 'demo-row', title: 'Demo Row', type: 'section', layout: { span: 1 }, props: { header: 'S', footer: '', style: 'plain', density: 'thin', hasGlyphs: false, spacing: { type: 'token', name: 'm' } }, children: [lamp('demo-first'), lamp('demo-second')] }];
     const saved = saveAsComponent(base, ['pages', 2, 'components', 0], 'Lamp Row');
     const entry = saved.document.componentLibrary![0];

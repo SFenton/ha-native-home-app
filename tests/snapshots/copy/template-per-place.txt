@@ -1,11 +1,11 @@
-demo-second
+Demo Second
 State tile · Sample Detail › Demo Row
 Linked to Lamp Row
 Used in 2 places. A change here asks first.
-Parameters (1)
+Choose Fields…
+Each place sets (1)
 Entity
-Entity
-Add Parameter…
+Entity · Entity of Demo First
 Title
 Subtitle
 None
@@ -66,7 +66,7 @@ Advanced
 [names]
 More
 Close
-Parameters
+Each place sets
 Add Subtitle
 Set Per Place: Entity
 Active when: From the style.

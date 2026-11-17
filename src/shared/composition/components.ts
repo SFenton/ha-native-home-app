@@ -1,4 +1,4 @@
-import { COMPONENT_ENTRY_LIMITS, type ComponentEntry, type ComponentParamKind, type ComponentRefNode, type CompositionDocument, type CompositionNode } from './schema';
+import { COMPONENT_ENTRY_LIMITS, type ComponentEntry, type ComponentStringKind, type ComponentRefNode, type CompositionDocument, type CompositionNode } from './schema';
 
 /**
  * Saved components (`sh.component-ref@1`): a document-level library of nodes, and `component-ref` nodes that stand for one of them. A reference is
@@ -8,6 +8,8 @@ import { COMPONENT_ENTRY_LIMITS, type ComponentEntry, type ComponentParamKind, t
 
 /** The capability a document needs when it holds a `componentLibrary` key or a `component-ref` node. */
 export const COMPONENT_REF_CAPABILITY = 'sh.component-ref@1';
+/** The capability a document needs when a parameter has the kind `value` or a `component-ref` holds a `values` key (a pending id: the app does not list it yet). */
+export const COMPONENT_VALUES_CAPABILITY = 'sh.component-values@1';
 
 /** The most entries a library holds, and the most parameters, bindings and private sources one component declares. */
 export const COMPONENT_LIMITS = { entries: 100, ...COMPONENT_ENTRY_LIMITS } as const;
@@ -109,11 +111,37 @@ export function writeField<T>(node: T, field: string, value: unknown): T {
 }
 
 /**
+ * `node` with `field` set to `value` for a `value` parameter (`sh.component-values@1`): the same copy-on-write walk as {@link writeField}, except that the
+ * last step is created when the object that holds it exists, and `null` removes it. A missing object on the way, or a list on the last step, leaves `node`
+ * as it is (a list's place cannot be removed, or grown, without moving its neighbours).
+ */
+export function writeValue<T>(node: T, field: string, value: unknown): T {
+  const steps = fieldSteps(field);
+  if (!steps.length) return node;
+  const set = (current: unknown, depth: number): unknown => {
+    if (current === null || typeof current !== 'object') return undefined;
+    const last = depth === steps.length - 1;
+    if (Array.isArray(current) && last && (!Object.hasOwn(current, steps[depth]) || value === null)) return undefined;
+    if (!last && !Object.hasOwn(current, steps[depth])) return undefined;
+    const copy: Record<string, unknown> = Array.isArray(current) ? [...current] as unknown as Record<string, unknown> : { ...current };
+    if (last) {
+      if (value === null) delete copy[steps[depth]]; else copy[steps[depth]] = value;
+      return copy;
+    }
+    const inner = set(Reflect.get(current, steps[depth]), depth + 1);
+    if (inner === undefined) return undefined;
+    copy[steps[depth]] = inner;
+    return copy;
+  };
+  return (set(node, 0) as T | undefined) ?? node;
+}
+
+/**
  * What a field holds, as far as a binding cares, from where it sits: a `pageId`, a `modalId`, a `stateId`, a source or provider id, an entity id
  * (an `entityId` or `...EntityId` key, a `copySourceId`, or the literal under an `entityId` or `entity_id` key), the name of an SF Symbol, the value of a
  * literal, or a node's own `title`. Undefined for any field a parameter may not fill. `node` is a body node or one of an entry's private sources.
  */
-export function fieldKind(node: unknown, field: string): ComponentParamKind | undefined {
+export function fieldKind(node: unknown, field: string): ComponentStringKind | undefined {
   const steps = fieldSteps(field);
   const last = steps.at(-1);
   if (last === undefined) return undefined;
@@ -149,7 +177,7 @@ export const bodyIdOf = (id: string): string => id.includes('~') ? id.slice(id.i
 export const instanceNodeId = (refId: string, innerId: string, root: boolean): string => root ? refId : derivedId(refId, innerId);
 
 /** `value` with every source key that names an id in `names` rewritten to the mapped id; the same object when nothing changes. */
-function renameSources<T>(value: T, names: ReadonlyMap<string, string>): T {
+export function renameSources<T>(value: T, names: ReadonlyMap<string, string>): T {
   const through = (list: unknown[], rename: (item: unknown) => unknown): unknown[] => {
     const next = list.map(rename);
     return next.some((item, index) => item !== list[index]) ? next : list;
@@ -170,7 +198,7 @@ function renameSources<T>(value: T, names: ReadonlyMap<string, string>): T {
 }
 
 /** The private sources of `entry` as the names they take in the instance `refId`: `<reference id>~<source id>`. */
-const privateNames = (refId: string, entry: Pick<ComponentEntry, 'sources' | 'flows'>): Map<string, string> =>
+export const privateNames = (refId: string, entry: Pick<ComponentEntry, 'sources' | 'flows'>): Map<string, string> =>
   new Map(ownedSources(entry).map(source => [source.id, derivedId(refId, source.id)]));
 
 /**
@@ -188,6 +216,12 @@ export function expandSources(ref: ComponentRefNode, entry: ComponentEntry): Doc
   });
 }
 
+/** Whether two field paths are one, or one lies under the other (`props/tone` and `props/tone/color`). */
+export const fieldsOverlap = (first: string, second: string): boolean => {
+  const a = fieldSteps(first), b = fieldSteps(second), shared = Math.min(a.length, b.length);
+  return a.slice(0, shared).every((step, index) => step === b[index]);
+};
+
 const expansions = new WeakMap<object, Map<string, CompositionNode>>();
 
 /**
@@ -198,20 +232,27 @@ const expansions = new WeakMap<object, Map<string, CompositionNode>>();
  * identity and then the reference's id, width and arguments, so an unchanged component is expanded once.
  */
 export function expandRef(ref: ComponentRefNode, entry: ComponentEntry): CompositionNode {
-  const key = `${ref.id}\0${ref.layout.span}\0${ref.args ? JSON.stringify(ref.args) : ''}\0${entry.bindings ? JSON.stringify(entry.bindings) : ''}\0${entry.sources ? JSON.stringify(entry.sources) : ''}\0${entry.flows ? JSON.stringify(entry.flows) : ''}`;
+  const key = `${ref.id}\0${ref.layout.span}\0${ref.args ? JSON.stringify(ref.args) : ''}\0${ref.values ? JSON.stringify(ref.values) : ''}\0${entry.bindings ? JSON.stringify(entry.bindings) : ''}\0${entry.sources ? JSON.stringify(entry.sources) : ''}\0${entry.flows ? JSON.stringify(entry.flows) : ''}`;
   const cache = expansions.get(entry.node) ?? new Map<string, CompositionNode>();
   const known = cache.get(key);
   if (known) return known;
-  const bindings = new Map<string, { field: string; value: string }[]>();
+  const names = privateNames(ref.id, entry);
+  const bindings = new Map<string, { field: string; value: unknown; whole?: true }[]>();
   for (const binding of entry.bindings ?? []) {
     const value = ref.args?.[binding.param];
     if (value === undefined || binding.nodeId === undefined) continue;
     bindings.set(binding.nodeId, [...bindings.get(binding.nodeId) ?? [], { field: binding.field, value }]);
   }
-  const names = privateNames(ref.id, entry);
+  // A `value` argument is written after the strings, and a source key inside it that names one of the entry's own sources is this use's copy.
+  const valued = new Set((entry.params ?? []).filter(param => param.kind === 'value').map(param => param.name));
+  for (const binding of entry.bindings ?? []) {
+    if (!valued.has(binding.param) || binding.nodeId === undefined || !ref.values || !Object.hasOwn(ref.values, binding.param)) continue;
+    const value = names.size ? renameSources(ref.values[binding.param], names) : ref.values[binding.param];
+    bindings.set(binding.nodeId, [...bindings.get(binding.nodeId) ?? [], { field: binding.field, value, whole: true }]);
+  }
   const rename = (node: CompositionNode, root: boolean): CompositionNode => {
     let next: CompositionNode = node;
-    for (const { field, value } of bindings.get(node.id) ?? []) next = writeField(next, field, value);
+    for (const { field, value, whole } of bindings.get(node.id) ?? []) next = whole ? writeValue(next, field, value) : writeField(next, field, value);
     next = mapChildren(next, child => rename(child, false));
     const id = instanceNodeId(ref.id, node.id, root);
     const layout = root ? { ...next.layout, span: ref.layout.span } : next.layout;

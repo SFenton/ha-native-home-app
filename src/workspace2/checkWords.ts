@@ -151,7 +151,9 @@ export function wordsFor(document: CompositionDocument, issue: CompositionIssue,
     case 'missing_required': return emptyText(value, target) && f ? emptyWords(f) : `${f ?? 'A required value'} is needed. Add it.`;
     case 'invalid_value': return emptyText(value, target) && f ? emptyWords(f) : `${f ?? 'A value'}${quoted(value)} is not allowed. Change it to a value the app accepts.`;
     case 'duplicate_key': return `${f ?? 'A setting'} appears twice. Delete one of them in Edit as JSON.`;
-    case 'limit_exceeded': return `${f ?? 'A list'} ${tooMany(value)}`;
+    case 'limit_exceeded':
+      if (/\/values\/[^/]+$/.test(issue.pointer)) return `${f ? `${f}: ` : ''}This value is too large for one place. Shorten it.`;
+      return `${f ?? 'A list'} ${tooMany(value)}`;
     case 'duplicate_id': return `${f ?? 'An ID'}${quoted(value)} is used twice. Give one of them a different name.`;
     case 'invalid_reference': return `${f ?? 'A link'}${quoted(value)} points to something that is not there. Choose one that exists.`;
     case 'binding_type': return `${f ?? 'The data'} reads data of the wrong kind for this. Choose a source or entity that fits.`;
@@ -159,6 +161,7 @@ export function wordsFor(document: CompositionDocument, issue: CompositionIssue,
     case 'asset_integrity': return `${f ?? 'An image'} is missing or has changed. Choose the image again.`;
     case 'unsupported_capability':
       if (issue.capability === 'sh.component-ref@1') return 'Templates need a newer app than this one runs. Unlink them, or wait for the app to update.';
+      if (issue.capability === 'sh.component-values@1') return 'Settings for colors, rules and numbers need a newer app than this one runs. Make them the same everywhere, or wait for the app to update.';
       if (issue.capability === 'sh.tab-blocks@1') return 'Shared areas in tabs need a newer app than this one runs. Put the controls in each tab, or wait for the app to update.';
       if (issue.capability === 'sh.tab-bar@1') return 'Tab bar settings need a newer app than this one runs. Use the default bar, or wait for the app to update.';
       if (issue.capability === 'sh.tile-swipe@1') return 'Swiping a tile needs a newer app than this one runs. Turn Swipe to Adjust off, or wait for the app to update.';

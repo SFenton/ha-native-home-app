@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { valueAt } from '../composition-editor';
 import type { IndexEntry } from '../preview2/model';
@@ -7,9 +7,9 @@ import { TextInput, LabeledRow } from './editors/controls';
 import { sourceName } from './dialogs/sources';
 import { mechanicalLabel } from './labels';
 import { ownStateField } from './linked';
-import {
-  addParameter, bindableFields, bindingWords, defaultOf, kindWords, labelValid, nameProblem, PARAM_LABEL_MAX, paramLabel, removeParameter, setArgument, setParamLabel, suggestName,
-} from './params';
+import { bindingWords, defaultOf, kindWords, labelValid, PARAM_LABEL_MAX, paramLabel, removeParameter, setArgument, setParamLabel } from './params';
+import PlaceValueRow from './PlaceValueRow';
+import { ChooseFieldsButton } from './ChooseFields';
 import ChoiceField, { type Choice } from './pickers/ChoiceField';
 import { PickerRow, IconField } from './pickers/PickerField';
 import EntityList from './pickers/EntityList';
@@ -21,13 +21,17 @@ import type { Workspace2 } from './useWorkspace2';
  *
  * - On the root of a place: {@link TemplateSettings}, one row for each parameter under its label, the place's own value, with the picker the kind
  *   already has elsewhere (entity, state, data source, page, sheet, symbol) or a text field. A change is this place's alone, so it never asks.
- * - On any node of the template: {@link TemplateParameters}, the author's list of parameters, each opening in place to its label and Remove Parameter,
- *   and Add Parameter… to mark one more field of the selected node. Changing the list changes the template, so it goes through the edit question.
+ * - On any node of the template: {@link TemplateParameters}, the author's list of what each place sets, each opening in place to its label and Remove
+ *   Setting. Fields are marked from Choose Fields (`ChooseFields.tsx`). Changing the list changes the template, so it goes through the edit question.
  */
 export default function ComponentParams({ ws, document, entry, onError }: { ws: Workspace2; document: CompositionDocument; entry: IndexEntry; onError: (message: string) => void }) {
   const component = document.componentLibrary?.find(item => item.id === entry.component);
   if (!component) return null;
-  return ws.mode === 'edit' ? <TemplateParameters ws={ws} document={document} component={component} entry={entry} onError={onError}/> : null;
+  const path = entry.bodyPath ?? entry.path, node = valueAt(document, path) as CompositionNode | undefined;
+  return ws.mode === 'edit' ? <>
+    {node && node.type !== 'component-ref' && <ChooseFieldsButton document={document} component={component} node={node} path={path}/>}
+    <TemplateParameters ws={ws} document={document} component={component} entry={entry} onError={onError}/>
+  </> : null;
 }
 
 // MARK: - Settings of a place
@@ -46,6 +50,7 @@ export function TemplateSettings({ ws, document, component, refPath, onError }: 
   return <section className="w2-group" data-group="parameters" aria-label="Settings" data-testid="component-settings">
     {params.map(param => {
       const label = paramLabel(param), value = ref.args?.[param.name] ?? defaultOf(component, param.name);
+      if (param.kind === 'value') return <PlaceValueRow key={param.name} document={document} component={component} refPath={refPath} param={param} say={ws.linked.say} onChange={next => ws.studio.apply(next)} onError={onError}/>;
       if (param.kind === 'text') return <LabeledRow key={param.name} label={label}><TextInput label={label} value={value} maxLength={240} onCommit={next => set(param.name, next)}/></LabeledRow>;
       if (param.kind === 'symbol') return <IconField key={param.name} label={label} symbol={value} onPick={next => set(param.name, next)} path={`args/${param.name}`}/>;
       if (param.kind === 'entity-id') return <EntitySetting key={param.name} label={label} value={value} domains={domainOf(defaultOf(component, param.name))} onPick={next => set(param.name, next)} path={`args/${param.name}`}/>;
@@ -107,48 +112,26 @@ function sharedWithOthers(document: CompositionDocument, entryId: string, refPat
   return (['pages', 'modals'] as const).some(kind => document[kind].some((surface, index) => holds(surface.components, [kind, index, 'components'])));
 }
 
-// MARK: - Parameters (authoring)
+// MARK: - Settings (authoring)
 
-/** The template's parameters, each opening in place, and a form to mark one more field of the selected node. */
-export function TemplateParameters({ ws, document, component, entry, onError }: { ws: Workspace2; document: CompositionDocument; component: ComponentEntry; entry: IndexEntry; onError: (message: string) => void }) {
-  const node = valueAt(document, entry.bodyPath ?? entry.path) as CompositionNode | undefined;
-  const fields = useMemo(() => node && node.type !== 'component-ref' ? bindableFields(node, component) : [], [node, component]);
-  const [open, setOpen] = useState(false);
+/** What each place sets: the template's settings, each opening in place to its label and Remove Setting. They are made from Choose Fields. */
+export function TemplateParameters({ document, component, onError, ws }: { ws: Workspace2; document: CompositionDocument; component: ComponentEntry; entry: IndexEntry; onError: (message: string) => void }) {
   const [opened, setOpened] = useState<string>();
-  const [field, setField] = useState('');
-  const [name, setName] = useState('');
-  const nameId = useId(), errorId = useId(), fieldId = useId();
   const params = component.params ?? [];
-  const chosen = fields.find(item => item.field === field) ?? fields[0];
-  const problem = chosen && name ? nameProblem(component, name, chosen.kind) : undefined;
   const run = (change: () => CompositionDocument) => { try { ws.studio.apply(change()); return true; } catch (error) { onError(error instanceof Error ? error.message : String(error)); return false; } };
-  const begin = () => { setOpen(true); if (fields[0]) { setField(fields[0].field); setName(suggestName(component, fields[0])); } };
-  const choose = (next: string) => { setField(next); const found = fields.find(item => item.field === next); if (found) setName(suggestName(component, found)); };
-  if (!params.length && !fields.length) return null;
-  return <section className="w2-group" data-group="component-parameters" aria-label="Parameters" data-testid="component-parameters">
-    <h3 className="w2-group-title">{params.length ? `Parameters (${params.length})` : 'Parameters'}</h3>
-    {params.length > 0 && <ul className="w2-param-list">
+  if (!params.length) return null;
+  return <section className="w2-group" data-group="component-parameters" aria-label="Each place sets" data-testid="component-parameters">
+    <h3 className="w2-group-title">{`Each place sets (${params.length})`}</h3>
+    <ul className="w2-param-list">
       {params.map(param => <ParameterRow key={param.name} component={component} param={param} open={opened === param.name} onToggle={() => setOpened(opened === param.name ? undefined : param.name)}
         onLabel={label => run(() => setParamLabel(document, component.id, param.name, label))} onRemove={() => { run(() => removeParameter(document, component.id, param.name)); setOpened(undefined); }}/>)}
-    </ul>}
-    {!open && <button type="button" className="w2-param-add" disabled={!fields.length} onClick={begin}
-      title={!fields.length ? 'This element has no field a parameter can fill.' : undefined}>Add Parameter…</button>}
-    {open && chosen && <form className="w2-param-form" onSubmit={event => { event.preventDefault(); if (problem || !node) return; if (run(() => addParameter(document, component.id, node.id, chosen.field, name.trim()))) setOpen(false); }}>
-      <label className="w2-param-field" htmlFor={fieldId}><span className="w2-row-label">Field</span>
-        <select id={fieldId} value={chosen.field} onChange={event => choose(event.target.value)}>
-          {fields.map(item => <option key={item.field} value={item.field}>{`${item.label} · ${kindWords[item.kind]}`}</option>)}
-        </select></label>
-      <label className="w2-param-field" htmlFor={nameId}><span className="w2-row-label">Name</span>
-        <input id={nameId} value={name} maxLength={80} onChange={event => setName(event.target.value)} aria-invalid={problem ? true : undefined} aria-describedby={problem ? errorId : undefined}/></label>
-      {problem && <p id={errorId} role="alert" className="w2-field-error">{problem}</p>}
-      <div className="w2-param-actions"><button type="button" onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="w2-primary" disabled={!name || Boolean(problem)}>Add</button></div>
-    </form>}
+    </ul>
   </section>;
 }
 
 /**
- * One parameter: its label over what it fills ("Entity · Fills Entity of Light and 1 more"). Pressed, it opens in place to a Label field, the line
- * that says what it fills, and Remove Parameter.
+ * One setting: its label over what it fills ("Entity · Entity of Light and 1 more", "Icon color of Light"). Pressed, it opens in place to a Label field,
+ * the line that says what it fills, and Remove Setting.
  */
 function ParameterRow({ component, param, open, onToggle, onLabel, onRemove }: { component: ComponentEntry; param: NonNullable<ComponentEntry['params']>[number]; open: boolean; onToggle: () => void; onLabel: (label: string) => void; onRemove: () => void }) {
   const body = useId(), labelId = useId(), errorId = useId();
@@ -158,7 +141,7 @@ function ParameterRow({ component, param, open, onToggle, onLabel, onRemove }: {
   const commit = () => { if (!invalid && text.trim() !== (param.label ?? '')) onLabel(text); };
   return <li className="w2-param-item" data-param={param.name} data-open={open || undefined}>
     <button type="button" className="w2-param-row w2-param-head" aria-expanded={open} aria-controls={body} onClick={onToggle}>
-      <span className="w2-param-text"><span className="w2-param-name">{paramLabel(param)}</span><span className="w2-param-where">{kindWords[param.kind]}</span></span>
+      <span className="w2-param-text"><span className="w2-param-name">{paramLabel(param)}</span><span className="w2-param-where">{param.kind === 'value' ? where : `${kindWords[param.kind]} · ${where}`}</span></span>
       {open ? <ChevronDown size={16} aria-hidden/> : <ChevronRight size={16} aria-hidden/>}
     </button>
     {open && <div id={body} className="w2-param-open">
@@ -167,7 +150,7 @@ function ParameterRow({ component, param, open, onToggle, onLabel, onRemove }: {
           onChange={event => setText(event.target.value)} onBlur={commit} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); commit(); } }}/></label>
       {invalid && <p id={errorId} role="alert" className="w2-field-error">{`Name the setting in 1 to ${PARAM_LABEL_MAX} characters`}</p>}
       <p className="w2-caption">{`Fills ${where}`}</p>
-      <button type="button" className="w2-danger" onClick={onRemove}>Remove Parameter</button>
+      <button type="button" className="w2-danger" onClick={onRemove}>Remove Setting</button>
     </div>}
   </li>;
 }
