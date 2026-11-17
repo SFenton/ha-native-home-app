@@ -23,13 +23,14 @@ import { wgFlowCases, wgFlowEvaluations, wgFlowFamilies, wgFlowNeeds } from './w
 import { wgChartCases, wgChartEvaluations, wgChartFamilies, wgChartNeeds } from './wgchart-corpus';
 import { wgDialCases, wgDialEvaluations, wgDialFamilies, wgDialNeeds } from './wgdial-corpus';
 import { neCases, neEvaluations, neFamilies, neNeeds } from './neoperands-corpus';
+import { pbCases, pbEvaluations, pbFamilies, pbNeeds } from './profile-badges-corpus';
 import { placeCase, shippedCapabilities, shippedIssue } from './corpus-handshake';
 
 type J = Record<string, any>;
 const root = path.resolve(import.meta.dirname, '../contract/corpus');
 const base: J = JSON.parse(readFileSync(path.join(root, 'accept/fixture-composition-first-slice.json'), 'utf8'));
 const PAGE = 2;
-const FAMILIES = ['conditions', 'rules', 'app-state', 'home-status', ...askFamilies, ...grammar2Families, ...wgStyleFamilies, ...wgFlowFamilies, ...wgChartFamilies, ...wgDialFamilies, ...neFamilies];
+const FAMILIES = ['conditions', 'rules', 'app-state', 'home-status', ...askFamilies, ...grammar2Families, ...wgStyleFamilies, ...wgFlowFamilies, ...wgChartFamilies, ...wgDialFamilies, ...neFamilies, ...pbFamilies];
 
 // MARK: Builders
 const lit = (value: unknown): J => ({ type: 'literal', value });
@@ -135,12 +136,12 @@ reject('app-state-field-not-in-topic', 'A read names a field its topic has.', ['
 reject('app-state-wrong-kind', 'A read of a number field as text is refused.', ['app-state', 'conditions'], when(cmp('eq', read('app-clock', ['hour'], 'string'), lit('1'))));
 reject('home-status-counts-wrong-kind', 'The count of a home status is a number.', ['home-status-counts', 'conditions'], when(cmp('eq', read('lights', ['count'], 'string'), lit('1'))));
 
-cases.push(...askCases, ...grammar2Cases, ...wgStyleCases, ...(wgFlowCases as unknown as typeof wgStyleCases), ...wgChartCases, ...wgDialCases, ...neCases);
+cases.push(...askCases, ...grammar2Cases, ...wgStyleCases, ...(wgFlowCases as unknown as typeof wgStyleCases), ...wgChartCases, ...wgDialCases, ...neCases, ...(pbCases as unknown as typeof wgStyleCases));
 
 // MARK: Writing
 const needsIds: Record<string, string> = {
   conditions: 'sh.conditions@1', rules: 'sh.rules@1', 'app-state': 'sh.app-state@1', 'home-status-counts': 'sh.home-status-counts@1', 'pipeline-operands': 'sh.pipeline-operands@1',
-  ...askNeeds, ...grammar2Needs, ...wgStyleNeeds, ...wgFlowNeeds, ...wgChartNeeds, ...wgDialNeeds, ...neNeeds,
+  ...askNeeds, ...grammar2Needs, ...wgStyleNeeds, ...wgFlowNeeds, ...wgChartNeeds, ...wgDialNeeds, ...neNeeds, ...pbNeeds,
 };
 const shipped = shippedCapabilities(root);
 // `tile-ink-default-` belongs to its own generator: the grammar2 family `tile-ink` must not claim it by prefix.
@@ -153,12 +154,13 @@ for (const item of cases) {
   const draft = structuredClone(base);
   draft.document.pages[PAGE].components = item.components;
   // A case of the asks families carries an app state topic only when it uses one, so the first capability the shipped list refuses is the one the case is about.
-  draft.document.dataSources.push(...(askCases.includes(item) || grammar2Cases.includes(item) || wgStyleCases.includes(item as (typeof wgStyleCases)[number]) || (wgFlowCases as unknown[]).includes(item) || wgChartCases.includes(item as (typeof wgChartCases)[number]) ? sources.filter(entry => entry.model !== 'app-state@1' || item.needs.includes('app-state')) : sources));
+  draft.document.dataSources.push(...(askCases.includes(item) || grammar2Cases.includes(item) || wgStyleCases.includes(item as (typeof wgStyleCases)[number]) || (wgFlowCases as unknown[]).includes(item) || wgChartCases.includes(item as (typeof wgChartCases)[number]) || (pbCases as unknown[]).includes(item) ? sources.filter(entry => entry.model !== 'app-state@1' || item.needs.includes('app-state')) : sources));
   item.tweak?.(draft);
   const bytes = () => new TextEncoder().encode(JSON.stringify(draft));
   let studioIssue: J | undefined;
   try { draft.capabilities = compileCompositionDocument(draft.document).capabilities; }
   catch { draft.capabilities = [...new Set([...draft.capabilities, ...item.needs.map(name => needsIds[name])])].sort(); }
+  (item as { finish?: (envelope: J) => void }).finish?.(draft);
   try { decodeCompositionPublication(bytes()); if (item.reject) problems.push(`${item.name} was accepted`); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
@@ -273,6 +275,7 @@ evaluations.push(...wgFlowEvaluations as Evaluation[]);
 evaluations.push(...wgChartEvaluations as Evaluation[]);
 evaluations.push(...wgDialEvaluations as Evaluation[]);
 evaluations.push(...neEvaluations as Evaluation[]);
+evaluations.push(...pbEvaluations as Evaluation[]);
 const evaluationRoot = path.join(root, 'evaluation');
 mkdirSync(evaluationRoot, { recursive: true });
 for (const name of readdirSync(evaluationRoot)) if (name.endsWith('.json')) unlinkSync(path.join(evaluationRoot, name));

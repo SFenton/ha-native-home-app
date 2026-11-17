@@ -1,25 +1,40 @@
 import { ChevronLeft, Menu, X } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { CompositionActionSlot, CompositionDocument, CompositionGroups } from '../shared/composition/schema';
 import { isShown, type VisibilityRule } from './evaluate';
 import type { SelectionKey } from './model';
-import { Badge, GlyphByName, useBadge } from './nodes/shared';
+import { Badge, GlyphByName, useBadge, type BadgeFace } from './nodes/shared';
+import { AvatarDisc, useViewerName } from './nodes/avatar';
 import { useRender } from './render-context';
 import { useIsSelected } from './selection-store';
 
 type Item = CompositionGroups[number]['items'][number];
 
 /** A header circle: glass, 44 pt, selectable in Edit and acting in Use (its action, or `onPress` for the menu). */
-function Circle({ selKey, label, icon, action, onPress, expanded, className = '', badge }: { selKey?: SelectionKey; label: string; icon: string; action?: CompositionActionSlot; onPress?: () => void; expanded?: boolean; className?: string; badge?: string | null }) {
+function Circle({ selKey, label, icon, action, onPress, expanded, className = '', badge, disc }: { selKey?: SelectionKey; label: string; icon: string; action?: CompositionActionSlot; onPress?: () => void; expanded?: boolean; className?: string; badge?: BadgeFace | null; /** Drawn in place of the glyph: the Profile disc. */ disc?: ReactNode }) {
   const ctx = useRender();
   const selected = useIsSelected(ctx.store, selKey ?? 'chrome-item:');
   return <button type="button" className={`sh-circle ${className}`.trim()} aria-label={label} title={label} data-sel={selKey}
     data-selected={selKey && selected && ctx.mode === 'edit' ? '' : undefined}
-    aria-expanded={expanded} onClick={() => { if (ctx.mode !== 'use') return; if (action) ctx.run(action); onPress?.(); }}><GlyphByName name={icon} size={20}/><Badge text={badge ?? null}/></button>;
+    aria-expanded={expanded} onClick={() => { if (ctx.mode !== 'use') return; if (action) ctx.run(action); onPress?.(); }}>{disc ?? <GlyphByName name={icon} size={20}/>}<Badge badge={badge}/></button>;
 }
 /** A header button with its badge (`sh.badges@1`). */
 function ButtonItem({ item }: { item: Extract<Item, { type: 'button' }> }) {
   const badge = useBadge(item.badge, `chrome-item:${item.id}/badge`);
-  return <Circle selKey={`chrome-item:${item.id}`} label={item.label} icon={item.icon.name} action={item.action} badge={badge}/>;
+  return <Circle selKey={`chrome-item:${item.id}`} label={badge.spoken ? `${item.label}, ${badge.spoken}` : item.label} icon={item.icon.name} action={item.action} badge={badge}/>;
+}
+
+/**
+ * The header's Profile button. With a `profile` block (`sh.shell-profile@1`) it draws the person's disc (initials in the preview, never a photo) or the
+ * person symbol, with the authored badge; the label is "Profile" and the badge's spoken words follow it. Without one it draws the initials disc, as the app does; only `look: symbol` draws the person symbol.
+ */
+function ProfileCircle({ item, rail }: { item: Extract<Item, { type: 'shell-header' }>; rail: boolean }) {
+  const profile = item.profile;
+  const badge = useBadge(profile?.badge, `chrome-item:${item.id}/profile/badge`);
+  const name = useViewerName();
+  const look = profile?.look ?? 'photo';
+  return <Circle selKey={`chrome-item:${item.id}`} label={badge.spoken ? `Profile, ${badge.spoken}` : 'Profile'} icon={rail ? 'person.crop.circle' : 'person'} action={item.profileAction}
+    badge={badge} disc={<AvatarDisc name={name} size={44} look={look}/>}/>;
 }
 
 /** The two buttons of the app's `shell-header` item: Quick Links, then Profile. */
@@ -31,7 +46,7 @@ function ItemView({ item, root, rail = false }: { item: Item; root: boolean; /**
   if (item.type === 'button') return <ButtonItem item={item}/>;
   return <>
     <Circle selKey={`chrome-item:${item.id}`} label="Quick Links" icon="square.grid.2x2" action={item.quickLinksAction}/>
-    <Circle selKey={`chrome-item:${item.id}`} label="Profile" icon={rail ? 'person.crop.circle' : 'person'} action={item.profileAction}/>
+    <ProfileCircle item={item} rail={rail}/>
   </>;
 }
 
@@ -128,10 +143,10 @@ function TabButton({ tab, selected, ctx, onPicked, selectable = true }: { tab: C
   ctx.previous.set(key, visible);
   const badge = useBadge(tab.badge, `${key}/badge`);
   if (!visible && ctx.mode === 'use') return null;
-  return <button type="button" className="sh-tab" aria-current={selected ? 'page' : undefined} data-sel={selectable ? key : undefined} data-active={selected ? '' : undefined}
+  return <button type="button" className="sh-tab" aria-current={selected ? 'page' : undefined} aria-label={badge.spoken ? `${tab.label}, ${badge.spoken}` : undefined} data-sel={selectable ? key : undefined} data-active={selected ? '' : undefined}
     data-selected={selectable && picked && ctx.mode === 'edit' ? '' : undefined} data-hidden={!visible ? '' : undefined}
     onClick={() => { if (ctx.mode === 'use') ctx.run({ type: 'select-tab', tabId: tab.id }); onPicked?.(); }}>
-    <span className="sh-tab-glyph"><GlyphByName name={tab.icon.name} size={22}/><Badge text={badge}/></span><span>{tab.label}</span>
+    <span className="sh-tab-glyph"><GlyphByName name={tab.icon.name} size={22}/><Badge badge={badge}/></span><span>{tab.label}</span>
   </button>;
 }
 

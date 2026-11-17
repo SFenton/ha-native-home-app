@@ -6215,9 +6215,15 @@
       "note": "A tab of the shell with a badge from a format."
     },
     {
-      "file": "accept/badge-chrome-button.json",
-      "outcome": "accept",
-      "note": "A header button whose badge is a value; the shipped none stays valid."
+      "file": "reject/pending-badge-chrome-button.json",
+      "outcome": "reject",
+      "note": "A header button whose badge is a value; the shipped none stays valid.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
     },
     {
       "file": "reject/badge-boolean-value.json",
@@ -16057,6 +16063,741 @@
       "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/0/props/value/value/args"
+      }
+    },
+    {
+      "file": "reject/pending-profile-badges-header-profile-photo.json",
+      "outcome": "reject",
+      "note": "The header's Profile button asks for the person's photo over the initials, the default written out.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/12",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-header-profile-initials.json",
+      "outcome": "reject",
+      "note": "The initials disc only: no picture is asked for.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/12",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-header-profile-symbol.json",
+      "outcome": "reject",
+      "note": "The person symbol on glass, the web dashboard's look; the symbol is the header's alone.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/12",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-header-profile-empty.json",
+      "outcome": "reject",
+      "note": "A profile block with nothing in it: the id is needed because the block is there.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/12",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-header-profile-badge.json",
+      "outcome": "reject",
+      "note": "The count the Profile button carries: the sum of two counts, \"9+\" above nine, and the words VoiceOver says for it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "accept/profile-badges-header-without-profile-needs-no-id.json",
+      "outcome": "accept",
+      "note": "A header with no profile block is the header it always was: none of the four ids is declared."
+    },
+    {
+      "file": "reject/pending-profile-badges-header-profile-badge-none.json",
+      "outcome": "reject",
+      "note": "The built-in count is switched off by a badge of none: a drawn badge, no value.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-viewer.json",
+      "outcome": "reject",
+      "note": "The signed-in person as a row-sized disc: the smallest Profile Icon.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-person-large.json",
+      "outcome": "reject",
+      "note": "One named person as the large disc, with its title under it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-look-photo.json",
+      "outcome": "reject",
+      "note": "The photo over the initials, written out.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-look-initials.json",
+      "outcome": "reject",
+      "note": "The initials only, for a wall tablet that shows no photos.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-fill-standard.json",
+      "outcome": "reject",
+      "note": "The standard fill, the action blue.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-fill-colour.json",
+      "outcome": "reject",
+      "note": "An exact colour that keeps white initials at 4.5 to 1.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-action.json",
+      "outcome": "reject",
+      "note": "A disc that opens a page: a button, so it needs a title for VoiceOver.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-decoration.json",
+      "outcome": "reject",
+      "note": "No title and no action: the disc is decoration and VoiceOver skips it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-avatar-badge.json",
+      "outcome": "reject",
+      "note": "A Profile Icon with a count and the words VoiceOver says for it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-action-tile.json",
+      "outcome": "reject",
+      "note": "A power tile with a count, \"9+\" above nine, and the words VoiceOver says.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-door-tile.json",
+      "outcome": "reject",
+      "note": "A door tile with a count.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-light-group-tile.json",
+      "outcome": "reject",
+      "note": "A light group tile with a count.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-room-card.json",
+      "outcome": "reject",
+      "note": "A room card with a count.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-room-chip.json",
+      "outcome": "reject",
+      "note": "A room chip with a count.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-settings-link.json",
+      "outcome": "reject",
+      "note": "A settings row with a capsule before its chevron.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-text-four-characters.json",
+      "outcome": "reject",
+      "note": "A text badge of four characters, the most it draws.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-none-on-a-kind.json",
+      "outcome": "reject",
+      "note": "A badge of none on a kind that could not carry one: the field is there, so the id is declared.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-badge-chrome-button.json",
+      "outcome": "reject",
+      "note": "A header button whose badge is a value: drawn since this id, so the id is declared.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "accept/profile-badges-badge-chrome-button-none-needs-no-id.json",
+      "outcome": "accept",
+      "note": "A header button whose badge is none is the button it always was: no new id."
+    },
+    {
+      "file": "reject/pending-profile-badges-spoken-tab.json",
+      "outcome": "reject",
+      "note": "A tab badge with its spoken words: the tab's name stays its label and the words are its value.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-spoken-navigation-tile.json",
+      "outcome": "reject",
+      "note": "The words VoiceOver says on a tile that already carried a badge.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-spoken-chip.json",
+      "outcome": "reject",
+      "note": "The words VoiceOver says on a chip that already carried a badge.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-spoken-chrome-button.json",
+      "outcome": "reject",
+      "note": "The words VoiceOver says on a header button.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-profile-badges-cap-9-expanded.json",
+      "outcome": "reject",
+      "note": "Show at Most 9 as it is published: above nine the text \"9+\", otherwise the count as text; the spoken words say the whole number.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "accept/profile-badges-cap-9-tab.json",
+      "outcome": "accept",
+      "note": "Show at Most 9 alone on a tab, with no spoken words: the form the first publication uses, and it needs only the ids already shipped."
+    },
+    {
+      "file": "reject/pending-profile-badges-spoken-for-one.json",
+      "outcome": "reject",
+      "note": "Spoken As with a line for 1: the first case of a choose on the count equal to 1.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/profile-badges-avatar-look-symbol.json",
+      "outcome": "reject",
+      "note": "The person symbol is the header's alone: a node refuses it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/look"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-size-unknown.json",
+      "outcome": "reject",
+      "note": "A Profile Icon has two sizes, row and large: no free size.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/size"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-person-not-a-person.json",
+      "outcome": "reject",
+      "note": "A named person is a `person.*` entity.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/person/entityId"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-person-id-too-long.json",
+      "outcome": "reject",
+      "note": "An entity id is at most 255 characters.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/person/entityId"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-viewer-with-entity.json",
+      "outcome": "reject",
+      "note": "The viewer is whoever is signed in: it names no entity.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/person/entityId"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-fill-low-contrast.json",
+      "outcome": "reject",
+      "note": "White initials are not readable on a pale yellow: the fill must reach 4.5 to 1.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/fill"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-fill-pair.json",
+      "outcome": "reject",
+      "note": "The fill is one colour: a light and dark pair is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/fill/type"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-action-without-title.json",
+      "outcome": "reject",
+      "note": "A disc that is a button needs a title for VoiceOver.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/title"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-unknown-prop.json",
+      "outcome": "reject",
+      "note": "The props are closed.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/shape"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-action-not-navigation.json",
+      "outcome": "reject",
+      "note": "A Profile Icon opens a page: a service call is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/2",
+        "capability": "sh.avatar@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/action/type"
+      }
+    },
+    {
+      "file": "reject/profile-badges-header-profile-look-unknown.json",
+      "outcome": "reject",
+      "note": "The header's Profile button has three looks.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/10",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/navigation/chrome/groups/1/items/0/profile/look"
+      }
+    },
+    {
+      "file": "reject/profile-badges-header-profile-unknown-field.json",
+      "outcome": "reject",
+      "note": "The profile block is closed.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/10",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/navigation/chrome/groups/1/items/0/profile/size"
+      }
+    },
+    {
+      "file": "reject/profile-badges-header-profile-badge-boolean.json",
+      "outcome": "reject",
+      "note": "A badge is a number or text: a boolean is refused here too.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/10",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/navigation/chrome/groups/1/items/0/profile/badge/value"
+      }
+    },
+    {
+      "file": "reject/profile-badges-header-profile-on-a-button.json",
+      "outcome": "reject",
+      "note": "Only the header item has a profile block.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/10",
+        "capability": "sh.shell-profile@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/navigation/chrome/groups/0/items/1/profile"
+      }
+    },
+    {
+      "file": "reject/profile-badges-spoken-not-text.json",
+      "outcome": "reject",
+      "note": "The spoken words are text: a number is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/navigation/tabs/0/badge/spoken"
+      }
+    },
+    {
+      "file": "reject/profile-badges-spoken-boolean.json",
+      "outcome": "reject",
+      "note": "A boolean read is not text either.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/navigation/tabs/0/badge/spoken"
+      }
+    },
+    {
+      "file": "reject/profile-badges-spoken-on-none.json",
+      "outcome": "reject",
+      "note": "A badge of none says nothing else.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/navigation/tabs/0/badge/spoken"
+      }
+    },
+    {
+      "file": "reject/profile-badges-spoken-unknown-reference.json",
+      "outcome": "reject",
+      "note": "The spoken words read a source the document has.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_reference",
+        "pointer": "/document/navigation/tabs/0/badge/spoken/from/sourceId"
+      }
+    },
+    {
+      "file": "reject/profile-badges-badge-text-too-long.json",
+      "outcome": "reject",
+      "note": "A badge draws at most four characters: five are refused on a kind that carries one since this id.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/badge/value"
+      }
+    },
+    {
+      "file": "reject/profile-badges-badge-text-too-long-in-a-rule.json",
+      "outcome": "reject",
+      "note": "A text a rule can give is held to the same four characters.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/badge/value"
+      }
+    },
+    {
+      "file": "reject/profile-badges-badge-on-a-kind-boolean.json",
+      "outcome": "reject",
+      "note": "A badge is a number or text on every kind.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/pages/2/components/0/badge/value"
+      }
+    },
+    {
+      "file": "reject/profile-badges-badge-on-a-text-node.json",
+      "outcome": "reject",
+      "note": "A text node has no badge.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-nodes@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/badge"
+      }
+    },
+    {
+      "file": "reject/profile-badges-cap-left-in-a-publication.json",
+      "outcome": "reject",
+      "note": "Show at Most is the Studio's: a publication that leaves `cap` in a badge is refused as an unknown field.",
+      "issue": {
+        "code": "unknown_field",
+        "pointer": "/document/navigation/tabs/0/badge/cap"
+      }
+    },
+    {
+      "file": "reject/profile-badges-spoken-as-left-in-a-publication.json",
+      "outcome": "reject",
+      "note": "Spoken As is the Studio's: a publication that leaves its lines in a badge is refused as an unknown field.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/3",
+        "capability": "sh.badge-spoken@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/navigation/tabs/0/badge/spokenOther"
+      }
+    },
+    {
+      "file": "reject/profile-badges-avatar-capability-not-declared.json",
+      "outcome": "reject",
+      "note": "A Profile Icon whose manifest does not list `sh.avatar@1` does not match the document.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/profile-badges-shell-profile-capability-not-declared.json",
+      "outcome": "reject",
+      "note": "A profile block whose manifest does not list `sh.shell-profile@1` does not match the document.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/profile-badges-badge-spoken-capability-not-declared.json",
+      "outcome": "reject",
+      "note": "A spoken badge whose manifest does not list `sh.badge-spoken@1` does not match the document.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/profile-badges-badge-nodes-capability-not-declared.json",
+      "outcome": "reject",
+      "note": "A badge on a door tile whose manifest does not list `sh.badge-nodes@1` does not match the document.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
       }
     }
   ]

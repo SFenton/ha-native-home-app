@@ -19,6 +19,8 @@ Width
 Automatic
 Half
 Full
+Badge
+None
 Kind
 Lock
 Garage
@@ -58,6 +60,8 @@ Width
 Automatic
 Half
 Full
+Badge
+None
 Kind
 Lock
 Garage

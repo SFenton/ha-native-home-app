@@ -1,5 +1,8 @@
 [
   "sh.arc-track@1",
+  "sh.avatar@1",
+  "sh.badge-nodes@1",
+  "sh.badge-spoken@1",
   "sh.chart@1",
   "sh.choice-icons@1",
   "sh.countdown@1",
@@ -11,6 +14,7 @@
   "sh.linear-gauge@1",
   "sh.math-truncate@1",
   "sh.repeat@1",
+  "sh.shell-profile@1",
   "sh.stack@1",
   "sh.state-words@1",
   "sh.surface-controls@1",

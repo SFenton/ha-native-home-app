@@ -274,6 +274,10 @@ const gaugePartLabels: Record<string, FieldLabel> = {
   'arc-track.props.mirrors': entry('Flip in right-to-left', { group: 'behaviour', order: 5, caption: 'So progress still runs from the reading start.' }),
   'arc-track.a11y': entry('Accessibility', { group: 'behaviour', order: 6 }), 'arc-track.a11y.element': entry('Read as', { options: { hidden: 'Nothing', value: 'A value' } }),
   'arc-track.a11y.label': entry('Spoken name'), 'arc-track.a11y.value': entry('Spoken value', { caption: 'Without one, the percent is spoken.' }),
+  // The Profile Icon (`sh.avatar@1`). The Studio's Picture, Person, Size and Fill rows; the editor lane refines their widgets.
+  'avatar.props.person': entry('Person', { group: 'what', order: 1, caption: 'Whoever is signed in, or one person from the house.' }),
+  'avatar.props.look': entry('Picture', { group: 'look', order: 1, options: { photo: 'Photo, Then Initials', initials: 'Initials Only' } }),
+  'avatar.props.size': entry('Size', { group: 'look', order: 2, options: { row: 'Row', large: 'Large' } }),
 };
 
 /** The label map: the authored entries over the words found by last key. */

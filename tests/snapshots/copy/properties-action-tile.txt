@@ -15,6 +15,8 @@ Color
 Neutral
 Lights
 Occupancy
+Badge
+None
 Behavior
 When tapped
 Turn On or Off · input_boolean.demo_entity_122
@@ -45,6 +47,8 @@ Color
 Neutral
 Lights
 Occupancy
+Badge
+None
 Behavior
 When tapped
 Turn On or Off · input_boolean.demo_entity_122

@@ -438,17 +438,36 @@ export function resolveText(slot: TextSlot, env: Environment): ReadResult {
   return result.status === 'unavailable' && fallback !== undefined ? value(fallback) : result;
 }
 
+/** A badge as an evaluator reads it: none, or a value and, from `sh.badge-spoken@1`, the words VoiceOver says for it. */
+export type BadgeSlot = { type: 'none' } | { type: 'value'; value: Operand; spoken?: Operand };
 /**
  * A badge value (`sh.badges@1`): a number or text. It draws nothing (`null`) when it is `none`, empty, 0 (the number, or text that reads as 0) or
- * unavailable, and is "not yet" while loading, so the badge keeps what it showed. A number prints as `scalarText` prints it.
+ * unavailable (a rule that stalls with no source loading, raw reads included, counts as unavailable), and is "not yet" while a source loads, so the badge keeps what it showed. A number prints as `scalarText` prints it.
+ *
+ * With `spoken` (`sh.badge-spoken@1`) the answer also says `spoken`: the words VoiceOver adds after the name, or `null` to say the drawn text. A badge that
+ * draws nothing says nothing; a `spoken` that is empty, not text or unavailable says the drawn text; one still loading keeps what the badge showed. A badge
+ * with no `spoken` answers exactly as before, with no `spoken` key.
  */
-export function resolveBadge(badge: { type: 'none' } | { type: 'value'; value: Operand } | undefined, env: Environment): { status: 'value'; text: string | null } | { status: 'loading' } {
+export function resolveBadge(badge: BadgeSlot | undefined, env: Environment): { status: 'value'; text: string | null; spoken?: string | null } | { status: 'loading' } {
   if (!badge || badge.type === 'none') return { status: 'value', text: null };
-  const found = evaluateOperand(badge.value, env);
+  // A rule that stalls is `loading` to every slot. For a badge, "not yet" must mean a source that is still loading: a stall in which no read was loading
+  // is a count that cannot be read, and that draws nothing (the value rule), so a capped count behaves like a plain one.
+  let waiting = false;
+  const watched: Environment = { ...env, read: (sourceId, path) => { const r = env.read(sourceId, path); waiting ||= r.status === 'loading'; return r; },
+    ...(env.readRaw ? { readRaw: (sourceId: string) => { const r = env.readRaw!(sourceId); waiting ||= r.status === 'loading'; return r; } } : {}),
+    ...(env.viewerPersonState ? { viewerPersonState: () => { const r = env.viewerPersonState!(); waiting ||= r.status === 'loading'; return r; } } : {}) };
+  const found = evaluateOperand(badge.value, watched);
+  if (found.status === 'loading' && !waiting) return { status: 'value', text: null, ...(badge.spoken ? { spoken: null } : {}) };
   if (found.status === 'loading') return { status: 'loading' };
-  if (found.status !== 'value' || (typeof found.value !== 'string' && typeof found.value !== 'number')) return { status: 'value', text: null };
+  if (found.status !== 'value' || (typeof found.value !== 'string' && typeof found.value !== 'number')) return { status: 'value', text: null, ...(badge.spoken ? { spoken: null } : {}) };
   const text = scalarText(found.value)!.trim();
-  return { status: 'value', text: text === '' || finiteNumber(text) === 0 ? null : text };
+  const drawn = text === '' || finiteNumber(text) === 0 ? null : text;
+  if (!badge.spoken) return { status: 'value', text: drawn };
+  if (drawn === null) return { status: 'value', text: null, spoken: null };
+  const said = evaluateOperand(badge.spoken, env);
+  if (said.status === 'loading') return { status: 'loading' };
+  const words = said.status === 'value' && typeof said.value === 'string' ? said.value.trim() : '';
+  return { status: 'value', text: drawn, spoken: words === '' ? null : words };
 }
 
 // MARK: Enabled, tile faces, actions and questions

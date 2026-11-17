@@ -9,6 +9,8 @@ Width
 Automatic
 Half
 Full
+Badge
+None
 Kind
 Air
 Appliance
@@ -61,6 +63,8 @@ Width
 Automatic
 Half
 Full
+Badge
+None
 Kind
 Air
 Appliance

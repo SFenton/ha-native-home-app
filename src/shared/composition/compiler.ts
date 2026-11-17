@@ -25,6 +25,7 @@ import { checkRepeat } from './repeat';
 import { checkChartOperandKind, checkChartSource } from './chart-source';
 import { tileInkDefault } from './tile-ink-gate';
 import { expandBounded, remapLogicIssues } from './logic-library';
+import { badgeNodeKinds, expandBadgeSettings, initialsReadable, MAX_BADGE_TEXT, remapBadgeIssues } from './profile-badges';
 import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
 import { groupProblems } from './grid-groups';
@@ -97,6 +98,12 @@ const unsupported: Record<string, string> = {
   'paged-row': 'paged-row', 'content-image': 'content-image',
   'humidifier-schedule-field': 'humidifier-schedule-editor', 'humidifier-schedule-activities': 'collections',
 };
+/** The texts an operand is certain to be able to draw: a literal text, or any such text a rule can give. A text read from an entity cannot be told ahead. */
+function literalTexts(value: Operand): string[] {
+  if (value.type === 'literal') return typeof value.value === 'string' ? [value.value] : [];
+  if (value.type === 'choose') return [...value.cases.flatMap(entry => literalTexts(entry.then)), ...literalTexts(value.otherwise)];
+  return [];
+}
 type ActionSlot = CompositionActionSlot;
 /** The plain actions a slot can run, each with its pointer: itself, or the action of each case and of `otherwise` (not `none`). */
 function plainActions(value: ActionSlot, path: string): { action: CompositionAction; path: string }[] {
@@ -228,7 +235,8 @@ export function compileCompositionDocument(input: unknown, options: CompileOptio
   }
   if (expansion.document === input) {
     const compiled = compilePlain(input, options, true);
-    return { ...compiled, expanded: compiled.document };
+    // A draft with Show at Most or Spoken As is handed back as authored; `expanded` is what a publication holds.
+    return { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document };
   }
   // The draft holds named logic: every use is worked out first, so capabilities, budgets and every other check read plain operands and conditions.
   // An issue inside a worked-out use is reported where the use stands in the draft.
@@ -248,8 +256,18 @@ export interface CompiledComposition {
   /** The document with every logic use worked out and no `logicLibrary`: what a publication carries. */
   expanded: CompositionDocument;
 }
-function compilePlain(input: unknown, options: CompileOptions, bounded = false): { document: CompositionDocument; capabilities: string[] } {
+function compilePlain(input: unknown, options: CompileOptions, bounded = false): { document: CompositionDocument; capabilities: string[]; badged?: true } {
   if (!bounded) assertCompositionBounds(input);
+  // Show at Most and Spoken As are the draft's: they are worked out into plain operands first, so capabilities and every other check read what a publication holds.
+  // An issue inside a worked-out badge is reported at the setting that asked for it. `badged` tells the caller the document to hand back is the one authored.
+  const settings = expandBadgeSettings(input);
+  if (settings.document !== input) {
+    try { return { ...compilePlain(settings.document, options, true), badged: true }; }
+    catch (error) {
+      if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapBadgeIssues(error.issues, settings.badges, input));
+      throw error;
+    }
+  }
   if (record(input) && input.schemaVersion !== undefined && input.schemaVersion !== '2.0') reject('unsupported_schema', '/document/schemaVersion');
   if (new TextEncoder().encode(canonicalOfBounded(input)).byteLength > MAX_COMPOSITION_BYTES) reject('limit_exceeded', '/document');
   let document: CompositionDocument;
@@ -414,14 +432,26 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   function look(appearance: { icon: { type: string }; glyph?: { type: string }; fill: { type: string } }, path: string) {
     for (const slot of ['icon', 'glyph', 'fill'] as const) ruleSlot(appearance[slot], `${path}/${slot}`);
   }
-  /** A badge on a chip, a tile or a tab (`sh.badges@1`): a value that gives a number or text. */
-  function badge(value: { type: string; value?: Operand } | undefined, path: string) {
+  /**
+   * A badge on a chip, a tile, a tab, a header button or the Profile Icon (`sh.badges@1`): a value that gives a number or text. A `spoken` operand gives
+   * the words VoiceOver says and must be text (`sh.badge-spoken@1`). On a surface that needs `sh.badge-nodes@1` (`added`), a text the badge can be told to
+   * draw in full is at most four characters.
+   */
+  function badge(value: { type: string; value?: Operand; spoken?: Operand } | undefined, path: string, added = false) {
     if (!value) return;
     require('badges');
+    if (added) require('badge-nodes');
     if (value.type !== 'value' || !value.value) return;
     useOperand(value.value, `${path}/value`);
     const kind = operandKind(value.value);
     if (kind !== undefined && kind !== 'string' && kind !== 'number') add('binding_type', `${path}/value`);
+    if (added) for (const text of literalTexts(value.value)) if ([...text].length > MAX_BADGE_TEXT) add('limit_exceeded', `${path}/value`);
+    if (value.spoken) {
+      require('badge-spoken');
+      useOperand(value.spoken, `${path}/spoken`);
+      const spokenKind = operandKind(value.spoken);
+      if (spokenKind !== undefined && spokenKind !== 'string') add('binding_type', `${path}/spoken`);
+    }
   }
   /** `enabledWhen` (`sh.enabled-when@1`). */
   function enabled(rule: EnabledWhen | undefined, path: string) {
@@ -536,7 +566,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
         register('item', item.id, `${path}/${i}/items/${j}/id`);
         if (item.type === 'button') {
           action(item.action, `${path}/${i}/items/${j}/action`);
-          if (item.badge.type !== 'none') badge(item.badge, `${path}/${i}/items/${j}/badge`);
+          // A drawn badge on a header button needs `sh.badge-nodes@1`; `none` is the shipped default.
+          if (item.badge.type !== 'none') badge(item.badge, `${path}/${i}/items/${j}/badge`, true);
         }
         if (item.type === 'shell-header') {
           require('shell-header');
@@ -544,6 +575,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
           if (item.profileAction.type !== 'present') add('invalid_combination', `${path}/${i}/items/${j}/profileAction`);
           action(item.quickLinksAction, `${path}/${i}/items/${j}/quickLinksAction`);
           action(item.profileAction, `${path}/${i}/items/${j}/profileAction`);
+          // The look and badge of the Profile button (`sh.shell-profile@1`); the badge is the one every bar item has, authored here.
+          if (item.profile) { require('shell-profile'); badge(item.profile.badge, `${path}/${i}/items/${j}/profile/badge`, true); }
         }
       });
     });
@@ -990,7 +1023,19 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       visibility(item as Visibility, p);
       if (!grid && item.layout.span !== undefined && item.layout.span !== 1) add('invalid_combination', `${p}/layout/span`);
       if (depth > 1 && ['form', 'pinned-actions'].includes(item.type)) add('invalid_combination', `${p}/type`);
+      // A badge on a kind that could not carry one (`sh.badge-nodes@1`): the capability is needed whenever the field is present.
+      if (badgeNodeKinds.includes(item.type) && 'badge' in item && item.badge) badge(item.badge, `${p}/badge`, true);
       switch (item.type) {
+        case 'avatar': {
+          require('avatar');
+          if (item.props.person.type === 'person' && !/^person\.[a-z0-9_]+$/.test(item.props.person.entityId)) add('invalid_value', `${p}/props/person/entityId`);
+          if (item.props.fill?.type === 'solid-rgb' && !initialsReadable(item.props.fill)) add('invalid_value', `${p}/props/fill`);
+          if (item.action) {
+            if (!item.title.trim()) add('missing_required', `${p}/title`);
+            action(item.action, `${p}/action`);
+          }
+          break;
+        }
         case 'component-ref': {
           require('component-ref');
           if (inBody) { add('invalid_combination', `${p}/type`); break; }

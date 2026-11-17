@@ -3,6 +3,7 @@ import type { CompositionActionSlot, CompositionNode } from '../../shared/compos
 import type { Json } from '../../shared/types';
 import { evaluateOperand, type ReadResult } from '../evaluate';
 import type { EnabledWhen, Operand } from '../../shared/composition/expression';
+import type { BadgeSlot } from '../../shared/composition/evaluator';
 import {
   isEnabled, resolveBadge, resolveFill, resolveSymbol, resolveText, type BoundColor, type BoundSymbol, type Conditional, type Fill as FillLook, type SymbolLook, type TextSlot,
 } from '../../shared/composition/evaluator';
@@ -88,13 +89,19 @@ export function useSymbol(slot: SymbolLook | Conditional<SymbolLook> | BoundSymb
   const { env, kept } = useRender();
   return keepLook(kept, key, resolveSymbol(slot, { ...env, hasSymbol: hasGlyph })) ?? (slot.type === 'bound-symbol' ? slot.fallback : slot.type === 'conditional' ? slot.otherwise : slot);
 }
-/** The badge a chip, tile or tab draws: its text, or `null` for none (none, empty, 0 or unavailable); kept while loading. */
-export function useBadge(badge: { type: 'none' } | { type: 'value'; value: Operand } | undefined, key: string): string | null {
+/** What a badge draws and what VoiceOver says for it: the text (`null` for none) and the words from `spoken` (`null` says the text). */
+export interface BadgeFace { text: string | null; spoken: string | null }
+const noBadge: BadgeFace = { text: null, spoken: null };
+/** The badge an element draws: its text, or `null` for none (none, empty, 0 or unavailable), and the spoken words; kept while loading. */
+export function useBadge(badge: BadgeSlot | undefined, key: string): BadgeFace {
   const { env, kept } = useRender();
-  if (!badge || badge.type === 'none') return null;
+  if (!badge || badge.type === 'none') return noBadge;
   const found = resolveBadge(badge, env);
-  if (found.status === 'value') { kept?.set(key, found.text); return found.text; }
-  return (kept?.get(key) as string | null | undefined) ?? null;
+  if (found.status === 'value') {
+    const face = found.text === null ? noBadge : { text: found.text, spoken: found.spoken ?? null };
+    kept?.set(key, face); return face;
+  }
+  return (kept?.get(key) as BadgeFace | undefined) ?? noBadge;
 }
 /** Whether a control is enabled now (`sh.enabled-when@1`). `keep` repeats the last answer while the condition cannot be answered. */
 export function useEnabled(rule: EnabledWhen | undefined, key: string): boolean {
@@ -104,9 +111,9 @@ export function useEnabled(rule: EnabledWhen | undefined, key: string): boolean 
   previous.set(key, now);
   return now;
 }
-/** The small count on a chip, a tile or a tab. Nothing is drawn for no badge. */
-export function Badge({ text }: { text: string | null }) {
-  return text ? <span className="sh-badge" data-testid="badge" aria-label={`${text} new`}>{text}</span> : null;
+/** The small count on a chip, a tile, a tab or a header button. Nothing is drawn for no badge. Its label is the spoken words when the badge has them. */
+export function Badge({ badge }: { badge: BadgeFace | null | undefined }) {
+  return badge?.text ? <span className="sh-badge" data-testid="badge" aria-label={badge.spoken ?? `${badge.text} new`}>{badge.text}</span> : null;
 }
 /** Reads a field of a source (`['stateText']`, `['isOn']`). */
 export function useSourceRead(sourceId: string | undefined, path: string[]): ReadResult {

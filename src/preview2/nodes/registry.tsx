@@ -16,6 +16,7 @@ import { SprinklerControlNode } from './sprinkler';
 import { VacuumControlNode } from './vacuum';
 import { CameraTileNode } from './camera-tile';
 import { LightGroupTileNode } from './light-tile';
+import { AvatarNode } from './avatar';
 import { ActionTileNode, StateTileNode, NavigationTileNode, RoomCardNode, RoomChipNode, RoomOverviewTileNode, StatusChipNode } from './tiles';
 import { AlarmPanelNode, BedroomControlNode, BootstrapMessageNode, CameraControlsNode, CameraVideoNode, CameraViewerNode, CollectionNode, DoorTileNode, FormNode, PinnedActionsNode, RecipePartNode, RoomDeviceControlNode, RoomNavigationGridNode, RowCollectionNode, WeatherPanelNode } from './panels';
 
@@ -37,7 +38,7 @@ export const registry: Registry = {
   'weather-panel': WeatherPanelNode, 'alarm-panel': AlarmPanelNode, 'door-tile': DoorTileNode, 'room-navigation-grid': RoomNavigationGridNode, 'room-device-control': RoomDeviceControlNode,
   'bedroom-control': BedroomControlNode, 'camera-video': CameraVideoNode, 'camera-controls': CameraControlsNode, 'camera-viewer': CameraViewerNode, 'row-collection': RowCollectionNode,
   stack: StackNode, shape: ShapeNode, symbol: SymbolPartNode, repeat: RepeatNode,
-  chart: ChartNode, 'linear-gauge': GaugeNode, dial: DialNode, 'arc-track': ArcTrackNode,
+  chart: ChartNode, 'linear-gauge': GaugeNode, dial: DialNode, 'arc-track': ArcTrackNode, avatar: AvatarNode,
   collection: CollectionNode, form: FormNode, 'recipe-part': RecipePartNode, 'pinned-actions': PinnedActionsNode, 'bootstrap-message': BootstrapMessageNode,
 };
 /** The types the preview draws. */

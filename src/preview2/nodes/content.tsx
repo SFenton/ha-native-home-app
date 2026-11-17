@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { resolveTone } from '../../shared/composition/evaluator';
 import { useRender } from '../render-context';
 import { isStyledText, StyledText } from './parts';
-import { Glyph, Pressable, useEnabled, useOperand, type NodeOf } from './shared';
+import { Badge, Glyph, Pressable, useBadge, useEnabled, useOperand, type NodeOf } from './shared';
 
 /** `text`: a styled paragraph from an operand. */
 export function TextNode({ node }: { node: NodeOf<'text'> }) {
@@ -43,9 +43,11 @@ export function RowNode({ node }: { node: NodeOf<'row'> }) {
 /** `settings-link`: a glyph, a title, a subtitle and a chevron that opens a page. */
 export function SettingsLinkNode({ node }: { node: NodeOf<'settings-link'> }) {
   const hintId = node.props.hint ? `${node.id}-hint` : undefined;
+  const badge = useBadge(node.badge, `${node.id}/badge`);
   return <Pressable action={node.action} className="sh-row sh-settings-link" describedBy={hintId}>
     <span className="sh-row-glyph"><Glyph symbol={node.icon} size={20}/></span>
     <span className="sh-row-copy"><span className="sh-row-primary">{node.title}</span>{node.props.subtitle && <span className="sh-row-secondary">{node.props.subtitle}</span>}</span>
+    <Badge badge={badge}/>
     {node.props.showsChevron && <ChevronRight size={16} aria-hidden="true"/>}
     {hintId && <span id={hintId} hidden>{node.props.hint}</span>}
   </Pressable>;

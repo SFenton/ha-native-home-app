@@ -110,6 +110,10 @@ and Swift disagree (text order, text equality, number text, rounding) and the st
 a step on data the compiler refuses, to pin that evaluation is total; `expectedShape` is the hand-written shape after the steps. Written by
 the same generator, with hand-written expectations: do not edit by hand.
 
+The `profile-badges-` files (and their `pending-` twins) cover the four ids of the Profile Icon and badges lane (`sh.shell-profile@1`, `sh.avatar@1`, `sh.badge-spoken@1`, `sh.badge-nodes@1`): the header's `profile` block, the `avatar` node, `spoken` on a value badge and a badge on `action-tile`, `door-tile`, `light-group-tile`, `room-card`,
+`room-chip`, `settings-link`, `avatar` and a drawn header `button`. They are written by `scripts/profile-badges-corpus.ts` through `generate-expression-corpus.ts`; do not edit them by hand. Show at Most and Spoken As are the Studio's, never published: the cases hold what they work out into, and a case that leaves `cap` or a
+Spoken As line in a badge is refused as an unknown field. The `badge-cap-*` and `badge-spoken-*` evaluation cases pin `resolveBadge`: the answer carries `spoken` (the words, or `null` for the drawn text) only when the badge has a `spoken` operand. `badge-chrome-button` (a drawn header badge) declares `sh.badge-nodes@1` and is pending with them.
+
 The `component-`, `ref-`, `param-` and `body-` files (and their `pending-` twins) cover the lane L-linked id `sh.component-ref@1`: the `componentLibrary`
 key, the `component-ref` node, parameters (kinds `entity-id` and `state-id`, `label`, `origin`), bindings, template-owned `sources` and `args`; the `component-example-*` files are the four
 template examples (light button, vent tile, humidifier sheet, bed sheet), compiled with placeholder entity ids. They are written by `scripts/generate-component-corpus.ts` through the same generator. The
