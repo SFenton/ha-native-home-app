@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
+import { wallClock } from '../../preview2/clock';
 import type { FlowContext, PipelineInputs } from '../../shared/composition/pipeline';
 import { useWorkspaceData } from '../pickers/WorkspaceData';
 import { useLiveRun, type LiveRun } from './liveRun';
 import { flowData, useSample, type FlowData, type Sample } from './samples';
 
 /** The clock a flow reads in the Studio: this browser's local time, as the contract's `Clock`. */
-export function studioClock(date: Date = new Date()): FlowContext['clock'] {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return { now: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`, utcOffsetMinutes: -date.getTimezoneOffset() };
-}
+export function studioClock(date: Date = new Date()): FlowContext['clock'] { return wallClock(date); }
 
 /** What a flow draws now (its data, where it came from, and what the steps made), with the sample kept for it and whether values are hidden. */
 export function useFlowData(flowId: string, inputs: PipelineInputs): FlowData & { sample?: Sample; hide: boolean; run: LiveRun } {

@@ -2,8 +2,9 @@ import type { Json } from '../types';
 import type { EnabledWhen, Operand, Predicate } from './expression';
 import { clampedColor, parseColor, type ColorRole } from './color';
 import { formatDate } from './date-format';
+import { formatDuration } from './duration-format';
 import { mathArity } from './pipeline/schema';
-import { clockTime, clockToday, daysBetween, instant, progressBetween, wallTime, type Clock } from './pipeline/dates';
+import { clockTime, clockToday, daysBetween, instant, progressBetween, secondsBetween, wallTime, type Clock } from './pipeline/dates';
 import { finiteNumber, formatNumber, roundHalfAwayFromZero, scalarText, textEquals, titleCase, wordsCase } from './pipeline/text';
 
 /**
@@ -38,9 +39,17 @@ export interface Environment {
    * A host without it (a flow's) gives `unavailable`.
    */
   readRaw?(sourceId: string): ReadResult;
+  /**
+   * When the state of an `ha-entity` source last changed, as `YYYY-MM-DDTHH:MM:SS.sssZ` (`last-changed`, `sh.entity-time@1`). `unavailable` for a source
+   * with no entity or no time, `loading` before the first states arrive. A host without it (a flow's) gives `unavailable`.
+   */
+  readChanged?(sourceId: string): ReadResult;
   /** The new value of the control that sent the action being resolved. */
   controlValue?: Json;
-  /** The clock `clock` and `date` use; absent means they are unavailable. */
+  /**
+   * The clock `clock` and `date` use; absent means they are unavailable. `now-second` reads the same `now`: a host that ticks once a second (the
+   * preview, the app) gives it seconds that move, and a host that does not gives the minute's.
+   */
   clock?: Clock;
   /** The item a flow step or a repeat is looking at (`item` operands). */
   item?: Json;
@@ -107,6 +116,13 @@ function compute(op: Extract<Operand, { type: 'math' }>['op'], n: number[]): num
       return roundHalfAwayFromZero(n[0] * factor) / factor || 0;
     }
     case 'clamp': return n[1] <= n[2] ? Math.min(Math.max(n[0], n[1]), n[2]) : undefined;
+    case 'truncate': {
+      // Toward zero (`sh.math-truncate@1`); a result of -0 is 0.
+      const places = n.length === 2 ? n[1] : 0;
+      if (!Number.isInteger(places) || places < 0 || places > 6) return undefined;
+      const factor = 10 ** places;
+      return Math.trunc(n[0] * factor) / factor || 0;
+    }
     case 'scale': return n[1] === n[2] ? undefined : n[3] + (n[0] - n[1]) / (n[2] - n[1]) * (n[4] - n[3]);
   }
 }
@@ -138,6 +154,11 @@ function operandResult(operand: Operand, env: Environment): ReadResult {
       if (env.flow) return unavailable;
       const state = env.readRaw?.(operand.sourceId) ?? unavailable;
       return state.status === 'value' && typeof state.value !== 'string' ? unavailable : state;
+    }
+    case 'last-changed': {
+      if (env.flow) return unavailable;
+      const changed = env.readChanged?.(operand.sourceId) ?? unavailable;
+      return changed.status === 'value' && typeof changed.value !== 'string' ? unavailable : changed;
     }
     case 'list-count': {
       if (env.flow) return unavailable;
@@ -173,6 +194,10 @@ function operandResult(operand: Operand, env: Environment): ReadResult {
         const fraction = env.clock ? progressBetween(from.value, to.value, env.clock) : undefined;
         return fraction === undefined ? unavailable : value(fraction);
       }
+      if (operand.op === 'seconds-between') {
+        const seconds = secondsBetween(from.value, to.value, env.clock?.utcOffsetMinutes ?? 0);
+        return seconds === undefined ? unavailable : value(seconds);
+      }
       const days = daysBetween(from.value, to.value, env.clock?.utcOffsetMinutes ?? 0);
       return days === undefined ? unavailable : value(days);
     }
@@ -194,6 +219,11 @@ function operandResult(operand: Operand, env: Environment): ReadResult {
         } else if (spec && 'date' in spec) {
           // A date style draws a date or a date and time; any other value has no text, so the whole format is unavailable.
           const drawn = typeof found.value === 'string' ? formatDate(spec.date.style, found.value, env.clock) : undefined;
+          if (drawn === undefined) return unavailable;
+          output += drawn;
+        } else if (spec && 'duration' in spec) {
+          // A duration draws a number; anything else, or a number with no text (a compact duration of 0 or less), leaves the whole format without one.
+          const drawn = finiteNumber(found.value) === undefined ? undefined : formatDuration(spec.duration.style, spec.duration.unit, finiteNumber(found.value)!);
           if (drawn === undefined) return unavailable;
           output += drawn;
         } else {

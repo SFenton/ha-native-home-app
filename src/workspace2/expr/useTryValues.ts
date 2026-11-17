@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { createEnvironment, emptyOverlay, type House, type Overlay } from '../../preview2/projections';
 import type { Environment, ReadResult } from '../../shared/composition/evaluator';
 import { loading, unavailable, value } from '../../shared/composition/evaluator';
+import type { Clock } from '../../shared/composition/pipeline/dates';
 import type { CompositionDocument } from '../../shared/composition/schema';
 
 /**
@@ -51,8 +52,8 @@ export function withoutTries(next: Overlay, merged: Overlay, tries: TryApi): Ove
  * An environment over a document (the editor's draft, which may hold sources the saved document lacks), the house and the overrides.
  * "Unavailable" and "Loading" answer the reads of that entity as the evaluator's own `unavailable` and `loading`.
  */
-export function environmentFor(document: Pick<CompositionDocument, 'dataSources'>, house: House, overlay: Overlay | undefined, tries: TryApi): Environment {
-  const base = createEnvironment(document, house, triedOverlay(overlay ?? emptyOverlay, tries));
+export function environmentFor(document: Pick<CompositionDocument, 'dataSources'>, house: House, overlay: Overlay | undefined, tries: TryApi, clock?: Clock): Environment {
+  const base = createEnvironment(document, house, triedOverlay(overlay ?? emptyOverlay, tries), undefined, clock);
   if (!tries.count) return base;
   const entityOf = new Map(document.dataSources.flatMap(source => source.kind === 'ha-entity' && source.entityId.type === 'literal' ? [[source.id, String(source.entityId.value)] as const] : []));
   return {
@@ -63,6 +64,13 @@ export function environmentFor(document: Pick<CompositionDocument, 'dataSources'
       if (tried?.kind === 'loading') return loading;
       if (tried?.kind === 'value' && path.length === 1 && path[0] === 'state') return value(tried.value);
       return base.read(sourceId, path);
+    },
+    readChanged(sourceId): ReadResult {
+      // A tried "Unavailable" or "Loading" is the entity's own, so it has no time either; a tried state does not change when it last changed.
+      const tried = tries.overrides.get(entityOf.get(sourceId) ?? '');
+      if (tried?.kind === 'unavailable') return unavailable;
+      if (tried?.kind === 'loading') return loading;
+      return base.readChanged!(sourceId);
     },
     readRaw(sourceId): ReadResult {
       const tried = tries.overrides.get(entityOf.get(sourceId) ?? '');

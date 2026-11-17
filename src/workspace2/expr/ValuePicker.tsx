@@ -13,6 +13,9 @@ import { readOperand, type ValueKind } from './condition';
 import { itemFieldInfos, useFlowScope } from '../data/flowScope';
 import { flowSources } from '../data/flow';
 import { useRepeatScope } from '../data/repeatScope';
+import { SelectMenu } from '../SelectMenu';
+import { TextInput } from '../editors/controls';
+import { words } from './words';
 
 /** What a pick makes: the draft's document (it may hold a source the pick created) and the value, in one step. */
 export interface Picked {
@@ -43,6 +46,10 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
   const repeat = useRepeatScope();
   const groups = asked ?? (flow ? flowGroups : repeat ? ['item', ...all] as readonly PickerGroup[] : all);
   const [query, setQuery] = useState('');
+  // How a picked entity is read: its state, when it last changed (`sh.entity-time@1`), the seconds until a time its state holds, or the seconds since it changed (`sh.countdown@1`).
+  const [mode, setMode] = useState<'state' | 'changed' | 'until' | 'since'>('state');
+  // Seconds Until counts to the time an attribute holds (a timer's `finishes_at`); empty is the entity's state.
+  const [untilAttribute, setUntilAttribute] = useState('');
   const text = query.trim().toLowerCase();
   const document = draft.get();
   const match = (label: string) => !text || label.toLowerCase().includes(text);
@@ -61,6 +68,8 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
       for (const info of itemFieldInfos({ item: repeat.item, params: [] })) out.push({ group: 'item', label: info.name, make: () => ({ document: draft.get(), operand: { type: 'item', path: [info.name] }, kind: info.kind, closed: info.values }) });
       out.push({ group: 'item', label: 'Position', make: () => ({ document: draft.get(), operand: { type: 'index' }, kind: 'number' }) });
     }
+    // The clock to the second (`sh.countdown@1`): a flow runs on the minute clock, so only a page offers it.
+    if (groups.includes('time')) out.push({ group: 'time', label: words.nowSecond, make: () => ({ document: draft.get(), operand: { type: 'clock', part: 'now-second' }, kind: 'date' }) });
     for (const item of appItems) {
       const group = item.group as PickerGroup;
       if (!groups.includes(group)) continue;
@@ -100,9 +109,15 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
   return <div className="w2-expr-picker">
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Search values" aria-label="Search values" value={query} onChange={event => setQuery(event.target.value)}/></label>
     {groups.includes('entities') && <section aria-label={groupTitles.entities}><h3 className="w2-group-title">{groupTitles.entities}</h3>
+      {!flow && <div className="w2-expr-control"><SelectMenu label={words.pickRead} value={mode} options={[{ value: 'state', label: words.state }, { value: 'changed', label: words.lastChangedValue }, { value: 'until', label: words.secondsUntil }, { value: 'since', label: words.secondsSince }]} onChange={next => setMode(next as typeof mode)}/></div>}
+      {!flow && mode === 'until' && <TextInput label={words.untilAttribute} placeholder={words.untilAttributePlaceholder} value={untilAttribute} onCommit={text => setUntilAttribute(text.trim())}/>}
       <EntityList query={query} hideSearch autoFocus={false} height={height} kind="values" onPick={row => {
         const made = ensureSource(draft.get(), row.entityId);
-        onPick({ document: made.document, operand: readOperand(made.sourceId, ['state'], 'string'), kind: 'text' });
+        const state = readOperand(made.sourceId, ['state'], 'string');
+        if (mode === 'changed') onPick({ document: made.document, operand: { type: 'last-changed', sourceId: made.sourceId }, kind: 'date' });
+        else if (mode === 'until') onPick({ document: made.document, operand: { type: 'date', op: 'seconds-between', from: { type: 'clock', part: 'now-second' }, to: /^[A-Za-z0-9_-]+$/.test(untilAttribute.trim()) ? readOperand(made.sourceId, ['attributes', untilAttribute.trim()], 'string') : state }, kind: 'number' });
+        else if (mode === 'since') onPick({ document: made.document, operand: { type: 'date', op: 'seconds-between', from: { type: 'last-changed', sourceId: made.sourceId }, to: { type: 'clock', part: 'now-second' } }, kind: 'number' });
+        else onPick({ document: made.document, operand: state, kind: 'text' });
       }}/></section>}
     {order.map(group => {
       const here = rows.filter(row => row.group === group);

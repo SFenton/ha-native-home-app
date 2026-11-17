@@ -45,7 +45,7 @@ export function LeafEditor({ draft, leaf, ctx, write }: { draft: Draft; leaf: Le
   const kind = leftKind(leaf, ctx, row?.state?.split(' ')[0], itemInfo?.kind);
   const pickLeft = (picked: Picked) => {
     if (picked.predicate) { write(picked.predicate, picked.document); return; }
-    const allowed = comparisonsFor(picked.kind), comparison = allowed.includes(leaf.comparison) ? leaf.comparison : allowed[0];
+    const allowed = comparisonsFor(picked.kind, picked.operand), comparison = allowed.includes(leaf.comparison) ? leaf.comparison : allowed[0];
     commit({ left: picked.operand, comparison, right: [] }, undefined, picked.document);
   };
   const right = leaf.right[0] as Operand | undefined;

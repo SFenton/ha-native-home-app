@@ -12,7 +12,7 @@ import type { NativeState } from '../src/shared/native-state';
  */
 
 /** One cached entity, as Home Assistant reports it. A new object replaces it on every change. */
-export interface RawEntity { state: string; attributes: Readonly<Record<string, unknown>> }
+export interface RawEntity { state: string; attributes: Readonly<Record<string, unknown>>; /** `lc` of the stream: epoch seconds of the last state change. */ lastChanged?: number }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const sameAttributes = (left: Readonly<Record<string, unknown>>, right: Readonly<Record<string, unknown>>) => {
@@ -45,7 +45,7 @@ export class EntityCache {
       for (const [id, value] of Object.entries(event.a)) {
         if (!isRecord(value)) continue;
         seen.add(id);
-        const next: RawEntity = { state: typeof value.s === 'string' ? value.s : String(value.s ?? 'unknown'), attributes: isRecord(value.a) ? { ...value.a } : {} };
+        const next: RawEntity = { state: typeof value.s === 'string' ? value.s : String(value.s ?? 'unknown'), attributes: isRecord(value.a) ? { ...value.a } : {}, ...(typeof value.lc === 'number' ? { lastChanged: value.lc } : {}) };
         const before = this.entities.get(id);
         this.entities.set(id, next);
         if (!before || before.state !== next.state || !sameAttributes(before.attributes, next.attributes)) changed.push(id);
@@ -55,16 +55,17 @@ export class EntityCache {
       for (const [id, diff] of Object.entries(event.c)) {
         const before = this.entities.get(id);
         if (!before || !isRecord(diff)) continue;
-        let state = before.state;
+        let state = before.state, lastChanged = before.lastChanged;
         const attributes: Record<string, unknown> = { ...before.attributes };
         const add = diff['+'], drop = diff['-'];
         if (isRecord(add)) {
           if (typeof add.s === 'string') state = add.s;
+          if (typeof add.lc === 'number') lastChanged = add.lc;
           if (isRecord(add.a)) Object.assign(attributes, add.a);
         }
         if (isRecord(drop) && Array.isArray(drop.a)) for (const name of drop.a) if (typeof name === 'string') delete attributes[name];
         if (state === before.state && sameAttributes(before.attributes, attributes)) continue;
-        this.entities.set(id, { state, attributes });
+        this.entities.set(id, { state, attributes, ...(lastChanged !== undefined ? { lastChanged } : {}) });
         changed.push(id);
       }
     }
@@ -160,7 +161,7 @@ export class LiveEntityHub {
     if (!raw) return undefined;
     let found = this.projections.get(raw);
     if (found === undefined) {
-      try { found = projectNativeState({ entity_id: entityId, state: raw.state, attributes: raw.attributes }); }
+      try { found = projectNativeState({ entity_id: entityId, state: raw.state, attributes: raw.attributes, last_changed: raw.lastChanged }); }
       catch { found = null; }
       this.projections.set(raw, found);
     }

@@ -66,7 +66,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
     const own = join(join(join(base, 'parameters'), index), 'value');
     const local = newFacts();
     const shape = typeOperand(parameter.value, parameterScope, own, local);
-    facts.issues.push(...local.issues); facts.reads.push(...local.reads); facts.newOperands ||= local.newOperands; facts.wordsCase ||= local.wordsCase; facts.usesRules ||= local.usesRules; facts.flowExtras ||= local.flowExtras; facts.usesRepeat ||= local.usesRepeat;
+    facts.issues.push(...local.issues); facts.reads.push(...local.reads); facts.newOperands ||= local.newOperands; facts.wordsCase ||= local.wordsCase; facts.usesRules ||= local.usesRules; facts.flowExtras ||= local.flowExtras; facts.usesRepeat ||= local.usesRepeat; local.edge.forEach(name => facts.edge.add(name));
     local.paramRefs.forEach(ref => { facts.paramRefs.push(ref); parameterRefs.push({ from: parameter.name, ...ref }); });
     const have = kindsOf(withoutNull(shape));
     const wants = parameter.type === 'number' ? 'number' : parameter.type === 'boolean' ? 'boolean' : 'string';
@@ -86,7 +86,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
   // Request.
   const request = inputs.request, requestAt = join(base, 'request');
   const requestScope: TypeScope = { params: kinds, allowRead: false, allowViewer: true };
-  const absorb = (local: TypeFacts) => { facts.issues.push(...local.issues); facts.paramRefs.push(...local.paramRefs); facts.newOperands ||= local.newOperands; facts.wordsCase ||= local.wordsCase; facts.usesRules ||= local.usesRules; facts.flowExtras ||= local.flowExtras; facts.usesRepeat ||= local.usesRepeat; };
+  const absorb = (local: TypeFacts) => { facts.issues.push(...local.issues); facts.paramRefs.push(...local.paramRefs); facts.newOperands ||= local.newOperands; facts.wordsCase ||= local.wordsCase; facts.usesRules ||= local.usesRules; facts.flowExtras ||= local.flowExtras; facts.usesRepeat ||= local.usesRepeat; local.edge.forEach(name => facts.edge.add(name)); };
   const shapeCheck = (shape: Shape, pointer: string) => { const found = shapeProblem(shape, pointer); if (found) issue(found.code, found.pointer); };
   if (request.type === 'service-response') {
     const local = newFacts();
@@ -214,7 +214,8 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
   if (inputs.steps.length > PIPELINE_LIMITS.steps) issue('limit_exceeded', join(base, 'steps'));
 
   const capabilities = [PIPELINE_CAPABILITY, ...(facts.newOperands ? [PIPELINE_OPERANDS_CAPABILITY] : []), ...(facts.wordsCase ? [TEXT_CASE_WORDS_CAPABILITY] : []), ...(facts.usesRules ? [RULES_CAPABILITY] : []),
-    ...(output.kind === 'records' || facts.usesRepeat ? [REPEAT_CAPABILITY] : []), ...(facts.flowExtras ? [FLOW_EXTRAS_CAPABILITY] : [])];
+    ...(output.kind === 'records' || facts.usesRepeat ? [REPEAT_CAPABILITY] : []), ...(facts.flowExtras ? [FLOW_EXTRAS_CAPABILITY] : []),
+    ...[...facts.edge].sort().map(name => `sh.${name}@1`)];
   const dependencies = facts.reads.map(entry => ({ from: source.id, to: entry.read.from.sourceId, path: join(join(entry.pointer, 'from'), 'sourceId') }));
   return { issues: facts.issues, reads: facts.reads.map(entry => ({ read: entry.read, path: entry.pointer })), dependencies, capabilities };
 }

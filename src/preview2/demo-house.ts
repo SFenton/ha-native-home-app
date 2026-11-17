@@ -13,6 +13,9 @@ export function demoFriendlyName(entityId: string): string {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : entityId;
 }
 
+/** When every demo entity last changed: a fixed evening, so a "Since 9:30 PM" line has a time to draw without a Home Assistant connection (`sh.entity-time@1`). */
+export const DEMO_LAST_CHANGED = '2026-11-15T21:30:00.000Z';
+
 /** A plausible state for an entity, chosen by its domain. */
 function stateFor(entityId: string, index: number): string {
   switch (entityId.split('.')[0]) {
@@ -36,6 +39,6 @@ function stateFor(entityId: string, index: number): string {
 export function demoHouse(document: CompositionDocument): House {
   const ids = [...new Set(JSON.stringify(document).match(/"((?:light|switch|binary_sensor|sensor|climate|alarm_control_panel|lock|cover|camera|weather|person|input_boolean|fan|media_player|select)\.[a-z0-9_]+)"/g) ?? [])]
     .map(match => match.slice(1, -1));
-  const states: NativeState[] = ids.map((entityId, index) => ({ entityId, name: demoFriendlyName(entityId), state: stateFor(entityId, index), ...(entityId.startsWith('light.') ? { brightness: 180 } : {}) }));
+  const states: NativeState[] = ids.map((entityId, index) => ({ entityId, name: demoFriendlyName(entityId), state: stateFor(entityId, index), lastChanged: DEMO_LAST_CHANGED, ...(entityId.startsWith('light.') ? { brightness: 180 } : {}) }));
   return houseFrom({ states });
 }

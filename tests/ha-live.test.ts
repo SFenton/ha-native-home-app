@@ -40,7 +40,8 @@ describe('EntityCache', () => {
     // A diff: new state, a new attribute, a dropped one.
     const change = cache.apply({ c: { 'light.demo_a': { '+': { s: 'off', a: { color_mode: 'hs' } }, '-': { a: ['brightness'] } } } });
     expect(change).toEqual({ changed: ['light.demo_a'], removed: [] });
-    expect(cache.get('light.demo_a')).toEqual({ state: 'off', attributes: { friendly_name: 'A', color_mode: 'hs' } });
+    // `lc` (epoch seconds of the last state change, `entry` gives 1) is kept for `last-changed`.
+    expect(cache.get('light.demo_a')).toEqual({ state: 'off', attributes: { friendly_name: 'A', color_mode: 'hs' }, lastChanged: 1 });
     expect(cache.apply({ r: ['sensor.demo_b', 'sensor.demo_missing'] })).toEqual({ changed: [], removed: ['sensor.demo_b'] });
     expect(cache.size).toBe(1);
   });

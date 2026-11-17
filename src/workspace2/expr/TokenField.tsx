@@ -10,7 +10,7 @@ import TokenLine from './TokenLine';
 import TokenSettings from './TokenSettings';
 import ValuePicker from './ValuePicker';
 import { operandName } from './condition';
-import { MAX_TOKENS, operandSlot, parseLine, slotOperand, tokenCount, writeLine, type Part, type Token } from './tokens';
+import { MAX_TOKENS, newToken, operandSlot, parseLine, slotOperand, tokenCount, writeLine, type Part, type Token } from './tokens';
 import { useNameContext } from './useExpr';
 import { words } from './words';
 
@@ -53,7 +53,7 @@ export default function TokenField({ draft, address, label, onWording }: { draft
   const picker = (close: () => void, inline = false) => <ValuePicker draft={draft} groups={['entities', 'counts', 'time', 'person', 'models']} onPick={picked => {
     close(); draft.set(picked.document);
     // A pushed page has unmounted the line, so the value goes at the end of what the draft holds.
-    if (narrow && push && !inline) writeParts(draft, address, tokenCount(parts) >= MAX_TOKENS ? parts : [...parts, { token: { operand: picked.operand } }], false); else add({ operand: picked.operand });
+    if (narrow && push && !inline) writeParts(draft, address, tokenCount(parts) >= MAX_TOKENS ? parts : [...parts, { token: newToken(picked.operand) }], false); else add(newToken(picked.operand));
   }}/>;
   return <div className="w2-token-field" data-testid="token-field">
     <div className="w2-token-row">

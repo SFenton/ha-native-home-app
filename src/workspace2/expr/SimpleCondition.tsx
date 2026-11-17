@@ -30,8 +30,8 @@ export function ReadRow({ leaf, entityId, onChange }: { leaf: Leaf; entityId: st
   const entity = house?.states?.get(entityId) as unknown as Record<string, unknown> | undefined;
   const attributes = knownAttributes(entity), snake = (key: string) => key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   const lists = new Set(Object.entries(entity ?? {}).filter(([, value]) => Array.isArray(value)).map(([key]) => snake(key)));
-  const known = new Set<string>(['state', 'raw']);
-  const options: { value: string; label: string }[] = [{ value: 'state', label: words.state }, { value: 'raw', label: words.rawState }];
+  const known = new Set<string>(['state', 'raw', 'changed']);
+  const options: { value: string; label: string }[] = [{ value: 'state', label: words.state }, { value: 'raw', label: words.rawState }, { value: 'changed', label: words.lastChanged }];
   for (const item of attributes) {
     options.push({ value: `a:${item.name}`, label: `${item.name} · ${item.value}` }); known.add(`a:${item.name}`);
     if (lists.has(item.name)) {
@@ -53,6 +53,7 @@ export function ReadRow({ leaf, entityId, onChange }: { leaf: Leaf; entityId: st
   return <div className="w2-expr-readrow"><span className="w2-row-label">{words.read}</span>
     <div className="w2-expr-control"><SelectMenu label={words.read} value={current} options={options} onChange={set}/></div>
     {current === 'raw' && <p className="w2-caption">{words.rawStateNote}</p>}
+    {current === 'changed' && <p className="w2-caption">{words.lastChangedNote}</p>}
     {needle !== undefined && leaf.left.type === 'list-includes' && <TextInput label={words.item} placeholder={words.item} value={needle}
       onCommit={text => onChange({ ...leaf, left: { ...leaf.left, value: { type: 'literal', value: text } } as Operand })}/>}
     {other && <TextInput label="Attribute name" placeholder="Attribute" value="" onCommit={name => { if (/^[A-Za-z0-9_-]+$/.test(name)) onChange(leaf.left.type === 'read' ? { ...leaf, left: { ...leaf.left, from: { ...leaf.left.from, path: ['attributes', name] } } } : withLeft(leaf, operandForChoice(sourceId, `a:${name}`))); }}/>}
@@ -86,7 +87,7 @@ export default function SimpleCondition({ draft, rule, ctx, write }: { draft: Dr
     </PickerRow>
     {leaf && <>
       <ReadRow leaf={leaf} entityId={entityId} onChange={commit}/>
-      <ComparisonControls numeric={numericState(row?.state)} leaf={leaf} onChange={commit} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} unit={unitOf(row?.state)} allowed={SIMPLE_COMPARISONS}/>
+      <ComparisonControls numeric={numericState(row?.state)} leaf={leaf} onChange={commit} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} unit={unitOf(row?.state)} allowed={leaf.left.type === 'last-changed' ? ['is before', 'is after'] : SIMPLE_COMPARISONS}/>
     </>}
   </div>;
 }

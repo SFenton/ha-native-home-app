@@ -32,6 +32,14 @@ Hour
 Weekday
 In the phone's language and region.
 
+[Edge values]
+Read as
+Last Changed
+Seconds Until
+Seconds Since It Changed
+Now, to the second
+Changes every second, so the preview and the phone redraw once a second while it is on screen.
+
 [Places]
 Opens on
 First tab

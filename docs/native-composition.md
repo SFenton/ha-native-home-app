@@ -1175,6 +1175,36 @@ Four generic additions to the one expression grammar. Each shipped with the app 
 - **Editors.** A text value's token settings gain "Keep trailing zeros" (a number with decimals) and the "Capital letters" choice (text; see TC4 below). A condition's Read
   pop-up gains "Raw State" and, for a list attribute, "Number of Items" and "Includes…".
 
+#### Edge logic: last change, countdown, durations and truncation (lane `ne-operands`)
+
+Four generic additions, each its own id so a phone without one refuses a document that uses it (`unsupported_capability`) and native can take them in any
+order. Evaluation answers are hand-written in `scripts/neoperands-corpus.ts` from the production code they reproduce, and both sides run the same files.
+
+| Shape | Where | Capability | Rule |
+|---|---|---|---|
+| `last-changed { sourceId }` | operand | `sh.entity-time@1` | an `ha-entity` source (`binding_type` for a model, `invalid_reference` for none); gives when the state last changed as `YYYY-MM-DDTHH:MM:SS.sssZ` (UTC), `unavailable` while the entity is, `loading` before the first states; never inside a flow (`invalid_combination`). Draw it with the `time` and `short-date` styles; "Since 9:30 PM" is a `choose` on `date` `days-between` of it and the clock's today |
+| `date { op: "seconds-between", from, to }` | operand | `sh.countdown@1` (and `sh.pipeline-operands@1`) | whole seconds from the moment `from` to the moment `to` on the clock's wall, signed; a date is midnight, a fraction of a second is dropped; `unavailable` when either is not a date or a date and time. Allowed inside a flow |
+| `clock { part: "now-second" }` | operand | `sh.countdown@1` (and `sh.pipeline-operands@1`) | the wall time to the second. The app starts a 1 Hz tick on the first reader and stops it one tick after the last (a document with no reader costs no timer); the Studio's preview ticks once a second only while its document reads it. Never inside a flow (`invalid_combination`): a flow runs once on the minute clock it is given |
+| `formats[name] = { duration: { style, unit? } }` | `format` operand | `sh.duration-format@1` | the argument must be a number (`binding_type`), a number of seconds (`unit` `minutes` on `compact` says minutes; `unit` on another style is `invalid_combination` at `/duration/unit`); a non-number argument, 1e13 or more, and a `compact` duration of 0 or less have no text, so the whole format is `unavailable` and a slot's `fallback` ("Off") draws |
+| `math { op: "truncate", args }` | operand | `sh.math-truncate@1` | 1 or 2 arguments (`invalid_combination` otherwise): the number and the places, a whole number 0 to 6 (else `unavailable`), cut toward zero with `trunc(x * 10^places) / 10^places`; a result of -0 is 0 |
+
+**Duration styles** (English, integer arithmetic; native `ServerUIDurationFormat`, the Studio's `duration-format.ts`):
+
+| Style | Example | Rule (the shipped code it reproduces) |
+|---|---|---|
+| `compact` | `30m`, `1h`, `1h 30m` | minutes round to the nearest whole minute (a tie away from zero); seconds round **up** to whole minutes, at least 1 (`HumidifierController.formatMinutes`, `formatSeconds`); under 60 minutes `Nm`, else `Nh` or `Nh Mm` |
+| `clock` | `05:00`, `01:00:00` | whole seconds rounded down, never below `00:00`; hours only from one hour; two digits each (`BathroomFanController.formatRemaining`) |
+| `minutes-seconds` | `4:30`, `75:00` | seconds rounded **up**, never below `0:00`; minutes are unbounded (`BedFormat.countdown`) |
+| `span` | `1 hour`, `3 days`, `3 weeks`, `2 months` | the size of the number, its sign ignored: under a day in hours, under 21 days in days, under 60 days in weeks, else months of 30 days; the amount is rounded (a tie away from zero), at least 1; plural unless 1 (`TodoItem.dueLabel`). A sign is a rule's business: "Due in {span}" and "{span} overdue" are two `format` strings under a `choose` |
+
+**Departures from the shipped alarm panel.** `short-date` draws the year when it is not the clock's year ("Oct 14, 2025"); the panel never does. The panel also hides a
+time more than 60 seconds in the future, which an author writes as `compare after` against the clock's `now`.
+
+**Data.** The Studio's live proxy carries `lastChanged` on a state (`NativeState.lastChanged`): Home Assistant's `last_changed` from the REST snapshot or `lc` from the entity
+stream, as `YYYY-MM-DDTHH:MM:SS.sssZ`. The demo house gives every entity `2026-11-15T21:30:00.000Z`. `last_updated` is deliberately not carried: it moves on every attribute change.
+
+**Editors.** The value picker offers Now, to the second (outside a flow) and, above the entity list, a Read as choice: State, Last Changed, Seconds Until (from now, to the second, to a time the entity's state holds) and Seconds Since It Changed. A number token has As a length of time (Number, Short, Clock, Minutes and seconds, Words, with Counts in for Short) and Cut off, do not round (written as `truncate(value, n)` under a number format of the same `n`). A condition reads an entity's Last Changed, compared before or after a moment (never equal to a date). The time of last change is never an entity attribute: the Read pop-up lists no `last_changed`. A Last Changed or Now, to the second value starts drawn as a time and has the same Date Style choice as other moments. Seconds Until takes a Time attribute (a timer's `finishes_at`) or, left empty, the entity's state. The preview's clock is the browser's wall clock: a minute tick, and a second tick only while the document reads `now-second`.
+
 #### Text case "words" and the light and dark colour pair (lane TC4, TC4c)
 
 Two generic additions the native vacuum lowering needs to draw exactly what the old atom drew. Both shipped with the app (native-ingest c1a42b32; see `contract/corpus/capabilities.json`) and both

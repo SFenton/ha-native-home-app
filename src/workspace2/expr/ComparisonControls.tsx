@@ -19,7 +19,7 @@ export function leftKind(leaf: Leaf, ctx: NameContext, state?: string, asKind?: 
   if (read?.as === 'boolean') return 'yesno';
   if (read?.from.path.at(-1) === 'today') return 'date';
   // A raw state is text, a list count a number, "includes" yes or no.
-  if (leaf.left.type === 'raw-state' || leaf.left.type === 'list-count' || leaf.left.type === 'list-includes') return kindOf(leaf.left);
+  if (leaf.left.type === 'raw-state' || leaf.left.type === 'last-changed' || leaf.left.type === 'list-count' || leaf.left.type === 'list-includes') return kindOf(leaf.left);
   if (state !== undefined && Number.isFinite(Number(state)) && state.trim() !== '' && (leaf.comparison === 'is above' || leaf.comparison === 'is below')) return 'number';
   return leaf.left.type === 'clock' ? 'date' : leaf.left.type === 'viewer' && leaf.left.field === 'isAdmin' ? 'yesno' : 'text';
 }
@@ -43,7 +43,7 @@ export function ComparisonControls({ leaf, onChange, kind, states = [], unit, cl
   leaf: Leaf; onChange: (leaf: Leaf, typing?: string) => void; kind: ValueKind; /** Words the entity can be now, current first. */ states?: readonly string[]; unit?: string; closed?: readonly string[]; label?: string; allowed?: readonly Comparison[];
   /** The entity's state reads as a number now, so "is above" and "is below" are offered beside the words. */ numeric?: boolean;
 }) {
-  const base = comparisonsFor(kind), more: Comparison[] = numeric && kind === 'text' ? (['is above', 'is below'] as const).filter(item => !base.includes(item)) : [];
+  const base = comparisonsFor(kind, leaf.left), more: Comparison[] = numeric && kind === 'text' ? (['is above', 'is below'] as const).filter(item => !base.includes(item)) : [];
   const all = [...base.slice(0, 3), ...more, ...base.slice(3)];
   const options = allowed ? all.filter(item => allowed.includes(item)) : all;
   const choices = options.includes(leaf.comparison) ? options : [leaf.comparison, ...options];

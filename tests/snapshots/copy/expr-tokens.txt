@@ -12,8 +12,21 @@ The simulator uses these until you close this page. Nothing is saved or sent to 
 Keep trailing zeros
 Shows exactly this many decimals: 72 reads 72.0.
 Capital letters
+As a length of time
+Number
+Counts in
+A number of seconds, drawn as a length of time. Short draws nothing for 0 or less, so the wording you give for “unavailable” (such as Off) shows.
+A number of minutes, drawn as a length of time. Short draws nothing for 0 or less, so the wording you give for “unavailable” (such as Off) shows.
+Cut off, do not round
+Drops the extra decimals instead of rounding: 71.99 with one decimal reads 71.9.
 As written
 Capitalize each word
 Capitalize after underscores
 A space or an underscore ends a word: wheel stuck reads Wheel Stuck.
 Only an underscore ends a word: heat_cool reads Heat Cool, and heat cool reads Heat cool.
+Short (1h 30m)
+Clock (05:00)
+Minutes and seconds (4:30)
+Words (3 days)
+Seconds
+Minutes
