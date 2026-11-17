@@ -1,3 +1,4 @@
+import { publishedDocument, usesLogic } from '../src/shared/composition/logic-library';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod/v4';
@@ -138,6 +139,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const { expectedRevision } = publishSchema.parse(req.body);
     const draft = store.native.getDraft();
     if (draft.revision !== expectedRevision) throw new HttpError(409, 'The draft changed; reload and import again');
+    if (usesLogic(draft.document)) throw new HttpError(409, 'The draft holds a logic library; house import does not merge into one yet');
     const imported = importHouseLayout(compositionDocumentSchema.parse(draft.document), await ha.houseConfig());
     const saved = imported.added.length > 0 ? await store.native.save(imported.document, expectedRevision) : draft;
     res.json({ revision: saved.revision, added: imported.added, kept: imported.kept, dropped: imported.dropped });
@@ -179,13 +181,16 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     catch (error) { if (error instanceof HttpError && error.status === 404) answer('keep', 'nothing-published'); else answer('keep', 'unreachable'); return; }
     // The workspace keeps its own document id when a draft starts from the published layout, so the ids are not compared.
     const withoutId = (document: unknown) => canonicalCompositionJSON(document !== null && typeof document === 'object' ? { ...(document as Record<string, unknown>), id: '' } : document);
-    if (withoutId(liveLayout.document) === withoutId(draft.document)) { answer('keep', 'already-published', liveLayout.revision); return; }
+    // The app serves the draft's logic worked out, so the draft is compared in that form.
+    let served: unknown;
+    try { served = publishedDocument(draft.document); } catch { served = draft.document; }
+    if (withoutId(liveLayout.document) === withoutId(served)) { answer('keep', 'already-published', liveLayout.revision); return; }
     const revision = liveLayout.revision;
     // The draft differs from what the app serves. It has edits of its own unless it is what this Studio last published
     // (the app changed elsewhere, a rollback) or it was never edited at all (a new data folder).
     let published: ReturnType<typeof store.native.getPublished> | undefined;
     try { published = store.native.getPublished(); } catch { published = undefined; }
-    const pristine = published ? canonicalCompositionJSON(published.document) === canonicalCompositionJSON(draft.document) : draft.revision === 1;
+    const pristine = published ? canonicalCompositionJSON(published.document) === canonicalCompositionJSON(served) : draft.revision === 1;
     answer(pristine ? 'start' : 'ask', pristine ? 'no-unpublished-edits' : 'unpublished-edits', revision);
   });
   // The Studio's own notes (row icons). Not part of the document: Publish, Export and the app never carry them.

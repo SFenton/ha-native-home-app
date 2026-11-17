@@ -1,3 +1,4 @@
+import { logicLibrarySchema } from './logic-library';
 import { appStateSourceSchema } from './app-state';
 import { MAX_RULE_CASES, operandBase, predicateBase } from './expression';
 import { pipelineSourceSchema } from './pipeline/schema';
@@ -1108,6 +1109,8 @@ export const compositionDocumentSchema = object({
   stateStyles: stateStyleLibrarySchema.optional(),
   /** The saved components `component-ref` nodes use by id (`sh.component-ref@1`). Absent means none. */
   componentLibrary: z.array(componentEntrySchema).max(100).optional(),
+  /** Reusable named logic, in a draft only (`logic-library.ts`): worked out into plain operands and conditions before compiling, and refused in a publication. */
+  logicLibrary: logicLibrarySchema.optional(),
   bootstrap: object({
     type: z.literal('native-bootstrap@1'), arrivalAnnouncement: title,
     recovery: object({ loadingTitle: title, unavailableTitle: title, unavailableMessage: text(2000), retryLabel: label }),

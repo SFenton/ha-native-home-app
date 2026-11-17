@@ -1,3 +1,4 @@
+import { publishedDocument } from '../src/shared/composition/logic-library';
 import type { CompositionPublication } from '../src/shared/composition/schema';
 import { canonicalCompositionJSON } from '../src/shared/composition/json';
 import { HttpError } from './store';
@@ -167,8 +168,11 @@ export class HaPublicationClient {
   async get(draft?: { document: unknown; revision: number }): Promise<HaPublicationSummary> {
     const { summary, liveDocument } = await this.rawGet();
     if (draft === undefined) return summary;
-    const comparable = summary.current !== null && liveDocument !== undefined;
-    return { ...summary, draftRevision: draft.revision, draftIsLive: comparable ? canonicalCompositionJSON(liveDocument) === canonicalCompositionJSON(draft.document) : null };
+    // The app serves the draft's logic worked out, so that is what is compared; a draft whose logic does not work out is not comparable.
+    let served: unknown;
+    try { served = publishedDocument(draft.document); } catch { served = undefined; }
+    const comparable = summary.current !== null && liveDocument !== undefined && served !== undefined;
+    return { ...summary, draftRevision: draft.revision, draftIsLive: comparable ? canonicalCompositionJSON(liveDocument) === canonicalCompositionJSON(served) : null };
   }
 
   /**
