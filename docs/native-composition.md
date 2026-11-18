@@ -1544,6 +1544,36 @@ Two pending ids. **`sh.dial-control@1`** is the `dial-control` node and the `sto
   draws as before. The barometer's place is `{ share: 0.5, offset: 4 }` (`.agents/decisions/2026-11-17-barometer-centre-text.md` in the native repository). `layoutDial` answers it as `textCenterY`; the preview positions the text there.
 - **Corpus.** `scripts/dialctl-corpus.ts` writes the `dialctl-` and `dial-text-place-` cases (and their `pending-` twins) and their evaluation cases through the same generator; the family is `dialctl` so `dial-` does not claim its files. Evaluation subject `dialctl` (ops `state`, `bounds`, `move`, `adjust`, `nearest`, `snap`, `ticks`, `tick-count`, `angle`) is answered by `tests/dial-corpus.ts`, and operand cases may set `env.controlValue` and `env.controlValues`.
 
+### Counting many entities (`sh.count@1`, lane SC1)
+
+One pending id for one operand. A document that has no `count` declares nothing new and compiles byte for byte as before (`tests/count-operand.test.ts`). Native mirror lane: NC1.
+
+**Why.** A count written with `math add` over `choose` costs about four nodes an entity and is written again at every use, so four or more entities pass the 64-node limit of an expression. `count` costs one node plus its tests, whatever
+the number of entities, and a use of it is evaluated once.
+
+| Shape | Where | Capability | Rule |
+|---|---|---|---|
+| `count { of: [{ test, viewer? }] }` | operand | `sh.count@1` | a number from 0 to the number of entries (`operandKind` is `number`). 1 to 32 entries (`limit_exceeded` at `of` for none or more, from the schema's size rule). Never inside a flow (`invalid_combination`): a flow reads no document source, and evaluated there it is a gap, `null` |
+
+- **`test`** is a condition, the grammar that stands in `visibleWhen`: a `state`, `numeric`, `viewer` or `viewer-person` leaf, a `compare`, `in` or `exists` leaf (which add `sh.conditions@1`), and `all`, `any` and `not` over them. The entities it reads are its own sources, so the
+  source rules are the conditions' (`invalid_reference` for a source that is not declared, at `.../test/sourceId`). Each test has the budget of a rule's case: 32 nodes and 6 levels (`limit_exceeded`). A test that is not a condition is `unknown_variant` at `.../test/type`.
+- **`viewer?: { personEntityIds: [...] }`** puts the entry in play only while the viewer is one of the listed `person.*` entities (1 to 32; `invalid_value` for an id that is not `person.<name>`, `limit_exceeded` for none, `unknown_field` for anything else such as `userIds`).
+  A filter stands on an entry, never on the count, so one list can give each person their own number ("Sam's chores" and "Alex's chores") and a third entry can count for everyone. It costs no node.
+- **Cost.** `1 + the nodes of each test`: 32 `state` tests are 33 of the 64 (`MAX_EXPRESSION_NODES`). A test that holds an operand, such as `numeric` with `above`, costs 2, so 32 of them are 97 and refused (`limit_exceeded`), as the 64 limit has always done.
+  Several counts in one expression add up (a sum of two counts is `1 + (1 + a) + (1 + b)`).
+- **What it counts.** Each entry on its own, in order: a test that holds (`yes`) counts 1. A test that does not hold, or that sees a state other than the words it lists, counts 0 and is a value: the states `unavailable` and `unknown` are text to a `state` test, so
+  `in: ["on"]` does not count them, and a test can ask for them (`in: ["unavailable"]`). Words compare exactly as written. The same entity in two entries counts twice.
+- **What it cannot answer.** A test whose answer is `unknown` (the entity has no state at all, or is still loading, or a `numeric` test reads text) is **not counted**, and the count goes on with the rest. Only when **every entry in play** is unanswerable does the count have nothing to say:
+  `loading` when any read of any kind was "not yet" (a plain read, `raw-state`, `last-changed`, the viewer's person state, or a viewer not known yet), else `unavailable`. Every read path reports it the same way. A badge (`resolveBadge`) tracks the same paths, so a person-filtered count keeps its last text until the viewer is known. So one dead sensor does not blank a count of twenty, and a house that has not reported yet does not read "0" (a `choose` over `loading` stalls and the slot keeps what it showed, as for any rule).
+  A count whose entries are all filtered out by the viewer is the value 0 (the answer is known).
+- **The viewer.** Before the connection knows the viewer (`env.viewer` absent) a count that has a filtered entry is `loading`; a count with no filters never waits. A viewer who has no `personEntityId`, or is not listed, is not in that entry. An entry the viewer is not in is never read.
+  The viewer's own person entity is `viewer.personEntityId`, the same field the `viewer` operand reads.
+- **Grammar boundary.** A `count` standing where a `compare` argument stands is a number (`above`, `below`, `eq` against a number; against text it is `binding_type`). It adds with `math add`, so an app icon's number is `math add` of counts, one for each kind of thing.
+  The name is also the shell's profile `count` node (`sh.profile-count@1`): a record with `of` is the operand (a stray `id` on it is `unknown_field`), a record with an `id` and no `of` is the unsupported node. Corpus `count-operand-profile-node-is-not-the-operand` and `count-operand-stray-id` pin both.
+- **Corpus.** `scripts/count-corpus.ts` writes the `count-operand-` publication cases (`pending-count-operand-*` compile; `count-operand-*` are refused, each with its hand-written first issue) and the `count-operand-` evaluation cases (subjects `operand` and `condition`),
+  through `generate-expression-corpus.ts`. Evaluation env keys are the existing `reads` (`<source>/state` or `<source>/attributes/<name>`), `raw`, `changed`, `viewer` and `flow`, and `viewerPerson` (what the host's `viewerPersonState` gives; absent means none). Native mirror: `sh.count@1` joins `ServerUIIngestedCapabilities`, `capabilities.json` is regenerated and
+  `sh.count@1` is dropped from `capabilities.pending.json`, the generators are rerun, and `ServerUIOperand` decodes `count` with `ServerUIPredicate` for each test, strictly (unknown fields refused), and evaluates as above.
+
 ### Linked components (`sh.component-ref@1`, lane L-linked)
 
 A saved component is an entry of the document's `componentLibrary` (at most 100): `{ id, name, origin?, params?, sources?, bindings?, node }`. The `node` is the body,

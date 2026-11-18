@@ -67,6 +67,17 @@ Two pending ids (`sh.dial-control@1`, `sh.dial-text-place@1`; `contract/corpus/c
   The barometer's place is half the height and 4 points, production's own.
 - **Offered by Add** as Dial Control (Content), starting as One Value. It still publishes only once a shipped build declares `sh.dial-control@1`.
 
+## How Many Are…
+
+One pending id (`sh.count@1`; `contract/corpus/capabilities.pending.json`); a document that does not use it compiles byte-identical. The Studio's word for the `count` operand is **How Many Are…**, never "count operand", "predicate" or "test". The contract and evaluator are lane SC1's; the editor and the Logic Templates starter are PR #12's (decision: `studio-logic`, "Studio PR #12 round 1: counting many entities").
+
+- **The sentence.** "How many of these are *on*?" over a list of entities, each with its own words to match, such as "On" for a door sensor or "below 20" for a battery. It answers a number, so "None open", "1 open" and "4 open" are a rule over it, and a node can hide at zero.
+- **Many things, one place.** Up to 32 entities in one How Many Are…, and a use of it costs one piece rather than four for each entity. A person never counts nodes; the limit is shown as "up to 32".
+- **What counts.** An entity counts when its words match. One that is unavailable, unknown or has no state yet does not count and does not stop the others. Only when none of them can be told does the answer say it is not known yet, so a line keeps what it showed instead of saying "None open".
+- **Per person.** An entity can be marked "Only for…" with one or more people (their person entities). The number then follows who is looking; an entity with no one marked counts for everyone.
+- **Adding up.** A few How Many Are… values add into one number, one for each kind of thing, which is how a total such as an app icon's number is written.
+- **Until it lands.** "Add Cases for a Count…" and "How Many Are…" in the Logic Templates starter write three rules, is 0, is 1 and is more than 1, over the existing `math add` of `choose` (`sh.conditions@1`, `sh.operands@1`, `sh.rules@1`; no new capability id). It covers up to three entities (`COUNT_MAX_ENTITIES`): the count is written four times and each entity costs four nodes, so a fourth passes the 64-node operand limit. The starter says so ("Counts up to three entities.") and ticks no more than three; two counts added together would be written four times each and pass the limit too. When the one-node count operand (`sh.count@1`) lands, `howManyAre` in `logicModel.ts` is the one place that changes.
+
 ## Templates
 
 People see **Template**. The contract keeps its names (`componentLibrary`, `component-ref`, `sh.component-ref@1`) and so do the test ids. A template is linked: every
@@ -160,10 +171,6 @@ and the remove command. Unlinking turns the use back into its own logic and leav
 **Delete** asks only when the template is used, and counts every use, including those in the bodies of other templates (listed as "Door Words · Logic Template", a press
 opens that template): "It is used by 3. Each use keeps its logic, unlinked." A use inside another template is unlinked with its template's own settings kept. An unused
 template goes at once, with an undo toast.
-
-**Counting cases.** "Add Cases for a Count…" and "How Many Are…" write three rules, is 0, is 1 and is more than 1, over the existing `math add` of `choose`
-(`sh.conditions@1`, `sh.operands@1`, `sh.rules@1`; no new capability id). It covers up to three entities (`COUNT_MAX_ENTITIES`): the count is written four times
-and each entity costs four nodes, so a fourth passes the 64-node operand limit. The starter says so ("Counts up to three entities.") and ticks no more than three; two counts added together would be written four times each and pass the limit too. When the one-node count operand (`sh.count@1`) lands, `howManyAre` in `logicModel.ts` is the one place that changes.
 
 **The preview** and every value editor work a use out with its template's body (`expandLogic`) before they compile, by the library as it is now, so an edit to a
 template shows in every use at once; publication refuses a leftover setting or a missing template. The Logic Gallery sample (`src/preview2/fixtures/logic-gallery.json`:

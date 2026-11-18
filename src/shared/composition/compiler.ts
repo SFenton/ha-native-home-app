@@ -175,7 +175,8 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown): 
     let unsupportedPath: PropertyKey[] = path;
     for (let depth = path.length; depth >= 0; depth--) {
       const ownerPath = path.slice(0, depth), owner = at(input, ownerPath);
-      if (record(owner) && typeof owner.type === 'string' && unsupported[owner.type]) {
+      // `count` is also an operand (`sh.count@1`): a record with `of` is the operand; only a node, which has an id and no `of`, is the unsupported profile count.
+      if (record(owner) && typeof owner.type === 'string' && unsupported[owner.type] && !(owner.type === 'count' && (Object.hasOwn(owner, 'of') || !Object.hasOwn(owner, 'id')))) {
         capability = `sh.${unsupported[owner.type]}@1`; unsupportedPath = ownerPath; break;
       }
       const key = ownerPath.at(-1);

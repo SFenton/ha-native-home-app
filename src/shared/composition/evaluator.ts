@@ -103,6 +103,23 @@ const combine = (parts: ReadResult[]): ReadResult | undefined =>
 
 // MARK: Operands
 
+/**
+ * `env` with every way an expression reads watched: a read, a raw state, a last change and the viewer's person state that answer `loading`, and a viewer
+ * that is not known yet, call `notYet`. The result inherits from `env` (so an absent hook stays absent) and nothing is read until a test asks.
+ */
+export function watching(env: Environment, notYet: () => void): Environment {
+  const seen = (found: ReadResult): ReadResult => { if (found.status === 'loading') notYet(); return found; };
+  const out: Environment = Object.create(env);
+  Object.defineProperties(out, {
+    read: { value: (sourceId: string, path: string[]) => seen(env.read(sourceId, path)) },
+    viewer: { get: () => { if (!env.viewer) notYet(); return env.viewer; } },
+    ...(env.readRaw ? { readRaw: { value: (sourceId: string) => seen(env.readRaw!(sourceId)) } } : {}),
+    ...(env.readChanged ? { readChanged: { value: (sourceId: string) => seen(env.readChanged!(sourceId)) } } : {}),
+    ...(env.viewerPersonState ? { viewerPersonState: { value: () => seen(env.viewerPersonState!()) } } : {}),
+  });
+  return out;
+}
+
 function compute(op: Extract<Operand, { type: 'math' }>['op'], n: number[]): number | undefined {
   switch (op) {
     case 'add': return n.reduce((a, b) => a + b, 0);
@@ -170,6 +187,26 @@ function operandResult(operand: Operand, env: Environment): ReadResult {
       const list = env.read(operand.from.sourceId, operand.from.path);
       if (list.status !== 'value') return list;
       return Array.isArray(list.value) ? value(list.value.length) : unavailable;
+    }
+    case 'count': {
+      // The tests read the document's sources, which a flow does not have.
+      if (env.flow) return unavailable;
+      // Every way a test reads is watched; any "not yet" makes an unanswerable count `loading` rather than `unavailable`.
+      let waiting = false;
+      const watched = watching(env, () => { waiting = true; });
+      let held = 0, considered = 0, unknown = 0;
+      for (const entry of operand.of) {
+        if (entry.viewer) {
+          // No signed-in person yet: nothing about "whose" can be said. A person who is not one of the listed ones, or has no person entity, is simply not counted.
+          if (!env.viewer) return loading;
+          if (env.viewer.personEntityId === undefined || !entry.viewer.personEntityIds.includes(env.viewer.personEntityId)) continue;
+        }
+        considered += 1;
+        const answer = evaluatePredicate(entry.test, watched);
+        if (answer === 'yes') held += 1;
+        else if (answer === 'unknown') unknown += 1;
+      }
+      return considered > 0 && unknown === considered ? (waiting ? loading : unavailable) : value(held);
     }
     case 'list-includes': {
       if (env.flow) return unavailable;
@@ -458,9 +495,7 @@ export function resolveBadge(badge: BadgeSlot | undefined, env: Environment): { 
   // A rule that stalls is `loading` to every slot. For a badge, "not yet" must mean a source that is still loading: a stall in which no read was loading
   // is a count that cannot be read, and that draws nothing (the value rule), so a capped count behaves like a plain one.
   let waiting = false;
-  const watched: Environment = { ...env, read: (sourceId, path) => { const r = env.read(sourceId, path); waiting ||= r.status === 'loading'; return r; },
-    ...(env.readRaw ? { readRaw: (sourceId: string) => { const r = env.readRaw!(sourceId); waiting ||= r.status === 'loading'; return r; } } : {}),
-    ...(env.viewerPersonState ? { viewerPersonState: () => { const r = env.viewerPersonState!(); waiting ||= r.status === 'loading'; return r; } } : {}) };
+  const watched = watching(env, () => { waiting = true; });
   const found = evaluateOperand(badge.value, watched);
   if (found.status === 'loading' && !waiting) return { status: 'value', text: null, ...(badge.spoken ? { spoken: null } : {}) };
   if (found.status === 'loading') return { status: 'loading' };
