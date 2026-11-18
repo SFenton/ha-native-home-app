@@ -1,5 +1,5 @@
 name: S+H Studio
-version: 0.3.4
+version: 0.3.7
 slug: native_home_studio
 image: ghcr.io/sfenton/native-home-studio
 arch:

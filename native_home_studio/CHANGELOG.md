@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.7
+
+- Maintenance and internal changes.
+
+## 0.3.6
+
+- Studio can save a value or condition as a Logic Template and use it in many places.
+
+## 0.3.5
+
+- Maintenance and internal changes.
+
 ## 0.3.4
 
 - Maintenance and internal changes.
