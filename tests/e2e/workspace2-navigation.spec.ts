@@ -321,8 +321,9 @@ for (const pose of poses) {
     // The rail ends at the window's trailing edge, 83 pt wide, from the status strip down; the group is over the tabs pill, which has rounded ends.
     const bar = (await root.locator('.sh-rail-bar').boundingBox())!;
     expect(Math.abs((bar.x + bar.width) - (screen.x + screen.width))).toBeLessThan(1.5);
-    // R1: the closed portrait's bar is 69 pt wide in an 84 pt inset; the open Duo's rail keeps its 83.
-    expect(Math.abs(bar.width / screen.width - (pose.name === 'folded upright' ? 69 / 466 : 83 / 951))).toBeLessThan(0.004);
+    // The rail is one 48.5 pt pill column (the bar itself is the screen-sized layer it is drawn in): its width against the window's, the closed portrait 466 pt, the open Duo 951.
+    const column = (await root.locator('.sh-tabbar').boundingBox())!;
+    expect(Math.abs(column.width / screen.width - 48.5 / (pose.name === 'folded upright' ? 466 : 951))).toBeLessThan(0.004);
     const group = (await root.locator('.sh-rail-group').boundingBox())!;
     const pill = (await root.locator('.sh-tabbar').boundingBox())!;
     expect(group.y + group.height).toBeLessThan(pill.y);

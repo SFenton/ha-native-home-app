@@ -34,9 +34,6 @@ const windows: { choice: Choice; width: number; sheetSafe: number }[] = [
 
 /** Opens the workspace in Use on the given window and presents the Advanced Controls sheet, the way a person does. */
 async function openSheet(page: Page, choice: Choice) {
-  // The dev server bundles on its first page load, which can outlast the helper's wait on a busy machine.
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible({ timeout: 45_000 });
   await openWorkspace(page);
   await page.getByRole('button', { name: 'Use', exact: true }).first().click();
   const device = choice === 'iPhone' ? 'iPhone' : choice === 'iPad' ? 'iPad' : 'iPhone Duo';

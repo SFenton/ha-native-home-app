@@ -5,7 +5,7 @@ import { useReflow } from './reflow';
 import { footprintOf, halfTilts, halfTransform, OUTER_LIFT, PERSPECTIVE, rigGeometry, type Box, type HalfGeometry } from './rig-geometry';
 import { useCopyReach } from './copy-access';
 import { useTwinScroll } from './twin-scroll';
-import { duoWindow, radiiCss, type PreviewWindow, type Radii } from './windows';
+import { duoWindow, OPEN_DUO_BODY, radiiCss, type PreviewWindow, type Radii } from './windows';
 
 /** Which copy of the screen a render is for: the live inner display, its twin in the second half, or the outer display on the cover's back. */
 export type ScreenCopy = 'primary' | 'twin' | 'outer';
@@ -134,6 +134,7 @@ const RigUnit = memo(function RigUnit({ pose, token, reduced, frozen = false, re
   useReflow(roots, `${pose.turn}:${pose.fold}`, token, !frozen && !reduced);
   useTwinScroll(first, second, life.inner && life.twin);
   useCopyReach(first, second, life.inner && life.twin && !frozen, `${pose.turn}:${pose.fold}:${life.done}`);
+  const settled = life.done;
   const style = { width: g.unit.width, height: g.unit.height, transform: `translate(${-fp.cx}px, ${-fp.cy}px)`, '--sh-fold-ms': `${token.ms}ms`, '--sh-fold-ease': token.ease, '--sh-flatten-ms': `${FLATTEN_MS}ms` } as CSSProperties;
   return <div className="sh-rig" data-fold={pose.fold} data-turn={pose.turn} data-twin={life.twin ? '' : undefined} data-settling={life.done ? undefined : ''} data-frozen={frozen ? '' : undefined} style={style}>
     <div className="sh-ground" aria-hidden="true" style={{ left: fp.cx - fp.width / 2, top: fp.cy - fp.height / 2, width: fp.width, height: fp.height }}/>
@@ -144,10 +145,13 @@ const RigUnit = memo(function RigUnit({ pose, token, reduced, frozen = false, re
         const host = wide ? { left: 0, top: 0 } : half.host;
         const lit = pose.fold === 'partly' && !half.first;
         return <div key={half.first ? 'first' : 'second'} className="sh-half" data-half={half.first ? 'first' : 'second'} data-cover={half.cover ? '' : undefined}
+          // WebKit paints by DOM order and ignores `backface-visibility` here, so a half drawn later covers one drawn earlier. What cannot be seen is not painted: a closed Duo's base is wholly under the cover, and a flat Duo is one screen drawn in the first half, whose body then spans the whole device.
+          data-unseen={settled && (pose.fold === 'closed' ? !half.cover : pose.fold === 'open' && !half.first) ? '' : undefined}
           style={{ ...box(half.box), transformOrigin: half.origin, transform: halfTransform(half, tilts[at]) }}>
           <div className="sh-inner">
             <div className="sh-body" style={{ borderRadius: radiiCss(half.bodyRadii), clipPath: clipPathOf(half, g.vertical) }}/>
-            {life.inner && hosted && <Clip wide={wide} style={{ ...box(clip), borderRadius: radiiCss(half.screenRadii) }}>
+            {settled && pose.fold === 'open' && half.first && <div className="sh-body" style={{ inset: 'auto', left: 0, top: 0, width: g.unit.width, height: g.unit.height, borderRadius: radiiCss(OPEN_DUO_BODY.bodyRadii) }}/>}
+            {life.inner && hosted && <Clip wide={wide} style={{ ...box(clip), borderRadius: radiiCss(wide ? OPEN_DUO_BODY.screenRadii : half.screenRadii) }}>
               <div ref={at === 0 ? first : second} className="sh-host" data-copy={at} data-twin={at === 1 ? '' : undefined}
                 style={{ left: host.left, top: host.top, width: innerWindow.width, height: innerWindow.height }}>
                 {renderScreen(innerWindow, at === 0 ? 'primary' : 'twin')}
@@ -155,7 +159,7 @@ const RigUnit = memo(function RigUnit({ pose, token, reduced, frozen = false, re
               <div className="sh-light" data-on={lit ? '' : undefined}/>
             </Clip>}
           </div>
-          {half.cover && <OuterFace halfAxis={half.axis} face={g.outer.face} screen={g.outer.screen} bodyRadii={g.outer.bodyRadii} screenRadii={g.outer.screenRadii} strip={g.outer.strip}
+          {half.cover && life.outer && <OuterFace halfAxis={half.axis} face={g.outer.face} screen={g.outer.screen} bodyRadii={g.outer.bodyRadii} screenRadii={g.outer.screenRadii} strip={g.outer.strip}
             mounted={life.outer} window={outerWindow} renderScreen={renderScreen}/>}
         </div>;
       })}

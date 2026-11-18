@@ -35,11 +35,11 @@ const labels = (root: Element | null) => [...(root?.querySelectorAll('button') ?
 const tabCount = base.navigation.tabs.length;
 
 /** What every pose in the vertical bar shares. */
-function expectRail(container: HTMLElement, inset = 83, bar = inset) {
+function expectRail(container: HTMLElement, inset = 83) {
   const rail = container.querySelector('.sh-rail-bar')!;
   expect(rail, 'the rail').not.toBeNull();
-  // Order from the top: the header group, then the free space, then the tabs in their pill.
-  expect([...rail.children].map(child => child.className.split(' ').find(name => ['sh-rail-group', 'sh-rail-grow', 'sh-tabbar'].includes(name)))).toEqual(['sh-rail-group', 'sh-rail-grow', 'sh-tabbar']);
+  // Order from the top: the header, then the tabs in their pill. Nothing folds here, so there is no More.
+  expect([...rail.children].map(child => child.className.split(' ').find(name => ['sh-rail-header', 'sh-rail-more', 'sh-tabbar'].includes(name)))).toEqual(['sh-rail-header', 'sh-tabbar']);
   expect(labels(rail.querySelector('.sh-rail-group'))).toEqual(['Quick Links', 'Profile']);
   expect(rail.querySelector('.sh-rail-group')!.classList.contains('sh-shared')).toBe(true);
   expect(rail.querySelectorAll('.sh-tabbar .sh-tab')).toHaveLength(tabCount);
@@ -53,7 +53,6 @@ function expectRail(container: HTMLElement, inset = 83, bar = inset) {
   expect(container.querySelector('.sh-large-title')).toBeNull();
   // The rail is on the trailing edge, at the window's rail width.
   expect(container.querySelector<HTMLElement>('.sh-screen')!.style.getPropertyValue('--sh-rail')).toBe(`${inset}px`);
-  expect(container.querySelector<HTMLElement>('.sh-screen')!.style.getPropertyValue('--sh-rail-bar')).toBe(`${bar}px`);
 }
 
 describe('the Duo rail', () => {
@@ -63,8 +62,8 @@ describe('the Duo rail', () => {
 
   it('folded upright: Quick Links and Profile above the tabs pill, no hamburger, the title in the header row', () => {
     const { container } = mount(withChrome(), duoFolded);
-    // R1: the closed portrait's rail inset is 84 pt and the UITabBar is 69 pt wide.
-    expectRail(container, 84, 69);
+    // R1: the closed portrait's rail inset is 84 pt; the pill is 48.5 pt wide on the camera's centre line (418 of 466).
+    expectRail(container, 84);
     expect(container.querySelector('.sh-crease[data-on]')).toBeNull();
   });
 
@@ -75,8 +74,9 @@ describe('the Duo rail', () => {
     expect(container.querySelector('.sh-status')).toBeNull();
     expect(status.querySelector('.sh-time')?.textContent).toBe('9:41');
     expect(status.querySelector('.sh-wifi')).not.toBeNull();
-    // R1's keep-clear region: 84 x 170 at (382, 0).
-    expect([status.style.left, status.style.top, status.style.width, status.style.height]).toEqual(['382px', '0px', '84px', '170px']);
+    // A1: the time at y 92.5 and the mark at 130, on the rail's centre line, 418 pt in.
+    expect(status.style.getPropertyValue('--rail-cx')).toBe('418px');
+    expect([(status.querySelector('.sh-time') as HTMLElement).style.top, (status.querySelector('.sh-wifi') as unknown as HTMLElement).style.top]).toEqual(['92.5px', '130px']);
     expect(status.getAttribute('aria-hidden')).toBe('true');
   });
 
@@ -117,14 +117,71 @@ describe('the Duo rail', () => {
     const withProfile = (look: string) => withChrome().navigation.chrome.groups.map(group => ({ ...group, items: group.items.map(item => item.type === 'shell-header' ? { ...item, profile: { look } } : item) }));
     const withLook = (look: string) => ({ ...withChrome(), navigation: { ...withChrome().navigation, chrome: { groups: withProfile(look) } } }) as unknown as CompositionDocument;
     const rail = profileIn(withChrome(), duoFolded, '.sh-rail-group');
-    expect(rail.querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
+    // No block, or `photo`: native shows the photo first, so the sim draws the fixed grey stand-in (never a real picture, initials or a name).
+    expect(rail.querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('photo');
+    expect(rail.querySelector('.sh-stand-in')?.textContent).toBe('');
     cleanup();
     const header = profileIn(withChrome(), iphone, '.sh-header');
-    expect(header.querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
+    expect(header.querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('photo');
     cleanup();
-    expect(profileIn(withLook('photo'), duoFolded, '.sh-rail-group').querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
+    expect(profileIn(withLook('photo'), duoFolded, '.sh-rail-group').querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('photo');
     cleanup();
-    expect(profileIn(withLook('symbol'), duoFolded, '.sh-rail-group').querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('symbol');
+    expect(profileIn(withLook('initials'), duoFolded, '.sh-rail-group').querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('initials');
+    cleanup();
+    // `symbol` is the outlined person on glass, with no filled disc.
+    const symbolButton = profileIn(withLook('symbol'), duoFolded, '.sh-rail-group');
+    expect(symbolButton.querySelector('.sh-avatar-disc')).toBeNull();
+    expect(symbolButton.querySelector('svg')).not.toBeNull();
+  });
+
+  it('opens More on the folded items and closes it after a keyboard choice in Edit, giving focus back to the circle', async () => {
+    const win = duoWindow({ turn: 90, fold: 'closed' });
+    const view = mount(withChrome([{ id: 'demo_extra', placement: 'trailing', horizontal: 'separate-circles@1', vertical: 'shared@1', items: [button('demo_a', 'eligible'), button('demo_b', 'eligible')] }]), win);
+    const more = view.container.querySelector<HTMLButtonElement>('.sh-rail-more');
+    expect(more, 'the short rail folds something into More').not.toBeNull();
+    fireEvent.click(more!);
+    expect(more!.getAttribute('aria-expanded')).toBe('true');
+    const menu = view.container.querySelector<HTMLElement>('.sh-more-menu')!;
+    const row = menu.querySelector<HTMLElement>('[role=menuitem]')!;
+    row.focus();
+    fireEvent.keyDown(row, { key: 'Enter' });
+    await vi.waitFor(() => expect(more!.getAttribute('aria-expanded')).toBe('false'));
+  });
+
+  it('ends a held press when the window loses focus: the release after it commits nothing', () => {
+    // jsdom has no PointerEvent: a mouse event carrying the pointer fields the hold reads stands in for it.
+    if (!('PointerEvent' in window)) Object.defineProperty(window, 'PointerEvent', { configurable: true, value: class extends MouseEvent {
+      pointerId: number; isPrimary: boolean; pointerType: string;
+      constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 0; this.isPrimary = init.isPrimary ?? false; this.pointerType = init.pointerType ?? ''; }
+    } });
+    const view = mount(withChrome(), duoFolded, { mode: 'use' });
+    const tabs = [...view.container.querySelectorAll<HTMLElement>('.sh-tabbar .sh-tab')];
+    const select = vi.spyOn(HTMLElement.prototype, 'click');
+    fireEvent.pointerDown(tabs[0], { pointerId: 1, isPrimary: true, pointerType: 'touch', clientX: 10, clientY: 10, button: 0 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 10, clientY: 40 });
+    expect(view.container.querySelector('.sh-tab[data-lit]'), 'held before the blur').not.toBeNull();
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    fireEvent.blur(window);
+    select.mockClear();
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 10, clientY: 40 });
+    expect(select).not.toHaveBeenCalled();
+    expect(view.container.querySelector('.sh-tab[data-lit]')).toBeNull();
+    vi.restoreAllMocks();
+  });
+
+  it('counts only the tabs it draws: a tab its rule hides in Use is not in the rail pill, in Edit it is (dimmed)', () => {
+    const hidden = { type: 'state', sourceId: 'missing', path: ['state'], in: ['on'] };
+    const tabs = base.navigation.tabs.map((tab, at) => at === tabCount - 1 ? { ...tab, visibleWhen: hidden, whenUnknown: 'hide' } : tab);
+    const document = { ...withChrome(), navigation: { ...withChrome().navigation, tabs } } as unknown as CompositionDocument;
+    const height = (container: HTMLElement) => container.querySelector<HTMLElement>('.sh-rail-bar')!.style.getPropertyValue('--tabs-h');
+    const use = mount(document, duoFolded, { mode: 'use' });
+    expect(use.container.querySelectorAll('.sh-tabbar .sh-tab')).toHaveLength(tabCount - 1);
+    expect(height(use.container)).toBe(`${11 + 50 * (tabCount - 1)}px`);
+    expect(use.container.querySelector<HTMLElement>('.sh-tabbar')!.style.getPropertyValue('--tab-n')).toBe(String(tabCount - 1));
+    cleanup();
+    const edit = mount(document, duoFolded);
+    expect(edit.container.querySelectorAll('.sh-tabbar .sh-tab')).toHaveLength(tabCount);
+    expect(height(edit.container)).toBe(`${11 + 50 * tabCount}px`);
   });
 
   it('keeps the title in the header row of a pushed page, beside Back, and takes no menu there either', () => {

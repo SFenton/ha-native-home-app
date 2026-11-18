@@ -87,6 +87,12 @@ const settleTime = (samples: { t: number; angle: number }[], from: number, to: n
   return (at?.t ?? Infinity) - start;
 };
 
+/** The gap before the frame that settled: the true crossing is somewhere inside it, so a time read from drawn frames is that much uncertain. */
+const crossingGap = (samples: { t: number; angle: number }[], from: number, to: number) => {
+  const index = samples.findIndex((sample, at) => samples.slice(at).every(next => (next.angle - from) / (to - from) >= 0.99));
+  return index > 0 ? samples[index].t - samples[index - 1].t : 0;
+};
+
 test('closed to partly folded: the cover swings up from the base and the second display is there when it lands', async ({ page }) => {
   await startDuo(page);
   await press(page, 'Folded');
@@ -115,17 +121,19 @@ test('closed to partly folded never shows a frame whose inner layout differs fro
   // Read once per animation frame, in the callback that runs just before that frame paints: a sample is a painted frame. (Sampling from the test's own
   // timer reads between tasks, and under load it can land after a commit that a later task replaces before any frame is drawn: such a state is never seen.)
   const frames = await page.evaluate(async () => {
-    const out: { t: number; tracks: string }[] = [];
+    const out: { t: number; tracks: string; fold: string | null }[] = [];
     const read = () => [...document.querySelectorAll('[data-preview-root] .sh-rig:not([data-frozen]) .sh-half[data-half=first] .sh-inner .sh-clip[data-ready] [data-sel] .sh-grid')].slice(0, 3).map(grid => getComputedStyle(grid).gridTemplateColumns).join('|');
     const start = performance.now();
     document.querySelector<HTMLButtonElement>('[data-testid=simulator-rail] button[aria-label="Partly Folded"]')!.click();
-    await new Promise<void>(resolve => { const tick = (now: number) => { out.push({ t: Math.round(now - start), tracks: read() }); if (now - start < 900) requestAnimationFrame(tick); else resolve(); }; requestAnimationFrame(tick); });
+    await new Promise<void>(resolve => { const tick = (now: number) => { out.push({ t: Math.round(now - start), tracks: read(), fold: document.querySelector('[data-preview-root] .sh-rig:not([data-frozen])')?.getAttribute('data-fold') ?? null }); if (now - start < 900) requestAnimationFrame(tick); else resolve(); }; requestAnimationFrame(tick); });
     return out;
   });
   // The inner display is drawn from the frame its layout is final: every painted frame it is visible in reads the same tracks.
-  const seen = [...new Set(frames.map(frame => frame.tracks).filter(Boolean))];
-  expect(seen, `layouts by frame: ${JSON.stringify(frames.filter(frame => frame.tracks).map(frame => [frame.t, frame.tracks]))}`).toHaveLength(1);
-  expect(frames.filter(frame => frame.tracks).length, 'the display is visible in some frames').toBeGreaterThan(10);
+  // Frames painted before the rig changed pose still show the closed Duo (its own layout, rightly different): on a slow runner the first frames are those, so only the frames of the partly folded rig count.
+  const shown = frames.filter(frame => frame.fold === 'partly' && frame.tracks);
+  const seen = [...new Set(shown.map(frame => frame.tracks))];
+  expect(seen, `layouts by frame: ${JSON.stringify(shown.map(frame => [frame.t, frame.tracks]))}`).toHaveLength(1);
+  expect(shown.length, 'the display is visible in some frames').toBeGreaterThan(10);
 });
 
 for (const direction of ['Right', 'Left'] as const) {
@@ -139,8 +147,8 @@ for (const direction of ['Right', 'Left'] as const) {
       await expectPose(page, 'closed', turn);
       const live = previewRoot(page).locator('.sh-rig:not([data-frozen])');
       // A settled closed rig has exactly one rail bar.
-      await expect(live.locator('.sh-outer .sh-rail-bar')).toHaveCount(1);
-      const screen = (await previewRoot(page).locator('.sh-rig:not([data-frozen]) .sh-outer .sh-screen').boundingBox())!, bar = (await live.locator('.sh-outer .sh-rail-bar').boundingBox())!;
+      await expect(live.locator('.sh-rail-bar')).toHaveCount(1);
+      const screen = (await previewRoot(page).locator('.sh-rig:not([data-frozen]) .sh-outer .sh-screen').boundingBox())!, bar = (await live.locator('.sh-outer .sh-rail-bar .sh-tabbar').boundingBox())!;
       const camera = (await live.locator('.sh-camera').boundingBox())!;
       // The window is portrait at 0 and 180, landscape at 90 and 270.
       expect(screen.height > screen.width).toBe(turn % 180 === 0);
@@ -149,20 +157,22 @@ for (const direction of ['Right', 'Left'] as const) {
       railLeft.push(bar.x < screen.x + screen.width / 2);
       expect(bar.x < screen.x + screen.width / 2).toBe(leading);
       expect(camera.x + camera.width / 2 < screen.x + screen.width / 2).toBe(leading);
-      expect(Math.abs((leading ? bar.x - screen.x : screen.x + screen.width - bar.x - bar.width))).toBeLessThan(2);
-      // The status items stay in the rail column past the camera: nothing in that box is content, and the box is inside the rail's width.
-      const status = (await live.locator('.sh-outer .sh-rail-status').boundingBox())!;
-      // The rail's inset is 84 pt and its bar 69 pt (R1): the status column is the inset, no wider.
-      expect(Math.abs(status.width - bar.width * 84 / 69), 'as wide as the rail inset').toBeLessThanOrEqual(2);
-      const onContent = await page.evaluate(({ x, y, width, height }) => {
+      // The tab pill is 24 pt in from the camera's edge (A: pill 24 to 72.5), at the preview's zoom.
+      const inset = leading ? bar.x - screen.x : screen.x + screen.width - bar.x - bar.width;
+      expect(inset, 'the pill is about 24 pt from the camera-side edge').toBeGreaterThan(18 * screen.width / (turn % 180 ? 678 : 466));
+      expect(inset).toBeLessThan(30 * screen.width / (turn % 180 ? 678 : 466));
+      // The status items (portrait turns only) stay in the rail column past the camera: nothing under them is content.
+      const statusBoxes = await live.locator('.sh-outer .sh-rail-status > *').evaluateAll(items => items.map(item => { const box = item.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height }; }));
+      expect(statusBoxes.length, `turn ${turn}: the time and the mark at the portrait turns only`).toBe(turn % 180 === 0 ? 2 : 0);
+      const onContent = await page.evaluate(boxes => {
         const hits: string[] = [];
-        for (let column = 0; column <= 4; column += 1) for (let row = 0; row <= 8; row += 1) {
+        for (const { x, y, width, height } of boxes) for (let column = 0; column <= 4; column += 1) for (let row = 0; row <= 8; row += 1) {
           const at = document.elementsFromPoint(x + 1 + (width - 2) * column / 4, y + 1 + (height - 2) * row / 8);
           const node = at.find(element => element.closest('.sh-node'));
           if (node) hits.push(node.closest('.sh-node')!.getAttribute('data-sel') ?? 'node');
         }
         return hits;
-      }, status);
+      }, statusBoxes);
       expect(onContent, `turn ${turn}: the status box covers no content`).toEqual([]);
       // The camera is drawn in front of the screen: its centre is black and darker than the wallpaper just outside its ring.
       const [centre, outside] = await lumaAt(page, [
@@ -238,10 +248,11 @@ test('the rig: fold-pose reaches 99% of its travel at 317 ms and fold-swing at 5
   expect(swingDistinct).toBeGreaterThanOrEqual(10);
   // A settle time is read from drawn frames, so its resolution is the frame gap: a software renderer that draws every third frame can read two gaps late. The allowance is the median gap's excess over 60 Hz, twice; on a 60 Hz renderer it is nothing.
   const median = (samples: { t: number }[]) => { const gaps = samples.slice(1).map((sample, at) => sample.t - samples[at].t).sort((a, b) => a - b); return gaps[Math.floor(gaps.length / 2)]; };
-  const slack = (samples: { t: number }[]) => 2 * Math.max(0, median(samples) - 16.8);
-  note('settleSlackMs', { pose: Math.round(slack(pose)), swing: Math.round(slack(swing)) });
-  expect(Math.abs(poseSettle - 317)).toBeLessThanOrEqual(40 + slack(pose));
-  expect(Math.abs(swingSettle - 528)).toBeLessThanOrEqual(60 + slack(swing));
+  // A runner that drops one frame at the landing (a 50 ms gap) reads that late: the gap before the settled frame is allowed on top, so a measured 50 ms excess on a CI runner is not a fault of the rig (the :112 test failed on main's own merge commits for a related reason; this one has not, so the term is capped at two frames).
+  const slack = (samples: { t: number; angle: number }[], from: number, to: number) => Math.max(2 * Math.max(0, median(samples) - 16.8), Math.min(crossingGap(samples, from, to), 34) - 16.8);
+  note('settleSlackMs', { pose: Math.round(slack(pose, 0, 18)), swing: Math.round(slack(swing, 0, 180)) });
+  expect(Math.abs(poseSettle - 317)).toBeLessThanOrEqual(40 + slack(pose, 0, 18));
+  expect(Math.abs(swingSettle - 528)).toBeLessThanOrEqual(60 + slack(swing, 0, 180));
 });
 
 test('frame pacing: every transition keeps its glass live; a hardware renderer holds a 16.8 ms median and at most two gaps over 25 ms inside the token, a software one a p90 gap of 84 ms and no gap over 250 ms', async ({ page }) => {

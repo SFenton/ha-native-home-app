@@ -45,10 +45,10 @@
   .sh-wall::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, .44) 0, rgba(0, 0, 0, .45) 28%, rgba(0, 0, 0, .46) 50%, rgba(0, 0, 0, .52) 75%, rgba(0, 0, 0, .64) 100%); }
   .sh-status { position: absolute; inset: 0 0 auto 0; height: var(--sh-safe-top); z-index: 40; pointer-events: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 30px 12px; font: 600 17px/1 var(--sh-font); }
   .sh-island { position: absolute; left: 50%; top: 11px; width: 120px; height: 34px; margin-left: -60px; border-radius: 17px; background: #000; }
-  /* The closed Duo's status items: the time over the connection mark, on the rail under (or over) the camera, inside the region kept clear (R1). */
-  .sh-rail-status { position: absolute; z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; font: 600 15px/1 var(--sh-font); padding-top: calc(var(--sh-camera-y) + var(--sh-camera-size) / 2 + 8px); box-sizing: border-box; }
-  .sh-rail-status[data-camera-v=bottom] { flex-direction: column-reverse; padding-top: 0; padding-bottom: calc(var(--sh-keep-h) - var(--sh-camera-y) + var(--sh-camera-size) / 2 + 8px); }
-  .sh-wifi { width: 20px; height: 14px; border: 2.5px solid #fff; border-bottom: 0; border-radius: 12px 12px 0 0; box-sizing: border-box; }
+  /* The closed Duo's status items at the portrait turns: the time over the connection mark on the rail's centre line, in the region kept clear around the camera (A1, A2). Centres are placed by `rail-layout.ts`. */
+  .sh-rail-status { position: absolute; inset: 0; z-index: 40; pointer-events: none; font: 600 var(--rail-time)/1 var(--sh-font); }
+  .sh-rail-status > * { position: absolute; left: var(--rail-cx); transform: translate(-50%, -50%); }
+  .sh-rail-status .sh-wifi { display: block; }
   .sh-battery { width: 26px; height: 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: linear-gradient(90deg, #fff 80%, transparent 80%); }
 
   /* Pages */
@@ -259,19 +259,67 @@
   /* The Duo's rail is a vertical bar on the edge `verticalBarEdge` names (`duo.md`): the deck takes the rest, and the fold stays in window coordinates. */
   .sh-screen[data-rail] .sh-deck { right: var(--sh-rail); }
   .sh-screen[data-rail-side=leading] .sh-deck { right: 0; left: var(--sh-rail); }
-  /* The rail (`ui-rail` in the kit): from the status strip down, the header group on top, the tabs in a rounded pill at the bottom. */
-  .sh-rail-bar { position: absolute; top: var(--sh-safe-top); bottom: 0; right: 0; width: var(--sh-rail-bar, var(--sh-rail)); z-index: 20; display: flex; flex-direction: column; align-items: center; padding: 8px 0 22px; gap: 16px; pointer-events: none; }
-  .sh-screen[data-rail-side=leading] .sh-rail-bar { right: auto; left: 0; }
-  /* The camera is at the rail's bottom end in turns 90 and 180: the bars start there and read away from it, so the order mirrors. */
-  /* The closed Duo's rail starts after the region kept clear around the camera (R1: 84 x 170 at turn 0). */
-  .sh-screen[data-camera=top] .sh-rail-bar { top: var(--sh-camera-top); }
-  .sh-screen[data-camera=bottom] .sh-rail-bar { bottom: var(--sh-camera-bottom); }
-  .sh-screen[data-camera=bottom] .sh-rail-bar { flex-direction: column-reverse; padding: 22px 0 8px; }
-  .sh-rail-bar > * { pointer-events: auto; } .sh-rail-grow { flex: 1; pointer-events: none !important; }
-  .sh-rail-group { flex: none; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 22px; }
-  .sh-rail-circles { flex: none; flex-direction: column; align-items: center; gap: 12px; }
-  .sh-screen[data-rail] .sh-tabbar { position: static; width: 64px; height: auto; flex: none; flex-direction: column; padding: 6px 4px; border-radius: 28px; gap: 2px; }
-  .sh-screen[data-rail] .sh-tab { flex: none; width: 56px; height: 56px; border-radius: 24px; }
+  /* The rail (`ui-rail` in the kit): a 48.5 pt column on the camera's centre line. `rail-layout.ts` gives every top; the column's centre is `--rail-cx`. The layer covers the screen so More's menu and its catcher can. */
+  .sh-rail-bar { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+  .sh-rail-bar > * { pointer-events: auto; }
+  .sh-rail-header { position: absolute; left: var(--rail-cx); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--rail-gap); }
+  .sh-rail-group { flex: none; flex-direction: column; align-items: center; padding: 0; border-radius: calc(var(--rail-pill) / 2); width: var(--rail-pill); }
+  .sh-rail-circles { flex: none; flex-direction: column; align-items: center; gap: var(--rail-gap); }
+  .sh-rail-bar .sh-circle { width: var(--rail-circle); height: var(--rail-circle); }
+  .sh-rail-more { position: absolute; left: var(--rail-cx); transform: translateX(-50%); }
+  /* The badge's centre is a fixed offset from the disc's centre (the circle's centre), whatever its width (A7). */
+  .sh-rail-bar .sh-circle .sh-badge { top: calc(50% + var(--badge-dy)); left: calc(50% + var(--badge-dx)); inset-inline-end: auto; transform: translate(-50%, -50%); min-width: var(--badge-h); height: var(--badge-h); line-height: var(--badge-h); padding: 0 var(--badge-pad); border-radius: calc(var(--badge-h) / 2); }
+  .sh-rail-bar .sh-circle .sh-badge[data-len="2"] { min-width: var(--badge-wide); padding: 0; }
+  /* The tab pill: icons only at rest, 11 + 50 n tall; held, 76 wide and 11 + 60 n tall growing upward from a bottom nearer the edge (A9). Every number is a variable set from `rail-constants.ts`. */
+  .sh-screen[data-rail] .sh-tabbar { position: absolute; left: var(--rail-cx); top: var(--tabs-top); width: var(--tabs-w); height: var(--tabs-h); transform: translateX(-50%); box-sizing: border-box; flex-direction: column; padding: var(--tabs-pad) 0; border-radius: calc(var(--rail-pill) / 2); gap: 0; right: auto; bottom: auto;
+    transition: top var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out), height var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out), width var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out), border-radius var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }
+  .sh-screen[data-rail] .sh-tabbar[data-hold] { top: var(--held-top); width: var(--held-w); height: var(--held-h); border-radius: calc(var(--held-w) * .4); z-index: 5; }
+  .sh-screen[data-rail] .sh-tab { flex: none; width: 100%; height: var(--tab-pitch); border-radius: 0; background: none; gap: 0; transition: height var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }
+  .sh-screen[data-rail] .sh-tabbar[data-hold] .sh-tab { height: var(--held-pitch); }
+  .sh-screen[data-rail] .sh-tab[data-active]:not([data-hold] *) { background: none; }
+  .sh-screen[data-rail] .sh-tab::before { content: ''; position: absolute; left: 50%; top: 50%; width: var(--capsule-w); height: var(--capsule-h); transform: translate(-50%, -50%); border-radius: calc(var(--capsule-w) / 2); background: transparent; z-index: -1; }
+  .sh-screen[data-rail] .sh-tabbar:not([data-hold]) .sh-tab[data-active]::before { background: rgba(255, 255, 255, .17); }
+  .sh-screen[data-rail] .sh-tab .sh-tab-glyph svg { width: var(--glyph-tab); height: var(--glyph-tab); }
+  /* The label is there for the name and shows while held. */
+  .sh-tab-label { transition: opacity .2s ease-out; }
+  .sh-screen[data-rail] .sh-tab-label { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-size: var(--hold-label); font-weight: 500; opacity: 0; white-space: nowrap; }
+  .sh-screen[data-rail] .sh-tabbar[data-hold] .sh-tab-label { opacity: 1; }
+  .sh-screen[data-rail] .sh-tabbar[data-hold] .sh-tab-glyph { transform: translateY(-6px); }
+  /* The lens (A8, A10): 88 x 87, near-round, on the tab under the pointer; the tab under it takes the accent and every other tab is white. */
+  .sh-tab-lens { position: absolute; left: 50%; top: 0; width: var(--lens-w); height: var(--lens-h); border-radius: var(--lens-r); transform: translate(-50%, -50%) scale(.9); opacity: 0; pointer-events: none; z-index: 1;
+    background: rgba(255, 255, 255, .14); border: .5px solid var(--glass-rim, rgba(255, 255, 255, .4)); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); backdrop-filter: blur(10px) saturate(1.6); -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    transition: opacity .15s ease-out, transform var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }
+  .sh-screen[data-rail] .sh-tab-lens { top: calc(var(--tabs-pad) + var(--held-pitch) * (var(--hold-p, 0) + .5)); }
+  .sh-tabbar[data-hold] .sh-tab-lens { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .sh-tabbar[data-hold] .sh-tab { color: #fff; } .sh-tabbar[data-hold] .sh-tab[data-lit] { color: var(--action); }
+  .sh-tabbar[data-hold] .sh-tab[data-lit] .sh-tab-glyph { transform: scale(var(--lens-scale)); }
+  .sh-screen[data-rail] .sh-tabbar[data-hold] .sh-tab[data-lit] .sh-tab-glyph { transform: translateY(-6px) scale(var(--lens-scale)); }
+  .sh-tabbar { touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  /* On the horizontal bar (iPhone, iPad) a hold adds the lens only. */
+  .sh-screen:not([data-rail]) .sh-tab-lens { top: 50%; width: calc((100% - 8px) / var(--tab-n, 4) * var(--bar-lens-x)); height: var(--bar-lens-h); left: calc(4px + (100% - 8px) / var(--tab-n, 4) * (var(--hold-p, 0) + .5)); }
+  @media (prefers-reduced-motion: reduce) {
+    /* The Studio's own Reduce Motion rule (`.w2-scope * { transition: none !important }`) would make the hold appear at once; the lens and the labels cross-fade instead, and nothing scales. */
+    /* The pill takes its held size at once and cross-fades to it (A10): the new size fades in over 0.2 s, and back on release. */
+    .sh-screen[data-rail] .sh-tabbar, .sh-screen[data-rail] .sh-tab { transition: none; }
+    .sh-screen[data-rail] .sh-tabbar[data-hold] { animation: sh-fade .2s linear both !important; }
+    .sh-screen[data-rail] .sh-tabbar:not([data-hold]) { animation: sh-rail-fade-rest .2s linear both !important; }
+    .sh-tab-lens, .sh-tab-label { transition: opacity .2s linear !important; }
+    .sh-tabbar[data-hold] .sh-tab[data-lit] .sh-tab-glyph, .sh-screen[data-rail] .sh-tabbar[data-hold] .sh-tab[data-lit] .sh-tab-glyph { transform: none; }
+    .sh-tab-lens, .sh-tabbar[data-hold] .sh-tab-lens { transform: translate(-50%, -50%); }
+  }
+  /* More and its menu (A5, A6): glass, no scrim, the page undimmed; the menu covers the More circle. */
+  .sh-more-catch { position: absolute; inset: 0; background: transparent; z-index: 29; }
+  /* The menu covers the More circle, and draws over the tab pill (z-index 20) and the page: WebKit orders by DOM, so it is last in the rail too. */
+  .sh-rail-more[aria-expanded=true] { opacity: 0; }
+  /* Nearly opaque: WebKit draws no backdrop blur through the preserve-3d halves, so the rows must read over whatever is behind without it. */
+  .sh-more-menu { position: absolute; box-sizing: border-box; padding: calc(var(--menu-base) / 2) 0; border-radius: var(--menu-radius); background: rgba(44, 44, 46, .92); border: .5px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    z-index: 30; transform-origin: top right; animation: sh-rail-menu-in var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }
+  .sh-more-menu[data-side=leading] { transform-origin: top left; }
+  .sh-more-menu[data-closing] { opacity: 0; transform: scale(.8); transition: opacity .2s ease-in, transform .3s ease-in; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { .sh-more-menu { animation: sh-rail-menu-fade .2s linear !important; } .sh-more-menu[data-closing] { transform: none; } }
+  .sh-more-row { display: block; position: relative; width: 100%; height: var(--menu-row); text-align: start; padding: 0 0 0 var(--menu-label); font: 400 var(--menu-font)/var(--menu-row) var(--sh-font); color: var(--ink, #fff); background: none; border: 0; }
+  .sh-more-row:focus-visible { outline: 2px solid var(--action); outline-offset: -2px; border-radius: 14px; }
+  .sh-more-glyph { position: absolute; left: var(--menu-glyph); top: 50%; transform: translate(-50%, -50%); display: inline-flex; }
   /* In the vertical bar the title is a fixed 24 pt semibold inline title in the header row: there at rest, never collapsing (header-edge-fade R7 (6)). */
   .sh-header[data-vertical] { gap: 0; } .sh-header[data-vertical] .sh-inline-title { font-size: 24px; opacity: 1; transform: none; margin-left: 4px; } .sh-header[data-vertical] .sh-bar-side:not(:empty) + .sh-inline-title { margin-left: 8px; }
   .sh-flyout-layer { position: absolute; inset: 0; z-index: 50; pointer-events: none; }
@@ -471,3 +519,14 @@
 .sh-preview2 .sh-tile.sh-lit-filled .sh-tile-glyph, .sh-preview2 .sh-tile.sh-colored .sh-tile-glyph { color: #fff; }
 /* The power disc of a lit light tile is the dark disc of the brightness tile (`UKGlassTileView` on the lit face). */
 .sh-preview2 .sh-tile-parts:has(> .sh-lit-warm) .sh-tile-disc { background: #1C1C1E; color: #fff; }
+
+/* The photo stand-in (A7): one fixed grey drawing, no hue, face or initials. */
+.sh-preview2 .sh-stand-in { position: relative; overflow: hidden; background: linear-gradient(180deg, #8E8E93, #636366); box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .28); }
+.sh-preview2 .sh-stand-in i { position: absolute; background: rgba(255, 255, 255, .55); display: block; }
+.sh-preview2 .sh-stand-head { left: 34%; top: 18%; width: 32%; height: 32%; border-radius: 50%; }
+.sh-preview2 .sh-stand-shoulders { left: 16%; top: 58%; width: 68%; height: 60%; border-radius: 50% 50% 0 0 / 60% 60% 0 0; }
+
+/* Keyframes are top level: a browser ignores one defined inside the `.sh-preview2 {}` block. The rail's own (a name of devices.css's `sh-menu-in` would collide). */
+@keyframes sh-rail-fade-rest { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sh-rail-menu-in { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes sh-rail-menu-fade { from { opacity: 0; } to { opacity: 1; } }

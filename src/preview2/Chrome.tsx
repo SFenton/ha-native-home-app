@@ -1,40 +1,46 @@
 import { ChevronLeft, Menu, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 import type { CompositionActionSlot, CompositionDocument, CompositionGroups } from '../shared/composition/schema';
 import { isShown, type VisibilityRule } from './evaluate';
 import type { SelectionKey } from './model';
+import { RAIL } from './rail-constants';
 import { Badge, GlyphByName, useBadge, type BadgeFace } from './nodes/shared';
 import { AvatarDisc, useViewerName } from './nodes/avatar';
 import { useRender } from './render-context';
 import { useIsSelected } from './selection-store';
+import { useTabHold } from './useTabHold';
+import { tabBarVars } from './rail-style';
 
 type Item = CompositionGroups[number]['items'][number];
 
 /** A header circle: glass, 44 pt, selectable in Edit and acting in Use (its action, or `onPress` for the menu). */
-function Circle({ selKey, label, icon, action, onPress, expanded, className = '', badge, disc }: { selKey?: SelectionKey; label: string; icon: string; action?: CompositionActionSlot; onPress?: () => void; expanded?: boolean; className?: string; badge?: BadgeFace | null; /** Drawn in place of the glyph: the Profile disc. */ disc?: ReactNode }) {
+export function Circle({ selKey, label, icon, action, onPress, expanded, className = '', badge, disc, glyph = 20 }: { selKey?: SelectionKey; label: string; icon: string; action?: CompositionActionSlot; onPress?: () => void; expanded?: boolean; className?: string; badge?: BadgeFace | null; /** Drawn in place of the glyph: the Profile disc. */ disc?: ReactNode; /** The glyph's size in points. */ glyph?: number }) {
   const ctx = useRender();
   const selected = useIsSelected(ctx.store, selKey ?? 'chrome-item:');
   return <button type="button" className={`sh-circle ${className}`.trim()} aria-label={label} title={label} data-sel={selKey}
     data-selected={selKey && selected && ctx.mode === 'edit' ? '' : undefined}
-    aria-expanded={expanded} onClick={() => { if (ctx.mode !== 'use') return; if (action) ctx.run(action); onPress?.(); }}>{disc ?? <GlyphByName name={icon} size={20}/>}<Badge badge={badge}/></button>;
+    aria-expanded={expanded} onClick={() => { if (ctx.mode !== 'use') return; if (action) ctx.run(action); onPress?.(); }}>{disc ?? <GlyphByName name={icon} size={glyph}/>}<Badge badge={badge}/></button>;
 }
 /** A header button with its badge (`sh.badges@1`). */
-function ButtonItem({ item }: { item: Extract<Item, { type: 'button' }> }) {
+export function ButtonItem({ item }: { item: Extract<Item, { type: 'button' }> }) {
   const badge = useBadge(item.badge, `chrome-item:${item.id}/badge`);
   return <Circle selKey={`chrome-item:${item.id}`} label={badge.spoken ? `${item.label}, ${badge.spoken}` : item.label} icon={item.icon.name} action={item.action} badge={badge}/>;
 }
 
 /**
- * The header's Profile button. With a `profile` block (`sh.shell-profile@1`) it draws the person's disc (initials in the preview, never a photo) or the
- * person symbol, with the authored badge; the label is "Profile" and the badge's spoken words follow it. Without one it draws the initials disc, as the app does; only `look: symbol` draws the person symbol.
+ * The header's Profile button. With a `profile` block (`sh.shell-profile@1`) it draws the person's disc or the person symbol, with the authored badge;
+ * the label is "Profile" and the badge's spoken words follow it. `photo` (and no block, as the app does: photo first) draws a fixed grey stand-in, the same for every person
+ * and house, because the Studio never draws a person's picture (house data); `initials` is the blue disc with letters; `symbol` is the outlined person on glass, no fill.
  */
-function ProfileCircle({ item, rail }: { item: Extract<Item, { type: 'shell-header' }>; rail: boolean }) {
+export function ProfileCircle({ item, rail }: { item: Extract<Item, { type: 'shell-header' }>; rail: boolean }) {
   const profile = item.profile;
   const badge = useBadge(profile?.badge, `chrome-item:${item.id}/profile/badge`);
   const name = useViewerName();
   const look = profile?.look ?? 'photo';
-  return <Circle selKey={`chrome-item:${item.id}`} label={badge.spoken ? `Profile, ${badge.spoken}` : 'Profile'} icon={rail ? 'person.crop.circle' : 'person'} action={item.profileAction}
-    badge={badge} disc={<AvatarDisc name={name} size={44} look={look}/>}/>;
+  // The rail's disc is 30 pt in a 48.5 pt circle (A4); the horizontal header's is the circle's 44 pt.
+  const size = rail ? RAIL.glyph.profile : 44;
+  return <Circle selKey={`chrome-item:${item.id}`} label={badge.spoken ? `Profile, ${badge.spoken}` : 'Profile'} icon="person.crop.circle" action={item.profileAction}
+    badge={badge} glyph={rail ? RAIL.glyph.profile : 24} className="sh-profile" disc={look === 'symbol' ? undefined : <AvatarDisc name={name} size={size} look={look} standIn/>}/>;
 }
 
 /** The two buttons of the app's `shell-header` item: Quick Links, then Profile. */
@@ -91,31 +97,38 @@ export function HeaderBar({ groups, root, onBack, title, detail }: HeaderBarProp
  */
 export const railEligible = (item: Item): boolean => item.type === 'shell-header' || (item.type === 'button' && item.rail === 'eligible');
 /** The items of a group the vertical bar shows now: eligible ones, and not a root-only item on a pushed page. */
-const railItems = (group: CompositionGroups[number], root: boolean) => group.items.filter(item => railEligible(item) && (root || item.visibility !== 'root-only'));
+export const railItems = (group: CompositionGroups[number], root: boolean) => group.items.filter(item => railEligible(item) && (root || item.visibility !== 'root-only'));
 
-/**
- * The Duo's vertical bar (the folded Duo and the unfolded Duo sideways), `ui-rail` in the mockup kit: down the trailing edge from the
- * status strip, the header items in glass groups at the top, then the tabs in a rounded glass pill at the bottom. The leading groups sit
- * above the trailing ones, and each group is one glass blob (Quick Links, then Profile as the person symbol, no spacer) unless it says
- * `vertical: separate@1`, which gives each item its own circle (`UKServerUIChrome.install`). No menu button. The title is in the header row.
- */
-export function RailBar({ document, tabId, groups, root }: { document: CompositionDocument; tabId?: string; groups: CompositionGroups; root: boolean }) {
-  const ordered = ['leading', 'trailing'].flatMap(placement => groups.filter(group => group.placement === placement)).map(group => ({ group, items: railItems(group, root) })).filter(entry => entry.items.length);
-  return <div className="sh-rail-bar" data-rail-bar="">
-    {ordered.map(({ group, items }) => <div key={group.id} className={group.vertical === 'separate@1' ? 'sh-group sh-rail-circles' : 'sh-group sh-shared sh-rail-group'}>
-      {items.map(item => <ItemView key={item.id} item={item} root={root} rail/>)}</div>)}
-    <div className="sh-rail-grow"/>
-    <TabBar document={document} tabId={tabId}/>
-  </div>;
+/** Whether a tab is drawn now: its visibility rule against the environment (Edit draws every tab, dimmed). Remembers the answer, as a rule that says `keep` needs. */
+export function tabIsShown(tab: CompositionDocument['navigation']['tabs'][number], ctx: ReturnType<typeof useRender>): boolean {
+  const key: SelectionKey = `tab:${tab.id}`;
+  const visible = isShown(tab as VisibilityRule, ctx.env, ctx.previous.get(key));
+  ctx.previous.set(key, visible);
+  return visible;
 }
-
-/** The floating tab bar: a glass capsule of the document's tabs, the selected one lit. */
-export function TabBar({ document, tabId }: { document: CompositionDocument; tabId?: string }) {
+/** How many tabs the tab bar draws: in Use a tab its rule hides is not drawn, so it does not count (the rail's height, its compression and the lens depend on it). */
+export function useShownTabCount(document: CompositionDocument): number {
   const ctx = useRender();
   const tabs = document.navigation.tabs;
+  return ctx.mode === 'use' ? tabs.filter(tab => tabIsShown(tab, ctx)).length : tabs.length;
+}
+
+/**
+ * The floating tab bar: a glass capsule of the document's tabs, the selected one lit. Pressing and holding it shows what native shows: on the
+ * Duo's vertical bar the pill widens and every icon gains its label, and on every bar a lens sits on the tab under the pointer and follows it along
+ * the bar; a tab is selected when the press is released over it, never before (`tab-hold.ts`). `vertical` is the Duo's rail; `style` carries its layout.
+ */
+export function TabBar({ document, tabId, vertical = false, style }: { document: CompositionDocument; tabId?: string; vertical?: boolean; style?: CSSProperties }) {
+  const ctx = useRender();
+  const tabs = document.navigation.tabs, count = useShownTabCount(document);
+  const bar = useRef<HTMLElement>(null);
+  // A held release picks a tab the way a click does: the click runs the tab's action in Use and selects it in Edit.
+  const hold = useTabHold(bar, vertical ? 'y' : 'x', index => bar.current?.querySelectorAll<HTMLElement>('.sh-tab')[index]?.click());
   if (!tabs.length) return null;
-  return <nav className="sh-tabbar" aria-label="Tabs">
+  return <nav ref={bar} className="sh-tabbar" aria-label="Tabs" data-no-pan="" data-hold={hold.held ? '' : undefined} onPointerDown={hold.bind.onPointerDown} onContextMenu={hold.bind.onContextMenu}
+    style={{ ...tabBarVars(), ...style, '--hold-p': hold.position, '--tab-n': count } as CSSProperties}>
     {tabs.map(tab => <TabButton key={tab.id} tab={tab} selected={tab.id === tabId} ctx={ctx}/>)}
+    <span className="sh-tab-lens" aria-hidden="true"/>
   </nav>;
 }
 /**
@@ -139,14 +152,13 @@ export function Flyout({ document, tabId, open, onClose, replacesTabBar = true }
 function TabButton({ tab, selected, ctx, onPicked, selectable = true }: { tab: CompositionDocument['navigation']['tabs'][number]; selected: boolean; ctx: ReturnType<typeof useRender>; onPicked?: () => void; selectable?: boolean }) {
   const key: SelectionKey = `tab:${tab.id}`;
   const picked = useIsSelected(ctx.store, key);
-  const visible = isShown(tab as VisibilityRule, ctx.env, ctx.previous.get(key));
-  ctx.previous.set(key, visible);
+  const visible = tabIsShown(tab, ctx);
   const badge = useBadge(tab.badge, `${key}/badge`);
   if (!visible && ctx.mode === 'use') return null;
   return <button type="button" className="sh-tab" aria-current={selected ? 'page' : undefined} aria-label={badge.spoken ? `${tab.label}, ${badge.spoken}` : undefined} data-sel={selectable ? key : undefined} data-active={selected ? '' : undefined}
     data-selected={selectable && picked && ctx.mode === 'edit' ? '' : undefined} data-hidden={!visible ? '' : undefined}
     onClick={() => { if (ctx.mode === 'use') ctx.run({ type: 'select-tab', tabId: tab.id }); onPicked?.(); }}>
-    <span className="sh-tab-glyph"><GlyphByName name={tab.icon.name} size={22}/><Badge badge={badge}/></span><span>{tab.label}</span>
+    <span className="sh-tab-glyph"><GlyphByName name={tab.icon.name} size={22}/><Badge badge={badge}/></span><span className="sh-tab-label">{tab.label}</span>
   </button>;
 }
 

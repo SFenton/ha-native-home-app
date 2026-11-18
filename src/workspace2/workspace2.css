@@ -293,7 +293,7 @@
 .w2-scope .w2-pill[hidden] { display: none; }
 
 /* Rule 3 (studio-ux2, F19): the simulator rail. A column to the right of the device, or a row under the preview on a phone. */
-.w2-rail-slot { position: absolute; transform: translateY(-50%); z-index: 1; }
+.w2-rail-slot { position: absolute; inset-inline-end: 16px; top: 50%; transform: translateY(-50%); z-index: 1; }
 .w2-rail { display: flex; align-items: center; gap: 2px; padding: 6px; background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: 22px; box-shadow: var(--w2-shadow); }
 .w2-rail[data-orientation=vertical] { flex-direction: column; }
 .w2-scope .w2-rail .w2-icon-button { width: 36px; height: 36px; min-height: 36px; border-radius: 18px; }
@@ -359,15 +359,13 @@
 
 /* The simulator rail goes under the device on a canvas under 420 px: the stage keeps 66 px for it and the rail sits centred on the device. */
 .w2-canvas[data-rail=under] .w2-stage { padding-inline-end: 24px; padding-block-end: 66px; }
-.w2-wide .w2-rail-slot { transition: left .2s cubic-bezier(.32,.72,0,1), top .2s cubic-bezier(.32,.72,0,1); }
-.w2-rail-slot[data-under] { transform: translateX(-50%); }
+.w2-rail-slot[data-under] { inset-inline-end: auto; inset-inline-start: 50%; top: auto; bottom: 8px; transform: translateX(-50%); }
 .w2-scope .w2-pill-away { visibility: hidden; pointer-events: none; }
 
 /* Reduce Motion: no sliding or scaling; a 120 ms fade (the rules above name `transform`, so they are replaced, not added to). */
 @media (prefers-reduced-motion: reduce) {
   .w2-scope .w2-lib-panel, .w2-scope .w2-inspector { transform: none !important; opacity: 0; transition: opacity .12s linear !important; will-change: auto; }
   .w2-scope .w2-lib-panel[data-open], .w2-scope .w2-inspector[data-open] { opacity: 1; }
-  .w2-scope .w2-rail-slot { transition: none !important; }
 }
 
 /* The tree under the page on show (the Pages and Modals panels): the rows of "This Page", styled as part of the list. */

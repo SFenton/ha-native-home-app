@@ -18,14 +18,27 @@ export function useViewerName(): string | undefined {
 /**
  * The Profile Icon disc: white initials on the fill, drawn the way the app draws a person without a photo (`UKMonogramAvatar`). The preview never draws a
  * photo: the Studio does not proxy a person's picture, which is house data. With no name to take letters from, or for `symbol`, the person glyph is drawn.
+ * `standIn` is for the header's Profile button: `photo` then draws {@link StandInPhoto}, the grey disc that says "a photo goes here".
  */
-export function AvatarDisc({ name, size, look = 'photo', fill, className = '' }: {
-  name?: string; size: number; look?: 'photo' | 'initials' | 'symbol'; fill?: CSSProperties['background']; className?: string;
+export function AvatarDisc({ name, size, look = 'photo', fill, className = '', standIn = false }: {
+  name?: string; size: number; look?: 'photo' | 'initials' | 'symbol'; fill?: CSSProperties['background']; className?: string; standIn?: boolean;
 }) {
+  if (standIn && look === 'photo') return <StandInPhoto size={size} className={className}/>;
   const initials = look === 'symbol' ? undefined : initialsOf(name);
   return <span className={`sh-avatar-disc ${className}`.trim()} aria-hidden="true" data-look={initials ? 'initials' : 'symbol'}
     style={{ width: size, height: size, background: fill ?? STANDARD_DISC, fontSize: Math.round(size * 0.4) } as CSSProperties}>
     {initials ?? <GlyphByName name="person" size={Math.round(size * 0.5)}/>}
+  </span>;
+}
+
+/**
+ * The stand-in for a person's photo: one fixed drawing made in CSS, the same for everyone and every house, a grey gradient disc with a white head and
+ * shoulders at 55% and a 0.5 pt rim. Nothing about the person goes into it (no hue, face, initials or name), no image is read and nothing is stored.
+ * It is told apart from the initials (blue, letters) and the symbol (outlined, no fill) at a glance. Decorative: the button carries the name.
+ */
+export function StandInPhoto({ size, className = '' }: { size: number; className?: string }) {
+  return <span className={`sh-avatar-disc sh-stand-in ${className}`.trim()} aria-hidden="true" data-look="photo" style={{ width: size, height: size }}>
+    <i className="sh-stand-head"/><i className="sh-stand-shoulders"/>
   </span>;
 }
 

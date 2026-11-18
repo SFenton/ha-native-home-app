@@ -22,6 +22,8 @@ export default defineConfig({
   projects: [
     // STUDIO_E2E_GPU=1 runs the desktop project on the machine's GPU (ANGLE over Metal) instead of the software renderer CI uses; frame pacing is judged there.
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, ...(process.env.STUDIO_E2E_GPU ? { launchOptions: { args: ['--enable-gpu', '--use-angle=metal', '--ignore-gpu-blocklist'] } } : {}) } },
+    // S1 (`sim-blank`): the Duo rig in WebKit, on demand only (`STUDIO_E2E_WEBKIT=1 npx playwright test --project=webkit`); CI keeps Chromium.
+    ...(process.env.STUDIO_E2E_WEBKIT ? [{ name: 'webkit', testMatch: /preview2-(duo-webkit|rails-evidence)\.spec\.ts/, use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 } } }] : []),
     // The workspace specs also run at phone size with touch; the preview story page is a desktop study.
     { name: 'phone', testMatch: /workspace2-.*\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 } },
   ],

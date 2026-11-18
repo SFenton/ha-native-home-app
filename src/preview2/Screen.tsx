@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CompositionDocument } from '../shared/composition/schema';
 import { windowFold } from './fold';
-import { Flyout, headerGroups, RailBar, TabBar } from './Chrome';
+import { Flyout, headerGroups, TabBar } from './Chrome';
+import { RailBar } from './RailBar';
+import { STATUS } from './rail-constants';
+import { statusStack } from './rail-layout';
+import { WifiMark } from './WifiMark';
 import { basePageId, columnPanes, tabStack, type NavState } from './navigation';
 import { PageView } from './PageView';
 import { RenderCtx, useRender } from './render-context';
@@ -10,7 +14,7 @@ import { wallpaperImage } from './wallpaper';
 import { sheetFrame, scalesBackBehindSheet } from './sheet-frame';
 import { inVerticalBar, splitGeometry, usesFlyout } from './split';
 import { beginTransition, endTransition, MOTION_MS, type Transition } from './transition';
-import { railSideOf, type PreviewWindow } from './windows';
+import { railCentre, railSideOf, type PreviewWindow } from './windows';
 
 /** Props of {@link Screen}. */
 export interface ScreenProps {
@@ -84,19 +88,19 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
     </div>;
   // The fold's crease: drawn wherever the window can fold, lit only while it is (the book pose), so it fades with the tilt rather than appearing.
   const crease = win.bookHinge;
-  const camera = win.camera?.corner.vertical, clear = win.camera?.statusColumn.height ?? 0;
+  const camera = win.camera?.corner.vertical;
   // The rail carries the trailing header items of the page the header shows: the host page of a split, else the top of the stack.
   const headerPage = hostPage ?? page;
+  const railStatus = win.camera && win.pose ? statusStack(win.pose.turn, win.height) : undefined;
   const rootPage = panes ? panes.hostIndex === 0 : stack.length <= 1;
   return <RenderCtx.Provider value={ctx}><div className="sh-screen" data-sel={`page:${pageId}`} data-covered={nav.sheets.length > 0 && scalesBackBehindSheet(win) ? '' : undefined}
     data-rail={win.rail ? '' : undefined} data-rail-side={win.rail ? railSideOf(win) : undefined} data-camera={camera} data-short-bar={win.safeTop < 50 ? '' : undefined} data-flyout={hasFlyout ? '' : undefined}
-    style={{ '--sh-safe-top': `${win.safeTop}px`, '--sh-safe-bottom': `${win.safeBottom}px`, '--sh-rail': `${win.rail ?? 0}px`, '--sh-rail-bar': `${win.railBar ?? win.rail ?? 0}px`,
-      '--sh-camera-top': `${camera === 'top' ? clear : 0}px`, '--sh-camera-bottom': `${camera === 'bottom' ? clear : 0}px` } as React.CSSProperties}>
+    style={{ '--sh-safe-top': `${win.safeTop}px`, '--sh-safe-bottom': `${win.safeBottom}px`, '--sh-rail': `${win.rail ?? 0}px` } as React.CSSProperties}>
     <div className="sh-wall" data-background={background.type} aria-hidden="true">{image && <div className="sh-wall-image" style={{ backgroundImage: `url("${image.url}")`, filter: `blur(${image.blur}px)` }}/>}</div>
     {content}
     {crease && <div className="sh-crease" data-axis={crease.axis} data-on={win.hinge ? '' : undefined} aria-hidden="true"
       style={crease.axis === 'vertical' ? { left: crease.start, width: crease.length } : { top: crease.start, height: crease.length }}/>}
-    {vertical && hasTabs && headerPage ? <RailBar document={document} tabId={nav.tabId} groups={headerGroups(document, headerPage)} root={rootPage}/>
+    {vertical && hasTabs && headerPage ? <RailBar document={document} tabId={nav.tabId} groups={headerGroups(document, headerPage)} root={rootPage} window={win}/>
       : !hasFlyout && <TabBar document={document} tabId={nav.tabId}/>}
     {hasTabs && !vertical && (hasFlyout || flyoutOpen || lingering) && <Flyout document={document} tabId={nav.tabId} open={flyoutOpen} onClose={() => setFlyoutOpen(false)} replacesTabBar={hasFlyout}/>}
     {nav.sheets.map((frame, at) => {
@@ -106,10 +110,9 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
         onClose={() => ctx.run({ type: 'dismiss', scope: 'current-modal' })} onBack={() => ctx.run({ type: 'back' })}/>;
     })}
     {win.camera
-      // The closed Duo has no status bar across the top: the time and the connection stack on the rail, in the region kept clear around the camera (HIG, Designing for iPhone Duo, Vertical controls).
-      ? <div className="sh-rail-status" data-camera-h={win.camera.corner.horizontal} data-camera-v={win.camera.corner.vertical} aria-hidden="true"
-        style={{ left: win.camera.statusColumn.x, top: win.camera.statusColumn.y, width: win.camera.statusColumn.width, height: win.camera.statusColumn.height, '--sh-camera-y': `${win.camera.y - win.camera.statusColumn.y}px`, '--sh-camera-size': `${win.camera.size}px`, '--sh-keep-h': `${win.camera.statusColumn.height}px` } as React.CSSProperties}>
-        <span className="sh-time">9:41</span><i className="sh-wifi"/>
+      // The closed Duo has no status bar across the top: at the portrait turns the time and the connection mark stack on the rail's centre line, in the region kept clear around the camera (HIG, Designing for iPhone Duo, Vertical controls); at 90 and 270 native shows neither.
+      ? railStatus && <div className="sh-rail-status" aria-hidden="true" data-camera-h={win.camera.corner.horizontal} data-camera-v={win.camera.corner.vertical} style={{ '--rail-cx': `${railCentre(win)}px`, '--rail-time': `${STATUS.timeSize}px` } as React.CSSProperties}>
+        <span className="sh-time" style={{ top: railStatus.time }}>9:41</span><WifiMark style={{ top: railStatus.wifi }}/>
       </div>
       : <div className="sh-status" aria-hidden="true"><span className="sh-time">9:41</span>{win.island && <i className="sh-island"/>}<span className="sh-battery"/></div>}
   </div></RenderCtx.Provider>;

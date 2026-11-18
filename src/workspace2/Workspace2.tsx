@@ -170,7 +170,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
         {loadingState ?? <div className="w2-stage" data-mode={ws.mode} ref={setStageElement}>{stage}</div>}
         {!narrow && <HandleSlot ws={ws} stage={stageElement} onError={showError}/>}
         <ElementContextMenu ws={ws} stage={stageElement} onError={showError}/>
-        <RailSlot stage={stageElement} enabled={!narrow && Boolean(document)} deps={[window_, textStep, target, narrow, layout.left, layout.inspectorWidth]} under={under} window={window_} onWindow={moveWindow} textStep={textStep} onTextStep={setTextStep}/>
+        <RailSlot enabled={!narrow && Boolean(document)} under={under} window={window_} onWindow={moveWindow} textStep={textStep} onTextStep={setTextStep}/>
         {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} onGo={goTo} showPill={!narrow || Boolean(ws.flash)} away={!narrow && !checksPillShown(layout.canvas)}/></div>}
       </main>
       {!narrow && document && <InspectorSlot open={layout.inspector} ms={reduced ? 120 : inspectorMotion} tier={tier} width={layout.inspectorWidth} fallbackWidth={inspectorWidthFor(tier, width)} properties={properties}/>}

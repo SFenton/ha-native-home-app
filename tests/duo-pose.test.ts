@@ -76,12 +76,12 @@ describe('the Duo pose state machine', () => {
     expect(cameraCutout(0).y).toBeCloseTo(47.83, 2);
     // The other turns carry the same rectangles round the window, and say so.
     expect([90, 180, 270].map(turn => cameraCutout(turn as 90).interim)).toEqual([true, true, true]);
-    // The status column is the keep-clear confined to the rail: 84 x 170 at every turn, on the camera's side, and the camera lies inside it.
+    // The status column is the keep-clear confined to the rail: 84 wide and as long as the region is along the rail (170 at turns 0 and 180, 84 at 90 and 270), on the camera's side, and the camera lies inside it.
     for (const turn of [0, 90, 180, 270] as const) {
-      const { statusColumn: column, occlusion, corner } = cameraCutout(turn), window = turn % 180 === 0 ? { width: 466, height: 678 } : { width: 678, height: 466 };
-      expect([column.width, column.height], `turn ${turn}`).toEqual([84, 170]);
-      expect(column.x, `turn ${turn}`).toBe(corner.horizontal === 'right' ? window.width - 84 : 0);
-      expect(column.y, `turn ${turn}`).toBe(corner.vertical === 'top' ? 0 : window.height - 170);
+      const { occlusion, corner } = cameraCutout(turn), window = turn % 180 === 0 ? { width: 466, height: 678 } : { width: 678, height: 466 };
+      const reach = turn % 180 === 0 ? 170 : 84;
+      const column = { x: corner.horizontal === 'right' ? window.width - 84 : 0, y: corner.vertical === 'top' ? 0 : window.height - reach, width: 84, height: reach };
+      expect(cameraCutout(turn).reach, `turn ${turn}`).toBe(reach);
       expect(occlusion.x >= column.x && occlusion.x + occlusion.width <= column.x + column.width && occlusion.y >= column.y && occlusion.y + occlusion.height <= column.y + column.height, `turn ${turn}: the camera is inside`).toBe(true);
     }
     const k = (turn: 90 | 180 | 270) => cameraCutout(turn).keepClear;
@@ -114,7 +114,7 @@ describe('the window a pose gives', () => {
       const portrait = turn % 180 === 0;
       expect([win.width, win.height]).toEqual(portrait ? [466, 678] : [678, 466]);
       // R1: the rail inset is 84 pt and the bar 69 pt; the bottom inset is 34.
-      expect([win.rail, win.railBar, win.safeBottom]).toEqual([84, 69, 34]);
+      expect([win.rail, win.safeBottom]).toEqual([84, 34]);
       expect(win.interim).toBe(turn !== 0 ? true : undefined);
       expect(railSideOf(win)).toBe(closedRailSide(turn));
       expect(win.camera?.corner).toEqual(cameraCornerOf(turn));

@@ -1,3 +1,4 @@
+import { RAIL } from './rail-constants';
 import { cameraCutout, closedRailSide, hingeAxisOf, openRailSide, samePose, type CameraCutout, type DuoPose, type RailSide } from './duo-pose';
 
 /** A vertical or horizontal band the device cannot draw on, in window points. */
@@ -60,8 +61,6 @@ export interface PreviewWindow {
   bookHinge?: Hinge;
   /** Width of the vertical rail the tab bar becomes in a short window; the app's content (and a split) uses what is left. */
   rail?: number;
-  /** The rail bar's own width when it is narrower than the inset it takes (the closed Duo: a 69 pt bar flush to the edge in an 84 pt inset, R1). Absent: `rail`. */
-  railBar?: number;
   /** Whether the window's numbers are carried round from a measured pose rather than measured (the closed Duo at every turn but 0). */
   interim?: boolean;
   /**
@@ -86,15 +85,15 @@ export interface PreviewWindow {
  */
 export const previewWindows: readonly PreviewWindow[] = [
   { name: 'iPhone', width: 402, height: 874, safeTop: 62, safeBottom: 34, island: true, frame: PHONE_BODY },
-  { name: 'Duo folded', width: 466, height: 678, safeTop: 24, safeBottom: 34, rail: 84, railBar: 69, frame: FOLDED_DUO_BODY, pose: { turn: 0, fold: 'closed' } },
+  { name: 'Duo folded', width: 466, height: 678, safeTop: 24, safeBottom: 34, rail: 84, frame: FOLDED_DUO_BODY, pose: { turn: 0, fold: 'closed' } },
   // safeTop 62 is an iPhone figure the atlas kit (24) disagrees with; no measured source until R1.
   // The horizontal band is the fold's centre by symmetry (the fold bisects the 951 pt side): computed, not measured.
   { name: 'Duo open, upright', width: 669, height: 951, safeTop: 62, safeBottom: 34, bookHinge: { axis: 'horizontal', start: 455.3, length: 40.4 }, frame: OPEN_DUO_BODY, pose: { turn: 90, fold: 'open' } },
   { name: 'Duo open, sideways', width: 951, height: 669, safeTop: 24, safeBottom: 0, rail: 83, bookHinge: { axis: 'vertical', start: 455.3, length: 40.4 }, frame: OPEN_DUO_BODY, pose: { turn: 0, fold: 'open' } },
   { name: 'iPad upright', width: 834, height: 1194, safeTop: 24, safeBottom: 20, frame: PHONE_BODY },
   { name: 'iPad sideways', width: 1194, height: 834, safeTop: 24, safeBottom: 20, frame: PHONE_BODY },
-  // Last in the list so the indexes of the older windows hold. The folded Duo turned a quarter: the outer display transposed (678 x 466), the rail on its camera's edge. R1 measured the portrait only: its bottom inset (34), rail inset (84) and rail width (69) are kept here, interim.
-  { name: 'Duo folded, sideways', width: 678, height: 466, safeTop: 24, safeBottom: 34, rail: 84, railBar: 69, frame: FOLDED_DUO_BODY, pose: { turn: 90, fold: 'closed' } },
+  // Last in the list so the indexes of the older windows hold. The folded Duo turned a quarter: the outer display transposed (678 x 466), the rail on its camera's edge. R1 measured the portrait only: its bottom inset (34) and rail inset (84) are kept here, interim.
+  { name: 'Duo folded, sideways', width: 678, height: 466, safeTop: 24, safeBottom: 34, rail: 84, frame: FOLDED_DUO_BODY, pose: { turn: 90, fold: 'closed' } },
 ];
 
 /** The words for a window: its name alone. The size is the window's own business; a person picks a device, not a measure. */
@@ -146,3 +145,6 @@ export const railSideOf = (win: PreviewWindow): RailSide => win.railSide ?? 'tra
 
 /** Whether two windows are the same pose of the same device. */
 export const sameWindow = (a: PreviewWindow, b: PreviewWindow) => a.name === b.name && samePose(a.pose, b.pose) && Boolean(a.hinge) === Boolean(b.hinge);
+
+/** The rail's centre line in a window, from its left edge: 48 pt in from the camera-side edge. */
+export const railCentre = (win: PreviewWindow): number => railSideOf(win) === 'leading' ? RAIL.centre : win.width - RAIL.centre;

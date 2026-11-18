@@ -1,19 +1,17 @@
 import type { PreviewWindow } from '../preview2';
 import SimulatorRail from './SimulatorRail';
-import { useRailAnchor } from './useRailAnchor';
 
 /**
- * Where the simulator rail sits beside (or under) the device. The anchor is measured after layout and held as state, so it is held
- * here and not in the workspace: a drop that opens the inspector moves the device, the measure then sets the anchor, and that
- * re-render must cost the rail alone, not the whole workspace tree a second time inside the same task.
+ * Where the simulator rail sits: pinned to the canvas by CSS, never measured from the device. A pose change (fold, unfold, rotate) resizes
+ * the device but not the canvas, so the rail stays under the pointer; it moves only when the window or the canvas resizes. The stage keeps
+ * 80 px free at its trailing edge (or 66 px under it, on a canvas under 420 px) so the device never reaches the rail.
  */
-export default function RailSlot({ stage, enabled, deps, under, window: win, onWindow, textStep, onTextStep }: {
-  stage: HTMLElement | null; enabled: boolean; /** What can move the device without resizing the stage. */ deps: readonly unknown[]; under: boolean;
+export default function RailSlot({ enabled, under, window: win, onWindow, textStep, onTextStep }: {
+  enabled: boolean; under: boolean;
   window: PreviewWindow; onWindow: (window: PreviewWindow) => void; textStep: number; onTextStep: (step: number) => void;
 }) {
-  const anchor = useRailAnchor(stage, enabled, deps, under);
-  if (!enabled || !anchor) return null;
-  return <div className="w2-rail-slot" data-under={anchor.under ? '' : undefined} style={{ left: anchor.left, top: anchor.top }}>
-    <SimulatorRail window={win} onWindow={onWindow} textStep={textStep} onTextStep={onTextStep} orientation={anchor.under ? 'horizontal' : 'vertical'}/>
+  if (!enabled) return null;
+  return <div className="w2-rail-slot" data-under={under ? '' : undefined}>
+    <SimulatorRail window={win} onWindow={onWindow} textStep={textStep} onTextStep={onTextStep} orientation={under ? 'horizontal' : 'vertical'}/>
   </div>;
 }

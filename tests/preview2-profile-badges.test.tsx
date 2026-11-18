@@ -123,23 +123,27 @@ describe('the spoken words in the preview', () => {
 
 describe('the header in the preview', () => {
   const profile = (shown: HTMLElement) => shown.querySelector<HTMLElement>('button[aria-label^="Profile"]')!;
-  it('draws the initials disc when there is no profile block, as the app does', () => {
+  it('draws the fixed grey stand-in when there is no profile block, as native shows the photo first', () => {
     const button = profile(draw([], { chrome: [headerItem()] }));
-    expect(button.querySelector('.sh-avatar-disc')?.textContent).toBe('AD');
+    const disc = button.querySelector('.sh-avatar-disc')!;
+    expect(disc.getAttribute('data-look')).toBe('photo');
+    // Nothing of the person: no letters, no image, no name.
+    expect(disc.textContent).toBe('');
+    expect(button.querySelector('img')).toBeNull();
     expect(button.getAttribute('aria-label')).toBe('Profile');
+    expect(disc.getAttribute('aria-hidden')).toBe('true');
   });
-  it('draws the initials disc for photo and for initials, never a photo', () => {
-    for (const look of ['photo', 'initials']) {
-      const button = profile(draw([], { chrome: [headerItem({ look })] }));
-      expect(button.querySelector('.sh-avatar-disc')?.textContent, look).toBe('AD');
-      expect(button.querySelector('img')).toBeNull();
-      cleanup();
-    }
-  });
-  it('draws the person symbol for symbol, and when no name is known', () => {
-    expect(profile(draw([], { chrome: [headerItem({ look: 'symbol' })] })).querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('symbol');
+  it('draws the stand-in for photo and the initials disc for initials, never a picture', () => {
+    const photo = profile(draw([], { chrome: [headerItem({ look: 'photo' })] }));
+    expect(photo.querySelector('.sh-avatar-disc')?.className).toContain('sh-stand-in');
+    expect(photo.querySelector('img')).toBeNull();
     cleanup();
-    expect(profile(draw([], { chrome: [headerItem({ look: 'photo' })], viewer: false })).querySelector('.sh-avatar-disc')?.getAttribute('data-look')).toBe('symbol');
+    expect(profile(draw([], { chrome: [headerItem({ look: 'initials' })] })).querySelector('.sh-avatar-disc')?.textContent).toBe('AD');
+  });
+  it('draws the outlined person symbol with no disc for symbol', () => {
+    const button = profile(draw([], { chrome: [headerItem({ look: 'symbol' })] }));
+    expect(button.querySelector('.sh-avatar-disc')).toBeNull();
+    expect(button.querySelector('svg')).not.toBeNull();
   });
   it('carries the authored badge and says its words after the name', () => {
     const button = profile(draw([], { chrome: [headerItem({ look: 'photo', badge: value(shownCount, spokenWords) })], sensor: '12' }));

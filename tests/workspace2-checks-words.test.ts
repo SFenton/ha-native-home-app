@@ -138,6 +138,13 @@ describe('every compiler error names its target, its field and what to change, a
   });
 });
 
+describe('the line for profile settings (sh.shell-profile@1)', () => {
+  it('says the app needs to be newer, and what to leave alone', () => {
+    const issue: CompositionIssue = { code: 'unsupported_capability', pointer: '/document/navigation/chrome/groups/0/items/0/profile', capability: 'sh.shell-profile@1' };
+    expect(sentenceFor(home, issue).sentence).toContain('Profile button settings need a newer app than this one runs. Clear them, or wait for the app to update.');
+  });
+});
+
 describe('the lines for value settings (sh.component-values@1)', () => {
   it('says what to do when an app does not read value settings', () => {
     const issue: CompositionIssue = { code: 'unsupported_capability', pointer: '/document/pages/0/components/0', capability: 'sh.component-values@1' };
