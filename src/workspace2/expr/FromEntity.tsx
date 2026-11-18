@@ -2,7 +2,7 @@ import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import type { Json } from '../../shared/types';
 import { TextInput } from '../editors/controls';
 import type { Operand } from '../../shared/composition/expression';
-import { evaluateOperand, scalarText } from '../../preview2/evaluate';
+import { evaluateOperand, scalarText } from '../data/logic/logicEval';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import TokenField, { lineOperand } from './TokenField';
 import TokenSettings from './TokenSettings';
@@ -32,7 +32,7 @@ export default function FromEntity({ draft, path, label, onWording }: { draft: D
   return <div className="w2-expr-entity" data-testid="from-entity">
     <TokenField draft={draft} address={{ path, wrap: 'slot' }} label={label} onWording={onWording}/>
     <TextResult operand={operand} document={document}/>
-    {parts && tokenCount(parts) === 1 && <TokenSettings draft={draft} address={{ path, wrap: 'slot' }} index={0} onWording={onWording}/>}
+    {parts && tokenCount(parts) === 1 && <TokenSettings draft={draft} address={{ path, wrap: 'slot' }} index={0} onWording={onWording} inline/>}
     {parts && tokenCount(parts) >= 1 && (() => {
       const slot = valueAt(document, path) as { type: string; fallback?: string } | undefined;
       return slot && (slot.type === 'read' || slot.type === 'expr') ? <div className="w2-picker-row" data-stacked data-field-path={`${path.join('/')}/fallback`}><span className="w2-row-label">{words.ifUnavailable}</span>

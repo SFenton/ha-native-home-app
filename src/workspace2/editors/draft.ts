@@ -98,6 +98,15 @@ export function useOpenDraft(): Draft | undefined {
   return draft;
 }
 
+/** Ends the editor `draft` belongs to without its Done (the page that held it is gone), so the top bar's Undo stops following it. */
+export function releaseDraft(draft: Draft): void {
+  const at = open.indexOf(draft);
+  if (at < 0) return;
+  open.splice(at, 1);
+  if (!open.length) window.removeEventListener('keydown', onKey);
+  notify();
+}
+
 // MARK: Named steps
 
 /** A step an editor's Done made, so the top bar can say what Undo and Redo do ("Undo Only Show When on Guest Room"). */

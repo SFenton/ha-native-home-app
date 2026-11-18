@@ -16,6 +16,8 @@ import { useRepeatScope } from '../data/repeatScope';
 import { SelectMenu } from '../SelectMenu';
 import { TextInput } from '../editors/controls';
 import { words } from './words';
+import { useLogicScope } from '../data/logic/logicScope';
+import { defaultArgs, isUse, libraryOf, makeUse, setsLine, settingKindOf } from '../data/logic/logicModel';
 
 /** What a pick makes: the draft's document (it may hold a source the pick created) and the value, in one step. */
 export interface Picked {
@@ -30,7 +32,7 @@ export interface Picked {
 }
 const kindFor = (as: 'string' | 'number' | 'boolean'): ValueKind => as === 'number' ? 'number' : as === 'boolean' ? 'yesno' : 'text';
 const titleCase = (text: string) => text.replace(/[_-]/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, letter => letter.toUpperCase());
-const all: readonly PickerGroup[] = ['entities', 'counts', 'flows', 'time', 'window', 'phone', 'notifications', 'settings', 'person', 'models'];
+const all: readonly PickerGroup[] = ['templateSettings', 'logic', 'entities', 'counts', 'flows', 'time', 'window', 'phone', 'notifications', 'settings', 'person', 'models'];
 /** Inside a flow's step the picker offers only the item's fields, the flow's inputs, and Today and Now (a step cannot read an entity or the person). */
 const flowGroups: readonly PickerGroup[] = ['item', 'inputs', 'time'];
 
@@ -41,7 +43,7 @@ const flowGroups: readonly PickerGroup[] = ['item', 'inputs', 'time'];
  */
 export default function ValuePicker({ draft, groups: asked, onPick, conditions, height = 260 }: { draft: Draft; groups?: readonly PickerGroup[]; onPick: (picked: Picked) => void; /** The pick is a condition (a person test), not a value. */ conditions?: boolean; height?: number }) {
   const { entities } = useWorkspaceData();
-  const flow = useFlowScope();
+  const flow = useFlowScope(), scope = useLogicScope();
   // In a cell of a repeat (`sh.repeat@1`) the record's fields and its position are offered beside everything a page reads.
   const repeat = useRepeatScope();
   const groups = asked ?? (flow ? flowGroups : repeat ? ['item', ...all] as readonly PickerGroup[] : all);
@@ -54,7 +56,22 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
   const document = draft.get();
   const match = (label: string) => !text || label.toLowerCase().includes(text);
   const rows = useMemo(() => {
-    const out: { group: PickerGroup; label: string; make: () => Picked }[] = [];
+    const out: { group: PickerGroup; label: string; note?: string; make: () => Picked }[] = [];
+    // Inside a logic template's editor the first group is its settings; everywhere else it is the templates themselves (a body holds no use of another).
+    const own = scope ? libraryOf(document).find(entry => entry.id === scope.entryId) : undefined;
+    if (own && !flow) for (const param of own.params) {
+      const kind = settingKindOf(param), name = param.name, label = param.label ?? name;
+      if (kind === 'condition') { if (conditions) out.push({ group: 'templateSettings', label, make: () => ({ document: draft.get(), operand: { type: 'hole', name } as unknown as Operand, kind: 'yesno', predicate: { type: 'hole', name } as unknown as Predicate }) }); continue; }
+      if (kind === 'person') { out.push(conditions
+        ? { group: 'templateSettings', label: `Is ${label}`, make: () => ({ document: draft.get(), operand: { type: 'viewer', field: 'personEntityId' }, kind: 'text', predicate: { type: 'compare', op: 'eq', left: { type: 'viewer', field: 'personEntityId' }, right: { type: 'literal', value: { type: 'hole', name } } } as unknown as Predicate }) }
+        : { group: 'templateSettings', label, make: () => ({ document: draft.get(), operand: { type: 'literal', value: { type: 'hole', name } } as unknown as Operand, kind: 'text' }) }); continue; }
+      if (conditions && kind !== 'value' && kind !== 'entity' && kind !== 'number' && kind !== 'time' && kind !== 'text') continue;
+      const operand = (kind === 'entity' ? { type: 'read', from: { type: 'source', sourceId: { type: 'hole', name }, path: ['state'] }, as: 'string', missing: 'unavailable' }
+        : kind === 'value' ? { type: 'hole', name } : { type: 'literal', value: { type: 'hole', name } }) as unknown as Operand;
+      out.push({ group: 'templateSettings', label, make: () => ({ document: draft.get(), operand, kind: kind === 'number' || kind === 'time' ? 'number' : 'text' }) });
+    }
+    if (!scope && !conditions && !flow && !repeat) for (const entry of libraryOf(document)) if (entry.kind === 'operand')
+      out.push({ group: 'logic', label: entry.name, note: setsLine(entry), make: () => ({ document: draft.get(), operand: makeUse(entry, defaultArgs(entry)) as unknown as Operand, kind: 'text' }) });
     if (flow) {
       for (const info of itemFieldInfos(flow)) out.push({ group: 'item', label: info.name, make: () => ({ document: draft.get(), operand: { type: 'item', path: [info.name] }, kind: info.kind, closed: info.values }) });
       // The item's place in the list (`sh.repeat@1`): the first is 0. Offered in a flow's step beside the item's fields.
@@ -104,10 +121,18 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
       } else out.push({ group: 'person', label: 'Person Using the App', make: () => ({ document: draft.get(), operand: { type: 'viewer', field: 'userId' }, kind: 'text' }) });
     }
     return out.filter(row => match(row.label));
-  }, [document, groups, text, entities, conditions, flow, repeat]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [document, groups, text, entities, conditions, flow, repeat, scope]); // eslint-disable-line react-hooks/exhaustive-deps
   const order = (Object.keys(groupTitles) as PickerGroup[]).filter(group => group !== 'entities' && groups.includes(group));
+  const first = order.filter(group => group === 'templateSettings' || group === 'logic'), later = order.filter(group => group !== 'templateSettings' && group !== 'logic');
+  const section = (group: PickerGroup) => {
+    const here = rows.filter(row => row.group === group);
+    if (!here.length) return null;
+    return <section key={group} aria-label={groupTitles[group]}><h3 className="w2-group-title">{groupTitles[group]}</h3>
+      <ul className="w2-expr-picklist">{here.map(row => <li key={row.label}><button type="button" className="w2-expr-pickrow" data-group={group} onClick={() => onPick(row.make())}>{row.label}{row.note && <small className="w2-choice-note">{row.note}</small>}</button></li>)}</ul></section>;
+  };
   return <div className="w2-expr-picker">
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Search values" aria-label="Search values" value={query} onChange={event => setQuery(event.target.value)}/></label>
+    {first.map(section)}
     {groups.includes('entities') && <section aria-label={groupTitles.entities}><h3 className="w2-group-title">{groupTitles.entities}</h3>
       {!flow && <div className="w2-expr-control"><SelectMenu label={words.pickRead} value={mode} options={[{ value: 'state', label: words.state }, { value: 'changed', label: words.lastChangedValue }, { value: 'until', label: words.secondsUntil }, { value: 'since', label: words.secondsSince }]} onChange={next => setMode(next as typeof mode)}/></div>}
       {!flow && mode === 'until' && <TextInput label={words.untilAttribute} placeholder={words.untilAttributePlaceholder} value={untilAttribute} onCommit={text => setUntilAttribute(text.trim())}/>}
@@ -119,12 +144,7 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
         else if (mode === 'since') onPick({ document: made.document, operand: { type: 'date', op: 'seconds-between', from: { type: 'last-changed', sourceId: made.sourceId }, to: { type: 'clock', part: 'now-second' } }, kind: 'number' });
         else onPick({ document: made.document, operand: state, kind: 'text' });
       }}/></section>}
-    {order.map(group => {
-      const here = rows.filter(row => row.group === group);
-      if (!here.length) return null;
-      return <section key={group} aria-label={groupTitles[group]}><h3 className="w2-group-title">{groupTitles[group]}</h3>
-        <ul className="w2-expr-picklist">{here.map(row => <li key={row.label}><button type="button" className="w2-expr-pickrow" onClick={() => onPick(row.make())}>{row.label}</button></li>)}</ul></section>;
-    })}
+    {later.map(section)}
   </div>;
 }
 

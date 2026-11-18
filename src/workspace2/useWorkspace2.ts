@@ -15,6 +15,7 @@ import type { StatePreview } from '../preview2/render-context';
 import { createEnvironment } from '../preview2/projections';
 import { triedOverlay, useTryValues, withoutTries } from './expr/useTryValues';
 import { useLinkedGate } from './useLinkedGate';
+import { plainDocument } from './data/logic/logicPlain';
 import { useRepeats } from './repeats/useRepeats';
 
 /** Autosave waits this long after the last edit (spec 9). */
@@ -42,7 +43,9 @@ export type PropertiesTarget =
   /** Any other data source (an entity, an app topic or a model) open in the inspector the same way, so its fields stay reachable on a wide window. */
   | { kind: 'source'; id: string }
   /** A repeated piece's proposal (templates spec 5): open in the inspector while the Repeated Pieces level is, so the canvas can mark the piece beside it. */
-  | { kind: 'repeat'; id: string };
+  | { kind: 'repeat'; id: string }
+  /** A logic template open in the inspector, from the Data panel's Logic Templates group. */
+  | { kind: 'logic'; id: string };
 
 const firstSurface = (document: CompositionDocument): PreviewSurface => {
   const tab = document.navigation.tabs.find(item => item.id === document.navigation.initialTabId) ?? document.navigation.tabs[0];
@@ -64,8 +67,8 @@ export function useWorkspace2(active: boolean) {
   // The preview follows the newest document at once, problems or not: a problem is a thing to fix before Save and Publish, never
   // a reason to hold the screen back from the next edit. A document the preview cannot draw falls back to `lastGoodDocument`
   // (see `PreviewGuard`), so a half-typed edit never blanks it.
-  const previewDocument = document;
-  const lastGoodDocument = scheduled.lastGood;
+  const previewDocument = useMemo(() => plainDocument(document), [document]);
+  const lastGoodDocument = useMemo(() => plainDocument(scheduled.lastGood), [scheduled.lastGood]);
 
   // Repeated pieces: the walk runs while the level is open, a surface at a time, off the typing path (see `useRepeats`).
   const repeats = useRepeats(document);
@@ -76,6 +79,10 @@ export function useWorkspace2(active: boolean) {
   const [selection, setSelectionState] = useState<SelectionKey>();
   const [panel, setPanel] = useState<PanelKind>();
   const [flowId, setFlowId] = useState<string>();
+  /** The logic template open in the inspector. */
+  const [logicId, setLogicId] = useState<string>();
+  /** The page a logic template was opened from, for the editor's back button. */
+  const [logicFrom, setLogicFrom] = useState<{ key: SelectionKey; title: string }>();
   const [revealKey, setRevealKey] = useState<SelectionKey>();
   /** The alert the simulator draws while a field of the Ask First page has focus. */
   const [alertPreview, setAlertPreview] = useState<AlertSpec>();
@@ -86,14 +93,16 @@ export function useWorkspace2(active: boolean) {
     const exists = surfaceState && (surfaceState.kind === 'page' ? document.pages : document.modals).some(item => item.id === surfaceState.id);
     return exists ? surfaceState : firstSurface(document);
   }, [document, surfaceState]);
-  const select = useCallback((next: SelectionKey | undefined) => { setSelectionState(next); setPanel(undefined); setFlowId(undefined); if (next) { setRevealKey(next); pickRepeat(undefined); } }, [pickRepeat]);
+  const select = useCallback((next: SelectionKey | undefined) => { setSelectionState(next); setPanel(undefined); setFlowId(undefined); setLogicId(undefined); if (next) { setRevealKey(next); pickRepeat(undefined); } }, [pickRepeat]);
   /** Opens a Data Flow in the inspector; the node selection ends (spec "Selection"). */
-  const openFlow = useCallback((id: string | undefined) => { setSelectionState(undefined); setPanel(undefined); setFlowId(id); }, []);
+  const openFlow = useCallback((id: string | undefined) => { setSelectionState(undefined); setPanel(undefined); setLogicId(undefined); setFlowId(id); }, []);
+  /** Opens a logic template in the inspector; `from` names the page it was opened from, so the editor can offer a way back. */
+  const openLogic = useCallback((id: string | undefined, from?: { key: SelectionKey; title: string }) => { setSelectionState(undefined); setPanel(undefined); setFlowId(undefined); setLogicId(id); setLogicFrom(id ? from : undefined); }, []);
   // A change that removes the selected node (Undo of an add) ends the selection; any other change keeps it.
   useEffect(() => { setSelectionState(held => survivingSelection(held, index)); }, [index]);
   const changeSurface = useCallback((next: PreviewSurface) => { setSurfaceState(next); }, []);
   /** Use keeps a selection made in the library (L-mark: the simulator marks it); it still closes panels such as Tabs and the open Data Flow. */
-  const changeMode = useCallback((next: 'edit' | 'use') => { setMode(next); if (next === 'use') { setPanel(undefined); setFlowId(undefined); } }, []);
+  const changeMode = useCallback((next: 'edit' | 'use') => { setMode(next); if (next === 'use') { setPanel(undefined); setFlowId(undefined); setLogicId(undefined); } }, []);
 
   // The canvas goes to the place of the piece on show: its page or sheet, its tab and its row, with the mark on it.
   const mark = repeats.mark;
@@ -105,6 +114,7 @@ export function useWorkspace2(active: boolean) {
 
   const target = useMemo<PropertiesTarget | undefined>(() => {
     if (panel) return { kind: panel };
+    if (logicId && document?.logicLibrary?.some(entry => entry.id === logicId)) return { kind: 'logic', id: logicId };
     const open = flowId ? document?.dataSources.find(source => source.id === flowId) : undefined;
     if (open) return { kind: open.kind === 'model' && open.model === 'pipeline@1' ? 'flow' : 'source', id: open.id };
     if (repeats.selected && repeats.where === 'inspector') return { kind: 'repeat', id: repeats.selected.id };
@@ -116,7 +126,7 @@ export function useWorkspace2(active: boolean) {
     if (entry.kind === 'local-tab') return { kind: 'area', key: selection, path: entry.path };
     if (entry.kind === 'chrome-group' || entry.kind === 'chrome-item') return { kind: 'header', key: selection };
     return undefined;
-  }, [panel, flowId, document, selection, index, repeats.selected, repeats.where]);
+  }, [panel, flowId, logicId, document, selection, index, repeats.selected, repeats.where]);
 
   // --- Autosave -----------------------------------------------------------------------------------------------
   const [failedFor, setFailedFor] = useState<CompositionDocument>();
@@ -249,7 +259,7 @@ export function useWorkspace2(active: boolean) {
   return {
     studio: gatedStudio, linked, document, previewDocument, lastGoodDocument, index, checks, problemCount,
     mode, setMode: changeMode, surface, setSurface: changeSurface,
-    repeats, selection, select, panel, setPanel, flowId, openFlow, target, revealKey, alertPreview, setAlertPreview, statePreview, setStatePreview,
+    repeats, selection, select, panel, setPanel, flowId, openFlow, logicId, logicFrom, openLogic, target, revealKey, alertPreview, setAlertPreview, statePreview, setStatePreview,
     status, saveNow, persist, failedSave: failedFor !== undefined && failedFor === document, saveReason,
     retrySave: () => { setFailedFor(undefined); studio.setError(''); setSaveReason(''); },
     publication, publicationError, liveRevision, refreshPublication, publishedJson, phase, publishError, openPublish, closePublish, publish,

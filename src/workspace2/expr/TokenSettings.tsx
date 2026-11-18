@@ -1,3 +1,4 @@
+import type { Operand } from '../../shared/composition/expression';
 import { dateStyles, durationStyles, durationUnits, operandKind, textCases, type DateStyle, type DurationStyle, type DurationUnit, type TextCase } from '../../shared/composition/expression';
 import { valueAt } from '../../composition-editor';
 import { usePush } from '../kit';
@@ -9,13 +10,15 @@ import { lineOperand, writeParts, type LineAddress } from './TokenField';
 import { operandName } from './condition';
 import { newToken, parseLine, wordingFor01, type Part } from './tokens';
 import { useNameContext } from './useExpr';
+import LogicUseSettings from '../data/logic/LogicUse';
+import { isUse, workedOut } from '../data/logic/logicModel';
 import { words } from './words';
 
 /** The capital letters a text value can have: as written, then each case the contract has. */
 const textCaseChoices = [{ value: 'as-written', label: words.textCaseChoices['as-written'] }, ...[...textCases].reverse().map(item => ({ value: item, label: words.textCaseChoices[item] }))];
 
 /** What a token opened offers (spec "The token line"): its value, how a number is written, wording for 0 and 1, and Remove Value. */
-export default function TokenSettings({ draft, address, index, onWording, onClose }: { draft: Draft; address: LineAddress; index: number; onWording?: (parts: Part[], index: number) => void; onClose?: () => void }) {
+export default function TokenSettings({ draft, address, index, onWording, onClose, inline }: { draft: Draft; address: LineAddress; index: number; onWording?: (parts: Part[], index: number) => void; onClose?: () => void; /** Drawn in the editor's own page, not on a page of its own: a use that is unlinked or removed leaves the editor open, for Done. */ inline?: boolean }) {
   const document = useDraftDocument(draft), ctx = useNameContext(document), push = usePush();
   const operand = lineOperand(valueAt(document, address.path), address.wrap);
   const parts = operand ? parseLine(operand) : undefined;
@@ -23,6 +26,15 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
   const at = tokenIndexes[index], part = at === undefined ? undefined : parts![at];
   if (!parts || !part || !('token' in part)) return <p className="w2-caption">{words.customValue}</p>;
   const { token } = part;
+  const asUse: unknown = token.operand;
+  if (isUse(asUse)) {
+    const leaveUse = () => { onClose?.(); if (!onClose) push?.pop(); };
+    const afterChange = () => { if (!inline) leaveUse(); };
+    return <LogicUseSettings draft={draft} use={asUse} kind="value" removeLabel={words.removeValue} onLeave={leaveUse}
+      onChange={(next, base) => { if (base) draft.set(base); writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: next as unknown as Operand } } : item), false); }}
+      onUnlink={() => { const plain = workedOut(draft.get(), asUse) as Operand | undefined; if (plain) writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: plain } } : item), false); afterChange(); }}
+      onRemove={() => { writeParts(draft, address, parts.filter((_, i) => i !== at), false); afterChange(); }}/>;
+  }
   const set = (next: Part[]) => writeParts(draft, address, next, false);
   const update = (change: Partial<typeof token>) => set(parts.map((item, i) => i === at ? { token: { ...token, ...change } } : item));
   const numeric = token.operand.type === 'read' && token.operand.as === 'number' && !token.dateStyle;

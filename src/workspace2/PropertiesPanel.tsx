@@ -54,6 +54,10 @@ import MapOrientation from './controls/MapOrientation';
 import MapButtons from './controls/MapButtons';
 import { DialControlInspector, ThermostatInspector } from './dial/DialControlInspector';
 import { isThermostatDial } from '../shared/composition/dial-control-edit';
+import LogicEditor from './data/logic/LogicEditor';
+import { LogicScopeProvider } from './data/logic/logicScope';
+import { entryOf, kindWord, useCount } from './data/logic/logicModel';
+import { logicWords } from './data/logic/logicWords';
 
 /** The header every properties surface has: icon, title, one line of context, tags, More, Close (spec 5.2). */
 function Header({ icon, title, line, tags, more, onClose, grab }: { icon: string; title: string; line: string; tags?: ReactNode; more?: ReactNode; onClose: () => void; grab?: boolean }) {
@@ -279,6 +283,12 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     const uses = usedCount(document, target.id);
     header = <Header onClose={onClose} icon="activity" title={title} line={`Data Flow · ${uses > 0 ? `Used by ${uses}` : 'Not Used'}`} more={<FlowMenu ws={ws} id={target.id} onError={onError}/>}/>;
     body = <FlowEditor ws={ws} id={target.id}/>;
+  } else if (target.kind === 'logic') {
+    const entry = entryOf(document, target.id)!;
+    const uses = useCount(document, target.id);
+    title = entry.name;
+    header = <Header onClose={onClose} icon="sliders" title={title} line={`${logicWords.editorTitle} · ${kindWord(entry)} · ${logicWords.usedByLong(uses)}`} more={<button type="button" className="w2-primary w2-done" onClick={onClose}>Done</button>}/>;
+    body = <LogicEditor ws={ws} id={target.id}/>;
   } else if (target.kind === 'source') {
     const source = document.dataSources.find(item => item.id === target.id)!;
     const uses = usedCount(document, target.id);
@@ -303,10 +313,11 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     header = <Header onClose={onClose} icon="image" title="Wallpaper" line="Behind every page"/>;
     body = <WallpaperPanel/>;
   }
-  const dataActions = { openFlow: ws.openFlow };
+  const dataActions = { openFlow: ws.openFlow, openLogic: (id: string) => ws.openLogic(id, 'key' in target && target.key ? { key: target.key, title } : undefined) };
   const repeat = target.kind === 'node' ? repeatScopeOf(document, index, target.key) : undefined;
-  return <RepeatScopeProvider scope={repeat}><RowsProvider value={ctx}><DataActionsProvider value={dataActions}><AlertPreviewContext.Provider value={ws.setAlertPreview}><StatePreviewContext.Provider value={stateApi}>
+  const logicScope = target.kind === 'logic' ? { entryId: target.id } : undefined;
+  return <LogicScopeProvider value={logicScope}><RepeatScopeProvider scope={repeat}><RowsProvider value={ctx}><DataActionsProvider value={dataActions}><AlertPreviewContext.Provider value={ws.setAlertPreview}><StatePreviewContext.Provider value={stateApi}>
     <PushStack key={`${target.kind}:${'key' in target ? target.key : 'id' in target ? target.id : ''}`} rootTitle={title} rootHeader={<>{header}{notice && <p role="alert" className="w2-notice">{notice}</p>}</>}
       root={<div className="w2-props-body">{body}</div>}/>
-  </StatePreviewContext.Provider></AlertPreviewContext.Provider></DataActionsProvider></RowsProvider></RepeatScopeProvider>;
+  </StatePreviewContext.Provider></AlertPreviewContext.Provider></DataActionsProvider></RowsProvider></RepeatScopeProvider></LogicScopeProvider>;
 }

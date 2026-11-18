@@ -5,6 +5,13 @@ import type { DateStyle, DurationStyle, DurationUnit, FormatSpec, Operand, Predi
  * No token is a `literal`; one bare text token is a `read`; anything else is a `format` whose arguments are named `a`, `b`, … and never shown.
  */
 
+/** Whether an operand is a use of a logic template, a setting of the template being edited, or a text or number a setting stands in: each is one token. */
+export const isLogicOperand = (operand: unknown): boolean => {
+  if (!operand || typeof operand !== 'object') return false;
+  const value = operand as { type?: string; value?: { type?: string } };
+  return value.type === 'logic-ref' || value.type === 'hole' || (value.type === 'literal' && value.value?.type === 'hole');
+};
+
 /** A value inside text: the operand it reads, and the decimals when it is a number. */
 export interface Token {
   operand: Operand; digits?: number;
@@ -54,6 +61,7 @@ export function writeLine(parts: readonly Part[]): Operand {
   const line = tidy(parts);
   const tokens = line.filter((part): part is { token: Token } => 'token' in part);
   if (!tokens.length) return { type: 'literal', value: line.map(part => 'text' in part ? part.text : '').join('') };
+  if (line.length === 1 && isLogicOperand(tokens[0].token.operand) && tokens[0].token.digits === undefined && tokens[0].token.dateStyle === undefined && !tokens[0].token.textCase && !tokens[0].token.duration) return tokens[0].token.operand;
   if (line.length === 1 && tokens[0].token.operand.type === 'read' && tokens[0].token.operand.as === 'string' && tokens[0].token.digits === undefined && tokens[0].token.dateStyle === undefined && !tokens[0].token.textCase && !tokens[0].token.duration) return tokens[0].token.operand;
   const args: Record<string, Operand> = {}, formats: Record<string, FormatSpec> = {};
   let pattern = '', index = 0;
@@ -71,6 +79,7 @@ export function writeLine(parts: readonly Part[]): Operand {
 
 /** Reads an operand as parts, or undefined when the line cannot show it (a rule, a map, math: a custom value). */
 export function parseLine(operand: Operand): Part[] | undefined {
+  if (isLogicOperand(operand)) return [{ token: { operand } }];
   if (operand.type === 'literal') return typeof operand.value === 'string' ? tidy([{ text: operand.value }]) : undefined;
   if (operand.type === 'read') return [{ token: { operand } }];
   if (operand.type !== 'format') return undefined;

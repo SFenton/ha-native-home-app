@@ -1,7 +1,7 @@
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import type { Operand } from '../../shared/composition/expression';
 import { clampedColor, parseColor, type Rgb } from '../../shared/composition/color';
-import { evaluateOperand, scalarText } from '../../preview2/evaluate';
+import { evaluateOperand, scalarText } from '../data/logic/logicEval';
 import type { Json } from '../../shared/types';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import LookControl, { type LookKind } from './LookControl';

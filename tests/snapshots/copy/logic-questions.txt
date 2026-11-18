@@ -1,0 +1,4 @@
+Delete “Count or All”?
+It is used by 3. Each use keeps its logic, unlinked.
+Cancel
+Delete Template

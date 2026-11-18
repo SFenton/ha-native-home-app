@@ -6,7 +6,7 @@ import { conditionCount, entityOfSource, groupOf, inputsOf, markerOf, openLeaf, 
 import { policyEffect, words, type Place } from './words';
 import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
 import { useWorkspaceData } from '../pickers/WorkspaceData';
-import { evaluatePredicate } from '../../preview2/evaluate';
+import { evaluatePredicate } from '../data/logic/logicEval';
 import type { CompositionDocument } from '../../shared/composition/schema';
 
 /**

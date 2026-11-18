@@ -1,0 +1,33 @@
+Count or All
+Logic Template · Value · Used by 3
+Done
+Name
+Each use sets (3)
+Count
+Value · tried with 3
+Word
+Text · tried with On
+When None
+Text · tried with All Closed
+Add Setting…
+Value
+1 rule
+Shows 3 On
+Worked out with each setting’s Try With value.
+Test
+Used by
+Logic Gallery
+Lights · Subtitle
+Logic Gallery
+Doors · Subtitle
+Show 1 More
+Delete Template
+
+[names]
+Close
+Settings
+Count, Value, tried with 3
+Word, Text, tried with On
+When None, Text, tried with All Closed
+Logic
+Value: 1 rule

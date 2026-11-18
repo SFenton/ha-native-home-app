@@ -14,8 +14,17 @@ import { inputsOf, operandInputs } from './condition';
 import { fixedOf, modeOf, rulesOf, seedRules, toSlot, type Kind, type Mode, type RulesDraft } from './value';
 import { slotOperand, wordingFor01, type Part } from './tokens';
 import { words } from './words';
+import SaveAsLogic from '../data/logic/SaveLogicDialog';
 
 type Slot = { type: string } & Record<string, unknown>;
+/** The words a Fixed field shows for a slot: its own text, or the text of a literal operand; nothing for logic that is not a plain value (a use, a rule, a read). */
+const fixedText = (slot: unknown): string => {
+  const held = slot as { type?: string; value?: unknown } | undefined;
+  if (!held) return '';
+  if (held.type === 'literal') return typeof held.value === 'object' ? '' : String(held.value ?? '');
+  const operand = slotOperand(held as never) as { type?: string; value?: unknown } | undefined;
+  return operand?.type === 'literal' && typeof operand.value !== 'object' ? String(operand.value ?? '') : '';
+};
 type Memo = { mode?: Exclude<Mode, 'custom'>; fixed?: Operand | Json; entity?: Operand; rules?: RulesDraft<Operand | Json>; entered?: boolean };
 /** What each mode last held while the page is open (spec "Changing mode keeps work"); it is the page's, never the document's. */
 const memory = new WeakMap<Draft, Map<string, Memo>>();
@@ -74,10 +83,11 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   const inputs = mode === 'rules' ? (rulesOf(slot, kind)?.cases ?? []).flatMap(entry => inputsOf(entry.when)) : kind === 'text' && slot ? (() => { const operand = slotOperand(slot); return operand ? operandInputs(operand) : []; })() : mode === 'entity' && slot && 'value' in slot ? operandInputs(slot.value as Operand) : [];
   const unique = [...new Map(inputs.map(input => [`${input.sourceId}|${input.path.join('/')}`, input])).values()];
   return <div className="w2-editor-section w2-expr-editor" data-testid="value-editor" data-mode={mode}>
+    {kind === 'text' && <SaveAsLogic draft={draft} path={path} kind="value" onSaved={() => { memo.mode = 'entity'; setModeState('entity'); }}/>}
     {modes.length > 1 && <Segmented label={`${label} value`} value={mode} options={modes.map(item => ({ value: item, label: modeWords[item] }))} onChange={setMode}/>}
     {mode === 'fixed' && <>
       {kind === 'text'
-        ? <div className="w2-picker-row" data-stacked><TextInput label={label} value={String((slot as { value?: unknown } | undefined)?.value ?? (slot && slotOperand(slot)?.type === 'literal' ? (slotOperand(slot) as { value: unknown }).value : ''))} maxLength={maxLength}
+        ? <div className="w2-picker-row" data-stacked><TextInput label={label} value={fixedText(slot)} maxLength={maxLength}
           onCommit={text => draft.set(replaceAt(draft.get(), path, { type: 'literal', value: text }), `fixed:${key}`)}/></div>
         : <LookControl look={look ?? 'fill'} value={slot as unknown as Json} label={label} onChange={(next, live) => draft.set(replaceAt(draft.get(), path, next), live ? `look:${key}` : undefined)}/>}
       <p className="w2-caption">{words.sameValue}</p></>}

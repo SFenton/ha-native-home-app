@@ -1,0 +1,1162 @@
+{
+ "document": {
+  "schemaVersion": "2.0",
+  "id": "document-demo",
+  "name": "Logic Gallery",
+  "theme": {
+   "appearance": "dark",
+   "tokens": "canonical@1",
+   "typography": "dynamic-type@1",
+   "background": {
+    "type": "solid",
+    "token": "shell-base@1"
+   }
+  },
+  "navigation": {
+   "initialPageId": "page-logic-gallery",
+   "initialTabId": "tab-gallery",
+   "initialArguments": {},
+   "tabs": [
+    {
+     "id": "tab-gallery",
+     "label": "Logic Gallery",
+     "icon": {
+      "type": "sf-symbol",
+      "name": "square.grid.2x2",
+      "rendering": "canonical",
+      "unavailable": "fallback"
+     },
+     "pageId": "page-logic-gallery",
+     "arguments": {}
+    }
+   ],
+   "policy": {
+    "type": "canonical-shell@1",
+    "tabSwitch": "preserve-cut@1",
+    "reselect": "pop-root-then-scroll@1",
+    "stackMotion": "canonical-stack@1",
+    "restoration": "scene@1",
+    "selectionWhileModal": "reject"
+   },
+   "chrome": {
+    "groups": [
+     {
+      "id": "chrome-navigation",
+      "placement": "leading",
+      "horizontal": "separate-circles@1",
+      "vertical": "shared@1",
+      "items": [
+       {
+        "id": "chrome-menu",
+        "type": "shell-menu",
+        "label": "Sections",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "line.3.horizontal",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "visibility": "root-when-menu-available"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "pages": [
+   {
+    "id": "page-logic-gallery",
+    "title": "Logic Gallery",
+    "icon": {
+     "type": "sf-symbol",
+     "name": "square.grid.2x2",
+     "rendering": "canonical",
+     "unavailable": "fallback"
+    },
+    "parameters": {},
+    "navigation": {
+     "type": "stack"
+    },
+    "layout": {
+     "type": "column",
+     "padding": {
+      "top": {
+       "type": "token",
+       "name": "m"
+      },
+      "leading": {
+       "type": "token",
+       "name": "l"
+      },
+      "bottom": {
+       "type": "token",
+       "name": "m"
+      },
+      "trailing": {
+       "type": "token",
+       "name": "l"
+      }
+     },
+     "spacing": {
+      "type": "token",
+      "name": "xl"
+     },
+     "maxWidth": {
+      "type": "unbounded"
+     },
+     "scroll": "content-fit@1",
+     "chrome": "canonical-page@1",
+     "ground": "host"
+    },
+    "toolbar": {
+     "type": "inherit"
+    },
+    "components": [
+     {
+      "id": "grid-count",
+      "type": "tile-grid",
+      "title": "Count or All",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 4,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "tile-lights",
+        "type": "navigation-tile",
+        "title": "Lights",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "lightbulb",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "family": "neutral",
+         "selected": "none",
+         "subtitle": {
+          "type": "expr",
+          "value": {
+           "type": "logic-ref",
+           "logicId": "count-or-all",
+           "args": {
+            "count": {
+             "type": "math",
+             "op": "add",
+             "args": [
+              {
+               "type": "choose",
+               "cases": [
+                {
+                 "when": {
+                  "type": "state",
+                  "sourceId": "demo-light-1",
+                  "path": [
+                   "state"
+                  ],
+                  "in": [
+                   "on"
+                  ]
+                 },
+                 "then": {
+                  "type": "literal",
+                  "value": 1
+                 }
+                }
+               ],
+               "otherwise": {
+                "type": "literal",
+                "value": 0
+               }
+              },
+              {
+               "type": "choose",
+               "cases": [
+                {
+                 "when": {
+                  "type": "state",
+                  "sourceId": "demo-light-2",
+                  "path": [
+                   "state"
+                  ],
+                  "in": [
+                   "on"
+                  ]
+                 },
+                 "then": {
+                  "type": "literal",
+                  "value": 1
+                 }
+                }
+               ],
+               "otherwise": {
+                "type": "literal",
+                "value": 0
+               }
+              },
+              {
+               "type": "choose",
+               "cases": [
+                {
+                 "when": {
+                  "type": "state",
+                  "sourceId": "demo-light-3",
+                  "path": [
+                   "state"
+                  ],
+                  "in": [
+                   "on"
+                  ]
+                 },
+                 "then": {
+                  "type": "literal",
+                  "value": 1
+                 }
+                }
+               ],
+               "otherwise": {
+                "type": "literal",
+                "value": 0
+               }
+              }
+             ]
+            },
+            "word": "On",
+            "whenNone": "All Off"
+           }
+          }
+         }
+        },
+        "action": {
+         "type": "select-tab",
+         "tabId": "tab-gallery"
+        }
+       },
+       {
+        "id": "tile-doors",
+        "type": "navigation-tile",
+        "title": "Doors",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "door.left.hand.open",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "family": "neutral",
+         "selected": "none",
+         "subtitle": {
+          "type": "expr",
+          "value": {
+           "type": "logic-ref",
+           "logicId": "count-or-all",
+           "args": {
+            "count": {
+             "type": "choose",
+             "cases": [
+              {
+               "when": {
+                "type": "state",
+                "sourceId": "demo-door",
+                "path": [
+                 "state"
+                ],
+                "in": [
+                 "on"
+                ]
+               },
+               "then": {
+                "type": "literal",
+                "value": 1
+               }
+              }
+             ],
+             "otherwise": {
+              "type": "literal",
+              "value": 0
+             }
+            },
+            "word": "Open",
+            "whenNone": "All Closed"
+           }
+          }
+         }
+        },
+        "action": {
+         "type": "select-tab",
+         "tabId": "tab-gallery"
+        }
+       },
+       {
+        "id": "tile-windows",
+        "type": "navigation-tile",
+        "title": "Windows",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "window.vertical.open",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "family": "neutral",
+         "selected": "none",
+         "subtitle": {
+          "type": "expr",
+          "value": {
+           "type": "logic-ref",
+           "logicId": "count-or-all",
+           "args": {
+            "count": {
+             "type": "choose",
+             "cases": [
+              {
+               "when": {
+                "type": "state",
+                "sourceId": "demo-window",
+                "path": [
+                 "state"
+                ],
+                "in": [
+                 "on"
+                ]
+               },
+               "then": {
+                "type": "literal",
+                "value": 1
+               }
+              }
+             ],
+             "otherwise": {
+              "type": "literal",
+              "value": 0
+             }
+            },
+            "word": "Open",
+            "whenNone": "All Closed"
+           }
+          }
+         }
+        },
+        "action": {
+         "type": "select-tab",
+         "tabId": "tab-gallery"
+        }
+       }
+      ]
+     },
+     {
+      "id": "section-yours",
+      "type": "section",
+      "title": "Yours or Theirs",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "header": "Yours or Theirs",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": false,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "row-chores-mine",
+        "type": "row",
+        "title": "Chores",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "primary": {
+          "type": "expr",
+          "value": {
+           "type": "logic-ref",
+           "logicId": "yours-or-theirs",
+           "args": {
+            "person": "person.demo_sam",
+            "name": "Sam",
+            "thing": "Chores"
+           }
+          }
+         },
+         "secondary": {
+          "type": "literal",
+          "value": ""
+         },
+         "value": {
+          "type": "literal",
+          "value": ""
+         },
+         "accessory": "none",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable"
+        }
+       },
+       {
+        "id": "row-chores-theirs",
+        "type": "row",
+        "title": "Chores",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "primary": {
+          "type": "expr",
+          "value": {
+           "type": "logic-ref",
+           "logicId": "yours-or-theirs",
+           "args": {
+            "person": "person.demo_alex",
+            "name": "Alex",
+            "thing": "Chores"
+           }
+          }
+         },
+         "secondary": {
+          "type": "literal",
+          "value": ""
+         },
+         "value": {
+          "type": "literal",
+          "value": ""
+         },
+         "accessory": "none",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable"
+        }
+       },
+       {
+        "id": "row-side",
+        "type": "row",
+        "title": "Side",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "primary": {
+          "type": "expr",
+          "value": {
+           "type": "logic-ref",
+           "logicId": "yours-or-theirs",
+           "args": {
+            "person": "person.demo_sam",
+            "name": "Sam",
+            "thing": "Side"
+           }
+          }
+         },
+         "secondary": {
+          "type": "literal",
+          "value": ""
+         },
+         "value": {
+          "type": "literal",
+          "value": ""
+         },
+         "accessory": "none",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable"
+        }
+       }
+      ]
+     },
+     {
+      "id": "banner-night",
+      "type": "info-box",
+      "title": "Night Hours",
+      "layout": {
+       "span": 1
+      },
+      "visibleWhen": {
+       "type": "logic-ref",
+       "logicId": "night-hours",
+       "args": {
+        "from": 1320,
+        "until": 420
+       }
+      },
+      "whenUnknown": "hide",
+      "props": {
+       "message": {
+        "type": "literal",
+        "value": "Chimes are off until 7:00 AM"
+       },
+       "tone": "neutral",
+       "unavailableText": "Unavailable"
+      }
+     },
+     {
+      "id": "section-night",
+      "type": "section",
+      "title": "Night Hours",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "header": "Night Hours",
+       "footer": "",
+       "style": "module-list",
+       "density": "thin",
+       "hasGlyphs": false,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       }
+      },
+      "children": [
+       {
+        "id": "row-chime",
+        "type": "row",
+        "title": "Doorbell Chime",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "primary": {
+          "type": "literal",
+          "value": "Doorbell Chime"
+         },
+         "secondary": {
+          "type": "literal",
+          "value": ""
+         },
+         "value": {
+          "type": "literal",
+          "value": ""
+         },
+         "accessory": "none",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable"
+        },
+        "action": {
+         "type": "select-tab",
+         "tabId": "tab-gallery"
+        },
+        "enabledWhen": {
+         "condition": {
+          "type": "not",
+          "of": {
+           "type": "logic-ref",
+           "logicId": "night-hours",
+           "args": {
+            "from": 1320,
+            "until": 420
+           }
+          }
+         },
+         "whenUnknown": "enabled"
+        }
+       },
+       {
+        "id": "row-chimes-value",
+        "type": "row",
+        "title": "Chimes",
+        "layout": {
+         "span": 1
+        },
+        "props": {
+         "primary": {
+          "type": "literal",
+          "value": "Chimes"
+         },
+         "secondary": {
+          "type": "literal",
+          "value": ""
+         },
+         "value": {
+          "type": "expr",
+          "value": {
+           "type": "choose",
+           "cases": [
+            {
+             "when": {
+              "type": "logic-ref",
+              "logicId": "night-hours",
+              "args": {
+               "from": 1320,
+               "until": 420
+              }
+             },
+             "then": {
+              "type": "literal",
+              "value": "Off Until 7:00 AM"
+             }
+            }
+           ],
+           "otherwise": {
+            "type": "literal",
+            "value": "On"
+           }
+          }
+         },
+         "accessory": "none",
+         "loadingText": "Loading",
+         "unavailableText": "Unavailable"
+        }
+       }
+      ]
+     },
+     {
+      "id": "grid-try",
+      "type": "tile-grid",
+      "title": "Try It",
+      "layout": {
+       "span": 1
+      },
+      "props": {
+       "minimum": "tile@1",
+       "maxColumns": 4,
+       "spacing": {
+        "type": "token",
+        "name": "m"
+       },
+       "equalRowHeights": false,
+       "shortRow": "share",
+       "fold": "page"
+      },
+      "children": [
+       {
+        "id": "try-demo-light-1",
+        "type": "action-tile",
+        "title": "Demo Light 1",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "power",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "binding": {
+         "sourceId": "power-demo-light-1",
+         "projection": "power-tile@1"
+        },
+        "props": {
+         "family": "lights",
+         "bodyActionId": "power",
+         "actionOrder": [
+          "power"
+         ],
+         "stateText": "provider",
+         "feedback": "policy"
+        },
+        "action": {
+         "type": "domain",
+         "sourceId": "power-demo-light-1",
+         "intent": "power.toggle",
+         "feedback": "policy",
+         "confirmation": {
+          "type": "policy"
+         }
+        }
+       },
+       {
+        "id": "try-demo-light-2",
+        "type": "action-tile",
+        "title": "Demo Light 2",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "power",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "binding": {
+         "sourceId": "power-demo-light-2",
+         "projection": "power-tile@1"
+        },
+        "props": {
+         "family": "lights",
+         "bodyActionId": "power",
+         "actionOrder": [
+          "power"
+         ],
+         "stateText": "provider",
+         "feedback": "policy"
+        },
+        "action": {
+         "type": "domain",
+         "sourceId": "power-demo-light-2",
+         "intent": "power.toggle",
+         "feedback": "policy",
+         "confirmation": {
+          "type": "policy"
+         }
+        }
+       },
+       {
+        "id": "try-demo-light-3",
+        "type": "action-tile",
+        "title": "Demo Light 3",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "power",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "binding": {
+         "sourceId": "power-demo-light-3",
+         "projection": "power-tile@1"
+        },
+        "props": {
+         "family": "lights",
+         "bodyActionId": "power",
+         "actionOrder": [
+          "power"
+         ],
+         "stateText": "provider",
+         "feedback": "policy"
+        },
+        "action": {
+         "type": "domain",
+         "sourceId": "power-demo-light-3",
+         "intent": "power.toggle",
+         "feedback": "policy",
+         "confirmation": {
+          "type": "policy"
+         }
+        }
+       },
+       {
+        "id": "try-demo-door",
+        "type": "action-tile",
+        "title": "Demo Door",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "power",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "binding": {
+         "sourceId": "power-demo-door",
+         "projection": "power-tile@1"
+        },
+        "props": {
+         "family": "lights",
+         "bodyActionId": "power",
+         "actionOrder": [
+          "power"
+         ],
+         "stateText": "provider",
+         "feedback": "policy"
+        },
+        "action": {
+         "type": "domain",
+         "sourceId": "power-demo-door",
+         "intent": "power.toggle",
+         "feedback": "policy",
+         "confirmation": {
+          "type": "policy"
+         }
+        }
+       },
+       {
+        "id": "try-demo-window",
+        "type": "action-tile",
+        "title": "Demo Window",
+        "icon": {
+         "type": "sf-symbol",
+         "name": "power",
+         "rendering": "canonical",
+         "unavailable": "fallback"
+        },
+        "layout": {
+         "span": 1
+        },
+        "binding": {
+         "sourceId": "power-demo-window",
+         "projection": "power-tile@1"
+        },
+        "props": {
+         "family": "lights",
+         "bodyActionId": "power",
+         "actionOrder": [
+          "power"
+         ],
+         "stateText": "provider",
+         "feedback": "policy"
+        },
+        "action": {
+         "type": "domain",
+         "sourceId": "power-demo-window",
+         "intent": "power.toggle",
+         "feedback": "policy",
+         "confirmation": {
+          "type": "policy"
+         }
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "modals": [],
+  "dataSources": [
+   {
+    "id": "demo-light-1",
+    "kind": "ha-entity",
+    "entityId": {
+     "type": "literal",
+     "value": "switch.demo_light_1"
+    }
+   },
+   {
+    "id": "demo-light-2",
+    "kind": "ha-entity",
+    "entityId": {
+     "type": "literal",
+     "value": "switch.demo_light_2"
+    }
+   },
+   {
+    "id": "demo-light-3",
+    "kind": "ha-entity",
+    "entityId": {
+     "type": "literal",
+     "value": "switch.demo_light_3"
+    }
+   },
+   {
+    "id": "demo-door",
+    "kind": "ha-entity",
+    "entityId": {
+     "type": "literal",
+     "value": "switch.demo_door"
+    }
+   },
+   {
+    "id": "demo-window",
+    "kind": "ha-entity",
+    "entityId": {
+     "type": "literal",
+     "value": "switch.demo_window"
+    }
+   },
+   {
+    "id": "power-demo-light-1",
+    "kind": "model",
+    "model": "power-toggle@1",
+    "inputs": {
+     "entityId": {
+      "type": "literal",
+      "value": "switch.demo_light_1"
+     }
+    }
+   },
+   {
+    "id": "power-demo-light-2",
+    "kind": "model",
+    "model": "power-toggle@1",
+    "inputs": {
+     "entityId": {
+      "type": "literal",
+      "value": "switch.demo_light_2"
+     }
+    }
+   },
+   {
+    "id": "power-demo-light-3",
+    "kind": "model",
+    "model": "power-toggle@1",
+    "inputs": {
+     "entityId": {
+      "type": "literal",
+      "value": "switch.demo_light_3"
+     }
+    }
+   },
+   {
+    "id": "power-demo-door",
+    "kind": "model",
+    "model": "power-toggle@1",
+    "inputs": {
+     "entityId": {
+      "type": "literal",
+      "value": "switch.demo_door"
+     }
+    }
+   },
+   {
+    "id": "power-demo-window",
+    "kind": "model",
+    "model": "power-toggle@1",
+    "inputs": {
+     "entityId": {
+      "type": "literal",
+      "value": "switch.demo_window"
+     }
+    }
+   },
+   {
+    "id": "app-clock",
+    "kind": "model",
+    "model": "app-state@1",
+    "inputs": {
+     "topic": "clock"
+    }
+   }
+  ],
+  "variables": {},
+  "assets": [],
+  "liveActivities": [],
+  "logicLibrary": [
+   {
+    "id": "count-or-all",
+    "name": "Count or All",
+    "kind": "operand",
+    "params": [
+     {
+      "name": "count",
+      "kind": "operand",
+      "label": "Count",
+      "sample": {
+       "type": "literal",
+       "value": 3
+      }
+     },
+     {
+      "name": "word",
+      "kind": "text",
+      "label": "Word",
+      "sample": "On"
+     },
+     {
+      "name": "whenNone",
+      "kind": "text",
+      "label": "When None",
+      "sample": "All Closed"
+     }
+    ],
+    "body": {
+     "type": "choose",
+     "cases": [
+      {
+       "when": {
+        "type": "compare",
+        "op": "above",
+        "left": {
+         "type": "hole",
+         "name": "count"
+        },
+        "right": {
+         "type": "literal",
+         "value": 0
+        }
+       },
+       "then": {
+        "type": "format",
+        "pattern": "{a} {b}",
+        "args": {
+         "a": {
+          "type": "hole",
+          "name": "count"
+         },
+         "b": {
+          "type": "literal",
+          "value": {
+           "type": "hole",
+           "name": "word"
+          }
+         }
+        }
+       }
+      }
+     ],
+     "otherwise": {
+      "type": "literal",
+      "value": {
+       "type": "hole",
+       "name": "whenNone"
+      }
+     }
+    }
+   },
+   {
+    "id": "yours-or-theirs",
+    "name": "Yours or Theirs",
+    "kind": "operand",
+    "params": [
+     {
+      "name": "person",
+      "kind": "text",
+      "label": "Person",
+      "sample": "person.demo_sam",
+      "display": "person"
+     },
+     {
+      "name": "name",
+      "kind": "text",
+      "label": "Name",
+      "sample": "Sam"
+     },
+     {
+      "name": "thing",
+      "kind": "text",
+      "label": "Thing",
+      "sample": "Chores"
+     }
+    ],
+    "body": {
+     "type": "choose",
+     "cases": [
+      {
+       "when": {
+        "type": "compare",
+        "op": "eq",
+        "left": {
+         "type": "viewer",
+         "field": "personEntityId"
+        },
+        "right": {
+         "type": "literal",
+         "value": {
+          "type": "hole",
+          "name": "person"
+         }
+        }
+       },
+       "then": {
+        "type": "format",
+        "pattern": "Your {a}",
+        "args": {
+         "a": {
+          "type": "literal",
+          "value": {
+           "type": "hole",
+           "name": "thing"
+          }
+         }
+        }
+       }
+      }
+     ],
+     "otherwise": {
+      "type": "format",
+      "pattern": "{a}’s {b}",
+      "args": {
+       "a": {
+        "type": "literal",
+        "value": {
+         "type": "hole",
+         "name": "name"
+        }
+       },
+       "b": {
+        "type": "literal",
+        "value": {
+         "type": "hole",
+         "name": "thing"
+        }
+       }
+      }
+     }
+    }
+   },
+   {
+    "id": "night-hours",
+    "name": "Night Hours",
+    "kind": "condition",
+    "params": [
+     {
+      "name": "from",
+      "kind": "number",
+      "display": "time",
+      "label": "From",
+      "sample": 1320
+     },
+     {
+      "name": "until",
+      "kind": "number",
+      "display": "time",
+      "label": "Until",
+      "sample": 420
+     }
+    ],
+    "body": {
+     "type": "any",
+     "of": [
+      {
+       "type": "compare",
+       "op": "above",
+       "left": {
+        "type": "read",
+        "from": {
+         "type": "source",
+         "sourceId": "app-clock",
+         "path": [
+          "minuteOfDay"
+         ]
+        },
+        "as": "number",
+        "missing": "unavailable"
+       },
+       "right": {
+        "type": "literal",
+        "value": {
+         "type": "hole",
+         "name": "from"
+        }
+       }
+      },
+      {
+       "type": "compare",
+       "op": "below",
+       "left": {
+        "type": "read",
+        "from": {
+         "type": "source",
+         "sourceId": "app-clock",
+         "path": [
+          "minuteOfDay"
+         ]
+        },
+        "as": "number",
+        "missing": "unavailable"
+       },
+       "right": {
+        "type": "literal",
+        "value": {
+         "type": "hole",
+         "name": "until"
+        }
+       }
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

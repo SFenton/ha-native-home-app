@@ -6,6 +6,8 @@ export interface TokenLineProps {
   label: string;
   parts: readonly Part[];
   nameOf: (token: Token) => string;
+  /** A use of a logic template or a setting of one: how it is marked and what a screen reader says. */
+  describe?: (token: Token) => { role: 'use' | 'setting'; label: string } | undefined;
   onChange: (parts: Part[], typing: boolean) => void;
   /** A token was pressed (or Enter on a selected one). `anchor` is its element, for a popover. */
   onOpenToken: (index: number, anchor: HTMLElement) => void;
@@ -26,7 +28,7 @@ const same = (a: readonly Part[], b: readonly Part[]) => JSON.stringify(a) === J
  * character. Typing is plain text; `{` asks for a value; Backspace before a token selects it and a second one removes it. The DOM is
  * the author while typing and is rebuilt only when the parts change from outside (a token edited, a mode switch, an undo).
  */
-export default function TokenLine({ label, parts, nameOf, onChange, onOpenToken, onAsk, onNote, register, invalid, describedBy }: TokenLineProps) {
+export default function TokenLine({ label, parts, nameOf, describe, onChange, onOpenToken, onAsk, onNote, register, invalid, describedBy }: TokenLineProps) {
   const root = useRef<HTMLDivElement>(null);
   const tokens = useRef<Token[]>([]);
   const caretAfter = useRef<number | undefined>(undefined);
@@ -52,7 +54,9 @@ export default function TokenLine({ label, parts, nameOf, onChange, onOpenToken,
       const span = document.createElement('span');
       span.className = 'w2-token'; span.contentEditable = 'false'; span.dataset.k = String(tokens.current.length); span.setAttribute('role', 'button'); span.tabIndex = -1;
       const name = nameOf(part.token);
-      span.textContent = name; span.setAttribute('aria-label', `value: ${name}`);
+      const kind = describe?.(part.token);
+      span.textContent = name; span.setAttribute('aria-label', kind ? kind.label : `value: ${name}`);
+      if (kind) { span.dataset.logic = kind.role; span.classList.add(kind.role === 'use' ? 'w2-token-logic' : 'w2-token-setting'); }
       tokens.current.push(part.token);
       element.append(span);
     }

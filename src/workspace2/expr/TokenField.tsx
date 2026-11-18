@@ -10,6 +10,7 @@ import TokenLine from './TokenLine';
 import TokenSettings from './TokenSettings';
 import ValuePicker from './ValuePicker';
 import { operandName } from './condition';
+import { describeToken } from '../data/logic/logicTokens';
 import { MAX_TOKENS, newToken, operandSlot, parseLine, slotOperand, tokenCount, writeLine, type Part, type Token } from './tokens';
 import { useNameContext } from './useExpr';
 import { words } from './words';
@@ -50,14 +51,14 @@ export default function TokenField({ draft, address, label, onWording }: { draft
     if (narrow && push) { push.push({ title: words.value, body: <TokenSettings draft={draft} address={address} index={index} onWording={onWording}/> }); return; }
     setOpen({ index, anchor });
   };
-  const picker = (close: () => void, inline = false) => <ValuePicker draft={draft} groups={['entities', 'counts', 'time', 'person', 'models']} onPick={picked => {
+  const picker = (close: () => void, inline = false) => <ValuePicker draft={draft} groups={['templateSettings', 'logic', 'entities', 'counts', 'time', 'person', 'models']} onPick={picked => {
     close(); draft.set(picked.document);
     // A pushed page has unmounted the line, so the value goes at the end of what the draft holds.
     if (narrow && push && !inline) writeParts(draft, address, tokenCount(parts) >= MAX_TOKENS ? parts : [...parts, { token: newToken(picked.operand) }], false); else add(newToken(picked.operand));
   }}/>;
   return <div className="w2-token-field" data-testid="token-field">
     <div className="w2-token-row">
-      <TokenLine label={label} parts={parts} nameOf={token => operandName(token.operand, ctx)} onChange={(next, typing) => writeParts(draft, address, next, typing)}
+      <TokenLine label={label} parts={parts} nameOf={token => operandName(token.operand, ctx)} describe={token => describeToken(token.operand, ctx)} onChange={(next, typing) => writeParts(draft, address, next, typing)}
         onOpenToken={openToken} onAsk={() => setAsking(true)} onNote={setNote} register={fn => { insert.current = fn; }} describedBy={note ? noteId : undefined}/>
       <PickerRow stacked title={words.insertValue} primary={<Plus size={16} aria-hidden/>} popupClassName="w2-expr-addpop">
         {close => picker(close)}

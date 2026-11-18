@@ -1,7 +1,8 @@
 import { operandKind, type Operand, type Predicate } from '../../shared/composition/expression';
-import { evaluatePredicate, type Environment, type Tri } from '../../shared/composition/evaluator';
+import type { Environment, Tri } from '../../shared/composition/evaluator';
+import { evaluatePredicate } from '../data/logic/logicEval';
 import type { Json } from '../../shared/types';
-import { operandSlot, slotOperand } from './tokens';
+import { isLogicOperand, operandSlot, slotOperand } from './tokens';
 
 /**
  * The value field's pure logic (spec "Files"): which mode a slot is in, what each mode seeds from the others, and the slot each mode
@@ -29,6 +30,7 @@ export function modeOf(slot: Slot | undefined, kind: Kind): Mode {
   if (slot.type === 'expr') {
     const value = slot.value as Operand;
     if (value.type === 'choose') return 'rules';
+    if (isLogicOperand(value)) return 'entity';
     if (value.type === 'literal') return 'fixed';
     return value.type === 'format' || value.type === 'read' ? 'entity' : 'custom';
   }

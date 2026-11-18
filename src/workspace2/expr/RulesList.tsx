@@ -15,7 +15,8 @@ import { parseLine } from './tokens';
 import { MoreMenu } from './ui';
 import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
 import { words } from './words';
-import { scalarText, evaluateOperand } from '../../preview2/evaluate';
+import CountCases from '../data/logic/CountCases';
+import { scalarText, evaluateOperand } from '../data/logic/logicEval';
 
 /** What a rule's Then says in a row: a look's swatch or glyph and name, or the text with its values named. */
 export function ThenSummary({ kind, look, then, ctx }: { kind: Kind; look?: LookKind; then: Operand | Json | undefined; ctx: NameContext }) {
@@ -75,6 +76,12 @@ export default function RulesList({ draft, path, kind, look, label }: { draft: D
   const nowLabel = used === undefined ? undefined : used === 'otherwise' ? words.otherwise : `Rule ${used + 1}`;
   const thenOf = used === undefined ? undefined : used === 'otherwise' ? rules.otherwise : rules.cases[used]?.then;
   return <div className="w2-expr-rules" data-testid="rules-list">
+    {kind === 'text' && <CountCases draft={draft} onCases={made => {
+      const seeded = count === 1 && !rules.cases[0].when, start = seeded ? 0 : count;
+      if (!seeded && count + made.cases.length > MAX_RULES) return;
+      write({ cases: [...(seeded ? [] : rules.cases), ...made.cases], otherwise: seeded ? made.otherwise : rules.otherwise });
+      open(start);
+    }}/>}
     <p className="w2-caption">{words.firstRule}</p>
     <ol ref={list} className="w2-expr-rulelist" aria-label={`${label} rules`}>
       {rules.cases.map((entry, index) => {

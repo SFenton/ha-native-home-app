@@ -13,6 +13,10 @@ import {
 import { pickActive, setFlowFocus, setPickSlot, useFlowFocus } from './focus';
 import { useSample, valueAfterStep } from './samples';
 import { studioClock, useFlowData } from './useFlowData';
+import LogicRow from './logic/LogicRow';
+import { focusLogicName, useLogicActions } from './logic/useLogicActions';
+import { addEntry, canAddEntry, libraryOf, useCounts } from './logic/logicModel';
+import { logicWords } from './logic/logicWords';
 import './data.css';
 
 /** The words for an app topic, and the order the App group lists them in. */
@@ -80,6 +84,12 @@ export default function DataPanel({ ws, onError }: { ws: Workspace2; onError: (m
   const appName = (source: Source) => appTopicWords[(source as { inputs?: { topic?: string } }).inputs?.topic ?? ''] ?? sourceName(source, names);
   const shown = { flows: flows.filter(source => matches(query, source.inputs.title)), entities: entitySources.filter(source => matches(query, sourceName(source, names), source.id)),
     apps: apps.filter(source => matches(query, appName(source))), models: models.filter(source => matches(query, sourceName(source, names), source.id)) };
+  const logicCounts = useMemo(() => useCounts(document), [document]);
+  const library = libraryOf(document), shownLogic = library.filter(entry => matches(query, entry.name));
+  const logicActions = useLogicActions(ws, onError);
+  const makeLogic = (kind: 'value' | 'condition') => {
+    try { const made = addEntry(document, kind); ws.studio.apply(made.document); ws.openLogic(made.id); focusLogicName(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
+  };
   const count = flows.length;
   const room = canAddFlow(document);
   const make = (kind: RequestKind) => {
@@ -107,7 +117,12 @@ export default function DataPanel({ ws, onError }: { ws: Workspace2; onError: (m
     <p className="w2-data-count">{`${count} ${count === 1 ? 'data flow' : 'data flows'} · ${others.length} ${others.length === 1 ? 'source' : 'sources'}`}</p>
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Find data" aria-label="Find data" value={query} onChange={event => setQuery(event.target.value)}/></label>
     <div className="w2-lib-scroll">
-      {document.dataSources.length === 0 && <p className="w2-empty">No data yet. Add a Data Flow to get some.</p>}
+      {document.dataSources.length === 0 && library.length === 0 && <p className="w2-empty">No data yet. Add a Data Flow to get some.</p>}
+      <section className="w2-data-group" aria-label={logicWords.group} data-testid="logic-group"><h3 className="w2-group-title">{logicWords.group}</h3>
+        {library.length === 0 ? <p className="w2-caption" data-testid="logic-empty">{logicWords.empty}</p>
+          : shownLogic.length === 0 ? <p className="w2-caption">Nothing matches.</p>
+          : <ul className="w2-data-list" aria-label={logicWords.group}>{shownLogic.map(entry => <LogicRow key={entry.id} ws={ws} entry={entry} uses={logicCounts.get(entry.id) ?? 0} actions={logicActions}/>)}</ul>}
+      </section>
       {group('Data Flows', shown.flows.map(source => <FlowRow key={source.id} ws={ws} source={source} uses={uses.get(source.id) ?? 0} onError={onError}/>))}
       {group('Entities', shown.entities.map(source => plain(source, sourceName(source, names))))}
       {group('App', shown.apps.map(source => plain(source, appName(source))))}
@@ -121,12 +136,21 @@ export default function DataPanel({ ws, onError }: { ws: Workspace2; onError: (m
         </Menu.Popup></Menu.Positioner></Menu.Portal>
       </Menu.Root>
       <Menu.Root>
+        <Menu.Trigger className="w2-data-add" disabled={!canAddEntry(document)} aria-describedby={canAddEntry(document) ? undefined : 'w2-logic-limit'}><Plus size={16} aria-hidden/>{logicWords.addTemplate}</Menu.Trigger>
+        <Menu.Portal><Menu.Positioner side="top" sideOffset={6} align="start" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu" aria-label={logicWords.addMenu}>
+          <Menu.Item className="w2-menu-item" onClick={() => makeLogic('value')}>{logicWords.addValue}</Menu.Item>
+          <Menu.Item className="w2-menu-item" onClick={() => makeLogic('condition')}>{logicWords.addCondition}</Menu.Item>
+        </Menu.Popup></Menu.Positioner></Menu.Portal>
+      </Menu.Root>
+      <Menu.Root>
         <Menu.Trigger className="w2-data-add"><Plus size={16} aria-hidden/>Source</Menu.Trigger>
         <Menu.Portal><Menu.Positioner side="top" sideOffset={6} align="start" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu w2-data-sources" aria-label="Add a source">
           {modelChoices().filter(choice => choice.model !== 'pipeline@1').map(choice => <Menu.Item key={choice.model} className="w2-menu-item" onClick={() => addSource(choice)}>{choice.name}</Menu.Item>)}
         </Menu.Popup></Menu.Positioner></Menu.Portal>
       </Menu.Root>
       {!room && <p id="w2-data-limit" className="w2-caption" role="note">{flowLimits.flows.words}</p>}
+      {!canAddEntry(document) && <p id="w2-logic-limit" className="w2-caption" role="note">{logicWords.limitTemplates}</p>}
+      {logicActions.dialog}
     </footer>
   </div>;
 }

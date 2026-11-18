@@ -1,4 +1,6 @@
 Search data
+Logic Templates
+No logic templates yet. Choose Save as Logic Template from a value’s or a condition’s More menu.
 Entities
 switch.demo_entity_98
 Used by
@@ -248,6 +250,7 @@ Home status · contacts
 Used by
 1
 Data Flow
+Logic Template
 Add Source
 Remove Unused
 
