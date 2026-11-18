@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.10
+
+- Studio can lay a page out in two sides for the iPhone Duo partly folded sideways, and its Duo preview reflows into them as the fold moves.
+- The Duo simulator's side rail now matches the app, with a More menu, and a held tab bar shows its labels.
+
 ## 0.3.9
 
 - Studio template places can be paired with an entity by choosing it in an Entity row.
