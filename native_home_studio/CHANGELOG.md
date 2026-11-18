@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.9
+
+- Studio template places can be paired with an entity by choosing it in an Entity row.
+- Studio templates open in an editor from their row, list their uses, find single repeated tiles, and keep every place when deleted.
+
+## 0.3.8
+
+- The Studio's dial editor offers Set Per Place inside a template, Checks flags an empty Otherwise text, and the Duo preview's keyboard reach no longer flips while tiles move.
+
 ## 0.3.7
 
 - Maintenance and internal changes.
