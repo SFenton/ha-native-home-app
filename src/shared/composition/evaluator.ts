@@ -484,7 +484,12 @@ export function resolveText(slot: TextSlot, env: Environment): ReadResult {
 export type BadgeSlot = { type: 'none' } | { type: 'value'; value: Operand; spoken?: Operand };
 /**
  * A badge value (`sh.badges@1`): a number or text. It draws nothing (`null`) when it is `none`, empty, 0 (the number, or text that reads as 0) or
- * unavailable (a rule that stalls with no source loading, raw reads included, counts as unavailable), and is "not yet" while a source loads, so the badge keeps what it showed. A number prints as `scalarText` prints it.
+ * unavailable (a rule that stalls with no source loading counts as unavailable), and is "not yet" while a source loads, so the badge keeps what it showed. A number prints as `scalarText` prints it.
+ *
+ * "Not yet" is any read the badge's own value makes that is still loading, by {@link watching}: a plain `read`, a raw state, a last change and the viewer's
+ * person state, and a viewer the connection does not know yet. It holds for every badge, with or without a `count` in it: a badge over the `viewer`
+ * operand or over `last-changed` keeps its last text while that is not known (it drew nothing before), as `studio-logic.md` says a loading badge does. The
+ * `spoken` words are read with the plain environment: only the drawn value is watched.
  *
  * With `spoken` (`sh.badge-spoken@1`) the answer also says `spoken`: the words VoiceOver adds after the name, or `null` to say the drawn text. A badge that
  * draws nothing says nothing; a `spoken` that is empty, not text or unavailable says the drawn text; one still loading keeps what the badge showed. A badge

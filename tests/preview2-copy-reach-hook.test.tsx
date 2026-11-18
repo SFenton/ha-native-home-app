@@ -3,6 +3,7 @@ import { act, cleanup, render } from '@testing-library/react';
 import { useRef } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { guardFocus, useCopyReach } from '../src/preview2/copy-access';
+import { playReflow } from '../src/preview2/reflow';
 
 const rect = (left: number, top: number, width: number, height: number) => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
 const frames = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
@@ -74,5 +75,61 @@ describe('the reachable copy follows what moves a control', () => {
     hidden.focus();
     guardFocus(document.getElementById('h0')!, document.getElementById('h1')!, hidden);
     expect(document.activeElement).not.toBe(hidden);
+  });
+
+  it('waits while a reflow move plays and looks again when it ends', async () => {
+    const { q } = mountTwins();
+    await frames();
+    const tile = q('h0', '[data-sel="node:tile"]');
+    tile.dispatchEvent(new Event('sh-reflow-start', { bubbles: true }));
+    for (const host of ['h0', 'h1']) q(host, '[data-sel="node:tile"]').style.left = '520px';
+    await frames();
+    // Mid-move the rects include the travelling translate: nothing flips yet.
+    expect(q('h0', '[data-sel="node:tile"]').hasAttribute('aria-hidden')).toBe(false);
+    expect(q('h1', '[data-sel="node:tile"]').getAttribute('aria-hidden')).toBe('true');
+    tile.dispatchEvent(new Event('sh-reflow-end', { bubbles: true }));
+    await frames();
+    expect(q('h0', '[data-sel="node:tile"]').getAttribute('aria-hidden')).toBe('true');
+    expect(q('h1', '[data-sel="node:tile"]').hasAttribute('aria-hidden')).toBe(false);
+  });
+
+  it('does not wait on a move whose node left the page', async () => {
+    const { q } = mountTwins();
+    await frames();
+    const gone = document.createElement('div');
+    document.body.append(gone);
+    q('h0', '#h0-btn').dispatchEvent(new Event('sh-reflow-start', { bubbles: true }));
+    gone.remove();
+    for (const host of ['h0', 'h1']) q(host, '[data-sel="node:tile"]').style.left = '520px';
+    q('h0', '#h0-btn').remove();
+    await frames();
+    expect(q('h1', '[data-sel="node:tile"]').hasAttribute('aria-hidden')).toBe(false);
+  });
+
+  it('reassigns on any focus, so a control just moved out of sight does not keep focus', async () => {
+    const { q } = mountTwins();
+    await frames();
+    expect(q('h0', '#h0-btn').getAttribute('tabindex')).toBeNull();
+    // The tile moves into the second half, and the observers have not run yet: the first copy's button is still marked reachable.
+    for (const host of ['h0', 'h1']) q(host, '[data-sel="node:tile"]').style.left = '520px';
+    q('h0', '#h0-btn').focus();
+    expect(document.activeElement).toBe(q('h1', '#h1-btn'));
+    expect(q('h0', '#h0-btn').getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('resumes after a move that is cancelled, with no end sent by hand', async () => {
+    const { q } = mountTwins();
+    await frames();
+    const tile = q('h0', '[data-sel="node:tile"]');
+    let cancel!: (reason: unknown) => void;
+    (tile as unknown as { animate: unknown }).animate = () => ({ finished: new Promise<void>((_, reject) => { cancel = reject; }) });
+    playReflow([{ id: 't', dx: 40, dy: 0 }], new Map([['t', tile]]), { ms: 300, ease: 'ease' });
+    for (const host of ['h0', 'h1']) q(host, '[data-sel="node:tile"]').style.left = '520px';
+    await frames();
+    expect(q('h0', '[data-sel="node:tile"]').hasAttribute('aria-hidden')).toBe(false);
+    cancel(new DOMException('cancelled', 'AbortError'));
+    await frames();
+    expect(q('h0', '[data-sel="node:tile"]').getAttribute('aria-hidden')).toBe('true');
+    expect(q('h1', '[data-sel="node:tile"]').hasAttribute('aria-hidden')).toBe(false);
   });
 });

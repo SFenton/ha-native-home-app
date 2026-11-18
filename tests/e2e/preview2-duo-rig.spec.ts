@@ -25,6 +25,8 @@ const rig = (page: Page) => previewRoot(page).locator('.sh-rig:not([data-frozen]
 const expectPose = async (page: Page, fold: string, turn: number) => {
   await expect(rig(page)).toHaveAttribute('data-fold', fold);
   await expect(rig(page)).toHaveAttribute('data-turn', String(turn));
+  // The pose it left stays mounted, fading, for a moment: on a slow runner a measure taken now finds its rail bar as well as the new one.
+  await expect(previewRoot(page).locator('.sh-rig-slot[data-leaving]')).toHaveCount(0, { timeout: 5000 });
 };
 
 /** The luma (0 to 255) of the page's pixels at the given viewport points, from one screenshot decoded in the page. */

@@ -204,3 +204,8 @@ badgeOf('raw-state-loading-keeps', 'The same for raw states.', rawTwo, LOADING, 
 badgeOf('person-state-loading-keeps', 'The same for the viewer\'s person state.', home, LOADING, { viewerPerson: LOADING });
 badgeOf('nothing-to-say-draws-nothing', 'A count that cannot be read and waits on nothing draws no badge.', rawTwo, { status: 'value', text: null });
 badgeOf('zero-draws-nothing', 'A count of 0 draws no badge.', three, { status: 'value', text: null }, states({ a: 'off', b: 'off', c: 'off' }));
+
+// A badge with no `count` in it keeps its last text on the same "not yet" reads (`studio-logic.md`, the badge's loading rule): these are the plain operands.
+const plainBadge = (name: string, note: string, subject: J, expected: J, env: J = {}) => countEvaluations.push({ name: `badge-${name}`, note, subject: { badge: { type: 'value', value: subject } }, env, expected });
+plainBadge('viewer-operand-without-a-viewer-keeps', 'A badge over the viewer\'s id, before the connection knows the viewer, keeps what it showed rather than drawing nothing.', { type: 'viewer', field: 'userId' }, LOADING);
+plainBadge('last-changed-loading-keeps', 'A badge over a last-change time that is still loading keeps what it showed.', { type: 'last-changed', sourceId: 'a' }, LOADING, { changed: { a: LOADING } });
