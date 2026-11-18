@@ -245,7 +245,7 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
   useEffect(() => {
     if (!stage || ws.mode !== 'edit') return;
     const nodeAt = (target: EventTarget | null) => {
-      if (!(target instanceof Element) || target.closest('.sh-handle-slot, .sh-add-slot, input, textarea, select')) return undefined;
+      if (!(target instanceof Element) || target.closest('.sh-handle-slot, .sh-add-slot, .sh-link-badge, input, textarea, select')) return undefined;
       const element = target.closest<HTMLElement>('[data-sel^="node:"]');
       return element ? { element, key: element.getAttribute('data-sel') as SelectionKey } : undefined;
     };

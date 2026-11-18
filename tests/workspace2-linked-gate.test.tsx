@@ -131,3 +131,43 @@ describe('the edit question dialog', () => {
     expect(studio.apply).not.toHaveBeenCalled();
   });
 });
+
+describe('the template editor is a session of its own (studio-tpl-ux)', () => {
+  function withEditor(templateId: string | undefined) {
+    const fixture = twoPlaces();
+    let current = fixture.document;
+    const studio = { get document() { return current; }, latestDocument: () => current, apply: vi.fn((next: CompositionDocument) => { current = next; }) } as any;
+    const hook = renderHook(({ id }: { id: string | undefined }) => useLinkedGate({ studio, document: current, index: buildDocumentIndex(current), selection: undefined, surface: undefined, select: vi.fn(), templateId: id }), { initialProps: { id: templateId } });
+    return { ...fixture, hook, studio, now: () => current };
+  }
+
+  it('lets an edit from the open template through without the question', () => {
+    const { hook, studio, document, entryId } = withEditor(undefined);
+    hook.rerender({ id: entryId });
+    act(() => hook.result.current.apply(edit(document, 'Everywhere')));
+    expect(studio.apply).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.question).toBeUndefined();
+  });
+
+  it('asks again for the same edit through a place, and once the editor has closed', () => {
+    const { hook, studio, document, entryId } = withEditor(undefined);
+    act(() => hook.result.current.apply(edit(document, 'Through a place')));
+    expect(studio.apply).not.toHaveBeenCalled();
+    expect(hook.result.current.question).toBeDefined();
+    act(() => hook.result.current.cancel());
+    hook.rerender({ id: entryId });
+    act(() => hook.result.current.apply(edit(document, 'Open')));
+    expect(studio.apply).toHaveBeenCalledTimes(1);
+    hook.rerender({ id: undefined });
+    act(() => hook.result.current.apply(edit(document, 'Closed')));
+    expect(studio.apply).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.question).toBeDefined();
+  });
+
+  it('does not let one open template skip the question for another', () => {
+    const { hook, studio, document } = withEditor('another-template');
+    act(() => hook.result.current.apply(edit(document, 'Not this one')));
+    expect(studio.apply).not.toHaveBeenCalled();
+    expect(hook.result.current.question).toBeDefined();
+  });
+});

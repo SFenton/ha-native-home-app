@@ -250,6 +250,11 @@
 .w2-narrow ~ .w2-toast-viewport { bottom: 84px; }
 .w2-toast { background: var(--w2-ink); color: var(--w2-bg); border-radius: 10px; padding: 10px 16px; font-weight: 600; box-shadow: var(--w2-shadow); transition: opacity .2s, transform .2s; }
 .w2-toast[data-starting-style], .w2-toast[data-ending-style] { opacity: 0; transform: translateY(8px); }
+.w2-toast .w2-toast-action { margin-left: 12px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; min-height: 44px; min-width: 44px; cursor: pointer; flex: none; padding: 0 4px; }
+.w2-toast-viewport { flex-direction: column; align-items: stretch; gap: 8px; }
+.w2-toast > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.w2-toast .w2-toast-title { margin: 0; font-size: 14px; line-height: 1.35; font-weight: 600; }
+.w2-toast:has(.w2-toast-action) { pointer-events: auto; }
 
 
 /* The selected tile's handle (wide): drawn into the preview's slot, so it uses its own look, not the chrome's. */
@@ -680,18 +685,8 @@
 .w2-palette-group { display: grid; gap: 4px; }
 .w2-saved-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .w2-saved-row { display: flex; align-items: center; gap: 4px; min-height: 48px; }
-.w2-saved-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 8px; background: none; border: 0; border-radius: 10px; text-align: start; color: inherit; font: inherit; cursor: pointer; }
-.w2-saved-main[aria-disabled] { opacity: 0.4; cursor: default; }
-.w2-saved-glyph { display: inline-flex; flex: none; }
-.w2-saved-text { display: grid; min-width: 0; }
-.w2-saved-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.w2-saved-uses { font-size: 12px; opacity: 0.7; }
-.w2-saved-more { width: 28px; height: 28px; flex: none; }
 .w2-saved-rename { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px; }
 .w2-saved-rename input { flex: 1; min-width: 0; min-height: 36px; }
-.w2-uses-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
-.w2-uses-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-@media (pointer: coarse) { .w2-saved-row, .w2-saved-main { min-height: 56px; } .w2-saved-more { width: 44px; height: 44px; } }
 
 /* component parameters */
 .w2-param-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 2px; }
@@ -739,8 +734,6 @@ button.w2-tick, .w2-scope button.w2-tick { appearance: none; padding: 0; min-hei
 @media (pointer: coarse) { .w2-row[data-choose="settable"] .w2-choose-line { min-height: 56px; } .w2-tick, .w2-scope button.w2-tick { inline-size: 24px; block-size: 24px; } }
 @media (pointer: coarse) { .w2-per-place-button { min-height: 44px; min-width: 44px; } .w2-scope .w2-template-row { min-height: 56px; } }
 
-.w2-toast-action { margin-left: 12px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; min-height: 44px; min-width: 44px; cursor: pointer; }
-.w2-toast:has(.w2-toast-action) { pointer-events: auto; }
 .w2-tag-warning.w2-tab-empty { margin-left: 4px; }
 .w2-tab-sub { font-size: 12px; opacity: .7; }
 .w2-segment-dim { opacity: .45; }
@@ -755,3 +748,40 @@ button.w2-tick, .w2-scope button.w2-tick { appearance: none; padding: 0; min-hei
 .w2-scope .w2-group-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--w2-separator, rgba(128, 128, 128, .25)); }
 .w2-scope .w2-group-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .w2-scope .w2-dial-swatch { display: inline-block; vertical-align: -2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--w2-line); flex: none; margin-inline-end: 8px; }
+
+/* Templates (studio-tpl-ux): a template's row is the library's tree row (LibraryRow): 32 px, icon in the tree's icon column, name, count, + and More. */
+.w2-saved-list { grid-template-columns: minmax(0, 1fr); }
+.w2-palette-group { grid-template-columns: minmax(0, 1fr); }
+.w2-palette .w2-saved-list, .w2-uses-tree .w2-saved-list { padding-inline: 6px; }
+.w2-palette-group > .w2-tree-group, .w2-uses-tree > section > .w2-tree-group { margin-inline: 6px; }
+.w2-saved-row, .w2-uses-tree li { display: flex; align-items: center; gap: 0; min-height: 32px; border-radius: 8px; }
+.w2-saved-row:hover, .w2-scope .w2-use-row:hover { background: var(--w2-hover); }
+.w2-saved-row[data-open], .w2-scope .w2-use-row[data-selected] { background: var(--w2-selected); font-weight: 600; }
+.w2-saved-row[data-open] .w2-tree-icon, .w2-use-row[data-selected] .w2-tree-icon { color: var(--w2-link); }
+.w2-scope .w2-tpl-row { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 0; height: 32px; min-height: 32px; padding: 0 0 0 26px; border: 0; border-radius: 8px; background: none; text-align: start; font-size: 14px; font-weight: inherit; color: var(--w2-ink-card); cursor: default; outline-offset: -2px; }
+.w2-scope .w2-tpl-row:hover:not(:disabled) { background: none; }
+.w2-scope .w2-tpl-row[aria-disabled] { opacity: .4; }
+.w2-scope .w2-saved-add, .w2-scope .w2-saved-more { flex: none; width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; background: none; display: grid; place-items: center; color: var(--w2-muted); border-radius: 6px; opacity: .6; }
+.w2-saved-row:hover .w2-saved-add, .w2-saved-row:hover .w2-saved-more, .w2-saved-row:focus-within .w2-saved-add, .w2-saved-row:focus-within .w2-saved-more, .w2-saved-row[data-open] .w2-saved-add, .w2-saved-row[data-open] .w2-saved-more { opacity: 1; }
+.w2-scope .w2-saved-add:hover:not(:disabled), .w2-scope .w2-saved-more:hover:not(:disabled) { background: var(--w2-field); }
+.w2-tpl-trail { flex: 0 1 auto; max-width: 45%; margin-inline: 8px; font-size: 12px; font-weight: 400; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-uses-count { flex: none; margin: 0 12px 2px; font-size: 12px; color: var(--w2-muted); }
+.w2-scope .w2-tpl-emptycta { margin: 0 12px 8px; justify-self: start; }
+.w2-lib-foot .w2-tree-count { margin-inline: 2px 0; }
+.w2-lib-foot .w2-tpl-foothint { flex-basis: 100%; margin: 0; }
+.w2-tpl-everywhere { display: flex; gap: 8px; align-items: center; margin: 4px 16px 8px; padding: 8px 10px; border-radius: 10px; background: var(--w2-selected); font-size: 13px; }
+.w2-tpl-everywhere svg { flex: none; color: var(--w2-link); }
+.w2-tpl-editor-actions { padding: 8px 0; }
+.w2-tpl-editor-foot { padding: 8px 16px; }
+.w2-tpl-editor-choose { border-top: 0; padding-top: 0; }
+.w2-tpl-editor-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.w2-scope .w2-saved-row .w2-saved-add:disabled { opacity: .35; cursor: default; }
+.w2-tpl-editor-list { margin: 4px 0; }
+.w2-phone-templates .w2-saved-list, .w2-uses-page .w2-uses-tree { padding-inline: 6px; }
+.w2-phone-templates .w2-actions { margin: 8px 12px 12px; }
+.w2-phone-templates .w2-actions button { display: inline-flex; align-items: center; gap: 8px; }
+@media (pointer: coarse) {
+  .w2-saved-row, .w2-uses-tree li, .w2-scope .w2-tpl-row { min-height: 44px; height: 44px; font-size: 15px; }
+  .w2-scope .w2-saved-add, .w2-scope .w2-saved-more { width: 44px; height: 44px; min-height: 44px; opacity: 1; }
+  .w2-scope .w2-tpl-row { padding-inline-start: 10px; }
+}

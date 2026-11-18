@@ -93,12 +93,20 @@ People see **Template**. The contract keeps its names (`componentLibrary`, `comp
 place that uses it shows the same body, and a small round link badge on the place's root says so (the badge is also on the library row). No template ships
 built in: people save their own, and the owner's reusable ones are built for the owner as templates in the owner's own library.
 
-**The library.** The Templates group of the Components palette lists them: one 48 px row for each (glyph, name, "Used in 12 places" or "Not used yet") with
-Rename, Show Uses and Delete in its More menu. With none it says "No templates yet. Choose Save as Template from a component’s More menu." A click or Enter
-adds a place after the selection; a drag adds it at the drop cue; in Use the rows are disabled under the palette's notice. After the list is a slot for the
-Find Repeated Pieces row. On a phone the Add sheet has a third segment, Tiles, Templates, Entities, which lists the same rows (each with a 44 px More) and
-a tap adds a place at the sheet's destination; its search says "Search tiles, templates and entities". Save as Template… and Unlink From Template are in an
-element's More menu.
+**The library.** The Templates group of the Components palette lists them as the library's tree rows: glyph, name and the place count, with a + (Add to
+Page) and a More menu (Add to Page, Rename, Show Uses, Delete). With none it says "No templates yet. Choose Save as Template from a component’s More menu."
+A click or Enter on a row opens the template's editor in the inspector, and edits made there skip the edit question; in Use the editor is read only (Name, Add to Page, Delete and the root's fields are disabled); the + adds a place after the selection and a
+drag adds it at the drop cue; in Use the + is disabled under the palette's notice. Show Uses opens a Templates › Name › Uses level (no popover), which groups the
+places by page. Find Repeated Pieces is the palette's footer. On a phone the Add sheet has a third segment, Tiles, Templates, Entities, which lists the same rows
+(each with a 44 px More that gains Edit Template); a tap adds a place at the sheet's destination, and its search says "Search tiles, templates and entities".
+Project > Templates lists them too, and a row opens the editor. Save as Template… and Unlink From Template are in an element's More menu.
+
+**The link badge.** The round badge on a place's root is an Edit mark: in Use it is not drawn. In Edit it is a button named "Edit template Name" with a keyboard path and a hit
+area of 28 px on a fine pointer and 44 px on a coarse one, and it opens the template's editor; a click on the tile around it still selects the place.
+
+**Delete.** Deleting a template that places use asks once ("Delete “Name”?"), then one apply replaces each place with its own copy, with the settings it has now,
+so every page looks the same. The copies take the ids `<place>-<inner>` (a `-2`, `-3` on a clash), a source only the template held is copied in under the same
+scheme, and one Undo restores every place. Unlink From Template makes its copy the same way. An unused template is deleted at once.
 
 **The edit question.** A change to a template that two or more places use is held and asks "Update “name” everywhere?" with Update Template, Save as New
 Template… and Cancel. None is the default, so a Return meant for a field does nothing. Update Template opens a session for that place: later changes there go
@@ -151,9 +159,9 @@ optional field; a value may create a field the body lacks when the object holdin
 A binding may not fill a node's id, type or child lists, a field of a source, or an item of a list; two bindings on one node may not overlap. The record is
 `SFenton/native-home:.agents/decisions/2026-11-16-studio-template-any-field.md` (PR SFenton/native-home#134, merged; Gate: app_wide=no).
 
-**Repeated pieces.** "Find Repeated Pieces" sits under the templates in the Templates group, with the count once the walk has run. It opens a level of the library
-panel (a phone: Project > Repeated Pieces, a half-height sheet that leaves the page showing). The walk (`src/shared/composition/repeats.ts`) reduces each node to
-`type:kind:control:family`, takes the pieces of 3 or more nodes whose shape appears at least twice, outermost only, and never one that holds a template place.
+**Repeated pieces.** "Find Repeated Pieces" is the footer of the Templates palette, with the count once the walk has run. It opens a level of the library
+panel (a phone: Project > Templates > Find Repeated Pieces, a half-height sheet that leaves the page showing). The walk (`src/shared/composition/repeats.ts`) reduces each node to
+`type:kind:control:family`, takes the pieces of 3 or more nodes whose shape appears at least twice, outermost only, and never one that holds a template place. The level lists Groups and, apart, Single Tiles: a leaf tile whose shape appears in at least 2 places outside every group (`REPEAT_MIN_TILE_PLACES`).
 It runs while the level is open, once the edits pause and a surface at a time with the main thread given back between slices (`useRepeats`), so no keystroke
 waits on it. A row marks the first place on the canvas (a dashed outline and "1 of 14") and opens the proposal in the inspector: a name, "Each place sets" (one
 checked row for each group of fields that differ and always change together, with an editable label), the places, and the foot with Save as Template. Unchecking a

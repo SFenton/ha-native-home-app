@@ -1,16 +1,14 @@
-import { useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { AlertDialog } from '@base-ui/react/alert-dialog';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { Popover } from '@base-ui/react/popover';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Plus } from 'lucide-react';
+import { useTemplateActions } from './templateActions';
+import { templateWords as words } from './templateWords';
 import { componentReferences, type ComponentUse } from '../shared/composition/components';
 import type { ComponentEntry, CompositionDocument } from '../shared/composition/schema';
 import { useAdd } from './add/AddHost';
 import { useDrag } from './dnd/DragLayer';
-import { deleteComponent, nameTaken, nameValid, renameComponent, usesText } from './linked';
+import { nameTaken, nameValid, renameComponent, usesText } from './linked';
 import RowGlyph from './RowGlyph';
-import { typeName } from './util';
-import { useHeld } from './useHeld';
 import type { Workspace2 } from './useWorkspace2';
 
 /** A drag starts after this many pixels, as everywhere else in the Studio. */
@@ -26,29 +24,27 @@ export function savedRows(document: CompositionDocument | undefined): { entry: C
   return entries.map(entry => ({ entry, uses: all.filter(use => use.ref.componentId === entry.id) }));
 }
 
-/** The place a use is, in words: the page, sheet or tab it sits in. */
-const placeWords = (use: ComponentUse) => use.tab ? `${use.surface.title} › ${use.tab.label}` : use.surface.title;
-const placeKind = (use: ComponentUse) => use.tab ? 'Tab' : use.surface.kind === 'page' ? 'Page' : 'Sheet';
 
 /**
- * The Templates group of the Components palette (studio-linked spec, "The library"): one 48 px row for each template, with its glyph, its name and
- * how many places use it, and a More menu (Rename, Show Uses, Delete). A click or Enter adds a place of the template after the selection, a drag adds it at
- * the drop cue. In Use the rows are disabled under the palette's notice.
+ * The Templates group of the Components palette (studio-tpl-ux): a 32 px tree row for each template with its icon, name and the number of places,
+ * a + (Add to Page) and a More menu (Add to Page, Rename, Show Uses, Delete). A click or Enter opens the template's editor, a drag adds a place at the
+ * drop cue. In Use + and the menu's Add, Rename and Delete are disabled.
+ *
+ * Two callers change what a row does: `onAdd` is the phone Add sheet (a tap adds at the sheet's destination, More gains Edit Template) and `onOpen` is
+ * Project > Templates (a tap and Show Uses go to the caller; the row has More only, since the sheet covers the page).
  */
-export default function SavedComponents({ ws, query, disabled, describedBy, onAdd }: { ws: Workspace2; query: string; disabled: boolean; describedBy?: string; /** Adds a place somewhere the caller chose (the phone Add sheet's destination); without it a click adds after the selection and a drag adds at the drop cue. */ onAdd?: (entryId: string) => void }) {
+export default function SavedComponents({ ws, query, disabled, describedBy, onAdd, onEdit, onOpen }: { ws: Workspace2; query: string; disabled: boolean; describedBy?: string; /** Adds a place somewhere the caller chose (the phone Add sheet's destination); without it a click opens the editor and a drag adds at the drop cue. */ onAdd?: (entryId: string) => void; /** The phone Add sheet's More > Edit Template: the caller closes its sheet, then opens the editor. */ onEdit?: (entryId: string) => void; /** Project > Templates on a phone: a tap opens the editor, and the row has More only. */ onOpen?: (entryId: string) => void }) {
   const document = ws.document!;
   const add = useAdd(), drag = useDrag();
   const rows = useMemo(() => savedRows(document), [document]);
   const needle = query.trim().toLowerCase();
   const shown = rows.filter(row => !needle || row.entry.name.toLowerCase().includes(needle));
   const [renaming, setRenaming] = useState<string>();
-  const [uses, setUses] = useState<{ id: string; anchor: HTMLElement }>();
-  const [deleting, setDeleting] = useState<string>();
   const dragged = useRef(false);
   const run = (action: () => void) => { try { action(); } catch (error) { ws.linked.say(error instanceof Error ? error.message : String(error)); } };
   const down = (entry: ComponentEntry) => (event: ReactPointerEvent<HTMLButtonElement>) => {
     dragged.current = false;
-    if (!drag || onAdd || disabled || event.button !== 0 || event.pointerType === 'touch') return;
+    if (!drag || onAdd || onOpen || disabled || event.button !== 0 || event.pointerType === 'touch') return;
     const cell = event.currentTarget, start = { x: event.clientX, y: event.clientY };
     let started = false;
     const moved = (e: PointerEvent) => {
@@ -63,70 +59,51 @@ export default function SavedComponents({ ws, query, disabled, describedBy, onAd
     const up = stop(true), cancel = stop(false);
     window.addEventListener('pointermove', moved); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel);
   };
-  const usingFor = uses ? rows.find(row => row.entry.id === uses.id) : undefined;
-  const deletingRow = deleting ? rows.find(row => row.entry.id === deleting) : undefined;
-  const heldRow = useHeld(deletingRow);
+  const actions = useTemplateActions(ws);
+  const list = useRef<HTMLUListElement>(null);
+  const [stop, setStop] = useState<string>();
+  const keys = (event: ReactKeyboardEvent<HTMLUListElement>) => {
+    const buttons = [...list.current?.querySelectorAll<HTMLButtonElement>('button.w2-tpl-row') ?? []];
+    const at = buttons.indexOf(window.document.activeElement as HTMLButtonElement);
+    const next = event.key === 'ArrowDown' ? at + 1 : event.key === 'ArrowUp' ? at - 1 : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : undefined;
+    if (at < 0 || next === undefined) return;
+    event.preventDefault(); buttons[Math.max(0, Math.min(buttons.length - 1, next))].focus();
+  };
   // Every hook is above these returns: the group goes from empty to listed as templates come and go.
   if (!rows.length) return <p className="w2-empty" data-testid="saved-empty">No templates yet. Choose Save as Template from a component’s More menu.</p>;
   if (!shown.length) return onAdd ? <p className="w2-empty">Nothing matches.</p> : null;
+  const tabbable = shown.find(row => row.entry.id === stop)?.entry.id ?? shown[0].entry.id;
   return <>
-    <ul className="w2-saved-list" aria-label="Templates">
-      {shown.map(({ entry, uses: places }) => <li key={entry.id} className="w2-saved-row" data-testid="saved-row" data-component={entry.id}>
+    <ul ref={list} className="w2-saved-list" aria-label="Templates" onKeyDown={keys}>
+      {shown.map(({ entry, uses: places }) => {
+        const open = !onAdd && !onOpen && ws.templateId === entry.id;
+        return <li key={entry.id} className="w2-saved-row" data-testid="saved-row" data-component={entry.id} data-open={open || undefined}>
         {renaming === entry.id
           ? <Rename document={document} entry={entry} onDone={() => setRenaming(undefined)} onRename={name => run(() => { ws.studio.apply(renameComponent(document, entry.id, name)); })}/>
-          : <button type="button" className="w2-saved-main" aria-disabled={disabled || undefined} aria-describedby={disabled ? describedBy : undefined} title={entry.name}
-            aria-label={`${entry.name}. ${usesText(places.length)}`}
+          : <button type="button" className="w2-tpl-row" tabIndex={entry.id === tabbable ? 0 : -1} onFocus={() => setStop(entry.id)} aria-current={open || undefined} aria-disabled={(onAdd && disabled) || undefined} aria-describedby={disabled ? describedBy : undefined} title={entry.name}
+            aria-label={`${entry.name}, template, ${usesText(places.length).toLowerCase()}`}
             onPointerDown={down(entry)}
-            onClick={event => { if (disabled) return; if (dragged.current) { dragged.current = false; return; } if (onAdd) onAdd(entry.id); else add?.addSaved(entry.id, event.currentTarget); }}>
-            <span className="w2-saved-glyph"><RowGlyph type={entry.node.type} icon={(entry.node as { icon?: { name: string } }).icon?.name} size={20}/></span>
-            <span className="w2-saved-text"><span className="w2-saved-name">{entry.name}</span><span className="w2-saved-uses">{usesText(places.length)}</span></span>
+            onClick={() => { if (dragged.current) { dragged.current = false; return; } if (onAdd) { if (!disabled) onAdd(entry.id); } else if (onOpen) onOpen(entry.id); else ws.openTemplate(open ? undefined : entry.id); }}>
+            <span className="w2-tree-icon"><RowGlyph type={entry.node.type} icon={(entry.node as { icon?: { name: string } }).icon?.name}/></span>
+            <span className="w2-tree-title">{entry.name}</span><span className="w2-tree-count" title={usesText(places.length)}>{places.length}</span>
           </button>}
+        {renaming !== entry.id && !onAdd && !onOpen && <button type="button" className="w2-icon-button w2-saved-add" aria-label={words.addLabel(entry.name)} title={words.add} disabled={disabled} onClick={event => add?.addSaved(entry.id, event.currentTarget)}><Plus size={16} aria-hidden/></button>}
         {renaming !== entry.id && <Menu.Root>
-          <Menu.Trigger className="w2-icon-button w2-saved-more" aria-label={`More for ${entry.name}`} disabled={disabled}><MoreHorizontal size={18} aria-hidden/></Menu.Trigger>
+          <Menu.Trigger className="w2-icon-button w2-saved-more" aria-label={`More for ${entry.name}`}><MoreHorizontal size={16} aria-hidden/></Menu.Trigger>
           <Menu.Portal><Menu.Positioner sideOffset={6} align="end" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu">
-            <Menu.Item className="w2-menu-item" onClick={() => setRenaming(entry.id)}>Rename</Menu.Item>
-            {places.length > 0 && <Menu.Item className="w2-menu-item" onClick={event => setUses({ id: entry.id, anchor: (event.currentTarget as HTMLElement) })}>Show Uses</Menu.Item>}
+            {!onAdd && !onOpen && <Menu.Item className="w2-menu-item" disabled={disabled} onClick={event => add?.addSaved(entry.id, event.currentTarget as HTMLElement)}>{words.add}</Menu.Item>}
+            {onAdd && <Menu.Item className="w2-menu-item" onClick={() => (onEdit ?? ws.openTemplate)(entry.id)}>{words.edit}</Menu.Item>}
+            {!onOpen && <Menu.Separator className="w2-menu-sep"/>}
+            <Menu.Item className="w2-menu-item" disabled={disabled} onClick={() => setRenaming(entry.id)}>{words.rename}</Menu.Item>
+            <Menu.Item className="w2-menu-item" disabled={places.length === 0} onClick={() => { if (onOpen) onOpen(entry.id); else if (onAdd) (onEdit ?? ws.openTemplate)(entry.id); else ws.setUsesId(entry.id); }}>{words.showUses}</Menu.Item>
             <Menu.Separator className="w2-menu-sep"/>
-            <Menu.Item className="w2-menu-item w2-danger-item" onClick={() => {
-              if (places.length === 0) run(() => { ws.studio.apply(deleteComponent(document, entry.id)); ws.linked.say(`Deleted ${entry.name}.`); });
-              else setDeleting(entry.id);
-            }}>Delete</Menu.Item>
+            <Menu.Item className="w2-menu-item w2-danger-item" disabled={disabled} onClick={() => actions.remove(entry.id)}>{words.deletePlain}</Menu.Item>
           </Menu.Popup></Menu.Positioner></Menu.Portal>
         </Menu.Root>}
-      </li>)}
+      </li>; })}
     </ul>
-    {usingFor && uses && <Popover.Root open onOpenChange={next => { if (!next) setUses(undefined); }}>
-      <Popover.Portal><Popover.Positioner anchor={uses.anchor.isConnected ? uses.anchor : undefined} sideOffset={8} align="start" className="w2-positioner">
-        <Popover.Popup className="w2-scope w2-popover w2-saved-uses-pop" aria-label={`Used in ${usingFor.uses.length} ${usingFor.uses.length === 1 ? 'Place' : 'Places'}`} data-testid="saved-uses">
-          <Popover.Title className="w2-uses-title">{`Used in ${usingFor.uses.length} ${usingFor.uses.length === 1 ? 'Place' : 'Places'}`}</Popover.Title>
-          <ul className="w2-uses-list">{usingFor.uses.map(use => <li key={use.ref.id}>
-            <button type="button" className="w2-link-row" onClick={() => { ws.selectAnywhere(`node:${use.ref.id}`); setUses(undefined); }}>
-              <span className="w2-style-text"><span className="w2-page-title">{placeWords(use)}</span><span className="w2-page-via">{`${placeKind(use)} · ${typeName(usingFor.entry.node.type)}`}</span></span></button></li>)}</ul>
-        </Popover.Popup>
-      </Popover.Positioner></Popover.Portal>
-    </Popover.Root>}
-    <AlertDialog.Root open={Boolean(deletingRow)} onOpenChange={next => { if (!next) setDeleting(undefined); }}>
-      <AlertDialog.Portal><AlertDialog.Backdrop className="w2-backdrop"/><AlertDialog.Viewport className="w2-dialog-viewport">
-        {heldRow && <DeleteQuestion row={heldRow} onCancel={() => setDeleting(undefined)} onDelete={() => {
-          run(() => { ws.studio.apply(deleteComponent(document, heldRow.entry.id)); ws.linked.say(`Deleted ${heldRow.entry.name}. Its places are unlinked.`); });
-          setDeleting(undefined);
-        }}/>}
-      </AlertDialog.Viewport></AlertDialog.Portal>
-    </AlertDialog.Root>
+    {actions.dialog}
   </>;
-}
-
-/** The delete question for a component that is in use: no default button and no red, the person chose Delete and nothing leaves a page. */
-function DeleteQuestion({ row, onCancel, onDelete }: { row: { entry: ComponentEntry; uses: ComponentUse[] }; onCancel: () => void; onDelete: () => void }) {
-  const popup = useRef<HTMLDivElement>(null);
-  return <AlertDialog.Popup ref={popup} className="w2-scope w2-dialog w2-dialog-s w2-linked-question" data-testid="delete-component" tabIndex={-1} initialFocus={popup}>
-    <header className="w2-dialog-head"><AlertDialog.Title>{`Delete “${row.entry.name}”?`}</AlertDialog.Title></header>
-    <AlertDialog.Description className="w2-dialog-text">{`It is used in ${row.uses.length} ${row.uses.length === 1 ? 'place' : 'places'}. Each one stays where it is, unlinked.`}</AlertDialog.Description>
-    <div className="w2-linked-actions">
-      <button type="button" onClick={onCancel}>Cancel</button>
-      <button type="button" className="w2-tonal" onClick={onDelete}>Delete Template</button>
-    </div>
-  </AlertDialog.Popup>;
 }
 
 /** A saved row's name as a field with Done, the way State Styles rename: one undo step per committed name, the same name rules as the dialog. */

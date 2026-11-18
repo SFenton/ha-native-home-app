@@ -221,9 +221,10 @@ describe('the phone Add sheet\'s Templates segment', () => {
     fireEvent.click(within(segment).getByRole('button', { name: 'Templates' }));
     const row = screen.getByTestId('saved-row');
     expect(row.textContent).toContain('Lamp Row');
-    expect(row.textContent).toContain('Used in 2 places');
+    expect(within(row).getByTitle('Used in 2 places').textContent).toBe('2');
     expect(within(row).getByRole('button', { name: 'More for Lamp Row' })).toBeTruthy();
-    fireEvent.click(within(row).getByRole('button', { name: /^Lamp Row\./ }));
+    expect(within(row).queryByRole('button', { name: /Add Lamp Row/ })).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: /^Lamp Row, template/ }));
     expect(onAdd).toHaveBeenCalledWith(entry.id);
   });
 
@@ -244,5 +245,38 @@ describe('the phone Add sheet\'s Templates segment', () => {
     picker(document, vi.fn(), false);
     expect(screen.queryByRole('button', { name: 'Templates' })).toBeNull();
     expect(screen.getByRole('searchbox', { name: 'Search tiles and entities' })).toBeTruthy();
+  });
+});
+
+describe('the template editor in Use (studio-tpl-ux)', () => {
+  function editor(mode: 'edit' | 'use') {
+    const { document, entry } = template(true);
+    const apply = vi.fn();
+    const ws = Project.workspace(document, { kind: 'template', id: entry.id } as never, { extra: { mode, linked: { session: undefined, say: vi.fn() }, openTemplate: vi.fn(), setUsesId: vi.fn() } as never }, apply);
+    render(<PropertiesPanel ws={ws} onClose={() => {}} onOpenProject={() => {}} onError={() => {}}/>);
+    return { apply, entry };
+  }
+
+  it('reads only: Name, Add to Page, Delete and every field of the root are disabled, and nothing has been written', () => {
+    const { apply } = editor('use');
+    const editorEl = screen.getByTestId('template-editor');
+    expect((within(editorEl).getByRole('textbox', { name: 'Name' }) as HTMLInputElement).disabled).toBe(true);
+    expect((within(editorEl).getByRole('button', { name: 'Add to Page' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(editorEl).getByRole('button', { name: 'Delete Template…' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(editorEl).queryByRole('button', { name: 'Choose Fields…' })).toBeNull();
+    const fields = editorEl.querySelector('fieldset.w2-tpl-editor-fields') as HTMLFieldSetElement;
+    expect(fields.disabled).toBe(true);
+    const controls = [...fields.querySelectorAll('input, textarea, select, button')];
+    expect(controls.length).toBeGreaterThan(0);
+    expect(controls.filter(control => !control.matches(':disabled'))).toEqual([]);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('is editable in Edit, with Choose Fields in its own padded group', () => {
+    editor('edit');
+    const editorEl = screen.getByTestId('template-editor');
+    expect((within(editorEl).getByRole('textbox', { name: 'Name' }) as HTMLInputElement).disabled).toBe(false);
+    expect((editorEl.querySelector('fieldset.w2-tpl-editor-fields') as HTMLFieldSetElement).disabled).toBe(false);
+    expect(within(editorEl.querySelector('.w2-tpl-editor-choose') as HTMLElement).getByRole('button', { name: 'Choose Fields…' })).toBeTruthy();
   });
 });

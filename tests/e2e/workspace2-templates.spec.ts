@@ -54,7 +54,8 @@ test('the Templates group lists a saved template with its use count, and the emp
   const row = page.locator('[data-group="saved"]').getByTestId('saved-row');
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('Lamp Pair');
-  await expect(row).toContainText('Used in 2 places');
+  await expect(row.locator('.w2-tree-count')).toHaveText('2');
+  await expect(row.getByRole('button', { name: 'Lamp Pair, template, used in 2 places' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Templates' })).toBeVisible();
   await snap(page, 'desktop-templates-group');
 });
@@ -73,9 +74,9 @@ test('on a phone, Add then Templates lists the template and a tap adds a place',
   await segment.getByRole('button', { name: 'Templates' }).click();
   const row = picker.getByTestId('saved-row');
   await expect(row).toContainText('Lamp Pair');
-  await expect(row).toContainText('Used in 2 places');
+  await expect(row.getByRole('button', { name: 'Lamp Pair, template, used in 2 places' })).toBeVisible();
   await snap(page, 'phone-add-templates');
-  await row.getByRole('button', { name: /^Lamp Pair\./ }).click();
+  await row.getByRole('button', { name: /^Lamp Pair, template/ }).click();
   await expect(picker).toHaveCount(0);
   await expect(previewRoot(page).getByText('Demo Lamp', { exact: true })).toHaveCount(3);
   await expect(panel(page).getByRole('heading', { name: 'Lamp Pair', exact: true })).toBeVisible();
@@ -260,4 +261,237 @@ test('the template row, the per-place buttons and the settings are named for ass
   await page.reload();
   await selectInner(page, 'Demo Fan');
   await expect(panel(page).getByRole('button', { name: 'Set Per Place: Entity' })).toHaveText('Set Per Place');
+});
+
+// studio-tpl-ux: the list as tree rows, the editor, Uses, the footer, delete and the phone's Project > Templates.
+/** The lamps document with a second, unused template ("Spare Lamp"), so a list has two rows and one of them can be deleted with no question. */
+const withSpare = (() => {
+  const document = JSON.parse(JSON.stringify(lamps.document)) as { componentLibrary: { id: string; name: string; node: { id: string; children?: { id: string }[] } }[] };
+  const first = document.componentLibrary[0];
+  const spare = JSON.parse(JSON.stringify(first)) as typeof first;
+  spare.id = 'demo-spare-lamp'; spare.name = 'Spare Lamp'; spare.node.id = 'demo-spare-lamp-body';
+  spare.node.children?.forEach((child, at) => { child.id = `demo-spare-lamp-${at}`; });
+  document.componentLibrary.push(spare);
+  return document;
+})();
+const lampCount = (page: Page) => previewRoot(page).getByText('Demo Lamp', { exact: true });
+const savedRow = (page: Page, name = 'Lamp Pair') => page.getByTestId('saved-row').filter({ has: page.getByRole('button', { name: new RegExp(`^${name}, template`) }) });
+const rowButton = (page: Page, name = 'Lamp Pair') => page.getByTestId('saved-row').getByRole('button', { name: new RegExp(`^${name}, template`) });
+const drawnText = (page: Page) => previewRoot(page).evaluate(element => element.textContent ?? '');
+const editor = (page: Page) => page.getByTestId('template-editor');
+const badges = (page: Page) => previewRoot(page).locator('.sh-link-badge');
+const toastText = (page: Page) => page.locator('.w2-toast');
+async function openProjectTemplates(page: Page) {
+  await page.getByRole('button', { name: 'Project', exact: true }).click();
+  await page.getByTestId('templates-row').click();
+  await expect(page.getByTestId('phone-templates')).toBeVisible();
+}
+
+test.describe('the Templates list on a wide window', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'The library is the wide layout');
+  test.beforeEach(async ({ page, request }) => { await seed(request, withSpare); await openWorkspace(page); await openLibrary(page, 'Components'); });
+
+  test('rows are 32 px, left aligned, with the glyph, the name and the count', async ({ page }) => {
+    const row = savedRow(page);
+    const main = rowButton(page), box = (await main.boundingBox())!;
+    expect(Math.round(box.height)).toBe(32);
+    const glyph = (await main.locator('.w2-tree-icon').boundingBox())!, title = (await main.locator('.w2-tree-title').boundingBox())!, count = (await main.locator('.w2-tree-count').boundingBox())!;
+    expect(glyph.x).toBeLessThan(title.x);
+    expect(title.x - (glyph.x + glyph.width)).toBeLessThan(16);
+    expect(count.x).toBeGreaterThan(title.x);
+    await expect(main.locator('.w2-tree-count')).toHaveText('2');
+    await expect(row.getByRole('button', { name: 'Add Lamp Pair to the page' })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'More for Lamp Pair' })).toBeVisible();
+  });
+
+  test('a click opens the editor and tints the row, and the canvas does not change', async ({ page }) => {
+    const before = await drawnText(page);
+    await rowButton(page).click();
+    await expect(editor(page)).toBeVisible();
+    await expect(savedRow(page)).toHaveAttribute('data-open', 'true');
+    await expect(page.getByRole('region', { name: 'Components' }).or(page.getByTestId('library-panel')).first()).toBeVisible();
+    expect(await drawnText(page)).toBe(before);
+    await expect(lampCount(page)).toHaveCount(2);
+  });
+
+  test('+ adds after the selection, and More > Add to Page adds', async ({ page }) => {
+    await savedRow(page).getByRole('button', { name: 'Add Lamp Pair to the page' }).click();
+    await expect(lampCount(page)).toHaveCount(3);
+    await savedRow(page).getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await page.getByRole('menuitem', { name: 'Add to Page' }).click();
+    await expect(lampCount(page)).toHaveCount(4);
+  });
+
+  test('a drag still adds at the drop cue', async ({ page }) => {
+    const centre = async (locator: ReturnType<Page['locator']>) => { const box = (await locator.boundingBox())!; return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; };
+    const from = await centre(rowButton(page)), heading = (await previewRoot(page).getByText('Demo Lamps', { exact: true }).first().boundingBox())!, to = { x: heading.x + 40, y: heading.y - 10 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 12, from.y + 8, { steps: 3 });
+    await page.mouse.move(to.x, to.y, { steps: 10 });
+    await expect(page.getByTestId('drop-cue')).toBeVisible();
+    await page.mouse.up();
+    await expect(lampCount(page)).toHaveCount(3);
+    await expect(editor(page)).toHaveCount(0);
+  });
+
+  test('the arrow keys move between rows, Enter opens the editor, and Tab then Enter on + adds', async ({ page }) => {
+    await rowButton(page).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(rowButton(page, 'Spare Lamp')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(editor(page).getByRole('textbox', { name: 'Name' })).toHaveValue('Spare Lamp');
+    await page.keyboard.press('ArrowUp');
+    await expect(rowButton(page)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(savedRow(page).getByRole('button', { name: 'Add Lamp Pair to the page' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(lampCount(page)).toHaveCount(3);
+  });
+
+  test('Show Uses opens the level with no popover, a row selects the place and the level stays, and Back focuses the row', async ({ page }) => {
+    await savedRow(page).getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await page.getByRole('menuitem', { name: 'Show Uses' }).click();
+    const level = page.getByTestId('template-uses-level');
+    await expect(level).toBeVisible();
+    await expect(page.locator('[role=menu], [role=dialog], [role=alertdialog], [popover]')).toHaveCount(0);
+    await expect(level.getByRole('heading', { name: 'Uses' })).toBeVisible();
+    await expect(level).toContainText('Templates');
+    await expect(level).toContainText('Lamp Pair');
+    await level.locator('[data-use]').first().click();
+    await expect(panel(page).getByRole('heading', { name: 'Lamp Pair', exact: true })).toBeVisible();
+    await expect(level).toBeVisible();
+    await level.getByRole('button', { name: 'Back to Templates' }).click();
+    await expect(level).toHaveCount(0);
+    await expect(rowButton(page)).toBeFocused();
+  });
+
+  test('Find Repeated Pieces is in the footer and not in the Templates list', async ({ page }) => {
+    const find = page.getByTestId('find-repeats');
+    await expect(find).toBeVisible();
+    await expect(page.locator('[data-group="saved"]').getByTestId('find-repeats')).toHaveCount(0);
+    await expect(find.locator('xpath=ancestor::footer')).toHaveCount(1);
+    await snap(page, 'desktop-templates-footer');
+  });
+
+  test('Delete asks with the count and the wording, leaves the tiles without a badge, and Undo brings it all back', async ({ page }) => {
+    await expect(badges(page)).toHaveCount(2);
+    await savedRow(page).getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+    const dialog = page.getByTestId('delete-component');
+    await expect(dialog.getByRole('heading', { name: 'Delete “Lamp Pair”?' })).toBeVisible();
+    await expect(dialog).toContainText('It is used in 2 places. Each one becomes its own copy, with the settings it has now, so every page looks the same.');
+    await snap(page, 'desktop-delete-dialog');
+    await dialog.getByRole('button', { name: 'Delete Template' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(badges(page)).toHaveCount(0);
+    await expect(lampCount(page)).toHaveCount(2);
+    await expect(rowButton(page)).toHaveCount(0);
+    await expect(toastText(page)).toContainText('Deleted Lamp Pair. 2 places are now their own copies.');
+    await snap(page, 'desktop-delete-done');
+    await toastText(page).getByRole('button', { name: 'Undo' }).click();
+    await expect(badges(page)).toHaveCount(2);
+    await expect(rowButton(page)).toHaveCount(1);
+  });
+
+  test('an unused template deletes at once with no dialog', async ({ page }) => {
+    await savedRow(page, 'Spare Lamp').getByRole('button', { name: 'More for Spare Lamp' }).click();
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+    await expect(page.getByTestId('delete-component')).toHaveCount(0);
+    await expect(rowButton(page, 'Spare Lamp')).toHaveCount(0);
+    await expect(toastText(page)).toContainText('Deleted Spare Lamp.');
+    await snap(page, 'desktop-delete-unused');
+  });
+
+  test('the row menu lists Add to Page, Rename, Show Uses and Delete', async ({ page }) => {
+    await savedRow(page).getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await expect(page.getByRole('menuitem')).toHaveText(['Add to Page', 'Rename', 'Show Uses', 'Delete']);
+    await snap(page, 'desktop-templates-menu');
+  });
+
+  test('in Use the editor reads only', async ({ page }) => {
+    await page.getByRole('button', { name: 'Use', exact: true }).first().click();
+    await rowButton(page).click();
+    await expect(editor(page)).toBeVisible();
+    await expect(editor(page).getByRole('textbox', { name: 'Name' })).toBeDisabled();
+    await expect(editor(page).getByRole('button', { name: 'Add to Page' })).toBeDisabled();
+    await expect(editor(page).getByRole('button', { name: 'Delete Template…' })).toBeDisabled();
+    await expect(badges(page)).toHaveCount(0);
+    await snap(page, 'desktop-editor-use');
+  });
+});
+
+test('with no template the empty line has a Find Repeated Pieces link that opens the level', async ({ page, request }) => {
+  test.skip(isPhone(page), 'The library is the wide layout');
+  await seed(request);
+  await openWorkspace(page);
+  await openLibrary(page, 'Components');
+  const link = page.locator('[data-group="saved"]').getByRole('button', { name: 'Find Repeated Pieces' });
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page.getByTestId('repeats-level')).toBeVisible();
+});
+
+test.describe('delete on a phone, and Project > Templates', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 1440) >= 700, 'The phone layout');
+  test.beforeEach(async ({ page, request }) => { await seed(request, withSpare); await openWorkspace(page); });
+
+  test('Project > Templates lists the rows, a tap opens the editor in the properties sheet, and the uses row pushes Uses', async ({ page }) => {
+    await openProjectTemplates(page);
+    await expect(page.getByTestId('saved-row')).toHaveCount(2);
+    await snap(page, 'phone-templates-rows');
+    await rowButton(page).click();
+    await expect(editor(page)).toBeVisible();
+    await expect(page.getByTestId('phone-templates')).toHaveCount(0);
+    await fullSheet(page);
+    await snap(page, 'phone-editor');
+    await editor(page).getByTestId('template-uses-row').click();
+    await expect(panel(page).getByRole('heading', { name: 'Uses' })).toBeVisible();
+    await snap(page, 'phone-uses');
+    await panel(page).locator('[data-use]').first().click();
+    await expect(panel(page).getByRole('heading', { name: 'Lamp Pair', exact: true })).toBeVisible();
+  });
+
+  test('Delete asks, leaves the tiles with no badge, and Undo restores the template and the badges', async ({ page }) => {
+    await expect(badges(page)).toHaveCount(2);
+    await openProjectTemplates(page);
+    await savedRow(page).getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+    const dialog = page.getByTestId('delete-component');
+    await expect(dialog).toContainText('It is used in 2 places.');
+    await snap(page, 'phone-delete-dialog');
+    await dialog.getByRole('button', { name: 'Delete Template' }).click();
+    await expect(badges(page)).toHaveCount(0);
+    await expect(lampCount(page)).toHaveCount(2);
+    await expect(toastText(page)).toContainText('Deleted Lamp Pair. 2 places are now their own copies.');
+    await snap(page, 'phone-delete-done');
+    await toastText(page).getByRole('button', { name: 'Undo' }).click();
+    await expect(badges(page)).toHaveCount(2);
+  });
+
+  test('an unused template deletes with no dialog', async ({ page }) => {
+    await openProjectTemplates(page);
+    await savedRow(page, 'Spare Lamp').getByRole('button', { name: 'More for Spare Lamp' }).click();
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+    await expect(page.getByTestId('delete-component')).toHaveCount(0);
+    await expect(toastText(page)).toContainText('Deleted Spare Lamp.');
+  });
+
+  test('the Add sheet More has Edit Template, and Show Uses opens the editor', async ({ page }) => {
+    await page.locator('.w2-bottom-add').click();
+    const picker = page.getByTestId('add-picker');
+    await picker.getByRole('group', { name: 'Kind' }).getByRole('button', { name: 'Templates' }).click();
+    await picker.getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await expect(page.getByRole('menuitem')).toHaveText(['Edit Template', 'Rename', 'Show Uses', 'Delete']);
+    await snap(page, 'phone-add-more');
+    await page.getByRole('menuitem', { name: 'Edit Template' }).click();
+    await expect(picker).toHaveCount(0);
+    await expect(editor(page)).toBeVisible();
+    await clearSheet(page);
+    await page.locator('.w2-bottom-add').click();
+    await page.getByTestId('add-picker').getByRole('group', { name: 'Kind' }).getByRole('button', { name: 'Templates' }).click();
+    await page.getByTestId('add-picker').getByRole('button', { name: 'More for Lamp Pair' }).click();
+    await page.getByRole('menuitem', { name: 'Show Uses' }).click();
+    await expect(editor(page)).toBeVisible();
+  });
 });

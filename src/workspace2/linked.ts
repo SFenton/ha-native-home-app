@@ -1,7 +1,8 @@
 import { replaceAt, valueAt, type EditorPath } from '../composition-editor';
-import { componentReferences, componentUses, expandRef, libraryById, mapChildren, ownedSources, readField, type ComponentUse } from '../shared/composition/components';
+import { bodyIdOf, componentReferences, componentUses, expandRef, expandSources, libraryById, mapChildren, ownedSources, privateNames, readField, renameSources, type ComponentUse } from '../shared/composition/components';
 import { createId as uid } from '../shared/ids';
 import { compositionChildren, type ComponentEntry, type ComponentRefNode, type CompositionDocument, type CompositionNode } from '../shared/composition/schema';
+import { tileTypes } from '../shared/composition/repeats';
 import { sameJson } from '../sameJson';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { canHold, type Destination } from './add/insert';
@@ -40,10 +41,55 @@ function plainCopy(ref: ComponentRefNode, entries: ReadonlyMap<string, Component
   return entry ? freshIds(expandRef(ref, entry), true).node : undefined;
 }
 
+// MARK: - Detaching a place
+
+/** The ids a document already uses for nodes and data sources: what a detached copy's ids may not take. */
+function usedIds(document: Pick<CompositionDocument, 'pages' | 'modals' | 'dataSources'>): Set<string> {
+  const ids = new Set<string>(document.dataSources.map(source => source.id));
+  const walk = (node: CompositionNode) => { ids.add(node.id); compositionChildren(node).forEach(walk); };
+  for (const surface of [...document.pages, ...document.modals]) surface.components.forEach(walk);
+  return ids;
+}
+
+/** The first free id built on `base` (`base`, then `base-2`, `base-3`), recorded in `taken`. An id too long for the contract falls back to a fresh one. */
+function freeId(base: string, taken: Set<string>): string {
+  let id = base, number = 2;
+  while (taken.has(id) || id.length > 80) { const next = `${base}-${number++}`; id = next.length > 80 ? uid('native') : next; }
+  taken.add(id);
+  return id;
+}
+
+type DocumentSource = CompositionDocument['dataSources'][number];
+
+/** A place made a plain copy of its template: the node, and the data sources its private sources become (they join the document's). */
+interface Detached { node: CompositionNode; sources: DocumentSource[] }
+
+/**
+ * What the place `ref` stands for as a plain node, with **deterministic ids**: the expansion's `<place id>~<inner id>` becomes `<place id>-<inner id>` (then
+ * `-2`, `-3` where the id is taken), the root keeps the place's id, and each private source is copied into the document as `<place id>-<source id>` with
+ * the copy's `sourceId` and `providerId` pointing at it. The same document always gives the same ids, so what the place drew is exactly what it draws
+ * (an id with `~` cannot be authored). `taken` holds the ids in use; the copy's ids are added to it.
+ */
+function detach(ref: ComponentRefNode, entry: ComponentEntry, taken: Set<string>): Detached {
+  const prefix = `${ref.id}~`;
+  const ids = new Map<string, string>();
+  const names = new Map<string, string>();
+  for (const [source, derived] of privateNames(ref.id, entry)) names.set(derived, freeId(`${ref.id}-${source}`, taken));
+  const walk = (node: CompositionNode, root: boolean): CompositionNode => {
+    const id = root ? node.id : ids.get(node.id) ?? freeId(`${ref.id}-${node.id.startsWith(prefix) ? node.id.slice(prefix.length) : bodyIdOf(node.id)}`, taken);
+    ids.set(node.id, id);
+    return { ...mapChildren(node, child => walk(child, false)), id } as CompositionNode;
+  };
+  const expanded = expandRef(ref, entry);
+  const node = walk(names.size ? renameSources(expanded, names) : expanded, true);
+  const sources = expandSources(ref, entry).map(source => ({ ...source, id: names.get(source.id) ?? source.id }) as DocumentSource);
+  return { node, sources };
+}
+
 // MARK: - Words
 
-/** The words "tiles" or "things" for what a body holds: tiles when every node inside is a tile type. */
-export const tileTypes = new Set(['action-tile', 'navigation-tile', 'state-tile', 'door-tile', 'room-card', 'light-group-tile', 'camera-tile', 'room-overview-tile']);
+/** The node types that are tiles, for the words "tiles" and "things": tiles when every node inside is a tile type. */
+export { tileTypes };
 
 /** How many nodes sit under `node` (not counting it). */
 export function nodesInside(node: CompositionNode): number {
@@ -178,27 +224,43 @@ function valueAtNode(root: CompositionNode, id: string): CompositionNode | undef
 }
 
 /**
- * The document with the place at `path` made a plain copy of its component: the root keeps the reference's id and width, inner nodes get fresh ids.
- * Only this place changes. One undo step.
+ * The document with the place at `path` made a plain copy of its component: the root keeps the reference's id and width, inner nodes get the ids
+ * `<place id>-<inner id>` and each private source is copied into the document (see `detach`). Only this place changes. One undo step.
  */
 export function unlinkPlace(document: CompositionDocument, path: EditorPath): CompositionDocument {
   const ref = valueAt(document, path) as CompositionNode | undefined;
   if (!ref || ref.type !== 'component-ref') throw new Error('This is not a linked template');
-  const copy = plainCopy(ref, libraryById(document));
-  if (!copy) throw new Error('That template is gone');
-  return replaceAt(document, path, copy);
+  const entry = libraryById(document).get(ref.componentId);
+  if (!entry) throw new Error('That template is gone');
+  const copy = detach(ref, entry, usedIds(document));
+  const next = replaceAt(document, path, copy.node);
+  return copy.sources.length ? { ...next, dataSources: [...next.dataSources, ...copy.sources] } : next;
 }
 
-/** The document with every place that uses `id` made a plain copy. */
+/** The document with every place that uses `id` made a plain copy, in document order, and their private sources added to `dataSources`. */
 function unlinkAll(document: CompositionDocument, id: string): CompositionDocument {
-  const entries = libraryById(document);
-  const visit = (node: CompositionNode): CompositionNode => node.type === 'component-ref' ? node.componentId === id ? plainCopy(node, entries) ?? node : node : unlinkInsideOnly(node);
-  const unlinkInsideOnly = (node: CompositionNode): CompositionNode => mapChildren(node, visit);
+  const entries = libraryById(document), entry = entries.get(id);
+  if (!entry) return document;
+  const taken = usedIds(document);
+  const added: DocumentSource[] = [];
+  const visit = (node: CompositionNode): CompositionNode => {
+    if (node.type === 'component-ref') {
+      if (node.componentId !== id) return node;
+      const copy = detach(node, entry, taken);
+      added.push(...copy.sources);
+      return copy.node;
+    }
+    return mapChildren(node, visit);
+  };
   const surfaces = <T extends { components: CompositionNode[] }>(list: T[]): T[] => list.map(surface => ({ ...surface, components: surface.components.map(visit) }));
-  return { ...document, pages: surfaces(document.pages), modals: surfaces(document.modals) };
+  const pages = surfaces(document.pages), modals = surfaces(document.modals);
+  return { ...document, pages, modals, ...(added.length ? { dataSources: [...document.dataSources, ...added] } : {}) };
 }
 
-/** Deletes a component: every place that uses it stays where it is, unlinked, and the entry goes. One undo step. */
+/**
+ * Deletes a component: every place that uses it becomes its own copy where it stands (deterministic ids, private sources copied in) and the entry goes.
+ * What each place draws does not change. One undo step.
+ */
 export function deleteComponent(document: CompositionDocument, id: string): CompositionDocument {
   const unlinked = unlinkAll(document, id);
   const rest = (unlinked.componentLibrary ?? []).filter(entry => entry.id !== id);

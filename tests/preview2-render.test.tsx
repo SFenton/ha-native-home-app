@@ -393,6 +393,30 @@ describe('Preview2 linked components', () => {
     expect(within(nodeEl(container, 'one')).getByText('Body Tile')).toBeTruthy();
   });
 
+  it('in Edit the badge is a labelled button that opens the template and leaves the place unselected', () => {
+    const open = vi.fn();
+    const { container, props: p } = mount(linked(), { onOpenTemplate: open });
+    const badge = nodeEl(container, 'one').querySelector('button.sh-link-badge') as HTMLButtonElement;
+    expect(badge.getAttribute('aria-label')).toBe('Edit template Body');
+    expect(badge.hasAttribute('data-passthrough')).toBe(true);
+    fireEvent.click(badge);
+    expect(open).toHaveBeenCalledWith('c1');
+    expect(p.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('in Use there is no badge at all', () => {
+    const { container } = mount(linked(), { mode: 'use', onOpenTemplate: vi.fn() });
+    expect(container.querySelectorAll('.sh-link-badge')).toHaveLength(0);
+    expect(nodeEl(container, 'one').hasAttribute('data-linked')).toBe(true);
+  });
+
+  it('without a way to open the template the badge is a plain mark, hidden from VoiceOver', () => {
+    const { container } = mount(linked());
+    const badge = nodeEl(container, 'one').querySelector('.sh-link-badge')!;
+    expect(badge.tagName).toBe('SPAN');
+    expect(badge.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('draws a missing component as a placeholder and no badge', () => {
     const { container } = mount(linked());
     expect(nodeEl(container, 'lost')).toBeTruthy();

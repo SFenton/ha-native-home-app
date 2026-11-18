@@ -1,0 +1,174 @@
+{
+  "lane": "studio-tpl-ux",
+  "data": "demo fixtures only",
+  "poses": [
+    {
+      "file": "p01-desktop-delete-dialog.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Delete dialog for a used template: title, the count sentence, Cancel, red Delete Template",
+      "judgedAgainst": "pick-desktop-delete-dialog.png"
+    },
+    {
+      "file": "p02-desktop-delete-done.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Toast after a used delete with Undo, the tiles without badges",
+      "judgedAgainst": "pick-desktop-delete-done.png"
+    },
+    {
+      "file": "p03-desktop-delete-unused.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Toast after an unused delete",
+      "judgedAgainst": "proposal section 5"
+    },
+    {
+      "file": "p04-desktop-editor.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Editor from the row: Components panel showing, the row tinted, \"A change here shows in all N places.\", a Set Per Place line",
+      "judgedAgainst": "pick-desktop-editor.png"
+    },
+    {
+      "file": "p05-desktop-editor-foot.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "The same editor scrolled to Each place sets and Delete Template\u2026",
+      "judgedAgainst": "proposal section 2"
+    },
+    {
+      "file": "p06-desktop-row-menu.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "The row menu open: Add to Page, Rename, Show Uses, Delete",
+      "judgedAgainst": "proposal section 2"
+    },
+    {
+      "file": "p07-desktop-list-13.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "List of the templates with one row hovered",
+      "judgedAgainst": "pick-desktop-list.png"
+    },
+    {
+      "file": "p08-desktop-use-editor.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Use mode: the editor read only with Add to Page and Delete disabled",
+      "judgedAgainst": "owner follow-up"
+    },
+    {
+      "file": "p08-desktop-use-uses.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Use mode: the Uses page, the place selected, no badge",
+      "judgedAgainst": "linked-uses.png"
+    },
+    {
+      "file": "p09-desktop-tile-click.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Edit: a click on a template tile, the place form in the inspector, the badge not focused",
+      "judgedAgainst": "owner follow-up"
+    },
+    {
+      "file": "p10-phone-project-templates-foot.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "Project > Templates scrolled to the foot",
+      "judgedAgainst": "pick-phone-project-templates.png"
+    },
+    {
+      "file": "p10-phone-project-templates.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "Project > Templates with rows",
+      "judgedAgainst": "pick-phone-project-templates.png"
+    },
+    {
+      "file": "p11-phone-editor.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "The editor in the properties sheet",
+      "judgedAgainst": "pick-phone-editor.png"
+    },
+    {
+      "file": "p11-phone-uses.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "Uses pushed from the editor row",
+      "judgedAgainst": "pick-phone-uses.png"
+    },
+    {
+      "file": "p12-phone-delete-dialog.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "The delete dialog",
+      "judgedAgainst": "pick-phone-delete.png"
+    },
+    {
+      "file": "p12-phone-delete-toast.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "The toast with Undo",
+      "judgedAgainst": "pick-phone-delete.png"
+    },
+    {
+      "file": "p13-desktop-badge-focus.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "The badge focused: the ring inside the disc, clear of the heading",
+      "judgedAgainst": "verdict fix 1"
+    },
+    {
+      "file": "p13-phone-add-more.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "The Add sheet More open with Edit Template",
+      "judgedAgainst": "pick-phone-add-sheet.png"
+    },
+    {
+      "file": "p13-phone-badges-edit.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "A page with badges, in Edit",
+      "judgedAgainst": "pick-phone-add-sheet.png"
+    },
+    {
+      "file": "p13-phone-badges-use.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "The same page in Use, no badges",
+      "judgedAgainst": "owner follow-up"
+    },
+    {
+      "file": "p13-phone-single-tiles.png",
+      "project": "phone",
+      "size": "390x844",
+      "pose": "The Repeated Pieces sheet scrolled to Single Tiles",
+      "judgedAgainst": "phone-repeats-single-tiles.png"
+    },
+    {
+      "file": "p14-desktop-use-row.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Use mode: the row with + dimmed, More at full ink",
+      "judgedAgainst": "verdict round 2 change 1"
+    },
+    {
+      "file": "p15-desktop-use-row-menu.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Use mode: the row menu open, Add to Page, Rename and Delete dimmed, Show Uses live",
+      "judgedAgainst": "verdict round 2 change 1"
+    },
+    {
+      "file": "p16-desktop-use-editor-foot.png",
+      "project": "desktop",
+      "size": "1440x900",
+      "pose": "Use mode: the editor foot with Delete Template dimmed",
+      "judgedAgainst": "verdict round 2 change 1"
+    }
+  ]
+}

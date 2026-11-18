@@ -1,7 +1,10 @@
 Lamp Row
-Used in 2 places
+2
 
 [names]
 Templates
-Lamp Row. Used in 2 places
+Lamp Row, template, used in 2 places
+Used in 2 places
+Add Lamp Row to the page
+Add to Page
 More for Lamp Row

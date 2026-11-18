@@ -1,7 +1,7 @@
 Repeated Pieces
 0 found in 0 places
 Nothing found
-Nothing repeats yet. A piece of 3 or more parts that appears twice shows here.
+Nothing repeats yet. A tile that appears twice, or a piece of 3 or more parts that appears twice, shows here.
 
 [names]
 Back to Components

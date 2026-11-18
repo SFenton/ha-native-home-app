@@ -1,4 +1,5 @@
 import { Menu } from '@base-ui/react/menu';
+import PhoneTemplates from './PhoneTemplates';
 import { MoreHorizontal } from 'lucide-react';
 import { compositionSourceText } from '../composition-editor';
 import { Modal, Overlay, PushStack, usePush, type PushedPage } from './kit';
@@ -63,7 +64,7 @@ function SheetList({ ws, narrowOnly, report, onPanel, onGo, onClose, window: cur
     </ul>
     {narrowOnly && <ul className="w2-list">
       <li><button type="button" className="w2-list-row" disabled={!ws.studio.canRedo} onClick={ws.studio.redo}>Redo</button></li>
-      <li><button type="button" className="w2-list-row" data-testid="repeated-pieces-row" onClick={() => { onClose(); ws.repeats.setOpen(true); }}>Repeated Pieces</button></li>
+      <li><button type="button" className="w2-list-row" data-testid="templates-row" onClick={() => page('Templates', <PhoneTemplates ws={ws} onClose={onClose}/>)}>Templates</button></li>
       <li><button type="button" className="w2-list-row" onClick={() => page('Window', <WindowChoices window={current} onWindow={onWindow}/>)}>Window</button></li>
       {!report && checks}
     </ul>}

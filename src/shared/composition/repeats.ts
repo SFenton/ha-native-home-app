@@ -10,6 +10,9 @@ import type { ComponentStringKind, CompositionDocument, CompositionNode } from '
  * twice, outermost only: a piece inside another repeated piece is not listed on its own. A subtree that holds a `component-ref` is never a
  * repeat, since a template's body holds no reference.
  *
+ * A single tile is the other kind of repeat (studio-tpl-ux): a leaf node of a tile type with the same skeleton as at least one other, listed
+ * apart from the groups when {@link REPEAT_MIN_TILE_PLACES} places agree. It is not listed inside a listed group, and a template place is never one.
+ *
  * The walk is a generator that yields after each surface, so a caller can run it a surface at a time between tasks and never hold
  * the main thread for the whole document ({@link repeatSteps}); {@link findRepeats} runs it to the end.
  */
@@ -18,6 +21,11 @@ import type { ComponentStringKind, CompositionDocument, CompositionNode } from '
 export const REPEAT_MIN_NODES = 3;
 /** The fewest places a shape must appear in. */
 export const REPEAT_MIN_PLACES = 2;
+/** The fewest places a single tile (a leaf of a tile type) must appear in to be listed. */
+export const REPEAT_MIN_TILE_PLACES = 2;
+
+/** The node types that are tiles: what "tiles" and a single-tile repeat mean. */
+export const tileTypes = new Set(['action-tile', 'navigation-tile', 'state-tile', 'door-tile', 'room-card', 'light-group-tile', 'camera-tile', 'room-overview-tile']);
 /** The longest string an argument may hold (the contract's `args` limit). */
 const ARG_MAX = 240;
 
@@ -48,9 +56,14 @@ export interface RepeatClass {
 
 /** What the walk finds. */
 export interface RepeatResult {
+  /** The groups: pieces of {@link REPEAT_MIN_NODES} or more nodes. */
   classes: RepeatClass[];
-  /** How many places the classes have in all. */
+  /** How many places the groups have in all. */
   placeCount: number;
+  /** The single tiles (size 1), most places first. Each class holds only the places that agree on what a setting cannot fill. */
+  tiles: RepeatClass[];
+  /** How many places the single tiles have in all. */
+  tilePlaceCount: number;
   /** How many nodes the walk read. */
   nodeCount: number;
 }
@@ -125,7 +138,37 @@ export function* repeatSteps(document: Pick<CompositionDocument, 'pages' | 'moda
     });
   }
   classes.sort((a, b) => b.places.length * b.size - a.places.length * a.size);
-  return { classes, placeCount: classes.reduce((total, item) => total + item.places.length, 0), nodeCount };
+  const tiles = singleTiles(document, roots, found);
+  return { classes, placeCount: classes.reduce((total, item) => total + item.places.length, 0), tiles, tilePlaceCount: tiles.reduce((total, item) => total + item.places.length, 0), nodeCount };
+}
+
+/**
+ * The single tiles: leaves of a tile type that share a skeleton, outside every listed group. A shape is listed when {@link REPEAT_MIN_TILE_PLACES}
+ * of its places agree on every field a setting cannot fill, the way the proposal's default plan decides; the class holds those places.
+ */
+function singleTiles(document: Pick<CompositionDocument, 'pages' | 'modals'>, roots: Visit[], found: ReadonlyMap<number, Visit[]>): RepeatClass[] {
+  const inGroup = new Set<Visit>([...found.values()].flat());
+  const byShape = new Map<number, Visit[]>();
+  const walk = (item: Visit) => {
+    if (inGroup.has(item)) return;
+    if (item.lists.length === 0 && item.size === 1 && tileTypes.has(item.node.type)) byShape.set(item.shape, [...byShape.get(item.shape) ?? [], item]);
+    for (const list of item.lists) list.forEach(walk);
+  };
+  roots.forEach(walk);
+  const tiles: RepeatClass[] = [];
+  for (const places of byShape.values()) {
+    if (places.length < REPEAT_MIN_TILE_PLACES) continue;
+    const cls: RepeatClass = {
+      id: places[0].node.id, type: places[0].node.type, size: 1,
+      places: places.map(place => ({ nodeId: place.node.id, path: place.path, surface: place.surface, ...(place.tab ? { tab: place.tab } : {}) })),
+    };
+    const analysis = analyseRepeat(document, cls);
+    const kept = planRepeat(analysis, defaultUnchecked(analysis)).kept;
+    if (kept.length < REPEAT_MIN_TILE_PLACES) continue;
+    const agreed = kept.map(at => cls.places[at]);
+    tiles.push({ ...cls, id: agreed[0].nodeId, places: agreed });
+  }
+  return tiles.sort((a, b) => b.places.length - a.places.length);
 }
 
 /** The repeated pieces of a document, found in one go. */

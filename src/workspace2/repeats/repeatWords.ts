@@ -14,7 +14,8 @@ import { valueAt } from '../../composition-editor';
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
 /** The summary under the level's title: "49 found in 218 places". */
-export const summaryText = (result: Pick<RepeatResult, 'classes' | 'placeCount'>): string => `${result.classes.length} found in ${plural(result.placeCount, 'place')}`;
+export const summaryText = (result: Pick<RepeatResult, 'classes' | 'placeCount' | 'tiles' | 'tilePlaceCount'>): string =>
+  `${result.classes.length + result.tiles.length} found in ${plural(result.placeCount + result.tilePlaceCount, 'place')}`;
 
 /** How many places a row says: "14 places". */
 export const placesText = (count: number): string => plural(count, 'place');
@@ -27,6 +28,8 @@ export const firstNode = (document: Pick<CompositionDocument, 'pages' | 'modals'
 /** What a piece is, in a row and the proposal's header: "Tile grid, 3 tiles". */
 export function pieceText(document: Pick<CompositionDocument, 'pages' | 'modals'>, cls: RepeatClass): string {
   const node = firstNode(document, cls);
+  // A single tile is named by its type and kind: "Door tile".
+  if (cls.size === 1) return node ? typeName(node) : typeName(cls.type);
   const held = node ? inside(node) : [];
   const count = Math.max(held.length, cls.size - 1);
   const tiles = held.length > 0 && held.every(item => tileTypes.has(item.type));

@@ -1,16 +1,21 @@
 import { boundControlShows } from './editors/boundControl';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { TemplateUsesList } from './TemplateUses';
+import { templateWords } from './templateWords';
+import { useTemplateActions } from './templateActions';
+import { renameComponent, usesText } from './linked';
+import { LabeledRow, TextInput } from './editors/controls';
 import { buildDocumentIndex, type IndexEntry, type SelectionKey } from '../preview2/model';
 import { Menu } from '@base-ui/react/menu';
 import { ChangeListIconItem } from './ListIconPicker';
-import { ChevronRight, EyeOff, MoreHorizontal, X } from 'lucide-react';
+import { ChevronRight, EyeOff, Link2, MoreHorizontal, Plus, Search, X } from 'lucide-react';
 import type { ComponentEntry, CompositionDocument, CompositionNode } from '../shared/composition/schema';
 import { valueAt, type EditorPath } from '../composition-editor';
 import { GlyphByName } from '../preview2/nodes/shared';
 import { ChooseRow, gatherFixed, ObjectRows, RowsProvider, useRows } from './rows';
 import AdvancedFold from './AdvancedFold';
 import { fixedLine } from './labels';
-import { PushStack, Tag, usePush } from './kit';
+import { PushStack, Tag, useNarrow, usePush } from './kit';
 import { HeaderPanel, TabsPanel, WallpaperPanel } from './panels';
 import { useAdd } from './add/AddHost';
 import { useDeepRows } from './editors/overrides';
@@ -157,6 +162,45 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
   return <>{choosing && template && <ChooseBar component={template.component}/>}{fields}{width}{advanced}</>;
 }
 
+/** A template's own editor (studio-tpl-ux), opened from its row in the Templates list or from the link badge of a place: Name, its places, Add to Page, the fields of its root, Delete. */
+function TemplateEditor({ ws, component, at, onError }: { ws: Workspace2; component: ComponentEntry; at: number; onError: (message: string) => void }) {
+  const { document } = useRows();
+  const add = useAdd(), push = usePush(), narrow = useNarrow();
+  const actions = useTemplateActions(ws);
+  const uses = componentUses(document, component.id).length;
+  const path: EditorPath = ['componentLibrary', at, 'node'];
+  const edit = ws.mode === 'edit';
+  const view: TemplateView = { ws, component, entry: { kind: 'node', path, component: component.id } as unknown as IndexEntry, root: false, edit, onError };
+  const rename = (name: string) => { try { ws.studio.apply(renameComponent(document, component.id, name)); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
+  return <div className="w2-tpl-editor" data-testid="template-editor">
+    <section className="w2-group" aria-label="Template">
+      <LabeledRow label="Name"><TextInput label="Name" value={component.name} maxLength={80} disabled={!edit} onCommit={rename}/></LabeledRow>
+      <ul className="w2-list w2-tpl-editor-list"><li><button type="button" className="w2-list-row w2-push-row" data-testid="template-uses-row" disabled={uses === 0}
+        onClick={() => { if (narrow) push?.push({ title: templateWords.usesTitle, body: <TemplateUsesPage id={component.id}/> }); else ws.setUsesId(component.id); }}>
+        <span className="w2-page-text"><span className="w2-page-title">{usesText(uses)}</span></span><ChevronRight size={16} aria-hidden/></button></li></ul>
+      <div className="w2-tpl-editor-actions"><button type="button" className="w2-tonal" disabled={!edit} onClick={event => add?.addSaved(component.id, event.currentTarget)}><Plus size={16} aria-hidden/>{templateWords.add}</button></div>
+    </section>
+    {uses > 1 && <p className="w2-tpl-everywhere"><Link2 size={14} aria-hidden/>{templateWords.everywhere(uses)}</p>}
+    {edit && <section className="w2-group w2-tpl-editor-choose"><ChooseFieldsButton document={document} component={component} node={component.node} path={path}/></section>}
+    {/* In Use the editor only shows the template: a disabled fieldset keeps every field of its root from writing, so nothing skips the edit question. */}
+    <fieldset className="w2-tpl-editor-fields" disabled={!edit}><NodeBody path={path} template={view}/></fieldset>
+    {edit && <TemplateParameters ws={ws} document={document} component={component} entry={view.entry} onError={onError}/>}
+    <section className="w2-group w2-tpl-editor-foot"><button type="button" className="w2-danger" disabled={!edit} onClick={() => actions.remove(component.id)}>Delete Template…</button></section>
+    {actions.dialog}
+  </div>;
+}
+
+/** The Uses page a phone pushes inside the properties sheet. */
+function TemplateUsesPage({ id }: { id: string }) {
+  const ws = useContext(TemplateWs)!;
+  const [query, setQuery] = useState('');
+  const entry = ws.document?.componentLibrary?.find(item => item.id === id);
+  if (!entry) return null;
+  return <div className="w2-uses-page"><label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder={templateWords.findUses} aria-label={templateWords.findUses} value={query} onChange={event => setQuery(event.target.value)}/></label>
+    <TemplateUsesList ws={ws} entry={entry} query={query}/></div>;
+}
+const TemplateWs = createContext<Workspace2 | undefined>(undefined);
+
 /** What a node of a template needs to draw its fields as the template's: the template, the node's index entry, and whether this is a place's root. */
 interface TemplateView { ws: Workspace2; component: ComponentEntry; entry: IndexEntry; root: boolean; edit: boolean; onError: (message: string) => void }
 
@@ -283,6 +327,12 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     const uses = usedCount(document, target.id);
     header = <Header onClose={onClose} icon="activity" title={title} line={`Data Flow · ${uses > 0 ? `Used by ${uses}` : 'Not Used'}`} more={<FlowMenu ws={ws} id={target.id} onError={onError}/>}/>;
     body = <FlowEditor ws={ws} id={target.id}/>;
+  } else if (target.kind === 'template') {
+    const at = document.componentLibrary!.findIndex(item => item.id === target.id), component = document.componentLibrary![at];
+    const uses = componentUses(document, component.id).length;
+    title = component.name;
+    header = <Header onClose={onClose} icon={(component.node as { icon?: { name: string } }).icon?.name ?? 'grid'} title={title} line={templateWords.editorLine(uses)} more={<button type="button" className="w2-primary w2-done" onClick={onClose}>Done</button>}/>;
+    body = <TemplateEditor ws={ws} component={component} at={at} onError={onError}/>;
   } else if (target.kind === 'logic') {
     const entry = entryOf(document, target.id)!;
     const uses = useCount(document, target.id);
@@ -316,8 +366,8 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
   const dataActions = { openFlow: ws.openFlow, openLogic: (id: string) => ws.openLogic(id, 'key' in target && target.key ? { key: target.key, title } : undefined) };
   const repeat = target.kind === 'node' ? repeatScopeOf(document, index, target.key) : undefined;
   const logicScope = target.kind === 'logic' ? { entryId: target.id } : undefined;
-  return <LogicScopeProvider value={logicScope}><RepeatScopeProvider scope={repeat}><RowsProvider value={ctx}><DataActionsProvider value={dataActions}><AlertPreviewContext.Provider value={ws.setAlertPreview}><StatePreviewContext.Provider value={stateApi}>
+  return <TemplateWs.Provider value={ws}><LogicScopeProvider value={logicScope}><RepeatScopeProvider scope={repeat}><RowsProvider value={ctx}><DataActionsProvider value={dataActions}><AlertPreviewContext.Provider value={ws.setAlertPreview}><StatePreviewContext.Provider value={stateApi}>
     <PushStack key={`${target.kind}:${'key' in target ? target.key : 'id' in target ? target.id : ''}`} rootTitle={title} rootHeader={<>{header}{notice && <p role="alert" className="w2-notice">{notice}</p>}</>}
       root={<div className="w2-props-body">{body}</div>}/>
-  </StatePreviewContext.Provider></AlertPreviewContext.Provider></DataActionsProvider></RowsProvider></RepeatScopeProvider></LogicScopeProvider>;
+  </StatePreviewContext.Provider></AlertPreviewContext.Provider></DataActionsProvider></RowsProvider></RepeatScopeProvider></LogicScopeProvider></TemplateWs.Provider>;
 }

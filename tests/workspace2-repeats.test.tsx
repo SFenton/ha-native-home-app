@@ -41,8 +41,8 @@ const open = async () => {
   await waitFor(() => expect(screen.getByTestId('repeats-list')).toBeTruthy());
 };
 
-describe('the Find Repeated Pieces row', () => {
-  it('sits at the foot of the Templates group, with no count until the walk has run', async () => {
+describe('the Find Repeated Pieces button', () => {
+  it('sits in the panel footer, apart from the Templates list, with no count until the walk has run', async () => {
     render(<Harness document={fixture()}/>);
     const row = screen.getByTestId('find-repeats');
     expect(row.textContent).toBe('Find Repeated Pieces');
@@ -54,13 +54,14 @@ describe('the Find Repeated Pieces row', () => {
     expect(screen.getByTestId('find-repeats').getAttribute('aria-label')).toBe('Find Repeated Pieces, 2 found');
   });
 
-  it('follows the search: it matches its own words', () => {
+  it('stays in reach whatever the search says, and is not a row of the Templates list', () => {
     render(<Harness document={fixture()}/>);
+    const foot = screen.getByTestId('find-repeats').closest('footer')!;
+    expect(foot.getAttribute('aria-label')).toBe('Templates');
+    expect(screen.queryByRole('list', { name: 'Templates' })?.contains(screen.getByTestId('find-repeats')) ?? false).toBe(false);
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzzz' } });
-    expect(screen.queryByTestId('find-repeats')).toBeNull();
-    expect(screen.getByText('Nothing matches.')).toBeTruthy();
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'repeated' } });
     expect(screen.getByTestId('find-repeats')).toBeTruthy();
+    expect(screen.getByText('Nothing matches.')).toBeTruthy();
   });
 });
 
@@ -75,11 +76,11 @@ describe('the level', () => {
   });
 
   it('shows the empty line when nothing repeats', async () => {
-    render(<Harness document={withPage([grid('a', 'A', [actionTile('a1', 'x', 's1'), actionTile('a2', 'y', 's2')])])}/>);
+    render(<Harness document={withPage([grid('a', 'A', [actionTile('a1', 'x', 's1')])])}/>);
     fireEvent.click(screen.getByTestId('find-repeats'));
     await waitFor(() => expect(screen.getByTestId('repeats-empty')).toBeTruthy());
     expect(screen.getByText('Nothing found')).toBeTruthy();
-    expect(screen.getByText('Nothing repeats yet. A piece of 3 or more parts that appears twice shows here.')).toBeTruthy();
+    expect(screen.getByText('Nothing repeats yet. A tile that appears twice, or a piece of 3 or more parts that appears twice, shows here.')).toBeTruthy();
     expect(screen.getByTestId('repeats-summary').textContent).toBe('0 found in 0 places');
   });
 
@@ -107,7 +108,7 @@ describe('the level', () => {
     render(<Harness document={fixture()}/>);
     await open();
     expect(screen.getByRole('region', { name: 'Repeated Pieces' })).toBeTruthy();
-    expect(screen.getByRole('list', { name: 'Repeated pieces' })).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'Groups' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Repeated Pieces' })).toBeTruthy();
   });
 

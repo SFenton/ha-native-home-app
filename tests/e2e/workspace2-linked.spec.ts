@@ -29,7 +29,8 @@ test('Save as Template links the tile, shows the badge, and lists it in Template
   const row = page.getByTestId('saved-row');
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('Guest Tile');
-  await expect(row).toContainText('1 place');
+  await expect(row.locator('.w2-tree-count')).toHaveText('1');
+  await expect(row.getByRole('button', { name: 'Guest Tile, template, used in 1 place' })).toBeVisible();
   await snap(page, 'linked-saved');
 });
 
@@ -39,15 +40,18 @@ test('adding a second place, then changing the component asks before it writes',
   await chooseFromMenu(page, 'Demo Guests 1', 'Save as Template…');
   await page.getByTestId('save-component').getByRole('button', { name: 'Save', exact: true }).click();
   await openLibrary(page, 'Components');
-  await page.getByTestId('saved-row').getByRole('button').first().click();
+  await page.getByTestId('saved-row').getByRole('button', { name: /^Add .* to the page/ }).click();
   await expect(previewRoot(page).locator('.sh-link-badge')).toHaveCount(2);
-  await expect(page.getByTestId('saved-row')).toContainText('2 places');
+  await expect(page.getByTestId('saved-row').locator('.w2-tree-count')).toHaveText('2');
   // Rename is not an edit of the component, so it asks nothing.
   await page.getByRole('button', { name: /^More for / }).click();
   await page.getByRole('menuitem', { name: 'Show Uses' }).click();
-  await expect(page.getByTestId('saved-uses')).toContainText('Used in 2 Places');
+  const level = page.getByTestId('template-uses-level');
+  await expect(level).toBeVisible();
+  await expect(level).toContainText('2 places on 1 page');
   await snap(page, 'linked-uses');
-  await page.keyboard.press('Escape');
+  await level.getByRole('button', { name: 'Back to Templates' }).click();
+  await expect(level).toHaveCount(0);
   // Unlink is on the place's menu and leaves one use.
   await chooseFromMenu(page, 'Demo Guests 1', 'Unlink From Template');
   await expect(previewRoot(page).locator('.sh-link-badge')).toHaveCount(1);
@@ -91,7 +95,7 @@ test('a setting is chosen in the component and set at one place without changing
   await chooseFromMenu(page, 'Demo Guests 1', 'Save as Template…');
   await page.getByTestId('save-component').getByRole('button', { name: 'Save', exact: true }).click();
   await openLibrary(page, 'Components');
-  await page.getByTestId('saved-row').getByRole('button').first().click();
+  await page.getByTestId('saved-row').getByRole('button', { name: /^Add .* to the page/ }).click();
   await expect(previewRoot(page).locator('.sh-link-badge')).toHaveCount(2);
   const panel = page.getByLabel('Properties');
   await panel.getByRole('button', { name: 'Choose Fields…' }).click();
@@ -106,4 +110,21 @@ test('a setting is chosen in the component and set at one place without changing
   await settings.getByRole('textbox', { name: 'Title' }).fill('Side Door');
   await expect(previewRoot(page).getByText('Side Door', { exact: true })).toHaveCount(1);
   await snap(page, 'linked-parameter');
+});
+
+test('the link badge is a button in Edit that opens the template, and is gone in Use', async ({ page }) => {
+  test.skip(isPhone(page), 'A right-click needs a mouse');
+  await openWorkspace(page);
+  await chooseFromMenu(page, 'Demo Guests 1', 'Save as Template…');
+  await page.getByTestId('save-component').getByRole('button', { name: 'Save', exact: true }).click();
+  const badge = previewRoot(page).getByRole('button', { name: /^Edit template / });
+  await expect(badge).toHaveCount(1);
+  const box = (await badge.boundingBox())!;
+  expect(Math.min(box.width, box.height), 'the button itself is small; its hit area reaches 44').toBeGreaterThan(10);
+  await badge.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('template-editor')).toBeVisible();
+  await snap(page, 'link-badge-edit');
+  await page.getByRole('button', { name: 'Use', exact: true }).first().click();
+  await expect(previewRoot(page).locator('.sh-link-badge')).toHaveCount(0);
 });

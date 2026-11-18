@@ -103,6 +103,8 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const switchCategory = useCallback((next: Category) => { setYielded(false); if (next !== library.category || !library.open) library.press(next); }, [library]);
   // Project > Data opens the Data panel when there is a rail (the dialog stays a pushed page on a phone): one place to build Data Flows.
   const showDialog = useCallback((key: DialogKey | undefined) => { if (key === 'data' && !narrow) { setProjectOpen(false); switchCategory('data'); } else setDialog(key); }, [narrow, switchCategory]);
+  // The editor's "Used in N places" row opens the Uses level, which lives in the Components panel: open that, whatever it showed.
+  useEffect(() => { if (ws.usesId && !narrow) { setYielded(false); library.show('components'); library.setOpen(true); } }, [ws.usesId, narrow]); // eslint-disable-line react-hooks/exhaustive-deps
   const keepPanel = useCallback((key: SelectionKey) => { keptSelection.current = key; }, []);
   const reduced = reducedMotion();
   const panelMotion = tier === 'flyout' ? 250 : 200, inspectorMotion = 200;
@@ -136,13 +138,13 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const bottomInset = narrow && (levelOpen || repeatsUp) ? coverage(SNAP_HALF) : narrow && target ? coverage(snap) : 0;
   const className = `w2 w2-scope ${narrow ? 'w2-narrow' : 'w2-wide'} ${theme.dark ? 'w2-dark' : 'w2-light'}`;
   const stage = useMemo(() => document && ws.surface && ws.previewDocument ? <PreviewGuard document={ws.previewDocument} lastGood={ws.lastGoodDocument}>{shown => <Preview2
-    document={shown} mode={ws.mode} surface={ws.surface!} onSurfaceChange={ws.setSurface} selection={ws.selection} onSelect={ws.select}
+    document={shown} mode={ws.mode} surface={ws.surface!} onSurfaceChange={ws.setSurface} selection={ws.selection} onSelect={ws.select} onOpenTemplate={ws.openTemplate}
     window={window_} textScale={textScales[textStep]} appearance={appearance === 'follow' ? undefined : appearance} bezel={!narrow} live={ws.houseStates.live} overlay={ws.houseStates.overlay}
     onOverlayChange={ws.houseStates.setOverlay} onSimulatedCall={ws.simulated} revealKey={ws.revealKey} repeatMark={ws.repeats.mark} bottomInset={bottomInset} alert={ws.alertPreview}
     statePreview={ws.statePreview && ws.selection === `node:${ws.statePreview.nodeId}` ? ws.statePreview : undefined}
     mapPicture={ws.houseStates.streaming ? fetchPicture : undefined} records={useRecords}/>}</PreviewGuard> : undefined,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [ws.previewDocument, ws.lastGoodDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.live, ws.houseStates.streaming, ws.houseStates.overlay, window_, narrow, ws.revealKey, ws.repeats.mark, bottomInset, ws.alertPreview, ws.statePreview, textStep, appearance, ws.setSurface, ws.select, ws.houseStates.setOverlay, ws.simulated]);
+  [ws.previewDocument, ws.lastGoodDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.live, ws.houseStates.streaming, ws.houseStates.overlay, window_, narrow, ws.revealKey, ws.repeats.mark, bottomInset, ws.alertPreview, ws.statePreview, textStep, appearance, ws.setSurface, ws.select, ws.openTemplate, ws.houseStates.setOverlay, ws.simulated]);
   const underPreview = railUnderPreview(narrow, window_);
   const under = !narrow && railUnder(layout.canvas);
   useDeviceGlide(stageElement, `${layout.left}/${layout.inspectorWidth}/${tier}`, panelMotion);

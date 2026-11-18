@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { expandDocument } from '../src/shared/composition/components';
 import {
-  analyseRepeat, defaultUnchecked, findRepeats, planRepeat, repeatSteps, REPEAT_LIMITS, type RepeatAnalysis, type RepeatClass,
+  analyseRepeat, defaultUnchecked, findRepeats, planRepeat, repeatSteps, REPEAT_LIMITS, REPEAT_MIN_TILE_PLACES, type RepeatAnalysis, type RepeatClass,
 } from '../src/shared/composition/repeats';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { runChecks } from '../src/workspace2/checks';
@@ -253,5 +253,48 @@ describe('a big document', () => {
     const started = performance.now();
     for (const cls of result.classes) planRepeat(analyseRepeat(doc, cls), new Set());
     expect(performance.now() - started).toBeLessThan(2000);
+  });
+});
+
+describe('Single Tiles', () => {
+  const door = (id: string, title: string, source: string) => actionTile(id, title, source);
+  const second = (components: J[]) => ({ ...fixture().pages[0], id: 'page-b', components });
+
+  it('makes one class of two from garage door tiles that differ in Name and Source, kept apart from Groups', () => {
+    const doc = withPage([door('one', 'Left Garage Door', 'demo-source-left')], [second([door('two', 'Right Garage Door', 'demo-source-right')])]);
+    const result = findRepeats(doc);
+    expect(REPEAT_MIN_TILE_PLACES).toBe(2);
+    expect(result.classes).toEqual([]);
+    expect(result.tiles).toHaveLength(1);
+    expect(result.tiles[0]).toMatchObject({ type: 'action-tile', size: 1 });
+    expect(result.tiles[0].places.map(place => place.nodeId)).toEqual(['one', 'two']);
+    expect(result.tilePlaceCount).toBe(2);
+  });
+
+  it('does not list a tile that appears once, or a node that is not a tile', () => {
+    expect(findRepeats(withPage([door('one', 'Garage Door', 'demo-source-door')])).tiles).toEqual([]);
+    expect(findRepeats(withPage([grid('g1', 'A', []), grid('g2', 'A', [])])).tiles).toEqual([]);
+  });
+
+  it('does not list a tile that sits inside a listed group', () => {
+    const group = (id: string) => grid(id, 'Row', [door(`${id}-a`, 'Door', 'demo-source-door'), door(`${id}-b`, 'Door', 'demo-source-door'), door(`${id}-c`, 'Door', 'demo-source-door')]);
+    const result = findRepeats(withPage([group('g1'), group('g2')]));
+    expect(result.classes.length).toBeGreaterThan(0);
+    expect(result.tiles).toEqual([]);
+  });
+
+  it('does not list a template place, even beside a plain tile of the same shape', () => {
+    const plain = door('plain', 'Garage Door', 'demo-source-door');
+    const place = { id: 'place', type: 'component-ref', componentId: 'demo-door', layout: { span: 1 } };
+    const doc = { ...withPage([plain, place], [second([place as J])]), componentLibrary: [{ id: 'demo-door', name: 'Door', node: door('demo-door-body', 'Garage Door', 'demo-source-door') }] } as CompositionDocument;
+    const result = findRepeats(doc);
+    expect(result.tiles).toEqual([]);
+    expect(result.classes).toEqual([]);
+  });
+
+  it('leaves the groups as they were: the fixture still has its tile grid three times and its section twice', () => {
+    const result = findRepeats(fixture());
+    expect(result.classes.map(item => [item.type, item.size, item.places.length])).toEqual([['tile-grid', 4, 3], ['section', 4, 2]]);
+    expect(result.placeCount).toBe(5);
   });
 });

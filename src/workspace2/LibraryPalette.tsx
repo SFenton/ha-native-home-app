@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, Info, Layers, Search } from 'lucide-react';
+import { ChevronDown, Info, ScanSearch, Search } from 'lucide-react';
+import { templateWords } from './templateWords';
 import { Icon } from '../ui';
 import { lucide } from './add/AddPicker';
 import { useAdd } from './add/AddHost';
@@ -36,8 +37,8 @@ export default function LibraryPalette({ ws, kind, library }: { ws: Workspace2; 
   const saved = useMemo(() => grouped ? savedRows(ws.document) : [], [grouped, ws.document]);
   const logicHits = useMemo(() => needle && ws.document ? libraryOf(ws.document).filter(entry => entry.name.toLowerCase().includes(needle)) : [], [needle, ws.document]);
   const repeats = ws.repeats;
-  const findMatches = !needle || FIND_REPEATS.toLowerCase().includes(needle);
-  const savedMatch = saved.filter(row => !needle || row.entry.name.toLowerCase().includes(needle)).length + (kind === 'components' && repeats && findMatches ? 1 : 0);
+  const found = repeats?.result ? repeats.result.classes.length + repeats.result.tiles.length : 0;
+  const savedMatch = saved.filter(row => !needle || row.entry.name.toLowerCase().includes(needle)).length;
   const savedOpen = library?.groupOpen('saved', true) ?? true, builtOpen = library?.groupOpen('built-in', true) ?? true;
   // The button leaves focus on the first cell once Edit has drawn.
   useEffect(() => { if (focusFirst.current && ws.mode === 'edit') { focusFirst.current = false; gridRef.current?.querySelector<HTMLElement>('.w2-palette-grid button')?.focus(); } }, [ws.mode, shown.length]);
@@ -75,13 +76,10 @@ export default function LibraryPalette({ ws, kind, library }: { ws: Workspace2; 
       {grouped && library ? <>
         {needle && shown.length === 0 && savedMatch === 0 ? <p className="w2-empty">Nothing matches.</p> : <>
           {kind === 'components' && <section className="w2-palette-group" data-group="saved">
-            <h3 className="w2-group-title w2-tree-group"><button type="button" className="w2-tree-group-button" aria-expanded={savedOpen} onClick={() => library.setGroup('saved', !savedOpen)}><ChevronDown size={12} aria-hidden data-open={savedOpen || undefined}/><span>Templates</span><span className="w2-tree-count">{saved.length}</span></button></h3>
+            <h3 className="w2-group-title w2-tree-group"><button type="button" className="w2-tree-group-button" aria-expanded={savedOpen} onClick={() => library.setGroup('saved', !savedOpen)}><ChevronDown size={12} aria-hidden data-open={savedOpen || undefined}/><span>Templates</span><span className="w2-tree-count">{saved.length}</span></button>
+            </h3>
             {savedOpen && <SavedComponents ws={ws} query={query} disabled={disabled} describedBy={disabled ? noticeId : undefined}/>}
-            {/* No kits ship, so there is no Kits list: the Find Repeated Pieces row follows the templates. */}
-            {savedOpen && repeats && findMatches && <button type="button" className="w2-find-repeats" data-testid="find-repeats" aria-label={repeats.result ? `${FIND_REPEATS}, ${repeats.result.classes.length} found` : FIND_REPEATS} onClick={() => repeats.setOpen(true)}>
-              <Layers size={20} aria-hidden/><span className="w2-find-repeats-name">{FIND_REPEATS}</span>
-              {repeats.result && <span className="w2-find-repeats-count" data-testid="find-repeats-count">{`${repeats.result.classes.length}`}</span>}
-            </button>}
+            {savedOpen && saved.length === 0 && repeats && <button type="button" className="w2-link-button w2-tpl-emptycta" onClick={() => repeats.setOpen(true)}>{FIND_REPEATS}</button>}
           </section>}
           {paletteGroups[kind].map(group => {
             const here = shown.filter(type => group.keys.includes(type.key));
@@ -95,6 +93,9 @@ export default function LibraryPalette({ ws, kind, library }: { ws: Workspace2; 
         </>}
       </> : shown.length === 0 ? <p className="w2-empty">Nothing matches.</p> : typeGrid(shown)}
     </div>
-    {!disabled && <p className="w2-lib-hint">Drag onto the page, or click to add after the selection.</p>}
+    {kind === 'components' && repeats
+      ? <footer className="w2-lib-foot" aria-label="Templates"><button type="button" data-testid="find-repeats" aria-label={found ? `${FIND_REPEATS}, ${found} found` : FIND_REPEATS} onClick={() => repeats.setOpen(true)}><ScanSearch size={16} aria-hidden/>{FIND_REPEATS}{found ? <span className="w2-tree-count" data-testid="find-repeats-count">{found}</span> : null}</button>
+        {!disabled && <p className="w2-caption w2-tpl-foothint">{templateWords.footHint}</p>}</footer>
+      : !disabled && <p className="w2-lib-hint">Drag onto the page, or click to add after the selection.</p>}
   </div>;
 }

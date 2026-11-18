@@ -5,10 +5,11 @@ Tiles
 Templates
 Entities
 Lamp Row
-Used in 2 places
+2
 
 [names]
 Search tiles, templates and entities
 Kind
-Lamp Row. Used in 2 places
+Lamp Row, template, used in 2 places
+Used in 2 places
 More for Lamp Row

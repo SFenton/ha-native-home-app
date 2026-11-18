@@ -16,7 +16,7 @@ import type { ItemScope, UseRecords } from './flow-records';
 import { Screen } from './Screen';
 import { SelectionLayer } from './SelectionLayer';
 import { createSelectionStore } from './selection-store';
-import { ComponentLibraryContext, previewSources } from './component-library';
+import { ComponentLibraryContext, OpenTemplateContext, previewSources } from './component-library';
 import { libraryById } from '../shared/composition/components';
 import { poseOfWindow, previewWindows, radiiCss, type PreviewWindow } from './windows';
 import { DuoRig, type ScreenCopy } from './DuoRig';
@@ -66,6 +66,8 @@ export interface Preview2Props {
   onSimulatedCall?(summary: string): void;
   /** Scrolls this node into view. */
   revealKey?: SelectionKey;
+  /** Edit: the link badge of a template place opens the template in the editor. */
+  onOpenTemplate?(componentId: string): void;
   /** The piece the Repeated Pieces proposal is about: a dashed outline and a tag ("1 of 14"). */
   repeatMark?: { key: SelectionKey; label: string };
   /** Pixels covered by a narrow sheet; the revealed node stays above them. */
@@ -233,13 +235,13 @@ export default function Preview2(props: Preview2Props) {
   </SelectionLayer>;
   const style = { '--sh-inset': `${bottomInset / zoom}px`, '--sh-zoom': zoom, ...(props.textScale && props.textScale !== 1 ? { '--sh-text-scale': props.textScale } : {}) } as CSSProperties;
   return <div ref={host} className="sh-preview2" data-preview-root data-ink={props.ink ?? (tileInkDefault ? 'primary' : 'muted')} data-mode={mode} data-text-scale={props.textScale && props.textScale !== 1 ? props.textScale : undefined} data-bezel={bezel ? '' : undefined} style={style}>
-    <RenderCtx.Provider value={context}><ComponentLibraryContext.Provider value={library}>
+    <RenderCtx.Provider value={context}><ComponentLibraryContext.Provider value={library}><OpenTemplateContext.Provider value={props.onOpenTemplate}>
       <DeviceFrame width={modelWidth} height={height} zoom={zoom} pan={mode === 'use'} padding={bezel ? STAGE_PADDING : { x: 0, y: 0 }}
         stageClassName={pose ? 'sh-rig-stage' : ''} stageProps={pose ? { style: { '--sh-fold-ms': `${token.ms}ms`, '--sh-fold-ease': token.ease } as CSSProperties } : undefined}
         modelClassName={pose ? 'sh-model sh-rig-model' : `sh-model ${bezel ? 'sh-bezel' : 'sh-flat'}`} modelStyle={bodyStyle} modelProps={frame?.hingeStrip && !pose ? { 'data-strip': '' } : undefined}>
         {pose ? <DuoRig pose={pose} token={token} reduced={reduced} renderScreen={renderScreen}/> : renderScreen(win, 'primary')}
       </DeviceFrame>
-    </ComponentLibraryContext.Provider></RenderCtx.Provider>
+    </OpenTemplateContext.Provider></ComponentLibraryContext.Provider></RenderCtx.Provider>
     {mode === 'use' && <span className="sh-use-status" role="status">{marked ? `Showing ${marked} in the simulator.` : ''}</span>}
   </div>;
 }
