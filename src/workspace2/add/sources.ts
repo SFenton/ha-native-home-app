@@ -1,6 +1,8 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { holdsEntity } from './catalog';
+import type { ComponentEntry } from '../../shared/composition/schema';
+import { defaultOf } from '../params';
 
 type Source = CompositionDocument['dataSources'][number];
 const literal = (value: string) => ({ type: 'literal' as const, value });
@@ -145,4 +147,44 @@ export function acceptedDomains(document: CompositionDocument, path: EditorPath,
   if (current) return modelDomains(current);
   const node = valueAt(document, path) as { type?: string } | undefined;
   return byType[String(node?.type)];
+}
+
+// MARK: - Pairing a template's Source setting with an entity
+
+/** What a Source setting of a template pairs with: the single entity its default source reads, and the domains that source's model accepts. */
+export interface Pairing {
+  /** The model of the default source, or undefined when it is a plain entity source. */
+  model: string | undefined;
+  /** The domains the model accepts for its one entity; undefined when any entity fits. */
+  domains: readonly string[] | undefined;
+}
+
+/**
+ * Whether the Source setting `param` of `component` can be filled by naming one entity (the pairing step): its default source reads exactly one entity
+ * and is a plain entity source or a model that is not a camera (a camera is more than one entity, so it is swapped for another camera source, never
+ * re-pointed). A source that reads several entities, or none, stays a choice among the document's sources.
+ */
+export function pairingOf(document: CompositionDocument, component: ComponentEntry, param: string): Pairing | undefined {
+  if (component.params?.find(item => item.name === param)?.kind !== 'source-id') return undefined;
+  const source = document.dataSources.find(item => item.id === defaultOf(component, param));
+  if (!source || sourceEntity(source) === undefined) return undefined;
+  if (source.kind === 'model' && source.model === 'camera-stream@1') return undefined;
+  return { model: source.kind === 'model' ? source.model : undefined, domains: modelDomains(source) };
+}
+
+/**
+ * The source a place of a template reads once it is paired with `entityId`: the document's own source of the same model for that entity when there is
+ * one, else a new one (a copy of the default source with the entity swapped), so a second place for the same entity shares the first one's source.
+ *
+ * @returns The document (with the new source, when one was made) and the id to write as the setting's argument.
+ * @throws When the setting cannot be paired ({@link pairingOf}).
+ */
+export function pairSource(document: CompositionDocument, component: ComponentEntry, param: string, entityId: string): { document: CompositionDocument; sourceId: string } {
+  if (!pairingOf(document, component, param)) throw new Error('This setting is not paired with an entity');
+  const current = document.dataSources.find(item => item.id === defaultOf(component, param));
+  // A source of the same model that already reads this entity is the one to share, whatever else it carries (a light group keeps its members).
+  const model = current?.kind === 'model' ? current.model : undefined;
+  const known = document.dataSources.find(item => (item.kind === 'model' ? item.model : undefined) === model && sourceEntity(item) === entityId);
+  if (known) return { document, sourceId: known.id };
+  return sourceForNode(document, current, entityId, model === 'power-toggle@1');
 }

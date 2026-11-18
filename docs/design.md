@@ -117,7 +117,17 @@ when there is none). The kinds:
   widen it. A template that reads its entity through a source owns a copy of it (`sources`), one for each place.
 - *State*: a choice row, "This Place’s Own" (the default: a new place gets its own copy of the template's local state field) or "Shared: <state>". State settings
   come last.
-- Data source, page, sheet, text and symbol: the pickers those fields already have.
+- *Data source* whose default source reads one entity (a light, a switch, a door; not a camera): the pairing step. The place's form shows an **Entity** row
+  ("Entity", or "<label> Entity" when the template has more than one), limited to the domains the source's model accepts. Choosing an entity finds the
+  document's source of that model for it, or makes one (a copy of the default source with the entity swapped, with no group members), and writes its id as
+  the setting, all in one step. A second place for the same entity shares the first's source. A source that reads several entities, or none, stays a choice among
+  the document's sources (`add/sources.ts`, `pairingOf` and `pairSource`).
+- Page, sheet, text and symbol: the pickers those fields already have.
+
+**Converting tiles in bulk.** `scripts/convert-tiles.ts DOCUMENT SPEC OUT` makes tile templates from a copy of a document without the dialog. A spec lists, for each template,
+its name, the tile type, an id pattern and field filter that pick the tiles, and the label of each setting by a field it fills; `also` adds a setting the places
+do not yet differ in (a name or icon they share today) so a new place can set it. It builds on Find Repeated Pieces and Save as Template (`repeats/convertTiles.ts`),
+so each place keeps its tile's id and the worked-out document stays equal; it refuses when a tile would have to stay as it is. It touches no Studio.
 
 **Set Per Place.** Under each entity and state field of a template, in Edit, a worded line: "Set Per Place". With no setting of that kind it creates one (named by
 `suggestName`, labelled with the field's label). With one it opens a menu, "Use Light" for each and "New Setting"; Use fills this field from that setting too,

@@ -4,6 +4,7 @@ import { valueAt } from '../composition-editor';
 import type { IndexEntry } from '../preview2/model';
 import type { ComponentEntry, ComponentRefNode, CompositionDocument, CompositionNode } from '../shared/composition/schema';
 import { TextInput, LabeledRow } from './editors/controls';
+import { pairingOf, pairSource, sourceEntity } from './add/sources';
 import { sourceName } from './dialogs/sources';
 import { mechanicalLabel } from './labels';
 import { ownStateField } from './linked';
@@ -55,6 +56,18 @@ export function TemplateSettings({ ws, document, component, refPath, onError }: 
       if (param.kind === 'symbol') return <IconField key={param.name} label={label} symbol={value} onPick={next => set(param.name, next)} path={`args/${param.name}`}/>;
       if (param.kind === 'entity-id') return <EntitySetting key={param.name} label={label} value={value} domains={domainOf(defaultOf(component, param.name))} onPick={next => set(param.name, next)} path={`args/${param.name}`}/>;
       if (param.kind === 'state-id') return <StateSetting key={param.name} ws={ws} document={document} component={component} refPath={refPath} name={param.name} label={label} value={value} onError={onError}/>;
+      const pairing = param.kind === 'source-id' ? pairingOf(document, component, param.name) : undefined;
+      if (pairing) {
+        // The pairing step: the place names an entity, and the Studio finds or makes the model source that reads it (one document, one undo step).
+        const only = params.filter(item => item.kind === 'source-id' && pairingOf(document, component, item.name)).length === 1;
+        const entityId = sourceEntity(document.dataSources.find(source => source.id === value)) ?? '';
+        const pair = (picked: string) => {
+          try { const made = pairSource(document, component, param.name, picked); ws.studio.apply(setArgument(made.document, refPath, param.name, made.sourceId)); }
+          catch (error) { onError(error instanceof Error ? error.message : String(error)); }
+        };
+        const preset = pairing.domains ? [...pairing.domains] : domainOf(sourceEntity(document.dataSources.find(source => source.id === defaultOf(component, param.name))) ?? '');
+        return <EntitySetting key={param.name} label={only ? 'Entity' : `${label} Entity`} title={only ? 'Entity' : `Entity for ${label}`} value={entityId} domains={preset} restrict={pairing.domains} onPick={pair} path={`args/${param.name}`}/>;
+      }
       const choices: Choice[] = param.kind === 'source-id' ? document.dataSources.map(source => ({ id: source.id, label: sourceName(source), detail: source.id }))
         : (param.kind === 'page-id' ? document.pages : document.modals).map(item => ({ id: item.id, label: item.title }));
       return <ChoiceField key={param.name} label={label} title={`${kindWords[param.kind]} for ${label}`} choices={choices} value={value} onPick={next => set(param.name, next)} path={`args/${param.name}`}/>;
@@ -63,12 +76,12 @@ export function TemplateSettings({ ws, document, component, refPath, onError }: 
 }
 
 /** The Studio's entity row (the name over the id) and its picker page; the template default's domain chip is pressed on, not restricted. */
-function EntitySetting({ label, value, domains, onPick, path }: { label: string; value: string; domains: string[]; onPick: (entityId: string) => void; path: string }) {
+function EntitySetting({ label, title, value, domains, restrict, onPick, path }: { label: string; /** The picker's title; defaults to "Entity for <label>". */ title?: string; value: string; domains: string[]; /** Only these domains may be picked: what a paired source's model accepts. */ restrict?: readonly string[]; onPick: (entityId: string) => void; path: string }) {
   const { entities } = useWorkspaceData();
   const row = entities.find(item => item.entityId === value);
   const name = row?.name ?? value;
-  return <PickerRow label={label} title={`Entity for ${label}`} path={path} primary={value ? name : <span className="w2-placeholder">Choose</span>} secondary={value && name !== value ? value : undefined}>
-    {close => <EntityList domains={domains} kind="template" onPick={picked => { onPick(picked.entityId); close(); }}/>}
+  return <PickerRow label={label} title={title ?? (label === 'Entity' ? label : `Entity for ${label}`)} path={path} primary={value ? name : <span className="w2-placeholder">Choose</span>} secondary={value && name !== value ? value : undefined}>
+    {close => <EntityList domains={domains} restrict={restrict} kind="template" onPick={picked => { onPick(picked.entityId); close(); }}/>}
   </PickerRow>;
 }
 
