@@ -171,6 +171,7 @@ export function wordsFor(document: CompositionDocument, issue: CompositionIssue,
       if (issue.capability === 'sh.tab-blocks@1') return 'Shared areas in tabs need a newer app than this one runs. Put the controls in each tab, or wait for the app to update.';
       if (issue.capability === 'sh.tab-bar@1') return 'Tab bar settings need a newer app than this one runs. Use the default bar, or wait for the app to update.';
       if (issue.capability === 'sh.tile-swipe@1') return 'Swiping a tile needs a newer app than this one runs. Turn Swipe to Adjust off, or wait for the app to update.';
+      if (issue.capability === 'sh.shell-profile@1') return 'Profile button settings need a newer app than this one runs. Clear them, or wait for the app to update.';
       if (issue.capability === 'sh.state-words@1') return 'State words need a newer app than this one runs. Clear them to use the app’s words, or wait for the app to update.';
       if (issue.capability === 'sh.overlay@1') return 'Overlays need a newer app than this one runs. Remove it, or wait for the app to update.';
       if (issue.capability === 'sh.tile-parts@1') return 'Tile buttons and progress need a newer app than this one runs. Remove them, or wait for the app to update.';

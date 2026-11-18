@@ -91,11 +91,8 @@ export interface CameraCutout {
   occlusion: Rect;
   /** The region the app keeps clear of controls: the status items sit in it, and the rail starts after it. */
   keepClear: Rect;
-  /**
-   * Where the status items and the rail's start sit: the keep-clear region confined to the rail column, so the time and the connection mark
-   * stack past the camera on the rail at every turn and never reach the content beside it (at a quarter turn the keep-clear itself is wider than the rail).
-   */
-  statusColumn: Rect;
+  /** How far along the rail the camera keeps clear: the keep-clear region's height at this turn, 170 pt at turns 0 and 180 and 84 pt at 90 and 270 (the rotated region is 170 wide there, wider than the rail). */
+  reach: number;
   /** Whether the numbers are carried round from the closed portrait rather than measured: every turn but 0. */
   interim: boolean;
   /** The camera centre and the occlusion's width, for drawing. */
@@ -104,11 +101,10 @@ export interface CameraCutout {
 /** The camera of the closed Duo at a turn: R1's rectangles carried round the window. */
 export function cameraCutout(turn: Turn): CameraCutout {
   const quarters = turn / 90, occlusion = turnRect(R1_OCCLUSION, quarters), keepClear = turnRect(R1_KEEP_CLEAR, quarters);
-  const corner = cameraCornerOf(turn), window = turn % 180 === 0 ? CLOSED_PORTRAIT : { width: CLOSED_PORTRAIT.height, height: CLOSED_PORTRAIT.width };
-  const column = R1_KEEP_CLEAR.width, reach = R1_KEEP_CLEAR.height;
-  const statusColumn: Rect = { x: corner.horizontal === 'right' ? window.width - column : 0, y: corner.vertical === 'top' ? 0 : window.height - reach, width: column, height: reach };
+  const corner = cameraCornerOf(turn);
+  const reach = keepClear.height;
   return {
-    corner, occlusion, keepClear, statusColumn, interim: turn !== 0,
+    corner, occlusion, keepClear, reach, interim: turn !== 0,
     x: occlusion.x + occlusion.width / 2, y: occlusion.y + occlusion.height / 2, size: occlusion.width,
   };
 }

@@ -16,6 +16,7 @@
   .sh-rig-persp { position: absolute; left: 0; top: 0; transform-style: preserve-3d; }
   .sh-half { position: absolute; transform-style: preserve-3d; transition: transform var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }
   .sh-inner, .sh-outer { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform-style: preserve-3d; }
+  .sh-half[data-unseen] > .sh-inner { visibility: hidden; }
   .sh-body { position: absolute; inset: 0; background: #0b0b0d; box-shadow: 0 0 0 1px #3a3a3f, 0 0 0 3px #1c1c1f; pointer-events: none; }
   /* The shadow on the table is one flat shape under the whole body, so the halves can tilt without a seam in it. */
   .sh-ground { position: absolute; border-radius: 72px; box-shadow: 0 18px 40px rgba(0, 0, 0, .35); pointer-events: none; transition: left var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out), top var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out), width var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out), height var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }

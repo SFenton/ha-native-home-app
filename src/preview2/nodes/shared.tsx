@@ -113,7 +113,7 @@ export function useEnabled(rule: EnabledWhen | undefined, key: string): boolean 
 }
 /** The small count on a chip, a tile, a tab or a header button. Nothing is drawn for no badge. Its label is the spoken words when the badge has them. */
 export function Badge({ badge }: { badge: BadgeFace | null | undefined }) {
-  return badge?.text ? <span className="sh-badge" data-testid="badge" aria-label={badge.spoken ?? `${badge.text} new`}>{badge.text}</span> : null;
+  return badge?.text ? <span className="sh-badge" data-testid="badge" data-len={badge.text.length} aria-label={badge.spoken ?? `${badge.text} new`}>{badge.text}</span> : null;
 }
 /** Reads a field of a source (`['stateText']`, `['isOn']`). */
 export function useSourceRead(sourceId: string | undefined, path: string[]): ReadResult {
