@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.8
+
+- The Studio's dial editor offers Set Per Place inside a template, Checks flags an empty Otherwise text, and the Duo preview's keyboard reach no longer flips while tiles move.
+
 ## 0.3.7
 
 - Maintenance and internal changes.
