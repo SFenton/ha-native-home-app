@@ -27,6 +27,8 @@ const expectPose = async (page: Page, fold: string, turn: number) => {
   await expect(rig(page)).toHaveAttribute('data-turn', String(turn));
   // The pose it left stays mounted, fading, for a moment: on a slow runner a measure taken now finds its rail bar as well as the new one.
   await expect(previewRoot(page).locator('.sh-rig-slot[data-leaving]')).toHaveCount(0, { timeout: 5000 });
+  // And the new pose has stopped settling: a closed Duo that has just moved still draws both displays (two rail bars) until the swing is done.
+  await expect(previewRoot(page).locator('.sh-rig[data-settling]')).toHaveCount(0, { timeout: 5000 });
 };
 
 /** The luma (0 to 255) of the page's pixels at the given viewport points, from one screenshot decoded in the page. */
@@ -135,8 +137,11 @@ for (const direction of ['Right', 'Left'] as const) {
     for (const [index, turn] of turns.entries()) {
       if (index) await press(page, `Rotate ${direction}`);
       await expectPose(page, 'closed', turn);
-      const screen = (await previewRoot(page).locator('.sh-rig:not([data-frozen]) .sh-outer .sh-screen').boundingBox())!, bar = (await previewRoot(page).locator('.sh-rail-bar').boundingBox())!;
-      const camera = (await previewRoot(page).locator('.sh-camera').boundingBox())!;
+      const live = previewRoot(page).locator('.sh-rig:not([data-frozen])');
+      // A settled closed rig has exactly one rail bar.
+      await expect(live.locator('.sh-outer .sh-rail-bar')).toHaveCount(1);
+      const screen = (await previewRoot(page).locator('.sh-rig:not([data-frozen]) .sh-outer .sh-screen').boundingBox())!, bar = (await live.locator('.sh-outer .sh-rail-bar').boundingBox())!;
+      const camera = (await live.locator('.sh-camera').boundingBox())!;
       // The window is portrait at 0 and 180, landscape at 90 and 270.
       expect(screen.height > screen.width).toBe(turn % 180 === 0);
       // The rail is on the vertical edge the camera is on: trailing at 0 and 90, leading at 180 and 270.
@@ -146,7 +151,7 @@ for (const direction of ['Right', 'Left'] as const) {
       expect(camera.x + camera.width / 2 < screen.x + screen.width / 2).toBe(leading);
       expect(Math.abs((leading ? bar.x - screen.x : screen.x + screen.width - bar.x - bar.width))).toBeLessThan(2);
       // The status items stay in the rail column past the camera: nothing in that box is content, and the box is inside the rail's width.
-      const status = (await previewRoot(page).locator('.sh-rail-status').boundingBox())!;
+      const status = (await live.locator('.sh-outer .sh-rail-status').boundingBox())!;
       // The rail's inset is 84 pt and its bar 69 pt (R1): the status column is the inset, no wider.
       expect(Math.abs(status.width - bar.width * 84 / 69), 'as wide as the rail inset').toBeLessThanOrEqual(2);
       const onContent = await page.evaluate(({ x, y, width, height }) => {
@@ -416,14 +421,19 @@ for (const mode of ['Use', 'Edit'] as const) {
   test(`${mode}: tabbing through a partly folded page visits each control once, in the copy that shows it, and never scrolls a clip`, async ({ page }) => {
     await startDuo(page, mode);
     await press(page, 'Partly Folded');
-    // Every control that can take a tab stop in the preview: none is aria-hidden, none is clipped out of its half.
-    const stops = await page.evaluate(() => [...document.querySelectorAll('[data-preview-root] .sh-rig [data-copy] button, [data-preview-root] .sh-rig [data-copy] a[href], [data-preview-root] .sh-rig [data-copy] input, [data-preview-root] .sh-rig [data-copy] [tabindex]')]
+    // Every control that can take a tab stop in the preview: none is aria-hidden, none is clipped out of its half. Which copy exposes a control
+    // is assigned after the tilt's transition ends (`useCopyReach`, on a frame), so the marks are read once they are final, not on the frame the rig settles.
+    const readStops = () => page.evaluate(() => [...document.querySelectorAll('[data-preview-root] .sh-rig [data-copy] button, [data-preview-root] .sh-rig [data-copy] a[href], [data-preview-root] .sh-rig [data-copy] input, [data-preview-root] .sh-rig [data-copy] [tabindex]')]
       .filter(element => (element as HTMLElement).tabIndex >= 0).map(element => {
         const clip = element.closest('.sh-clip')!.getBoundingClientRect(), box = element.getBoundingClientRect(), x = box.left + box.width / 2;
         return { hidden: Boolean(element.closest('[aria-hidden=true]')), inClip: x >= clip.left && x <= clip.right, label: element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 24) };
       }));
-    expect(stops.length).toBeGreaterThan(3);
-    expect(stops.filter(stop => stop.hidden || !stop.inClip)).toEqual([]);
+    // The bad stops and the count come from one read, so the count is of the very stops that were judged.
+    let stops: Awaited<ReturnType<typeof readStops>> = [];
+    await expect.poll(async () => {
+      stops = await readStops();
+      return { bad: stops.filter(stop => stop.hidden || !stop.inClip), many: stops.length > 3 };
+    }, { timeout: 5000 }).toEqual({ bad: [], many: true });
     // And a person tabbing: focus never falls to the body inside the preview, stays inside its half, and no clip scrolls.
     await page.locator('[data-preview-root]').first().click({ position: { x: 4, y: 4 }, force: true }).catch(() => undefined);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
