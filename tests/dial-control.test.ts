@@ -151,7 +151,7 @@ describe('the rules the compiler adds to a dial control', () => {
     expect(issue([dialControl({ stoppers: [stopper('low', 68, { value: read('number'), limit: { max: read('number') } }), stopper('high', 75)], between: { rule: 'stop', gap: read('number') } })])).toBeUndefined();
     expect(issue([dialControl({ stoppers: [stopper('low', 68, { value: read('string') }), stopper('high', 75)] })])).toMatchObject({ code: 'binding_type' });
   });
-  it('is hidden in the preview until its editor lands', () => expect(isHiddenNode({ type: 'dial-control' })).toBe(true));
+  it('is drawn and edited in the Studio now (SD3)', () => expect(isHiddenNode({ type: 'dial-control' })).toBe(false));
 });
 
 describe('the text place of a dial', () => {

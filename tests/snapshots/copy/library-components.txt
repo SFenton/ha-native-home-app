@@ -17,7 +17,7 @@ Action tile
 Navigation tile
 State tile
 Content
-10
+11
 Row
 Text
 Readout
@@ -27,6 +27,7 @@ Shape
 Chart
 Gauge
 Dial
+Dial Control
 Arc
 Drag onto the page, or click to add after the selection.
 

@@ -15,6 +15,7 @@ Gauge
 Section
 Tile grid
 Dial
+Dial Control
 Arc
 Status rail
 Row

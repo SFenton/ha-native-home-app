@@ -119,20 +119,20 @@ export default function Preview2(props: Preview2Props) {
     if (!sameSurface(before, after)) from.onSurfaceChange(after);
   }, []);
   // Use mode: an action that asks first waits for the person's answer to the alert.
-  const [pending, setPending] = useState<{ action?: CompositionActionSlot; control?: Json; scope?: ItemScope; alert: AlertSpec; then?: () => void }>();
-  const execute = useCallback((action: CompositionActionSlot, control: Json | undefined, confirmed: boolean, scope?: ItemScope) => {
+  const [pending, setPending] = useState<{ action?: CompositionActionSlot; control?: Json; controlValues?: Record<string, Json>; scope?: ItemScope; alert: AlertSpec; then?: () => void }>();
+  const execute = useCallback((action: CompositionActionSlot, control: Json | undefined, confirmed: boolean, scope?: ItemScope, controlValues?: Record<string, Json>) => {
     const now = latest.current;
     if (now.mode !== 'use') return;
-    const plan = planAction(action, { document: now.document, house: now.live?.house ?? now.house ?? loadingHouse, overlay: now.overlay, control, confirmed, scope });
-    if (plan.confirm) { setPending({ action, control, scope, alert: plan.confirm }); return; }
+    const plan = planAction(action, { document: now.document, house: now.live?.house ?? now.house ?? loadingHouse, overlay: now.overlay, control, controlValues, confirmed, scope });
+    if (plan.confirm) { setPending({ action, control, controlValues, scope, alert: plan.confirm }); return; }
     markPerson();
     if (plan.overlay) { latest.current = { ...now, overlay: plan.overlay }; now.onOverlayChange(plan.overlay); }
     if (plan.call) deliverCall(plan.call);
     if (plan.simulated) now.onSimulatedCall?.(plan.simulated);
     if (plan.nav) commit(reduceNavigation(now.document, latest.current.nav, plan.nav));
   }, [commit]);
-  const run = useCallback((action: CompositionActionSlot, control?: Json, scope?: ItemScope) => execute(action, control, false, scope), [execute]);
-  const answer = (confirmed: boolean) => { const held = pending; setPending(undefined); if (confirmed && held) { if (held.then) held.then(); else if (held.action) execute(held.action, held.control, true, held.scope); } };
+  const run = useCallback((action: CompositionActionSlot, control?: Json, scope?: ItemScope, controlValues?: Record<string, Json>) => execute(action, control, false, scope, controlValues), [execute]);
+  const answer = (confirmed: boolean) => { const held = pending; setPending(undefined); if (confirmed && held) { if (held.then) held.then(); else if (held.action) execute(held.action, held.control, true, held.scope, held.controlValues); } };
   const ask = useCallback((alert: AlertSpec, then: () => void) => { if (latest.current.mode === 'use') setPending({ alert, then }); }, []);
   const note = useCallback((summary: string) => latest.current.onSimulatedCall?.(summary), []);
   useEffect(() => { if (props.mode !== 'use') setPending(undefined); }, [props.mode]);

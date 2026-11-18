@@ -28,6 +28,15 @@ import ActionRules, { ActionModeSwitch } from '../expr/ActionRules';
 
 // MARK: Value rows
 
+/** The stoppers of the dial control a call sits in (by id and name), or `undefined` when the call is not inside one. */
+function dialOf(document: CompositionDocument, path: EditorPath): { id: string; label: string }[] | undefined {
+  for (let depth = path.length; depth > 0; depth -= 1) {
+    const node = valueAt(document, path.slice(0, depth)) as { type?: string; props?: { stoppers?: { id: string; label?: { value?: unknown } }[] } } | undefined;
+    if (node?.type === 'dial-control') return (node.props?.stoppers ?? []).map(item => ({ id: item.id, label: typeof item.label?.value === 'string' ? item.label.value : item.id }));
+  }
+  return undefined;
+}
+
 /** How a service's field reads as an operand `as`. */
 const readType = (kind: ServiceFieldSpec['kind'] | undefined): 'string' | 'number' | 'boolean' => kind === 'number' ? 'number' : kind === 'boolean' ? 'boolean' : 'string';
 
@@ -49,6 +58,9 @@ function DataRow({ draft, path, name, spec, operand, onRemove }: { draft: Draft;
   const callPath = path.slice(0, -3);
   const setOperand = (next: Operand | undefined) => draft.set(replaceAt(draft.get(), callPath, withDataField(valueAt(draft.get(), callPath) as CallService, name, next)));
   const source: ValueSource = operand ? sourceOf(operand) : 'fixed';
+  // Inside a dial control (`sh.dial-control@1`) the control's value is a stopper's: the dial's one call names which, a stopper's own call is its value.
+  const dial = dialOf(doc, path);
+  const named = dial && !path.includes('stoppers') ? dial : undefined;
   const literal = operand?.type === 'literal' ? operand.value : undefined;
   const commit = (value: Json | undefined) => setOperand(value === undefined || value === '' ? undefined : { type: 'literal', value });
   let control: React.ReactNode;
@@ -60,7 +72,9 @@ function DataRow({ draft, path, name, spec, operand, onRemove }: { draft: Draft;
   } else if (source === 'entity' && operand?.type === 'read') {
     const entity = (doc.dataSources.find(item => item.id === operand.from.sourceId) as { entityId?: { value?: string } } | undefined)?.entityId?.value;
     control = <EntityField label={spec?.name ?? name} entityId={entity} onPick={row => { const made = ensureSource(draft.get(), row.entityId); draft.set(made.document); setOperand(operandFor('entity', undefined, made.sourceId)); }}/>;
-  } else if (source === 'control') control = <span className="w2-summary">The control’s value</span>;
+  } else if (source === 'control' && named) control = <PlainSelect label="Stopper" value={operand?.type === 'control' && operand.stopper ? operand.stopper : named[0].id}
+    options={named.map(item => ({ value: item.id, label: item.label }))} onChange={next => setOperand({ type: 'control', stopper: next })}/>;
+  else if (source === 'control') control = <span className="w2-summary">{dial ? 'This stopper’s value' : 'The control’s value'}</span>;
   else if (source === 'viewer' && operand?.type === 'viewer') control = <PlainSelect label="Person" value={operand.field} options={[{ value: 'userId', label: 'Their user ID' }, { value: 'isAdmin', label: 'Whether they are an admin' }, { value: 'personEntityId', label: 'Their person entity' }]} onChange={field => setOperand({ type: 'viewer', field: field as 'userId' | 'isAdmin' | 'personEntityId' })}/>;
   else control = <button type="button" className="w2-picker-button" onClick={() => push?.push({ title: 'Formula', body: <FormulaPage draft={draft} path={[...path, name]}/> })}><span className="w2-picker-primary">Formula</span></button>;
   return <LabeledRow label={spec?.name ?? name} keyName={name} trailing={<Menu.Root>
@@ -69,10 +83,10 @@ function DataRow({ draft, path, name, spec, operand, onRemove }: { draft: Draft;
       <Menu.RadioGroup value={source} onValueChange={next => {
         const to = next as ValueSource;
         if (to === source) return;
-        setOperand(operandFor(to, operand));
+        setOperand(to === 'control' && named ? { type: 'control', stopper: named[0].id } : operandFor(to, operand));
         if (to === 'formula') push?.push({ title: 'Formula', body: <FormulaPage draft={draft} path={[...path, name]}/> });
       }}>
-        {(Object.keys(sourceWords) as ValueSource[]).map(item => <Menu.RadioItem key={item} value={item} className="w2-menu-item">{sourceWords[item]}</Menu.RadioItem>)}
+        {(Object.keys(sourceWords) as ValueSource[]).map(item => <Menu.RadioItem key={item} value={item} className="w2-menu-item">{item === 'control' && dial ? (named ? 'This Dial' : 'This Stopper') : sourceWords[item]}</Menu.RadioItem>)}
       </Menu.RadioGroup>
       <Menu.Separator className="w2-menu-sep"/>
       <Menu.Item className="w2-menu-item w2-danger-item" onClick={onRemove}>Remove</Menu.Item>

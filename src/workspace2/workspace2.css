@@ -754,3 +754,4 @@ button.w2-tick, .w2-scope button.w2-tick { appearance: none; padding: 0; min-hei
 /* Group by State (`sh.grid-state-groups@1`): a card per group on its page. */
 .w2-scope .w2-group-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--w2-separator, rgba(128, 128, 128, .25)); }
 .w2-scope .w2-group-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.w2-scope .w2-dial-swatch { display: inline-block; vertical-align: -2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--w2-line); flex: none; margin-inline-end: 8px; }

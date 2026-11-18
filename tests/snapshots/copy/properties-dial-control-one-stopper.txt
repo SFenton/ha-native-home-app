@@ -1,0 +1,68 @@
+Study humidity
+Dial Control · Canvas
+Start From
+Preset
+One Value
+Range
+Lowest
+Highest
+Step
+Size
+Page
+Sheet
+Compact
+Stoppers
+Target
+50
+Add Stopper
+When Released
+Sends
+One Call for the Dial
+Call
+input_number.set_value
+Reading, Bands, Ticks
+Reading
+None
+Add Band
+Ticks
+Off
+Middle
+Top Line
+None
+Large Value
+Target
+Unit
+Decimals
+Caption
+None
+States
+Dimmed When
+Never
+Enabled When
+Always
+Unavailable Text
+Failure Text
+{value} is the number that was refused.
+Title
+Spoken name
+Spoken value
+None
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Add Reading
+Add Top Line
+Dimmed When: Never.
+Enabled When: Always.
+Spoken name value: Fixed
+Add Spoken value
+Only show when: Always.

@@ -3,6 +3,7 @@
  * the Studio only points out calls that are easy to regret.
  */
 import { overflowNotices } from './surface-controls-fit';
+import { dialControlWarnings } from './dial-control-edit';
 
 export interface CompositionWarning { pointer: string; message: string }
 
@@ -34,6 +35,9 @@ export function compositionWarnings(document: unknown): CompositionWarning[] {
     // A map whose buttons do not all fit a family: a note, never a refusal (the app puts the rest behind More).
     if (record.kind === 'map' && Array.isArray(record.controls) && typeof record.height === 'number' && typeof record.locate === 'boolean')
       for (const message of overflowNotices(record as unknown as Parameters<typeof overflowNotices>[0])) warnings.push({ pointer: `${pointer}/controls`, message });
+    // A dial control (`sh.dial-control@1`): the notes that need no house (a stopper with no value, a rim under 3 to 1, a first stopper above the second).
+    if (record.type === 'dial-control' && record.props && typeof record.props === 'object' && 'range' in record.props && 'stoppers' in record.props)
+      warnings.push(...dialControlWarnings(record as unknown as Parameters<typeof dialControlWarnings>[0], pointer));
     for (const [key, child] of Object.entries(record)) walk(child, `${pointer}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`);
   };
   walk(document, '/document');
