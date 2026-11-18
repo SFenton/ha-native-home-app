@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.4
+
+- Maintenance and internal changes.
+
+## 0.3.3
+
+- The dial's inspector gains a Text place group that moves the text in the middle.
+
+## 0.3.2
+
+- Studio can show when an entity last changed, countdowns, durations and truncated numbers.
+- The preview draws the Profile disc and badges on more elements, and a capped badge hides when its count is unavailable.
+
 ## 0.3.1
 
 - Studio loads the draft again when opened through Home Assistant.
