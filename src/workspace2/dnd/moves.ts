@@ -1,4 +1,5 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
+import { isTopLevelPageComponent, withoutFoldSide } from '../../shared/composition/fold-sides';
 import { compositionErrors, replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { buildDocumentIndex, type SelectionKey } from '../../preview2/model';
 import { canHold, endOf, ownerTitle, type Destination } from '../add/insert';
@@ -68,7 +69,9 @@ export function moveToSlot(document: CompositionDocument, key: SelectionKey, des
   const here = sameList(destination.list, fromList);
   const at = Math.max(0, Math.min(end.index, here && fromAt < destination.index ? destination.index - 1 : destination.index));
   const grid = (index.get(destination.owner)?.node?.type) === 'tile-grid';
-  const node = grid || entry.node.layout.span === 1 ? entry.node : { ...entry.node, layout: { ...entry.node.layout, span: 1 } };
+  const sized = grid || entry.node.layout.span === 1 ? entry.node : { ...entry.node, layout: { ...entry.node.layout, span: 1 } };
+  // A side belongs to a component at the top level of a page: a drop anywhere else (a sheet, a section) drops it.
+  const node = isTopLevelPageComponent([...end.list, at]) ? sized : withoutFoldSide(sized);
   const list = valueAt(removed, end.list) as unknown[];
   const next = replaceAt(removed, end.list, [...list.slice(0, at), node, ...list.slice(at)]);
   if (options.validate !== false && movedIntoProblems(document, next)) throw new Error(`${entry.node.title} cannot go there`);

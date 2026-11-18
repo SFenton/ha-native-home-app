@@ -18565,6 +18565,278 @@
         "code": "invalid_combination",
         "pointer": "/document/dataSources/9/inputs/request/value"
       }
+    },
+    {
+      "file": "reject/pending-fold-sides-auto-strip-and-four-sections.json",
+      "outcome": "reject",
+      "note": "The page switch on, a status strip and four sections: the strip spans, the sections lead and trail in turn.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-auto-one-override.json",
+      "outcome": "reject",
+      "note": "The page switch on with the third section pinned to the trailing side: the rest keep their turns.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-explicit-sides-no-switch.json",
+      "outcome": "reject",
+      "note": "Two sections pinned to sides and no page switch: a placed component alone turns the two sides on.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-one-side-only.json",
+      "outcome": "reject",
+      "note": "Every section pinned leading: the trailing side stays empty.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-switch-alone.json",
+      "outcome": "reject",
+      "note": "The page switch on a page of one section: the section leads and the trailing side stays empty.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-span-across-the-top.json",
+      "outcome": "reject",
+      "note": "Across the Top on the first components, before any section takes a side.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-hidden-keeps-its-slot.json",
+      "outcome": "reject",
+      "note": "A section a rule hides at run time keeps its slot, so the sections after it keep their sides.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-component-ref-carries-a-side.json",
+      "outcome": "reject",
+      "note": "A use of a saved component says its own side: the place says where it sits, the body does not.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-fold-sides-component-ref-without-a-side.json",
+      "outcome": "reject",
+      "note": "A use of a saved component with no side takes the automatic one.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "accept/fold-sides-no-fields-needs-no-id.json",
+      "outcome": "accept",
+      "note": "A page with no side field is today's page and needs no new id."
+    },
+    {
+      "file": "reject/fold-sides-nested-in-a-grid.json",
+      "outcome": "reject",
+      "note": "Only a page's top-level components take a side: a tile grid's child does not.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/children/0/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-nested-in-a-section.json",
+      "outcome": "reject",
+      "note": "A section's own child is nested too.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/children/0/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-in-a-sheet.json",
+      "outcome": "reject",
+      "note": "A sheet's components take no side: the sides belong to a page.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/modals/0/components/0/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-span-after-a-placed-section.json",
+      "outcome": "reject",
+      "note": "Across the Top has to come before the first section that takes a side.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/1/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-span-after-an-explicit-side.json",
+      "outcome": "reject",
+      "note": "A section pinned to a side ends the top: a later Across the Top is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/1/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-span-after-a-plain-section.json",
+      "outcome": "reject",
+      "note": "A plain section ends the top, as a placed one does.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/2/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-side-word-unknown.json",
+      "outcome": "reject",
+      "note": "The sides are span, leading and trailing.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-switch-word-unknown.json",
+      "outcome": "reject",
+      "note": "The page switch has one word, auto.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/layout/foldSides"
+      }
+    },
+    {
+      "file": "reject/fold-sides-switch-on-a-sheet.json",
+      "outcome": "reject",
+      "note": "A sheet has no page switch.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/modals/0/layout/foldSides"
+      }
+    },
+    {
+      "file": "reject/fold-sides-body-names-a-side.json",
+      "outcome": "reject",
+      "note": "A saved component's body does not say where it sits: each use does.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.fold-sides@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/componentLibrary/0/node/layout/foldSide"
+      }
+    },
+    {
+      "file": "reject/fold-sides-capability-not-declared.json",
+      "outcome": "reject",
+      "note": "A page with a side whose manifest lacks `sh.fold-sides@1` does not match.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/fold-sides-switch-capability-not-declared.json",
+      "outcome": "reject",
+      "note": "A page switch whose manifest lacks `sh.fold-sides@1` does not match.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
     }
   ]
 }

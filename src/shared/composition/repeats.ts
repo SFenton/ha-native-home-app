@@ -225,8 +225,8 @@ function leaves(node: CompositionNode, root: boolean): Map<string, Leaf> {
   };
   for (const [key, value] of Object.entries(node)) {
     if (key === 'id' || key === 'children') continue;
-    // The root's width is the reference's own.
-    if (root && key === 'layout' && value !== null && typeof value === 'object') { add(Object.fromEntries(Object.entries(value).filter(([name]) => name !== 'span')), [key]); continue; }
+    // The root's width and its side of the hinge (`sh.fold-sides@1`) are the reference's own.
+    if (root && key === 'layout' && value !== null && typeof value === 'object') { add(Object.fromEntries(Object.entries(value).filter(([name]) => name !== 'span' && name !== 'foldSide')), [key]); continue; }
     add(value, [key]);
   }
   return out;

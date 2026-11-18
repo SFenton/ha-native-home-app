@@ -1102,7 +1102,7 @@ node's `visibleWhen` and other predicates, rule-based values and authored string
 - **Data Flow additions.** Two request kinds: `entities` (1 to 64 literal entity ids and up to 8 named attributes; rows are
   `{ entityId, state, ...attributes }`; no `refresh`, the flow runs when an observed entity changes) and `none` (no data; `value` is an operand over
   the parameters, the viewer and the clock). A document holds up to 128 flows.
-- **Pending.** `sh.surface-orientation@1` and `sh.surface-controls@1` (see [vacuum-map-ctl](#map-orientation-and-corner-buttons-lane-vacuum-map-ctl)), the four style ids `sh.text-style@1`, `sh.stack@1`, `sh.symbol-part@1` and `sh.choice-icons@1` (see [WG-S1](#style-parts-text-style-stack-symbol-and-choice-icons-lane-wg-s1)), the two ids `sh.repeat@1` and `sh.flow-extras@1` (see [WG-S2](#repeat-and-the-extra-flow-steps-lane-wg-s2)), and the two data ids `sh.chart@1` and `sh.linear-gauge@1` (see [WG-S3](#data-parts-chart-and-linear-gauge-lane-wg-s3)), are in `contract/corpus/capabilities.pending.json`; every other id above is promoted: it shipped with the app (native-ingest L1a, L1b and c1a42b32), so it is in `capabilities.json`. An id is
+- **Pending.** `sh.surface-orientation@1` and `sh.surface-controls@1` (see [vacuum-map-ctl](#map-orientation-and-corner-buttons-lane-vacuum-map-ctl)), the four style ids `sh.text-style@1`, `sh.stack@1`, `sh.symbol-part@1` and `sh.choice-icons@1` (see [WG-S1](#style-parts-text-style-stack-symbol-and-choice-icons-lane-wg-s1)), the two ids `sh.repeat@1` and `sh.flow-extras@1` (see [WG-S2](#repeat-and-the-extra-flow-steps-lane-wg-s2)), the two data ids `sh.chart@1` and `sh.linear-gauge@1` (see [WG-S3](#data-parts-chart-and-linear-gauge-lane-wg-s3)), and `sh.fold-sides@1` (see [fold sides](#sections-on-the-two-sides-of-the-fold-shfold-sides1-lane-l3-of-studio-duo-sim)), are in `contract/corpus/capabilities.pending.json`; every other id above is promoted: it shipped with the app (native-ingest L1a, L1b and c1a42b32), so it is in `capabilities.json`. An id is
   mutable until a publication that uses it has been served, so changes fold into `@1`; after that, a change of meaning is `@2` beside `@1`.
 
 ### Generic parts (lane TC3)
@@ -1627,3 +1627,42 @@ a field whose options are not the tab ids (`invalid_combination`) and an entity 
 
 **Native ingestion.** The app reads `componentLibrary` and the reference nodes, expands them with the same rules before it builds the page, and must give the
 same answers on every `component-*` corpus file.
+
+### Sections on the two sides of the fold (`sh.fold-sides@1`, lane L3 of `studio-duo-sim`)
+
+One pending capability id (`src/shared/composition/pending.ts`, `contract/corpus/capabilities.pending.json`), declared only by a document that uses one of its two fields; a document with neither compiles byte-identical.
+While the iPhone Duo is partly folded sideways a page can lay its sections out in the two sides of the fold (the app's `FoldColumns` computes the geometry); this id lets a document say that it does, and where each section sits.
+
+| Field | Where | Values |
+|---|---|---|
+| `layout.foldSides` | a page | `auto`: the page lays its sections out in two sides. Absent: one column, as before. A sheet has none (`unknown_field`). |
+| `layout.foldSide` | a page's top-level component, a `component-ref` among them | `span` (Across the Top), `leading` or `trailing`. Anything else is `unknown_variant`. |
+
+**Placement.** Only a page's top-level components take a side. A nested component, a sheet's component and a saved component's own body are `invalid_combination` at `layout/foldSide`: a place says where it sits, the body does not.
+A page lays out in two sides when `foldSides` is `auto` or a component says `leading` or `trailing`.
+
+**The automatic rule (decision D1), one implementation in `src/shared/composition/fold-sides.ts`** that the compiler, the preview and the inspector all call, so there is no second reading of it:
+1. Components are counted after static filtering (a `notification-permission-banner` is left out) and before any rule hides one; a `pinned-actions` bar takes no side and holds no slot. A section that a rule hides at run time keeps its slot.
+2. The run of status strips (`status-rail`) at the top spans both sides, and so does any component in that run that says `span`.
+3. The rest alternate by position in the rest: the first leads, the next trails, and so on. An explicit `foldSide` wins and still holds its position in the count.
+4. A `span` has to come before the first section that takes a side; a later one is `invalid_combination` at `layout/foldSide` (`lateSpans`).
+
+**When the sides apply (the app).** Only while the vertical band exists and the content is wider than tall (partly folded, sideways). Each side must be at least 360 pt (`FoldColumns.resolve`, `SplitPolicy.geometry` with `isHinge`); on the Duo that is 455.3 pt, the 40.4 pt band and 372.3 pt of the 868 pt after the rail. Every side keeps the page padding at both edges.
+Any other pose is one column, whatever the fields say. Text is never scaled.
+
+**Preview.** `planFoldSides` (`src/preview2/fold-sides-plan.ts`) reads the page and the component library (a place of a saved component takes its body's type) and gives each section a side and an order; `PageBody` keeps every section in one DOM, so the reflow into the two sides is the rig's existing FLIP on `fold-pose`
+(offsets, never a scale) and nothing is re-created. The status strip spans the band; at the largest text size it heads the leading side and the trailing side starts at the top (`data-sides="head"`).
+
+**Capability table.** `sh.fold-sides@1` is declared by a page with `foldSides` or a component with `foldSide`; absent from the manifest it is `capability_manifest_mismatch` at `/capabilities`.
+A component that holds no slot (a pinned bar) compiles with a `foldSide` and the rule ignores it; the evaluation corpus pins that.
+
+**Pending, and what that means for publishing.** The app refuses the whole publication at the first id it does not list (`unsupported_capability` at `/capabilities/<n>`), so a project that declares `sh.fold-sides@1` cannot be read by the shipped app until the app updates.
+The Studio therefore never turns the id on by itself while it is pending (`src/shared/composition/pending.ts`): a new page carries no `foldSides`, and "Use Two Sides on Every Page" is not offered. An author can still choose Two Sides or a side;
+the rows say "The app can’t show this yet. Publishing it waits for an app update.", Checks carries a suggestion, and the Publish dialog warns. When the id ships (it leaves the pending list) a new page starts on `foldSides: auto` and the offer appears.
+
+**Corpus.** `scripts/generate-fold-sides-corpus.ts` writes 22 publication cases: nine accepted as `reject/pending-fold-sides-*`, the ordinary accept `accept/fold-sides-no-fields-needs-no-id.json` and twelve refused (`reject/fold-sides-*`),
+and 12 evaluation cases (`evaluation/fold-sides-*`, subject `foldsides`, `scripts/fold-sides-evaluations.ts`). An evaluation case gives a page's top-level components (`id`, `type`, `bodyType` for a `component-ref`, `foldSide`, `hiddenByRule`), the page switch, the Duo's geometry
+(455.3, 40.4 and 372.3 pt) and the page's side padding (16 pt), and records `{ active, sides: [{ id, side, width }] }`: the strip run and parity, an override holding its position, a hidden section keeping its slot, a `component-ref` read by its body, the notification banner and a pinned bar holding no slot, and a page that does not use the sides.
+`tests/fold-sides.test.ts` pins the D1 table and some of these answers by hand.
+
+**Native ingestion.** The app reads both fields and must give the same answers on every `fold-sides-*` publication case and every `evaluation/fold-sides-*` case. Home's Cameras and Guests are placed by authoring in the app today; by this rule (decision D1) Home must pin Cameras `trailing` ahead of Guests to match, which is a follow-up in the Home document, not in this contract.

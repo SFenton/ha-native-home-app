@@ -14,6 +14,7 @@
   "sh.duration-format@1",
   "sh.entity-time@1",
   "sh.flow-extras@1",
+  "sh.fold-sides@1",
   "sh.grid-state-groups@1",
   "sh.linear-gauge@1",
   "sh.math-truncate@1",

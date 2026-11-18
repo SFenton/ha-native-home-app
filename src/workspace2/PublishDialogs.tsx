@@ -1,6 +1,7 @@
 import { Modal } from './kit';
 import type { Workspace2 } from './useWorkspace2';
 import { toastManager } from './toasts';
+import { pendingUseWords } from './pendingUse';
 
 /** Publish to the app (spec 9): confirm, publishing, failed. One dialog; the buttons change with the phase. */
 export function PublishDialog({ ws }: { ws: Workspace2 }) {
@@ -8,6 +9,7 @@ export function PublishDialog({ ws }: { ws: Workspace2 }) {
   const open = phase !== 'idle';
   const busy = phase === 'publishing';
   const blocked = problemCount > 0;
+  const warning = ws.studio.document ? pendingUseWords(ws.studio.document) : undefined;
   const text = busy ? 'Publishing…'
     : phase === 'failed' ? publishError || 'Publishing did not finish.'
       : blocked ? `Fix ${problemCount} problem${problemCount === 1 ? '' : 's'} to publish.`
@@ -19,6 +21,7 @@ export function PublishDialog({ ws }: { ws: Workspace2 }) {
       <button type="button" className="w2-primary" disabled={busy || blocked} onClick={async () => { if (await ws.publish()) toastManager.add({ title: 'Published' }); }}>{phase === 'failed' ? 'Try Again' : 'Publish'}</button>
     </>}>
     <p className="w2-dialog-text" role={busy || phase === 'failed' ? 'status' : undefined} data-phase={phase}>{text}</p>
+    {warning && !busy && <p className="w2-dialog-text" role="alert" data-pending-warning>{warning}</p>}
   </Modal>;
 }
 

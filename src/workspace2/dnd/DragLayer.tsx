@@ -295,6 +295,21 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
   useEffect(() => () => stopScroll(), []);
   // The Duo's 3D rig flattens only while a drag runs (`duo-rig.css`), so drop targets can be hit-tested to the pixel.
   useEffect(() => { stage?.toggleAttribute('data-dragging', Boolean(session)); return () => stage?.removeAttribute('data-dragging'); }, [stage, session]);
+  // The rig's flatten moves every box under a pointer that holds still, and under a cue drawn by an arrow key: when a half's transform settles, the drop is found again where the pointer is
+  // (a keyboard drag redraws the cue of the slot it stands on), since no move or key will say so.
+  const dragging = Boolean(session);
+  useEffect(() => {
+    if (!stage || !dragging) return;
+    const settled = (event: TransitionEvent) => {
+      const current = live.current;
+      if (event.propertyName !== 'transform' || !(event.target as Element).matches?.('.sh-half') || !current) return;
+      if (current.mode !== 'keyboard') { find(current.point.x, current.point.y); return; }
+      const state = keyboard.current, destination = state && state.cursor >= 0 ? state.slots[state.cursor] : undefined, cue = destination && state?.cue?.(destination);
+      if (destination && cue) update({ ...current, hit: { destination, cue } });
+    };
+    stage.addEventListener('transitionend', settled);
+    return () => stage.removeEventListener('transitionend', settled);
+  }, [stage, dragging, find, update]);
   useEffect(() => { const host = ghostHost.current; if (host && session?.ghost) { host.replaceChildren(session.ghost); } else host?.replaceChildren(); }, [session?.ghost]);
 
   const locateNew = useCallback((type: string): Locator => (x, y) => stage && latest.current.ws.document ? locateOnCanvas(stage, latest.current.ws.document, 'node:__new__' as SelectionKey, x, y, type) : undefined, [stage]);

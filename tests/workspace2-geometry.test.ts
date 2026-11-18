@@ -54,3 +54,26 @@ describe('where a pointer would drop', () => {
     expect(cue?.line.width).toBeGreaterThan(0);
   });
 });
+
+describe('a page on two sides, posed flat (sh.fold-sides@1)', () => {
+  const pageKey = 'page:page-home' as never;
+  const section = (id: string, top: number) => element([0, top, 320, 90], { 'data-sel': `node:${id}` });
+  // The DOM groups the strip, then the leading side (weather, cameras), then the trailing side (guests); flat, CSS `order` stacks them in list order: strip, weather, guests, cameras.
+  const strip = section('hc-status-rail', 0), weather = section('hc-weather-summary', 100), guests = section('hc-home-guests-visible', 210), cameras = section('hc-home-cameras', 320);
+  const slot = element([0, 420, 320, 30], { class: 'sh-add-slot', 'data-add-for': pageKey });
+  const column = element([0, 0, 320, 450], { 'data-fold-sides': '' }, [
+    element([0, 0, 320, 90], { 'data-fold-group': 'strip' }, [strip]),
+    element([0, 100, 320, 340], { 'data-fold-group': 'lower' }, [
+      element([0, 100, 320, 340], { 'data-fold-group': 'leading' }, [weather, cameras]),
+      element([0, 210, 320, 90], { 'data-fold-group': 'trailing' }, [guests]),
+    ]),
+    slot,
+  ]);
+  const root = element([0, 0, 400, 460], {}, [column]);
+
+  it('drops the strip in the gap above Guests at Guests\' place in the list, not before Cameras', () => {
+    const hit = locateOnCanvas(root, doc, 'node:hc-status-rail' as never, 160, 205);
+    expect(hit?.destination.owner).toBe(pageKey);
+    expect(hit?.destination.index).toBe(2);
+  });
+});

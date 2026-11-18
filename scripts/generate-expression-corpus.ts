@@ -26,6 +26,7 @@ import { neCases, neEvaluations, neFamilies, neNeeds } from './neoperands-corpus
 import { pbCases, pbEvaluations, pbFamilies, pbNeeds } from './profile-badges-corpus';
 import { dialCtlCases, dialCtlEvaluations, dialCtlFamilies, dialCtlNeeds } from './dialctl-corpus';
 import { countCases, countEvaluations, countFamilies, countNeeds } from './count-corpus';
+import { foldSidesEvaluations } from './fold-sides-evaluations';
 import { placeCase, shippedCapabilities, shippedIssue } from './corpus-handshake';
 
 type J = Record<string, any>;
@@ -280,6 +281,7 @@ evaluations.push(...neEvaluations as Evaluation[]);
 evaluations.push(...pbEvaluations as Evaluation[]);
 evaluations.push(...dialCtlEvaluations as Evaluation[]);
 evaluations.push(...countEvaluations as Evaluation[]);
+evaluations.push(...foldSidesEvaluations as Evaluation[]);
 const evaluationRoot = path.join(root, 'evaluation');
 mkdirSync(evaluationRoot, { recursive: true });
 for (const name of readdirSync(evaluationRoot)) if (name.endsWith('.json')) unlinkSync(path.join(evaluationRoot, name));

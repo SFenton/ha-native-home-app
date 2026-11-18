@@ -368,6 +368,93 @@ test('Edit mode keeps the tilt and flattens only while a drag runs; Use mode nev
   await snap(page, 'rig-drag-restored');
 });
 
+/** How flat the first half of the rig lies: 1 when it has no tilt. */
+const flatNow = (page: Page) => previewRoot(page).locator('.sh-rig:not([data-frozen]) .sh-half[data-half=first]').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m11);
+
+/** A box once it has stopped moving (the preview reflows when the Properties card opens beside it). */
+async function settledBox(page: Page, target: ReturnType<Page['locator']>) {
+  let last = '';
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const now = JSON.stringify(await target.boundingBox());
+    if (now === last) return JSON.parse(now) as { x: number; y: number; width: number; height: number };
+    last = now;
+    await page.waitForTimeout(100);
+  }
+  throw new Error('The control kept moving');
+}
+type Rect = { x: number; y: number; width: number; height: number } | null;
+const rounded = (box: Rect) => box ? [box.x, box.y, box.width, box.height].map(Math.round) : null;
+/** The cue's box once it has stopped changing. */
+async function steadyCue(page: Page) {
+  const cue = page.getByTestId('drop-cue');
+  await expect(cue).toBeVisible();
+  let last = '';
+  await expect.poll(async () => { const now = JSON.stringify(rounded(await cue.boundingBox())); const same = now === last; last = now; return same; }).toBe(true);
+  return rounded(await cue.boundingBox());
+}
+/** Stretches the flatten to 1.5 s where the rig reads it (the rig sets the variable inline), and says so by the computed duration. */
+async function stretchFlatten(page: Page) {
+  await page.addStyleTag({ content: '.sh-rig { --sh-flatten-ms: 1500ms !important; }' });
+  await page.mouse.move(2, 2);
+}
+const halfDuration = (page: Page) => previewRoot(page).locator('.sh-rig:not([data-frozen]) .sh-half[data-half=first]').evaluate(element => getComputedStyle(element).transitionDuration);
+
+test('the drop cue follows the rig as it finishes flattening under a pointer that holds still', async ({ page }) => {
+  await startDuo(page, 'Edit');
+  await press(page, 'Partly Folded');
+  await selectTile(page, 'Weather');
+  const grip = page.getByTestId('node-handle').locator('[aria-label="Move"]');
+  await expect(grip).toBeVisible();
+  const from = await settledBox(page, grip);
+  // First, where the drop is once the rig is flat and the pointer is at rest on the tile.
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 12, from.y + 24, { steps: 3 });
+  await expect.poll(() => flatNow(page)).toBeGreaterThan(0.9999);
+  const tile = await settledBox(page, previewTile(page, 'Demo Guests 2'));
+  const point = { x: tile.x + tile.width / 2, y: tile.y + tile.height / 2 };
+  await page.mouse.move(point.x, point.y, { steps: 4 });
+  const truth = await steadyCue(page);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect.poll(() => flatNow(page)).toBeLessThan(0.96);
+  // Then the same drop with the flatten stretched: the pointer reaches the flat point while the rig is still tilted and sends nothing more.
+  await stretchFlatten(page);
+  const again = await settledBox(page, grip);
+  await page.mouse.move(again.x + again.width / 2, again.y + again.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(again.x + 12, again.y + 24, { steps: 3 });
+  // The flatten's own duration applies while the drag runs.
+  expect(await halfDuration(page)).toBe('1.5s');
+  await page.mouse.move(point.x, point.y, { steps: 4 });
+  expect(await flatNow(page), 'the rig is still flattening').toBeLessThan(0.9999);
+  await expect.poll(() => flatNow(page), { timeout: 10_000 }).toBeGreaterThan(0.9999);
+  await expect.poll(async () => rounded(await page.getByTestId('drop-cue').boundingBox()), { timeout: 3000 }).toEqual(truth);
+  await page.mouse.up();
+});
+
+test('a cue drawn by an arrow key while the rig flattens is drawn again where the slot is once it is flat', async ({ page }) => {
+  await startDuo(page, 'Edit');
+  await press(page, 'Partly Folded');
+  await selectTile(page, 'Weather');
+  const grip = page.getByTestId('node-handle').locator('[aria-label="Move"]');
+  await stretchFlatten(page);
+  // Lift, then step to the first slot at once, while the stretched flatten is still running.
+  await grip.focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowDown');
+  expect(await halfDuration(page)).toBe('1.5s');
+  expect(await flatNow(page), 'the rig is still flattening').toBeLessThan(0.9999);
+  await expect.poll(() => flatNow(page), { timeout: 10_000 }).toBeGreaterThan(0.9999);
+  // The cue now stands where the slot is: stepping away and back, on a flat rig, draws it in the same place.
+  await expect(page.getByTestId('drop-cue')).toBeVisible();
+  const settled = await steadyCue(page);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(async () => rounded(await page.getByTestId('drop-cue').boundingBox()), { timeout: 3000 }).toEqual(settled);
+  await page.keyboard.press('Escape');
+});
+
 test('a tap in each half of a partly folded Duo reaches its tile in Use: one in the first half and one in the second', async ({ page }) => {
   await startDuo(page);
   await press(page, 'Partly Folded');

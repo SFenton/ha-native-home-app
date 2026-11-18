@@ -15,6 +15,12 @@ Density
 Thin
 Dense
 Show icons
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 Only show when
 Always
@@ -43,6 +49,12 @@ Density
 Thin
 Dense
 Show icons
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 Only show when
 Always

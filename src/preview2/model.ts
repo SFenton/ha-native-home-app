@@ -1,5 +1,6 @@
 import type { ComponentEntry, ComponentRefNode, CompositionDocument, CompositionNode } from '../shared/composition/schema';
 import { expandRef } from '../shared/composition/components';
+import { staticallyHiddenTypes } from '../shared/composition/fold-sides';
 import { childSlots, type EditorPath } from '../composition-editor';
 
 type PlainOrRef = PlainNode | ComponentRefNode;
@@ -83,7 +84,7 @@ const pathId = (path: EditorPath) => JSON.stringify(path);
  * notification-permission banner ("Get door and camera alerts"), which the app turns on by default. The contract keeps the type,
  * so an existing draft that has one still validates, compiles, saves and publishes unchanged.
  */
-export const hiddenNodeTypes: readonly string[] = ['notification-permission-banner'];
+export const hiddenNodeTypes: readonly string[] = staticallyHiddenTypes;
 /** Whether the Studio leaves this node out of the canvas, the selection index and the properties. */
 export const isHiddenNode = (node: { type: string }): boolean => hiddenNodeTypes.includes(node.type);
 

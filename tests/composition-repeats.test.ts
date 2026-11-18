@@ -4,6 +4,7 @@ import { expandDocument } from '../src/shared/composition/components';
 import {
   analyseRepeat, defaultUnchecked, findRepeats, planRepeat, repeatSteps, REPEAT_LIMITS, REPEAT_MIN_TILE_PLACES, type RepeatAnalysis, type RepeatClass,
 } from '../src/shared/composition/repeats';
+import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { runChecks } from '../src/workspace2/checks';
 import { groupLabels } from '../src/workspace2/repeats/repeatWords';
@@ -169,6 +170,19 @@ describe('Save as Template', () => {
     const places = saved.document.pages[0].components.filter(node => node.type === 'component-ref');
     expect(places.map(node => node.id)).toEqual([...kept]);
     expect(saved.document.pages[0].components.find(node => node.id === 'rep-grid-study')?.type).toBe('tile-grid');
+  });
+
+  it('keeps each place\'s own fold side on its reference and none on the template body (sh.fold-sides@1)', () => {
+    const doc = fixture();
+    const sides: Record<string, string> = { 'rep-grid-kitchen': 'leading', 'rep-grid-hall': 'trailing' };
+    const pinned = { ...doc, pages: doc.pages.map((page, at) => at === 0 ? { ...page, components: page.components.map(node => sides[node.id] ? { ...node, layout: { ...node.layout, foldSide: sides[node.id] } } : node) } : page) } as CompositionDocument;
+    expect(() => compileCompositionDocument(pinned)).not.toThrow();
+    const analysis = analyseRepeat(pinned, findRepeats(pinned).classes[0]), plan = planRepeat(analysis, defaultUnchecked(analysis));
+    const saved = saveRepeat(pinned, analysis, plan, 'Lamp Grid', labelsOf(analysis));
+    const refs = saved.document.pages[0].components.filter(node => node.type === 'component-ref');
+    expect(refs.map(node => [node.id, (node.layout as J).foldSide])).toEqual(expect.arrayContaining([['rep-grid-kitchen', 'leading'], ['rep-grid-hall', 'trailing']]));
+    expect((saved.document.componentLibrary!.at(-1)!.node.layout as J).foldSide).toBeUndefined();
+    expect(() => compileCompositionDocument(saved.document)).not.toThrow();
   });
 
   it('adds the entry with a parameter for each checked group, and gives each place its own values', () => {

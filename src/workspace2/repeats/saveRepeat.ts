@@ -1,5 +1,6 @@
 import { replaceAt, valueAt } from '../../composition-editor';
 import { bodyNodes } from '../../shared/composition/components';
+import { omitFoldSide, type FoldSide } from '../../shared/composition/fold-sides';
 import type { RepeatAnalysis, RepeatPlan } from '../../shared/composition/repeats';
 import { createId as uid } from '../../shared/ids';
 import type { ComponentEntry, ComponentRefNode, CompositionDocument, CompositionNode } from '../../shared/composition/schema';
@@ -36,7 +37,7 @@ export function saveRepeat(document: CompositionDocument, analysis: RepeatAnalys
   const nodes = places.map(place => valueAt(document, place.path) as CompositionNode | undefined);
   if (nodes.some(node => !node)) throw new Error('A place of this piece has changed. Look for repeated pieces again.');
   const first = nodes[0]!;
-  const body = { ...first, id: uid('native'), layout: { ...first.layout, span: 1 } } as CompositionNode;
+  const body = { ...first, id: uid('native'), layout: { ...omitFoldSide(first.layout), span: 1 } } as CompositionNode;
   const inBody = bodyNodes(body);
   const taken = new Set<string>();
   const params: NonNullable<ComponentEntry['params']> = [], bindings: NonNullable<ComponentEntry['bindings']> = [];
@@ -53,8 +54,10 @@ export function saveRepeat(document: CompositionDocument, analysis: RepeatAnalys
   let next = document;
   plan.kept.forEach((at, order) => {
     const node = nodes[order]!;
+    // Each place keeps its own fold side (`sh.fold-sides@1`) on its reference; the template body holds none.
+    const side = (node.layout as { foldSide?: FoldSide }).foldSide;
     const args = Object.fromEntries(named.map(({ group, param }) => [param, group.values[at]]));
-    const ref: ComponentRefNode = { id: node.id, type: 'component-ref', componentId: entry.id, layout: node.layout.span === undefined ? {} : { span: node.layout.span }, ...(named.length ? { args } : {}) };
+    const ref: ComponentRefNode = { id: node.id, type: 'component-ref', componentId: entry.id, layout: { ...(node.layout.span === undefined ? {} : { span: node.layout.span }), ...(side === undefined ? {} : { foldSide: side }) }, ...(named.length ? { args } : {}) };
     next = replaceAt(next, places[order].path, ref);
   });
   next = { ...next, componentLibrary: [...(document.componentLibrary ?? []), entry] };

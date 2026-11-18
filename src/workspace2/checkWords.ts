@@ -176,6 +176,8 @@ export function wordsFor(document: CompositionDocument, issue: CompositionIssue,
       if (issue.capability === 'sh.tile-parts@1') return 'Tile buttons and progress need a newer app than this one runs. Remove them, or wait for the app to update.';
       return issue.capability === 'sh.extended-tabs@1' ? 'The tab bar holds 5. Remove a tab.' : `${f ?? 'This'} needs a feature the app does not have yet. Remove it.`;
     case 'invalid_combination':
+      // `layout/foldSide` (`sh.fold-sides@1`): Across the Top after a section that takes a side, or a side on a component that is not at the top of a page.
+      if (issue.pointer.endsWith('/layout/foldSide')) return value === 'span' ? 'Partly Folded: Across the Top has to come before the first section that takes a side. Move it up, or choose a side.' : 'Partly Folded: only a page’s top-level sections take a side. Choose Automatic.';
       if (typeof value === 'string' && entityId.test(value)) {
         // The entity a source's own model reads: say which kinds it takes.
         const source = path[0] === 'dataSources' && path[2] === 'inputs' && path[3] === 'entityId' ? document.dataSources[Number(path[1])] : undefined;

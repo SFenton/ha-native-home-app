@@ -2,6 +2,7 @@ import { z } from 'zod/v4';
 import { identifierSchema } from '../validation';
 import type { CompositionIssue } from './json';
 import { symbolUnavailable } from './symbol-unavailable';
+import { foldSideSchema } from './fold-sides';
 
 const object = z.strictObject;
 const text = (max: number, blank = false) => z.string().max(max).refine(value => blank || Boolean(value.trim()));
@@ -59,7 +60,7 @@ export function deviceControlModel(kind: DeviceControlKind): RoomDeviceSource['m
     : kind === 'grill-detail' ? 'grill@1' : 'humidifier@1';
 }
 export const roomDeviceControlSchema = object({
-  id, title, type: z.literal('room-device-control'), layout: object({ span: z.number().int().min(1).max(4).optional() }),
+  id, title, type: z.literal('room-device-control'), layout: object({ span: z.number().int().min(1).max(4).optional(), foldSide: foldSideSchema.optional() }),
   icon: symbol,
   binding: object({ sourceId: id }),
   props: object({

@@ -257,6 +257,13 @@ describe('the template editor in Use (studio-tpl-ux)', () => {
     return { apply, entry };
   }
 
+  it.each(['edit', 'use'] as const)('draws no Partly Folded row for a template root in %s: only a page\'s sections take a side', mode => {
+    editor(mode);
+    const editorEl = screen.getByTestId('template-editor');
+    expect(editorEl.querySelector('[data-fold-caption]')).toBeNull();
+    expect(within(editorEl).queryByText('Partly Folded')).toBeNull();
+  });
+
   it('reads only: Name, Add to Page, Delete and every field of the root are disabled, and nothing has been written', () => {
     const { apply } = editor('use');
     const editorEl = screen.getByTestId('template-editor');

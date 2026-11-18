@@ -188,6 +188,22 @@ describe('undo coalescing', () => {
   });
 });
 
+describe('the fold side rule at the one commit step (sh.fold-sides@1)', () => {
+  it('drops a side an edit nested, and one undo restores the document from before it exactly', async () => {
+    const { result } = renderHook(useCompositionStudio);
+    await waitFor(() => expect(result.current.document).toBeDefined());
+    const before = result.current.document!;
+    const inner = { ...text('inner'), layout: { span: 1, foldSide: 'leading' } } as CompositionNode;
+    const section = { id: 'side-section', title: 'S', type: 'section', layout: { span: 1, foldSide: 'trailing' }, props: { header: 'S', footer: '', style: 'plain', density: 'thin', hasGlyphs: false, spacing: { type: 'token', name: 'm' } }, children: [inner] } as unknown as CompositionNode;
+    act(() => result.current.apply({ ...before, pages: before.pages.map((page, at) => at === 0 ? { ...page, components: [section] } : page) }));
+    const applied = result.current.document!.pages[0].components[0] as unknown as { layout: { foldSide?: string }; children: { layout: { foldSide?: string } }[] };
+    expect(applied.layout.foldSide).toBe('trailing');
+    expect(applied.children[0].layout.foldSide).toBeUndefined();
+    act(() => result.current.undo());
+    expect(result.current.document).toEqual(before);
+  });
+});
+
 describe('native composition persistence controls', () => {
   it('saves dirty work before publishing exactly the saved revision', async () => {
     const { result } = renderHook(useCompositionStudio);

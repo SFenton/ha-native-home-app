@@ -3,9 +3,9 @@ import { prefersReducedMotion, type FoldToken } from './fold-motion';
 
 /**
  * Beautiful reflow: when the window's fold changes, the screen lays out once for its final pose and every element whose frame changed
- * travels from its old frame to its new one on the transition's own token (the app's `UKReflow`: lay out once inside one spring). Position
- * and size interpolate; nothing fades, nothing is re-created and order never changes mid-flight. Text is never drawn scaled: only a
- * box with no node inside it (a tile) changes size, and its content takes its final wrapping at once.
+ * travels from its old place to its new one on the transition's own token (the app's `UKReflow`: lay out once inside one spring). Only position
+ * interpolates; nothing fades, nothing is re-created and order never changes mid-flight. Text is never drawn scaled and never rewraps in flight: an
+ * element is laid out at its final size on the first frame, so its text takes its final wrapping at once (the motion spec), and it travels there.
  *
  * Frames are read from layout offsets, never rects, so the tilt of the 3D rig and the preview's zoom do not enter them.
  */
@@ -18,14 +18,14 @@ export interface Frame { x: number; y: number; width: number; height: number }
 /** One element in a measurement: its frame, the nearest measured element around it, and whether it has none inside it. */
 export interface Measured { frame: Frame; parent?: string; leaf: boolean }
 /** The words of a move. `dx` and `dy` are the translation to start from, relative to the element's measured parent. */
-export interface Move { id: string; dx: number; dy: number; width?: { from: number; to: number }; height?: { from: number; to: number } }
+export interface Move { id: string; dx: number; dy: number }
 
 /** Frames closer than this, in points, count as unmoved. */
 const EPSILON = 0.5;
 
 /**
  * The moves between two measurements. A child's translation is relative to its parent's own movement, because the child rides inside the
- * parent's animated box: `(old - old parent) - (new - new parent)`. Only an element with no node inside it changes size.
+ * parent's animated box: `(old - old parent) - (new - new parent)`.
  */
 export function planReflow(before: ReadonlyMap<string, Measured>, after: ReadonlyMap<string, Measured>): Move[] {
   const moves: Move[] = [];
@@ -35,12 +35,8 @@ export function planReflow(before: ReadonlyMap<string, Measured>, after: Readonl
     const parentThen = now.parent !== undefined ? before.get(now.parent) : undefined, parentNow = now.parent !== undefined ? after.get(now.parent) : undefined;
     const dx = (then.frame.x - (parentThen?.frame.x ?? 0)) - (now.frame.x - (parentNow?.frame.x ?? 0));
     const dy = (then.frame.y - (parentThen?.frame.y ?? 0)) - (now.frame.y - (parentNow?.frame.y ?? 0));
-    const resized = now.leaf && (Math.abs(then.frame.width - now.frame.width) > EPSILON || Math.abs(then.frame.height - now.frame.height) > EPSILON);
-    if (Math.abs(dx) <= EPSILON && Math.abs(dy) <= EPSILON && !resized) continue;
-    moves.push({
-      id, dx, dy,
-      ...(resized ? { width: { from: then.frame.width, to: now.frame.width }, height: { from: then.frame.height, to: now.frame.height } } : {}),
-    });
+    if (Math.abs(dx) <= EPSILON && Math.abs(dy) <= EPSILON) continue;
+    moves.push({ id, dx, dy });
   }
   return moves;
 }
@@ -83,10 +79,6 @@ export function playReflow(moves: readonly Move[], elements: ReadonlyMap<string,
     const element = elements.get(move.id);
     if (!element || typeof element.animate !== 'function') continue;
     const from: Keyframe = { translate: `${move.dx}px ${move.dy}px` }, to: Keyframe = { translate: '0px 0px' };
-    if (move.width && move.height) {
-      from.width = `${move.width.from}px`; from.height = `${move.height.from}px`;
-      to.width = `${move.width.to}px`; to.height = `${move.height.to}px`;
-    }
     const animation = element.animate([from, to], { duration: token.ms, easing: token.ease, fill: 'backwards' });
     // WAAPI animations fire no `animationend`: say when a move starts and ends, so what depends on where a node is (`copy-access.ts`) waits for
     // it to settle and then looks again. The start is only sent with a way to know the end (`finished`), which settles when the move ends and

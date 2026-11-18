@@ -14,7 +14,7 @@ import { valueAt, type EditorPath } from '../composition-editor';
 import { GlyphByName } from '../preview2/nodes/shared';
 import { ChooseRow, gatherFixed, ObjectRows, RowsProvider, useRows } from './rows';
 import AdvancedFold from './AdvancedFold';
-import { fixedLine } from './labels';
+import { fixedLine, type FieldGroup } from './labels';
 import { PushStack, Tag, useNarrow, usePush } from './kit';
 import { HeaderPanel, TabsPanel, WallpaperPanel } from './panels';
 import { useAdd } from './add/AddHost';
@@ -48,6 +48,7 @@ import { flowById, usedCount } from './data/flow';
 import { AreaInspector, OverlayPosition, TabBarGroup, TabsList } from './layout/LayoutEditors';
 import { ButtonsGroup, ProgressRow, WidthRow } from './layout/TileParts';
 import { SwipeRow } from './layout/SwipeRow';
+import { FoldSideRow } from './layout/FoldSides';
 import { StateWordsFold } from './layout/StateWordsFold';
 import { GroupsRow } from './layout/GroupsRow';
 import ToneField from './layout/ToneField';
@@ -95,6 +96,14 @@ export function MoveToPage({ id, onDone }: { id: string; onDone: (moved: Composi
   </div>;
 }
 
+/**
+ * Adds a row to the Layout group of what a node already draws there (`extra` of {@link ObjectRows}). A tile grid's own Around the Fold lever is the last generated row, so its Partly Folded
+ * row goes ahead of the group's other extras and the two sit together (decision D5 of `studio-duo-sim`).
+ */
+function withSide(row: ReactNode, extra: Partial<Record<FieldGroup, ReactNode>> | undefined, together = false): Partial<Record<FieldGroup, ReactNode>> | undefined {
+  return row === undefined ? extra : { ...extra, look: together ? <>{row}{extra?.look}</> : <>{extra?.look}{row}</> };
+}
+
 /** A node's own fields; its child nodes are edited by selecting them. */
 const notChildren = (at: EditorPath) => at.at(-1) === 'children';
 function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the root of a linked component: the reference's own path, which holds its Width. */ placePath?: EditorPath; /** For a node of a template: the template, and whether this is a place's root. */ template?: TemplateView }) {
@@ -132,14 +141,14 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
     {isDialControl && <DialControlInspector path={path} own={template ? own : undefined}/>}
     {isThermostat && <ThermostatInspector path={path}/>}
     <ObjectRows path={path} owner={nodeType} skip={hidden} overrides={overrides} below={perPlace} choose={choosing ? choose : undefined} groups={nodeType === 'state-tile' ? ['what', 'look', 'states', 'behaviour'] : isList(nodeType) || nodeType === 'repeat' ? ['what', 'look', 'behaviour', 'states'] : ['what', 'look', 'behaviour']}
-      extra={nodeType === 'state-tile' ? { what: <>{own('props/progress', <ProgressRow path={path}/>)}{own('props/discs', <ButtonsGroup path={path}/>)}</>, look: own('layout/span', <WidthRow path={path}/>), states: <StatesGroup path={path}/>, behaviour: <><StateTapRow path={path}/>{own('props/swipe', <SwipeRow path={path}/>)}</> } : nodeType === 'light-group-tile' ? { behaviour: own('props/swipe', <SwipeRow path={path}/>), what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'room-overview-tile' ? { what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'tile-grid' ? { look: own('props/groups', <GroupsRow path={path}/>) } : nodeType === 'status-pill' ? { what: own('props/tone', <ToneField path={path}/>) } : nodeType === 'bound-control' && (node as { props?: { kind?: string } }).props?.kind === 'choice' ? { what: own('props/options', <ChoicesGroup path={path}/>) } : nodeType === 'local-tabs' ? { what: <><TabsList path={path}/>{own('props/tabBar', <TabBarGroup path={path}/>)}</> } : nodeType === 'overlay' ? { what: <OverlayPosition path={path}/> } : isList(nodeType) ? { states: <><ShowStateRow path={path}/><FixedTextsNote path={path}/></> } : nodeType === 'repeat' ? { states: <ShowStateRow path={path}/> } : undefined}/>
+      extra={withSide(placePath === undefined ? <FoldSideRow path={path}/> : undefined, nodeType === 'state-tile' ? { what: <>{own('props/progress', <ProgressRow path={path}/>)}{own('props/discs', <ButtonsGroup path={path}/>)}</>, look: own('layout/span', <WidthRow path={path}/>), states: <StatesGroup path={path}/>, behaviour: <><StateTapRow path={path}/>{own('props/swipe', <SwipeRow path={path}/>)}</> } : nodeType === 'light-group-tile' ? { behaviour: own('props/swipe', <SwipeRow path={path}/>), what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'room-overview-tile' ? { what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'tile-grid' ? { look: own('props/groups', <GroupsRow path={path}/>) } : nodeType === 'status-pill' ? { what: own('props/tone', <ToneField path={path}/>) } : nodeType === 'bound-control' && (node as { props?: { kind?: string } }).props?.kind === 'choice' ? { what: own('props/options', <ChoicesGroup path={path}/>) } : nodeType === 'local-tabs' ? { what: <><TabsList path={path}/>{own('props/tabBar', <TabBarGroup path={path}/>)}</> } : nodeType === 'overlay' ? { what: <OverlayPosition path={path}/> } : isList(nodeType) ? { states: <><ShowStateRow path={path}/><FixedTextsNote path={path}/></> } : nodeType === 'repeat' ? { states: <ShowStateRow path={path}/> } : undefined, nodeType === 'tile-grid')}/>
     {isMap && <><MapOrientation path={path}/><MapButtons path={path}/></>}
     <ChildPosition path={path}/>
   </>;
   // While fields are chosen the boxes form one group, named for what they do.
   const grouped = (content: ReactNode) => choosing ? <div role="group" aria-label="Fields each place sets" className="w2-fields">{content}</div> : content;
   const fields = grouped(rows);
-  const width = placePath && <ObjectRows path={placePath} owner="component-ref" skip={at => at.length > placePath.length && at[placePath.length] !== 'layout'} groups={['look']}/>;
+  const width = placePath && <ObjectRows path={placePath} owner="component-ref" skip={at => at.length > placePath.length && at[placePath.length] !== 'layout'} groups={['look']} extra={{ look: <FoldSideRow path={placePath}/> }}/>;
   const advanced = <AdvancedFold type={nodeType} id={node.id} idPath={[...path, 'id'].join('/')} fixed={fixedLine(gatherFixed(document, path), nodeType === 'state-tile' ? 'the motion between states, the 1 second minimum for an in-progress look, haptics and what VoiceOver announces' : undefined)}>
     {grouped(<ObjectRows path={path} owner={nodeType} skip={child => hidden(child) || child.at(-1) === 'id'} overrides={overrides} choose={choosing ? choose : undefined} below={perPlace} groups={['advanced']}/>)}
   </AdvancedFold>;

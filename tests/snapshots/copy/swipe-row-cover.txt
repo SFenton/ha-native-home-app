@@ -30,6 +30,12 @@ Automatic
 2 columns
 3 columns
 4 columns
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 States
 Style
 Blind

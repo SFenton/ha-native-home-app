@@ -3,6 +3,7 @@ import { identifierSchema as id } from '../validation';
 import { remoteSlotCalls, serviceCallAllowed } from './service-vocabulary';
 import { visibilityFields } from './expression';
 import { stateWordsSchema } from './state-words';
+import { foldSideSchema } from './fold-sides';
 
 const object = z.strictObject;
 const text = (max: number, blank = false) => z.string().max(max).refine(v => blank || Boolean(v.trim()));
@@ -197,7 +198,7 @@ export function deviceProviderIssues(source: DeviceProviderSource): string[] {
 }
 
 export function deviceControlSchemas<A extends z.ZodType>(action: A) {
-  const node = { id, title, layout: object({ span: z.number().int().min(1).max(4).optional() }), ...visibilityFields };
+  const node = { id, title, layout: object({ span: z.number().int().min(1).max(4).optional(), foldSide: foldSideSchema.optional() }), ...visibilityFields };
   const base = { sourceId: id };
   const zone = z.number().int().min(0).max(31);
   const confirmation = object({ title, message: text(2000), confirmLabel: label, cancelLabel: z.literal('Cancel') });

@@ -10,6 +10,7 @@ import { layoutStack } from '../src/shared/composition/stack-layout';
 import { answerChart } from './chart-corpus';
 import { layoutGauge, type GaugeInput } from '../src/shared/composition/gauge-math';
 import { answerArc, answerDial, answerDialCtl } from './dial-corpus';
+import { foldSidesAnswer, type FoldAnswerInput } from '../src/shared/composition/fold-sides';
 import type { Json } from '../src/shared/types';
 
 /**
@@ -26,7 +27,7 @@ interface Case {
   expected: Record<string, any>;
 }
 /** The kinds of subject a case can have: each is answered by one function of the shared evaluator. */
-const subjectKinds = ['operand', 'condition', 'fill', 'symbol', 'text', 'badge', 'enabled', 'faces', 'action', 'asks', 'progress', 'tab', 'tone', 'stack', 'chart', 'gauge', 'dial', 'arc', 'dialctl'] as const;
+const subjectKinds = ['operand', 'condition', 'fill', 'symbol', 'text', 'badge', 'enabled', 'faces', 'action', 'asks', 'progress', 'tab', 'tone', 'stack', 'chart', 'gauge', 'dial', 'arc', 'dialctl', 'foldsides'] as const;
 const files = readdirSync(directory).filter(name => name.endsWith('.json')).sort();
 const cases: Case[] = files.map(name => JSON.parse(readFileSync(path.join(directory, name), 'utf8')));
 const environmentOf = (entry: Case): Environment => ({
@@ -65,6 +66,7 @@ function answer(entry: Case, env: Environment): unknown {
   if (subject.dial) return { dial: answerDial(subject.dial) };
   if (subject.arc) return { arc: answerArc(subject.arc) };
   if (subject.dialctl) return { dialctl: answerDialCtl(subject.dialctl) };
+  if (subject.foldsides) return { foldsides: foldSidesAnswer(subject.foldsides as FoldAnswerInput) };
   if (subject.progress) return { progress: tileProgress(subject.progress as Operand, env) };
   if (subject.tab) return { tab: tabOnShow(subject.tab.tabs, subject.tab.requested, subject.tab.fallback, env) };
   return { asks: asksFirst(subject.asks.when as Predicate | undefined, env) };

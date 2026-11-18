@@ -17,6 +17,12 @@ Lights
 Occupancy
 Badge
 None
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 When tapped
 Turn On or Off · input_boolean.demo_entity_122
@@ -49,6 +55,12 @@ Lights
 Occupancy
 Badge
 None
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 When tapped
 Turn On or Off · input_boolean.demo_entity_122

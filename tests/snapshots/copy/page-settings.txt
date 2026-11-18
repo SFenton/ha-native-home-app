@@ -10,6 +10,12 @@ Same as app
 Custom
 Open pages beside this one
 Used when the window is wide enough for two.
+Partly Folded
+Two Sides
+One Column
+Sections take a side of the fold when iPhone Duo is partly folded sideways.
+The app can’t show this yet. Publishing it waits for an app update.
+Reset Sides
 Opens from outside the app
 0
 Opened from

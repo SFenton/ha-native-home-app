@@ -3,6 +3,7 @@ import { componentLocations, moveCompositionNode, removeCompositionItem, reorder
 import { cloneNode } from './util';
 import { nodeTitle } from '../shared/composition/components';
 import { createId } from '../shared/ids';
+import { omitFoldSide } from '../shared/composition/fold-sides';
 
 const split = (path: EditorPath) => ({ list: path.slice(0, -1), index: Number(path.at(-1)) });
 
@@ -98,7 +99,9 @@ export const overlayInsets: readonly { value: number; label: string }[] = [
 export function putControlsOnTop(document: CompositionDocument, path: EditorPath): CompositionDocument {
   const { list, index } = split(path);
   const siblings = valueAt(document, list) as CompositionNode[], base = siblings[index];
-  const overlay = { id: createId('overlay'), title: 'Overlay', type: 'overlay', layout: {}, props: { anchors: [] }, children: [base] } as unknown as CompositionNode;
+  // The overlay takes the node's place on the page, so it takes the node's side of the hinge too (`sh.fold-sides@1`); the base inside holds none.
+  const side = (base.layout as { foldSide?: string }).foldSide;
+  const overlay = { id: createId('overlay'), title: 'Overlay', type: 'overlay', layout: side === undefined ? {} : { foldSide: side }, props: { anchors: [] }, children: [{ ...base, layout: omitFoldSide(base.layout) }] } as unknown as CompositionNode;
   return replaceAt(document, list, siblings.map((item, at) => at === index ? overlay : item));
 }
 
@@ -107,7 +110,12 @@ export function takeOffOverlay(document: CompositionDocument, path: EditorPath):
   const { list, index } = split(path);
   const siblings = valueAt(document, list) as CompositionNode[], overlay = siblings[index];
   if (overlay.type !== 'overlay' || overlay.children.length === 0) throw new Error('The selected item is not an overlay with a base');
-  return replaceAt(document, list, siblings.map((item, at) => at === index ? overlay.children[0] : item));
+  return replaceAt(document, list, siblings.map((item, at) => {
+    if (at !== index) return item;
+    // The base takes the overlay's place, and its side of the hinge with it.
+    const side = (overlay.layout as { foldSide?: string }).foldSide;
+    return side === undefined ? overlay.children[0] : { ...overlay.children[0], layout: { ...overlay.children[0].layout, foldSide: side } } as CompositionNode;
+  }));
 }
 
 /** Puts the control at one of the five places of its overlay, keeping its inset (Medium, 12, when it has none yet). */

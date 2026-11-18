@@ -12,6 +12,7 @@ import { fieldOptions, gatherFixed, ObjectRows, useRows, type RowOverride } from
 import type { Workspace2 } from '../useWorkspace2';
 import { useDeepRows } from '../editors/overrides';
 import { LinksList } from './Links';
+import { FoldSidesRow } from '../layout/FoldSides';
 
 type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
@@ -97,7 +98,7 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
   </> : kind === 'modal' && surface.presentation.height.type === 'fitted' ? <div className="w2-row"><CompositionFields schema={{ enum: ['root', 'top-page'] }} value={surface.presentation.height.follows}
     path={[...path, 'presentation', 'height', 'follows']} label="Fit to" document={document} onChange={onChange} onError={ws.studio.setError} options={fieldOptions('sheet', path)}/></div> : undefined;
   return <>
-    <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']} extra={{ look: navigationRows }}/>
+    <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']} extra={{ look: <>{navigationRows}{kind === 'page' && <FoldSidesRow path={path}/>}</> }}/>
     {kind === 'page' && <section className="w2-group"><button type="button" className="w2-disclosure-head" onClick={() => push?.push({
       title: 'Links', body: <LinksList pageId={surface.id}/>,
     })}><span className="w2-row-label w2-wide-label">Opens from outside the app</span><span className="w2-summary">{routes.length}</span><ChevronRight size={16} aria-hidden/></button></section>}
