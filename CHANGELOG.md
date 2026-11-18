@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4
+
+- Maintenance and internal changes.
+
 ## 0.3.3
 
 - The dial's inspector gains a Text place group that moves the text in the middle.
