@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openWorkspace, previewRoot, seed, snap } from './workspace2-helpers';
+import { openWorkspace, previewRoot, rigSettled, seed, snap } from './workspace2-helpers';
 
 /**
  * Where a sheet's `local-tabs` control is drawn (`vacuum-map-ctl`, `tabbar-fix`). Native decides by `pinned` alone: absent, the
@@ -28,7 +28,7 @@ function tabsDocument(pinned: boolean) {
 type Choice = 'iPhone' | 'Duo folded' | 'Duo upright' | 'Duo sideways' | 'iPad';
 /** The window's width and the bottom safe inset the sheet sees: only a sheet that reaches the bottom edge has the home indicator. */
 const windows: { choice: Choice; width: number; sheetSafe: number }[] = [
-  { choice: 'iPhone', width: 402, sheetSafe: 34 }, { choice: 'Duo folded', width: 466, sheetSafe: 0 },
+  { choice: 'iPhone', width: 402, sheetSafe: 34 }, { choice: 'Duo folded', width: 466, sheetSafe: 34 },
   { choice: 'Duo upright', width: 669, sheetSafe: 34 }, { choice: 'Duo sideways', width: 951, sheetSafe: 0 }, { choice: 'iPad', width: 834, sheetSafe: 0 },
 ];
 
@@ -45,9 +45,10 @@ async function openSheet(page: Page, choice: Choice) {
   await page.keyboard.press('Escape');
   const rail = page.getByTestId('simulator-rail');
   if (choice === 'Duo folded') await rail.getByRole('button', { name: 'Folded', exact: true }).click();
-  if (choice === 'Duo sideways') await rail.getByRole('button', { name: 'Rotate' }).click();
+  // Choosing iPhone Duo opens it flat and sideways; one Rotate Right stands it upright.
+  if (choice === 'Duo upright') await rail.getByRole('button', { name: 'Rotate Right' }).click();
   await expect(previewRoot(page).locator('.sh-page[data-current] .sh-large-title, .sh-page[data-current] .sh-inline-title').first()).toBeVisible();
-  await page.waitForTimeout(400);
+  await rigSettled(page);
   await previewRoot(page).locator('[data-sel="node:hc-open-rooms"]').click();
   await expect(previewRoot(page).locator('.sh-sheet-layer')).toHaveCount(1);
   await page.waitForTimeout(600);

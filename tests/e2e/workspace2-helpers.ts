@@ -165,3 +165,15 @@ export async function openChecksFromBar(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Project', exact: true }).click();
   await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Checks/ }).click();
 }
+
+/**
+ * Waits for the preview to come to rest: no display held for a move still running, and the stage's fit no longer changing (a rig that
+ * just mounted still tweens the stage's zoom). A rig at rest shows one copy of the screen (two when partly folded), so a test that finds
+ * a tile by its text reads it only after this.
+ */
+export async function rigSettled(page: Page): Promise<void> {
+  await expect(page.locator('.sh-rig[data-settling], .sh-rig-slot[data-leaving]')).toHaveCount(0, { timeout: 5000 });
+  const read = () => page.evaluate(() => [...document.querySelectorAll('[data-preview-root] .sh-screen')].slice(0, 1).map(element => { const r = element.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(value => value.toFixed(1)).join(','); }).join(';'));
+  let last = '';
+  await expect.poll(async () => { const now = await read(); const steady = now === last; last = now; return steady; }, { intervals: [120], timeout: 5000 }).toBe(true);
+}

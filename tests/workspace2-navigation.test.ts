@@ -97,13 +97,13 @@ describe('renaming, duplicating and deleting', () => {
 describe('windows and the split rule', () => {
   const [iphone, folded, duoUpright, duoSideways, ipadUpright, ipadSideways] = previewWindows;
 
-  it('ports SplitPolicy.allowsSplit and agrees with the app on the six known windows', () => {
+  it('ports SplitPolicy.allowsSplit and agrees with the app on the known windows', () => {
     // Expectations are the table in SplitPolicy.swift: iPhone, Duo folded, Duo unfolded portrait and iPad portrait never; Duo landscape and iPad landscape allowed.
     const decided = previewWindows.map(win => [win.name, allowsSplit(contentSize(win), isRegularWidth(win.width))]);
     expect(decided).toEqual([
-      ['iPhone', false], ['Duo folded', false], ['Duo open, upright', false], ['Duo open, sideways', true], ['iPad upright', false], ['iPad sideways', true],
+      ['iPhone', false], ['Duo folded', false], ['Duo open, upright', false], ['Duo open, sideways', true], ['iPad upright', false], ['iPad sideways', true], ['Duo folded, sideways', false],
     ]);
-    expect(previewWindows).toHaveLength(6);
+    expect(previewWindows).toHaveLength(7);
   });
 
   it('follows the rule at its edges: regular, wider than tall, each half 360', () => {
@@ -126,13 +126,13 @@ describe('windows and the split rule', () => {
   });
 
   it('shows the flyout at regular width with no hinge and no rail (the iPad), and the tab bar or its rail otherwise', () => {
-    expect(previewWindows.map(win => usesFlyout(win))).toEqual([false, false, false, false, true, true]);
+    expect(previewWindows.map(win => usesFlyout(win))).toEqual([false, false, false, false, true, true, false]);
     expect(usesFlyout(withPose(duoSideways, 'book'))).toBe(false);
   });
 
   it('lists the windows by name, without their sizes', () => {
     expect(previewWindows.map(windowLabel)).toEqual([
-      'iPhone', 'Duo folded', 'Duo open, upright', 'Duo open, sideways', 'iPad upright', 'iPad sideways',
+      'iPhone', 'Duo folded', 'Duo open, upright', 'Duo open, sideways', 'iPad upright', 'iPad sideways', 'Duo folded, sideways',
     ]);
   });
 });

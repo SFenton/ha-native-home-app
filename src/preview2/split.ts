@@ -1,4 +1,4 @@
-import type { PreviewWindow } from './windows';
+import { railSideOf, type PreviewWindow } from './windows';
 
 /** Narrowest pane a split may produce (`SplitPolicy.minimumPaneWidth` in the app). */
 export const MINIMUM_PANE_WIDTH = 360;
@@ -20,13 +20,16 @@ export function allowsSplit(size: { width: number; height: number }, regular: bo
 }
 
 /**
- * Whether the system draws the bars on the trailing vertical edge: the Duo folded and unfolded sideways, where the tab bar becomes the rail
- * (`shellInVerticalBar`, `toolbarVerticalEdge`). Geometry again: a window gets a rail width or it does not. Unfolded upright has horizontal bars.
+ * Whether the system draws the bars on a vertical edge: the Duo folded and unfolded sideways, where the tab bar becomes the rail
+ * (`shellInVerticalBar`, `toolbarVerticalEdge`), on the edge `railSideOf` names. Geometry again: a window gets a rail width or it does not. Unfolded upright has horizontal bars.
  */
 export const inVerticalBar = (win: PreviewWindow) => win.rail !== undefined;
 
 /** The area pages draw in: the window less the rail a short window gives the tab bar. */
 export const contentSize = (win: PreviewWindow) => ({ width: win.width - (win.rail ?? 0), height: win.height });
+
+/** Where the content area starts, in window points: the rail's width when the rail is on the leading edge, else 0. */
+export const contentOrigin = (win: PreviewWindow) => win.rail !== undefined && railSideOf(win) === 'leading' ? win.rail : 0;
 
 /** Pane widths of an open split. */
 export interface SplitGeometry { leading: number; band: number; trailing: number; hinge: boolean }
@@ -40,7 +43,8 @@ export function splitGeometry(win: PreviewWindow): SplitGeometry | undefined {
   if (!allowsSplit(size, isRegularWidth(win.width))) return undefined;
   const hinge = win.hinge?.axis === 'vertical' ? win.hinge : undefined;
   if (hinge) {
-    const leading = hinge.start, trailing = size.width - hinge.start - hinge.length;
+    // The band is in window points; the panes are what is left of the content area on each side of it.
+    const leading = hinge.start - contentOrigin(win), trailing = size.width - leading - hinge.length;
     if (leading >= MINIMUM_PANE_WIDTH && trailing >= MINIMUM_PANE_WIDTH) return { leading, band: hinge.length, trailing, hinge: true };
   }
   const leading = Math.floor((size.width - MIDPOINT_BAND) / 2);

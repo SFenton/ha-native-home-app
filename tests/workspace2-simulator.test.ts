@@ -7,19 +7,24 @@ const named = (name: string) => previewWindows.find(item => item.name === name)!
 describe('the simulator controls', () => {
   it('lists three devices by name, each opening in its first pose', () => {
     expect(devices.map(item => item.name)).toEqual(['iPhone', 'iPhone Duo', 'iPad']);
-    expect(windowOfDevice('iPhone Duo').name).toBe('Duo open, upright');
+    // Choosing the Duo opens it flat and sideways at turn 0, the way the owner's closed Duo opens.
+    expect(windowOfDevice('iPhone Duo').name).toBe('Duo open, sideways');
+    expect(windowOfDevice('iPhone Duo').pose).toEqual({ turn: 0, fold: 'open' });
     expect(windowOfDevice('iPad').name).toBe('iPad upright');
     for (const window of previewWindows) expect(devices.map(item => item.name)).toContain(deviceOf(window));
   });
 
   it('turns the Duo and the iPad, and nothing else', () => {
     expect(canRotate(named('iPhone'))).toBe(false);
-    expect(canRotate(named('Duo folded'))).toBe(false);
+    // The closed Duo rotates too, four ways, as the app does once it has seen a hinge.
+    expect(canRotate(named('Duo folded'))).toBe(true);
     expect(rotated(named('iPhone')).name).toBe('iPhone');
     expect(rotated(named('Duo open, upright')).name).toBe('Duo open, sideways');
     expect(rotated(named('Duo open, sideways')).name).toBe('Duo open, upright');
+    expect(rotated(named('Duo folded')).name).toBe('Duo folded, sideways');
     expect(rotated(named('iPad upright')).name).toBe('iPad sideways');
     expect(rotated(rotated(named('iPad upright'))).name).toBe('iPad upright');
+    expect(rotated(named('iPad upright'), 'left').name).toBe('iPad sideways');
   });
 
   it('keeps a half-open Duo half open when it turns, and a flat one flat', () => {
@@ -34,13 +39,17 @@ describe('the simulator controls', () => {
     expect(rotated(named('Duo open, upright')).hinge).toBeUndefined();
   });
 
-  it('gives only the Duo a posture, and partly folded only when it is open', () => {
+  it('gives only the Duo a posture, and every posture in every pose', () => {
     expect(postureOf(named('iPhone'))).toBeUndefined();
     expect(postureOf(named('iPad sideways'))).toBeUndefined();
     expect(postureOf(named('Duo folded'))).toBe('folded');
     expect(postureOf(named('Duo open, upright'))).toBe('unfolded');
     expect(canPosture(named('Duo open, upright'), 'partly')).toBe(true);
-    expect(canPosture(named('Duo folded'), 'partly')).toBe(false);
+    // Partly Folded is open from the folded Duo too: it opens straight to the book.
+    expect(canPosture(named('Duo folded'), 'partly')).toBe(true);
+    expect(canPosture(named('iPhone'), 'partly')).toBe(false);
+    expect(withPosture(named('Duo folded'), 'partly').pose).toEqual({ turn: 0, fold: 'partly' });
+    expect(withPosture(named('Duo folded'), 'partly').hinge?.axis).toBe('vertical');
     expect(canPosture(named('Duo open, sideways'), 'partly')).toBe(true);
     const hinged = withPosture(named('Duo open, upright'), 'partly');
     expect(hinged.name).toBe('Duo open, upright');
@@ -54,7 +63,9 @@ describe('the simulator controls', () => {
     const book = withPosture(named('Duo open, sideways'), 'partly');
     expect(book.hinge?.axis).toBe('vertical');
     expect(withPosture(book, 'unfolded').hinge).toBeUndefined();
-    expect(withPosture(named('Duo folded'), 'unfolded').name).toBe('Duo open, upright');
+    // Fold and unfold keep the turn: closed portrait opens sideways (the cover swings about the hinge strip), closed landscape opens upright.
+    expect(withPosture(named('Duo folded'), 'unfolded').name).toBe('Duo open, sideways');
+    expect(withPosture(named('Duo folded, sideways'), 'unfolded').name).toBe('Duo open, upright');
     expect(withPosture(named('Duo open, sideways'), 'unfolded').name).toBe('Duo open, sideways');
   });
 

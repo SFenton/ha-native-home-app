@@ -1,5 +1,5 @@
 import { fetchPicture } from '../preview2/map-picture';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
 import { useRecords } from './data/useRecords';
 import Preview2, { previewWindows, type PreviewWindow } from './preview';
@@ -80,6 +80,8 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   /** A selection the library made itself (going into a container) that must not close the panel where it and the inspector cannot both show. */
   const keptSelection = useRef<SelectionKey | undefined>(undefined);
   const [window_, setWindow] = useState<PreviewWindow>(previewWindows[0]);
+  /** The rail's moves render as a transition: the new display mounts in slices between frames, so a fold or a turn does not hold a frame (`studio-duo-sim`, frame pacing). */
+  const moveWindow = useCallback((next: PreviewWindow) => startTransition(() => setWindow(next)), []);
   const [pagesOpen, setPagesOpen] = useState(false), [projectOpen, setProjectOpen] = useState(false), [checksOpen, setChecksOpen] = useState(false), [levelOpen, setLevelOpen] = useState(false);
   const [textStep, setTextStep] = useState(defaultTextStep);
   const [dialog, setDialog] = useState<DialogKey>();
@@ -163,12 +165,12 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
         {loadingState ?? <div className="w2-stage" data-mode={ws.mode} ref={setStageElement}>{stage}</div>}
         {!narrow && <HandleSlot ws={ws} stage={stageElement} onError={showError}/>}
         <ElementContextMenu ws={ws} stage={stageElement} onError={showError}/>
-        <RailSlot stage={stageElement} enabled={!narrow && Boolean(document)} deps={[window_, textStep, target, narrow, layout.left, layout.inspectorWidth]} under={under} window={window_} onWindow={setWindow} textStep={textStep} onTextStep={setTextStep}/>
+        <RailSlot stage={stageElement} enabled={!narrow && Boolean(document)} deps={[window_, textStep, target, narrow, layout.left, layout.inspectorWidth]} under={under} window={window_} onWindow={moveWindow} textStep={textStep} onTextStep={setTextStep}/>
         {document && <div className="w2-checks-slot" hidden={narrow && Boolean(target)}><ChecksPill ws={ws} narrow={narrow} open={checksOpen} onOpenChange={setChecksOpen} onGo={goTo} showPill={!narrow || Boolean(ws.flash)} away={!narrow && !checksPillShown(layout.canvas)}/></div>}
       </main>
       {!narrow && document && <InspectorSlot open={layout.inspector} ms={reduced ? 120 : inspectorMotion} tier={tier} width={layout.inspectorWidth} fallbackWidth={inspectorWidthFor(tier, width)} properties={properties}/>}
       </div>
-      {underPreview && document && !target && <div className="w2-rail-under"><SimulatorRail window={window_} onWindow={setWindow} textStep={textStep} onTextStep={setTextStep} orientation="horizontal"/></div>}
+      {underPreview && document && !target && <div className="w2-rail-under"><SimulatorRail window={window_} onWindow={moveWindow} textStep={textStep} onTextStep={setTextStep} orientation="horizontal"/></div>}
       {narrow && document && (!target || levelOpen || repeatsUp) && <PhoneBottomBar ws={ws} onThisPage={() => setLevelOpen(true)}/>}
       {narrow && document && <LevelSheet ws={ws} open={levelOpen} onOpenChange={setLevelOpen} onError={showError}/>}
       {narrow && document && <RepeatsSheet ws={ws} onError={showError}/>}

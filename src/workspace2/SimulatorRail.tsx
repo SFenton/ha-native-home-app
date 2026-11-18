@@ -1,4 +1,4 @@
-import { BookOpen, Columns2, RotateCw, Smartphone } from 'lucide-react';
+import { BookOpen, Columns2, RotateCcw, RotateCw, Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { PreviewWindow } from '../preview2';
 import { canPosture, canRotate, deviceOf, postureOf, rotated, stepText, textScales, withPosture, type Posture } from './simulator';
@@ -10,7 +10,7 @@ const postureControls: readonly { posture: Posture; label: string; icon: ReactNo
 ];
 
 /**
- * The simulator controls (Studio spec, Rule 3): Rotate, the Duo's three postures, and text size down and up. A control the
+ * The simulator controls (Studio spec, Rule 3): Rotate Left and Right, the Duo's three postures, and text size down and up. The Duo turns and takes every posture from every pose. A control the
  * device cannot use is dimmed where it stands, so the rail never changes shape. Beside the device when wide (a column) and under
  * it on a phone (a row).
  */
@@ -19,7 +19,8 @@ export default function SimulatorRail({ window: win, onWindow, textStep, onTextS
 }) {
   const duo = deviceOf(win) === 'iPhone Duo', posture = postureOf(win);
   return <div className="w2-rail" role="toolbar" aria-label="Simulator" aria-orientation={orientation} data-orientation={orientation} data-testid="simulator-rail">
-    <button type="button" className="w2-icon-button" aria-label="Rotate" title="Rotate" disabled={!canRotate(win)} onClick={() => onWindow(rotated(win))}><RotateCw size={18} aria-hidden/></button>
+    <button type="button" className="w2-icon-button" aria-label="Rotate Left" title="Rotate Left" disabled={!canRotate(win)} onClick={() => onWindow(rotated(win, 'left'))}><RotateCcw size={18} aria-hidden/></button>
+    <button type="button" className="w2-icon-button" aria-label="Rotate Right" title="Rotate Right" disabled={!canRotate(win)} onClick={() => onWindow(rotated(win, 'right'))}><RotateCw size={18} aria-hidden/></button>
     {duo && <>
       <span className="w2-rail-sep" role="separator" aria-orientation={orientation === 'vertical' ? 'horizontal' : 'vertical'}/>
       {postureControls.map(item => <button key={item.posture} type="button" className="w2-icon-button" aria-label={item.label} title={item.label} aria-pressed={posture === item.posture}

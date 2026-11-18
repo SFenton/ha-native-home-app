@@ -45,6 +45,10 @@
   .sh-wall::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, .44) 0, rgba(0, 0, 0, .45) 28%, rgba(0, 0, 0, .46) 50%, rgba(0, 0, 0, .52) 75%, rgba(0, 0, 0, .64) 100%); }
   .sh-status { position: absolute; inset: 0 0 auto 0; height: var(--sh-safe-top); z-index: 40; pointer-events: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 30px 12px; font: 600 17px/1 var(--sh-font); }
   .sh-island { position: absolute; left: 50%; top: 11px; width: 120px; height: 34px; margin-left: -60px; border-radius: 17px; background: #000; }
+  /* The closed Duo's status items: the time over the connection mark, on the rail under (or over) the camera, inside the region kept clear (R1). */
+  .sh-rail-status { position: absolute; z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; font: 600 15px/1 var(--sh-font); padding-top: calc(var(--sh-camera-y) + var(--sh-camera-size) / 2 + 8px); box-sizing: border-box; }
+  .sh-rail-status[data-camera-v=bottom] { flex-direction: column-reverse; padding-top: 0; padding-bottom: calc(var(--sh-keep-h) - var(--sh-camera-y) + var(--sh-camera-size) / 2 + 8px); }
+  .sh-wifi { width: 20px; height: 14px; border: 2.5px solid #fff; border-bottom: 0; border-radius: 12px 12px 0 0; box-sizing: border-box; }
   .sh-battery { width: 26px; height: 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: linear-gradient(90deg, #fff 80%, transparent 80%); }
 
   /* Pages */
@@ -199,6 +203,7 @@
   .sh-sheet-layer[data-placement=bottom] .sh-sheet[data-fills-height] { height: calc(100% - var(--sh-sheet-top)); }
   /* The Duo landscape: the leading half, inset 8 pt from the leading, top and bottom edges, the app's own placement. */
   .sh-sheet-layer[data-placement=leading] { align-items: flex-start; justify-content: flex-start; padding: 8px; }
+  .sh-screen[data-rail-side=leading] .sh-sheet-layer[data-placement=leading] { padding-left: calc(var(--sh-rail) + 8px); }
   .sh-sheet-layer[data-placement=leading] .sh-sheet { width: var(--sheet-w); height: var(--sheet-h); max-height: none; border-radius: 38px; }
   /* A form or page sheet on iPad: centred, rounded all round, the form at 580 x 660 at most. */
   .sh-sheet-layer[data-placement=center] { align-items: center; justify-content: center; padding: var(--sh-sheet-top) 0 12px; }
@@ -228,14 +233,23 @@
   .sh-deck.sh-columns { display: flex; }
   .sh-pane { position: relative; flex: none; height: 100%; overflow: hidden; }
   .sh-band { flex: none; height: 100%; background: rgba(255, 255, 255, .1); }
-  .sh-band[data-hinge] { background: rgba(0, 0, 0, .35); }
   .sh-empty-pane { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 24px; text-align: center; color: var(--ink-3); font-size: 15px; }
-  .sh-fold { position: absolute; z-index: 45; pointer-events: none; background: repeating-linear-gradient(45deg, rgba(0, 0, 0, .55) 0 6px, rgba(40, 40, 44, .55) 6px 12px); box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .25); }
-  .sh-fold[data-axis=vertical] { top: 0; bottom: 0; } .sh-fold[data-axis=horizontal] { left: 0; right: 0; }
-  /* The Duo's rail is the trailing vertical bar (`duo.md`): the deck keeps the window's leading edge and the fold stays in window coordinates. */
+  /* The fold's crease (`studio-duo-sim` D4, owner feedback on PR #11): only a gentle light falloff across the bend, black 16% on the centre line falling to nothing over the reserved band. It is a gradient with no stroke: no line is drawn on the hinge, and what crosses the fold is drawn through it. */
+  .sh-crease { position: absolute; z-index: 45; pointer-events: none; opacity: 0; transition: opacity var(--sh-fold-ms, 450ms) var(--sh-fold-ease, ease-out); }
+  .sh-crease[data-on] { opacity: 1; }
+  .sh-crease[data-axis=vertical] { top: 0; bottom: 0; background: linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .16) 50%, rgba(0, 0, 0, 0)); }
+  .sh-crease[data-axis=horizontal] { left: 0; right: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .16) 50%, rgba(0, 0, 0, 0)); }
+  /* The Duo's rail is a vertical bar on the edge `verticalBarEdge` names (`duo.md`): the deck takes the rest, and the fold stays in window coordinates. */
   .sh-screen[data-rail] .sh-deck { right: var(--sh-rail); }
+  .sh-screen[data-rail-side=leading] .sh-deck { right: 0; left: var(--sh-rail); }
   /* The rail (`ui-rail` in the kit): from the status strip down, the header group on top, the tabs in a rounded pill at the bottom. */
-  .sh-rail-bar { position: absolute; top: var(--sh-safe-top); bottom: 0; right: 0; width: var(--sh-rail); z-index: 20; display: flex; flex-direction: column; align-items: center; padding: 8px 0 22px; gap: 16px; pointer-events: none; }
+  .sh-rail-bar { position: absolute; top: var(--sh-safe-top); bottom: 0; right: 0; width: var(--sh-rail-bar, var(--sh-rail)); z-index: 20; display: flex; flex-direction: column; align-items: center; padding: 8px 0 22px; gap: 16px; pointer-events: none; }
+  .sh-screen[data-rail-side=leading] .sh-rail-bar { right: auto; left: 0; }
+  /* The camera is at the rail's bottom end in turns 90 and 180: the bars start there and read away from it, so the order mirrors. */
+  /* The closed Duo's rail starts after the region kept clear around the camera (R1: 84 x 170 at turn 0). */
+  .sh-screen[data-camera=top] .sh-rail-bar { top: var(--sh-camera-top); }
+  .sh-screen[data-camera=bottom] .sh-rail-bar { bottom: var(--sh-camera-bottom); }
+  .sh-screen[data-camera=bottom] .sh-rail-bar { flex-direction: column-reverse; padding: 22px 0 8px; }
   .sh-rail-bar > * { pointer-events: auto; } .sh-rail-grow { flex: 1; pointer-events: none !important; }
   .sh-rail-group { flex: none; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 22px; }
   .sh-rail-circles { flex: none; flex-direction: column; align-items: center; gap: 12px; }

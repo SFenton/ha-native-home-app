@@ -1,3 +1,5 @@
+import { cameraCutout, closedRailSide, hingeAxisOf, openRailSide, samePose, type CameraCutout, type DuoPose, type RailSide } from './duo-pose';
+
 /** A vertical or horizontal band the device cannot draw on, in window points. */
 export interface Hinge { axis: 'vertical' | 'horizontal'; /** Where the band starts, along its axis' perpendicular. */ start: number; /** The band's thickness. */ length: number }
 
@@ -18,33 +20,18 @@ export interface HingeStrip {
 
 /**
  * The body drawn around a window, in points: the bezel, the screen's corners and the body's own corners. Values come from Apple's
- * Duo simulator profile (the screen masks and the `phone15` chrome) where measured; the camera cutout, the Dynamic Island and a
- * folded landscape window are held until the simulator measurement R1 (`build/research/studio-duosim.md`, section 7) and are not
- * drawn: `camera`, `islandAt` and `railSide` stay unset here until it reports.
+ * Duo simulator profile (the screen masks and the `phone15` chrome) where measured. The closed Duo's camera and rail edge per turn
+ * come from the pose (`duo-pose.ts`), and the Dynamic Island on either Duo display stays unmeasured (R1) and is not drawn.
  */
 export interface BodyFrame {
   bezel: number;
   screenRadii: Radii;
   bodyRadii: Radii;
   hingeStrip?: HingeStrip;
-  /** The outer camera's cutout, in window points. Unset: its corner, size and offset are unmeasured (R1). */
-  camera?: { x: number; y: number; width: number; height: number };
-  /** The side the folded Duo's rail takes in a rotation. Unset: unmeasured (R1); the rail stays trailing. */
-  railSide?: 'leading' | 'trailing';
 }
 
-// MARK: - Held until the simulator measurement (R1)
-// Each constant below is deliberately unset. Nothing in the repo or in Apple's pages measures it
-// (`build/research/studio-duosim.md`, sections 3a and 7); R1 records it on "iPhone Duo (HASS)". Do not guess a value: set it when R1 reports.
-
-/** The outer camera's cutout on the folded Duo: its corner, size and offset in window points. Unset: R1. */
-export const DUO_CAMERA_CUTOUT: BodyFrame['camera'] = undefined;
-/** Where the Dynamic Island sits on each Duo display during a Live Activity. Unset: R1. No island is drawn on any Duo window until it is. */
+/** Where the Dynamic Island sits on each Duo display during a Live Activity. Unset: R1 did not place it. No island is drawn on any Duo window until it is. */
 export const DUO_ISLAND_AT: { x: number; y: number; width: number; height: number } | undefined = undefined;
-/** Which side the folded Duo's rail takes per rotation. Unset: R1; the rail stays on the trailing edge and the folded Duo has no sideways window. */
-export const DUO_FOLDED_RAIL_SIDE: BodyFrame['railSide'] = undefined;
-/** The folded Duo turned a quarter (678 x 466 by transposition) with its safe areas and rail. Unset: R1; Rotate stays dimmed when folded. */
-export const DUO_FOLDED_LANDSCAPE: { width: number; height: number; safeTop: number; safeBottom: number; rail: number } | undefined = undefined;
 
 /** A set of corner radii as a CSS `border-radius` value. */
 export const radiiCss = (radii: Radii) => radii.map(value => `${value}px`).join(' ');
@@ -57,7 +44,6 @@ export const PHONE_BODY: BodyFrame = { bezel: 12, screenRadii: [55, 55, 55, 55],
  */
 export const FOLDED_DUO_BODY: BodyFrame = {
   bezel: 14, screenRadii: [8, 59, 59, 8], bodyRadii: [1, 69, 69, 1], hingeStrip: { width: 14, outside: 9, height: 693, radius: 7 },
-  camera: DUO_CAMERA_CUTOUT, railSide: DUO_FOLDED_RAIL_SIDE,
 };
 /**
  * The opened Duo's inner display: 55 pt screen corners (the profile). The 20 pt bezel is computed from Apple's open size and the
@@ -74,6 +60,10 @@ export interface PreviewWindow {
   bookHinge?: Hinge;
   /** Width of the vertical rail the tab bar becomes in a short window; the app's content (and a split) uses what is left. */
   rail?: number;
+  /** The rail bar's own width when it is narrower than the inset it takes (the closed Duo: a 69 pt bar flush to the edge in an 84 pt inset, R1). Absent: `rail`. */
+  railBar?: number;
+  /** Whether the window's numbers are carried round from a measured pose rather than measured (the closed Duo at every turn but 0). */
+  interim?: boolean;
   /**
    * Whether the window draws a Dynamic Island. Only the iPhone does: the Duo's inner display has no cutout (an under-display camera),
    * and where the island sits on either Duo display is unmeasured (R1, `build/research/studio-duosim.md`), so none is drawn.
@@ -81,6 +71,12 @@ export interface PreviewWindow {
   island?: boolean;
   /** The body drawn around it when the preview shows a bezel. */
   frame: BodyFrame;
+  /** The Duo's pose (turn and fold) this window is drawn in. Absent for a device that does not fold. */
+  pose?: DuoPose;
+  /** The screen edge the rail takes. Absent: trailing (the rail is trailing wherever the window has one and says nothing). */
+  railSide?: RailSide;
+  /** The closed Duo's outer camera: its occlusion and keep-clear regions, in window points. `interim` beyond turn 0 (R1). */
+  camera?: CameraCutout;
 }
 
 /**
@@ -90,13 +86,15 @@ export interface PreviewWindow {
  */
 export const previewWindows: readonly PreviewWindow[] = [
   { name: 'iPhone', width: 402, height: 874, safeTop: 62, safeBottom: 34, island: true, frame: PHONE_BODY },
-  { name: 'Duo folded', width: 466, height: 678, safeTop: 24, safeBottom: 0, rail: 83, frame: FOLDED_DUO_BODY },
+  { name: 'Duo folded', width: 466, height: 678, safeTop: 24, safeBottom: 34, rail: 84, railBar: 69, frame: FOLDED_DUO_BODY, pose: { turn: 0, fold: 'closed' } },
   // safeTop 62 is an iPhone figure the atlas kit (24) disagrees with; no measured source until R1.
   // The horizontal band is the fold's centre by symmetry (the fold bisects the 951 pt side): computed, not measured.
-  { name: 'Duo open, upright', width: 669, height: 951, safeTop: 62, safeBottom: 34, bookHinge: { axis: 'horizontal', start: 455.3, length: 40.4 }, frame: OPEN_DUO_BODY },
-  { name: 'Duo open, sideways', width: 951, height: 669, safeTop: 24, safeBottom: 0, rail: 83, bookHinge: { axis: 'vertical', start: 455.3, length: 40.4 }, frame: OPEN_DUO_BODY },
+  { name: 'Duo open, upright', width: 669, height: 951, safeTop: 62, safeBottom: 34, bookHinge: { axis: 'horizontal', start: 455.3, length: 40.4 }, frame: OPEN_DUO_BODY, pose: { turn: 90, fold: 'open' } },
+  { name: 'Duo open, sideways', width: 951, height: 669, safeTop: 24, safeBottom: 0, rail: 83, bookHinge: { axis: 'vertical', start: 455.3, length: 40.4 }, frame: OPEN_DUO_BODY, pose: { turn: 0, fold: 'open' } },
   { name: 'iPad upright', width: 834, height: 1194, safeTop: 24, safeBottom: 20, frame: PHONE_BODY },
   { name: 'iPad sideways', width: 1194, height: 834, safeTop: 24, safeBottom: 20, frame: PHONE_BODY },
+  // Last in the list so the indexes of the older windows hold. The folded Duo turned a quarter: the outer display transposed (678 x 466), the rail on its camera's edge. R1 measured the portrait only: its bottom inset (34), rail inset (84) and rail width (69) are kept here, interim.
+  { name: 'Duo folded, sideways', width: 678, height: 466, safeTop: 24, safeBottom: 34, rail: 84, railBar: 69, frame: FOLDED_DUO_BODY, pose: { turn: 90, fold: 'closed' } },
 ];
 
 /** The words for a window: its name alone. The size is the window's own business; a person picks a device, not a measure. */
@@ -107,7 +105,44 @@ export const canBook = (win: PreviewWindow) => win.bookHinge !== undefined;
 /** The window in the book pose (its hinge crosses it), or flat again. */
 export const withPose = (win: PreviewWindow, pose: 'flat' | 'book'): PreviewWindow => {
   const base = previewWindows.find(item => item.name === win.name) ?? win;
-  return pose === 'book' && base.bookHinge ? { ...base, hinge: base.bookHinge } : { ...base, hinge: base.hinge };
+  if (base.pose && base.bookHinge) return duoWindow({ turn: win.pose?.turn ?? base.pose.turn, fold: pose === 'book' ? 'partly' : 'open' });
+  return { ...base, hinge: base.hinge };
 };
 /** Whether a window is in the book pose. */
 export const isBook = (win: PreviewWindow) => win.bookHinge !== undefined && win.hinge !== undefined;
+
+/** The window's size by its name in {@link previewWindows}. */
+const named = (name: string) => previewWindows.find(item => item.name === name) as PreviewWindow;
+const duoCache = new Map<string, PreviewWindow>();
+
+/**
+ * The Duo window for a pose. Closed, the outer display (466 x 678, or 678 x 466 turned) with its rail on the camera's edge and the
+ * camera cutout; open, the inner display with a rail when its hinge is vertical; partly folded, the open window with its band. The
+ * same pose always gives the same object, so a memo keyed on the window holds across renders.
+ */
+export function duoWindow(pose: DuoPose): PreviewWindow {
+  const key = `${pose.turn}:${pose.fold}`, held = duoCache.get(key);
+  if (held) return held;
+  const vertical = hingeAxisOf(pose.turn) === 'vertical', closed = pose.fold === 'closed';
+  const base = named(closed ? (vertical ? 'Duo folded' : 'Duo folded, sideways') : (vertical ? 'Duo open, sideways' : 'Duo open, upright'));
+  const side = closed ? closedRailSide(pose.turn) : openRailSide(pose.turn);
+  const made: PreviewWindow = {
+    ...base, pose: { turn: pose.turn, fold: pose.fold }, hinge: pose.fold === 'partly' ? base.bookHinge : undefined,
+    ...(base.rail !== undefined && side ? { railSide: side } : {}), ...(closed ? { camera: cameraCutout(pose.turn), ...(pose.turn !== 0 ? { interim: true } : {}) } : {}),
+  };
+  duoCache.set(key, made);
+  return made;
+}
+
+/** The Duo's pose of a window: its own, or the one its name and hinge say. Undefined for a device that does not fold. */
+export function poseOfWindow(win: PreviewWindow): DuoPose | undefined {
+  if (win.pose) return win.pose;
+  const base = previewWindows.find(item => item.name === win.name);
+  return base?.pose ? { turn: base.pose.turn, fold: win.hinge ? 'partly' : base.pose.fold } : undefined;
+}
+
+/** The screen edge a window's rail takes. */
+export const railSideOf = (win: PreviewWindow): RailSide => win.railSide ?? 'trailing';
+
+/** Whether two windows are the same pose of the same device. */
+export const sameWindow = (a: PreviewWindow, b: PreviewWindow) => a.name === b.name && samePose(a.pose, b.pose) && Boolean(a.hinge) === Boolean(b.hinge);

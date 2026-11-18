@@ -10,7 +10,7 @@ import { wallpaperImage } from './wallpaper';
 import { sheetFrame, scalesBackBehindSheet } from './sheet-frame';
 import { inVerticalBar, splitGeometry, usesFlyout } from './split';
 import { beginTransition, endTransition, MOTION_MS, type Transition } from './transition';
-import type { PreviewWindow } from './windows';
+import { railSideOf, type PreviewWindow } from './windows';
 
 /** Props of {@link Screen}. */
 export interface ScreenProps {
@@ -18,6 +18,7 @@ export interface ScreenProps {
   nav: NavState;
   window: PreviewWindow;
 }
+
 /**
  * The app inside the window: one still wallpaper, the page stack of the selected tab (a push or pop slides both pages a full
  * width, a reduced-motion setting cross-fades), the floating tab bar and any presented sheets over a dimmed, scaled-back page.
@@ -70,7 +71,7 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
     ? <div className="sh-deck sh-columns" data-columns="">
       <div className="sh-pane" style={{ width: geometry.leading }}><PageView key={`lead:${hostPage.id}`} document={document} page={hostPage} root={panes.hostIndex === 0} current
         onBack={back} scrollToTop={nav.scrollTop}/></div>
-      <div className="sh-band" data-hinge={geometry.hinge ? '' : undefined} style={{ width: geometry.band }} aria-hidden="true"/>
+      <div className="sh-band" style={{ width: geometry.band }} aria-hidden="true"/>
       <div className="sh-pane" style={{ width: geometry.trailing }} data-pane="detail">
         {detailPage ? <PageView key={`detail:${detailPage.id}`} document={document} page={detailPage} root={false} detail current/>
           : <p className="sh-empty-pane">{panes.placeholder}</p>}
@@ -81,17 +82,20 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
       {page && !nav.emptyBase && <PageView key={page.id} document={document} page={page} root={stack.length <= 1} current onBack={back}
         scrollToTop={nav.scrollTop} motion={leaving ? `sh-in-${motion}` : ''}/>}
     </div>;
-  const hinge = win.hinge;
+  // The fold's crease: drawn wherever the window can fold, lit only while it is (the book pose), so it fades with the tilt rather than appearing.
+  const crease = win.bookHinge;
+  const camera = win.camera?.corner.vertical, clear = win.camera?.statusColumn.height ?? 0;
   // The rail carries the trailing header items of the page the header shows: the host page of a split, else the top of the stack.
   const headerPage = hostPage ?? page;
   const rootPage = panes ? panes.hostIndex === 0 : stack.length <= 1;
   return <RenderCtx.Provider value={ctx}><div className="sh-screen" data-sel={`page:${pageId}`} data-covered={nav.sheets.length > 0 && scalesBackBehindSheet(win) ? '' : undefined}
-    data-rail={win.rail ? '' : undefined} data-short-bar={win.safeTop < 50 ? '' : undefined} data-flyout={hasFlyout ? '' : undefined}
-    style={{ '--sh-safe-top': `${win.safeTop}px`, '--sh-safe-bottom': `${win.safeBottom}px`, '--sh-rail': `${win.rail ?? 0}px` } as React.CSSProperties}>
+    data-rail={win.rail ? '' : undefined} data-rail-side={win.rail ? railSideOf(win) : undefined} data-camera={camera} data-short-bar={win.safeTop < 50 ? '' : undefined} data-flyout={hasFlyout ? '' : undefined}
+    style={{ '--sh-safe-top': `${win.safeTop}px`, '--sh-safe-bottom': `${win.safeBottom}px`, '--sh-rail': `${win.rail ?? 0}px`, '--sh-rail-bar': `${win.railBar ?? win.rail ?? 0}px`,
+      '--sh-camera-top': `${camera === 'top' ? clear : 0}px`, '--sh-camera-bottom': `${camera === 'bottom' ? clear : 0}px` } as React.CSSProperties}>
     <div className="sh-wall" data-background={background.type} aria-hidden="true">{image && <div className="sh-wall-image" style={{ backgroundImage: `url("${image.url}")`, filter: `blur(${image.blur}px)` }}/>}</div>
     {content}
-    {hinge && <div className="sh-fold" data-axis={hinge.axis} aria-hidden="true"
-      style={hinge.axis === 'vertical' ? { left: hinge.start, width: hinge.length } : { top: hinge.start, height: hinge.length }}/>}
+    {crease && <div className="sh-crease" data-axis={crease.axis} data-on={win.hinge ? '' : undefined} aria-hidden="true"
+      style={crease.axis === 'vertical' ? { left: crease.start, width: crease.length } : { top: crease.start, height: crease.length }}/>}
     {vertical && hasTabs && headerPage ? <RailBar document={document} tabId={nav.tabId} groups={headerGroups(document, headerPage)} root={rootPage}/>
       : !hasFlyout && <TabBar document={document} tabId={nav.tabId}/>}
     {hasTabs && !vertical && (hasFlyout || flyoutOpen || lingering) && <Flyout document={document} tabId={nav.tabId} open={flyoutOpen} onClose={() => setFlyoutOpen(false)} replacesTabBar={hasFlyout}/>}
@@ -101,6 +105,12 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
       return <SheetView key={`${at}:${frame.modalId}`} modal={modal} frame={sheetFrame(win, modal.presentation)} page={document.pages.find(item => item.id === frame.pages.at(-1))} top={at === nav.sheets.length - 1}
         onClose={() => ctx.run({ type: 'dismiss', scope: 'current-modal' })} onBack={() => ctx.run({ type: 'back' })}/>;
     })}
-    <div className="sh-status" aria-hidden="true"><span className="sh-time">9:41</span>{win.island && <i className="sh-island"/>}<span className="sh-battery"/></div>
+    {win.camera
+      // The closed Duo has no status bar across the top: the time and the connection stack on the rail, in the region kept clear around the camera (HIG, Designing for iPhone Duo, Vertical controls).
+      ? <div className="sh-rail-status" data-camera-h={win.camera.corner.horizontal} data-camera-v={win.camera.corner.vertical} aria-hidden="true"
+        style={{ left: win.camera.statusColumn.x, top: win.camera.statusColumn.y, width: win.camera.statusColumn.width, height: win.camera.statusColumn.height, '--sh-camera-y': `${win.camera.y - win.camera.statusColumn.y}px`, '--sh-camera-size': `${win.camera.size}px`, '--sh-keep-h': `${win.camera.statusColumn.height}px` } as React.CSSProperties}>
+        <span className="sh-time">9:41</span><i className="sh-wifi"/>
+      </div>
+      : <div className="sh-status" aria-hidden="true"><span className="sh-time">9:41</span>{win.island && <i className="sh-island"/>}<span className="sh-battery"/></div>}
   </div></RenderCtx.Provider>;
 }

@@ -19,12 +19,14 @@ export default defineConfig({
   timeout: 60_000,
   use: { baseURL: `http://127.0.0.1:${port}`, trace: 'retain-on-failure', screenshot: 'only-on-failure', extraHTTPHeaders: { Authorization: `Bearer ${token}` } },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    // STUDIO_E2E_GPU=1 runs the desktop project on the machine's GPU (ANGLE over Metal) instead of the software renderer CI uses; frame pacing is judged there.
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, ...(process.env.STUDIO_E2E_GPU ? { launchOptions: { args: ['--enable-gpu', '--use-angle=metal', '--ignore-gpu-blocklist'] } } : {}) } },
     // The workspace specs also run at phone size with touch; the preview story page is a desktop study.
     { name: 'phone', testMatch: /workspace2-.*\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 } },
   ],
   webServer: {
-    command: `STUDIO_AUTH_TOKEN=${token} PORT=${port} DATA_DIR=${dataDir} npm run dev`,
+    // STUDIO_E2E_PROD=1 runs the built app (after `npm run build`): frame pacing is measured on it, not on React's development build.
+    command: `STUDIO_AUTH_TOKEN=${token} PORT=${port} DATA_DIR=${dataDir} npm run ${process.env.STUDIO_E2E_PROD ? 'start' : 'dev'}`,
     url: `http://127.0.0.1:${port}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,
