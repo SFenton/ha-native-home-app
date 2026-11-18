@@ -126,7 +126,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const close = useCallback(() => { ws.select(undefined); ws.setPanel(undefined); ws.repeats.pick(undefined); }, [ws]);
   // Choosing a Checks row goes to what it names: the item in the preview, or the Project panel or dialog that holds it.
   const goTo = useCallback((row: CheckRow) => followCheck(row, {
-    select: key => ws.selectAnywhere(key), panel: openPanel, dialog: key => { setProjectOpen(false); showDialog(key); }, focus: focusField,
+    select: key => ws.selectAnywhere(key), panel: openPanel, dialog: key => { setProjectOpen(false); showDialog(key); }, logic: id => { setProjectOpen(false); ws.openLogic(id); }, focus: focusField,
   }), [ws, openPanel, showDialog]);
   const openProjectDialog = useCallback((key: string) => { if (narrow) setProjectOpen(true); else showDialog(key as DialogKey); }, [narrow, showDialog]);
   const repeatsUp = narrow && ws.repeats.open;

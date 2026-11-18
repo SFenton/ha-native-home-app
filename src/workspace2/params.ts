@@ -5,6 +5,7 @@ import {
 import type { ComponentEntry, ComponentParamKind, ComponentRefNode, ComponentStringKind, CompositionDocument, CompositionNode } from '../shared/composition/schema';
 import { identifierSchema } from '../shared/validation';
 import { labelText, mechanicalLabel } from './labels';
+import { dialRowLabel } from './dial/dialLabels';
 import { schemaAt } from './schemaAt';
 
 /**
@@ -164,7 +165,7 @@ function onlyVariant(document: CompositionDocument, base: EditorPath, steps: str
 export function rowTarget(document: CompositionDocument, entry: ComponentEntry, node: CompositionNode, field: string): PerPlaceTarget | undefined {
   const steps = fieldSteps(field);
   if (!steps.length || node.type === 'component-ref') return undefined;
-  const label = fieldLabel(node.type, steps);
+  const label = (node.type === 'dial-control' ? dialRowLabel(node, steps) : undefined) ?? fieldLabel(node.type, steps);
   const kind = fieldKind(node, field);
   if (kind === 'entity-id' || kind === 'state-id') return { kind, label, binding: { nodeId: node.id, field }, value: readField(node, field) };
   if (kind === 'source-id' && sourceFields.has(field)) {

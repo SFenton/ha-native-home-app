@@ -24,6 +24,18 @@ export function callServiceWarnings(call: unknown, pointer = ''): CompositionWar
   return warnings;
 }
 
+/**
+ * A `choose` or `map` operand whose Otherwise is a text with nothing in it (`sh.rules@1`, a Logic Template's cases): when no case holds it says nothing. The
+ * Studio's "How Many Are…" cases write one for a counted value that is not a whole number. An Otherwise that is not text, or that reads something, is not asked.
+ */
+export function emptyOtherwiseWarnings(operand: unknown, pointer = ''): CompositionWarning[] {
+  if (!operand || typeof operand !== 'object') return [];
+  const value = operand as { type?: unknown; otherwise?: { type?: unknown; value?: unknown }; cases?: unknown };
+  if ((value.type !== 'choose' && value.type !== 'map') || !Array.isArray(value.cases)) return [];
+  const blank = value.otherwise?.type === 'literal' && typeof value.otherwise.value === 'string' && value.otherwise.value.trim() === '';
+  return blank ? [{ pointer: `${pointer}/otherwise`, message: 'Otherwise has no text, so nothing shows when no case holds. Add the text for Otherwise.' }] : [];
+}
+
 /** Every warning in a document, with the pointer of the offending action. */
 export function compositionWarnings(document: unknown): CompositionWarning[] {
   const warnings: CompositionWarning[] = [];
@@ -32,6 +44,8 @@ export function compositionWarnings(document: unknown): CompositionWarning[] {
     if (!value || typeof value !== 'object') return;
     const record = value as Record<string, unknown>;
     if (record.type === 'call-service') warnings.push(...callServiceWarnings(record, pointer));
+    // A choose or map case with an empty Otherwise text (a Logic Template's count cases write one).
+    warnings.push(...emptyOtherwiseWarnings(record, pointer));
     // A map whose buttons do not all fit a family: a note, never a refusal (the app puts the rest behind More).
     if (record.kind === 'map' && Array.isArray(record.controls) && typeof record.height === 'number' && typeof record.locate === 'boolean')
       for (const message of overflowNotices(record as unknown as Parameters<typeof overflowNotices>[0])) warnings.push({ pointer: `${pointer}/controls`, message });

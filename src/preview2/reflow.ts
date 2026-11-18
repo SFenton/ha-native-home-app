@@ -88,8 +88,15 @@ export function playReflow(moves: readonly Move[], elements: ReadonlyMap<string,
       to.width = `${move.width.to}px`; to.height = `${move.height.to}px`;
     }
     const animation = element.animate([from, to], { duration: token.ms, easing: token.ease, fill: 'backwards' });
-    // WAAPI animations fire no `animationend`: say when a move ends, so what depends on where a node is (`copy-access.ts`) looks again.
-    animation.finished?.then(() => element.dispatchEvent(new Event('sh-reflow-end', { bubbles: true })), () => undefined);
+    // WAAPI animations fire no `animationend`: say when a move starts and ends, so what depends on where a node is (`copy-access.ts`) waits for
+    // it to settle and then looks again. The start is only sent with a way to know the end (`finished`), which settles when the move ends and
+    // rejects when it is cancelled (a later plan replaces it), so a start is always followed by an end.
+    const finished = animation.finished;
+    if (finished) {
+      element.dispatchEvent(new Event('sh-reflow-start', { bubbles: true }));
+      const ended = () => { element.dispatchEvent(new Event('sh-reflow-end', { bubbles: true })); };
+      finished.then(ended, ended);
+    }
     played.push(animation);
   }
   return played;

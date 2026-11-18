@@ -11,8 +11,8 @@ import { domainName } from './pickers/entities';
 import type { DialogKey } from './projectDialogs';
 import type { PanelKind } from './useWorkspace2';
 
-/** Where choosing a Checks row goes: a selection in the preview, a Project panel, or a Project dialog. Every problem has one. */
-export type Destination = { select: SelectionKey } | { panel: PanelKind } | { dialog: DialogKey };
+/** Where choosing a Checks row goes: a selection in the preview, a Project panel, a Project dialog, or a Logic Template's editor. Every problem has one. */
+export type Destination = { select: SelectionKey } | { panel: PanelKind } | { dialog: DialogKey } | { logic: string };
 type Path = readonly (string | number)[];
 
 /** What an issue concerns: the thing by name, the field by its label (when the path names one), and where to go. */
@@ -59,6 +59,10 @@ function projectPart(document: CompositionDocument, path: Path): { place: string
   const index = typeof at === 'number' ? at : -1;
   switch (root) {
     case 'dataSources': return { place: sourcePlace(document, index), go: { dialog: 'data' }, rel: rest };
+    case 'logicLibrary': {
+      const entry = document.logicLibrary?.[index];
+      return entry ? { place: `In the Logic Template ${entry.name}`, go: { logic: entry.id }, rel: rest } : { place: 'Logic Templates', go: { dialog: 'json' }, rel: path };
+    }
     case 'localState': return { place: document.localState?.[index] ? `Local state ${document.localState[index].id}` : 'Local State', go: { dialog: 'local-state' }, rel: rest };
     case 'liveActivities': return { place: document.liveActivities[index] ? `Live Activity ${document.liveActivities[index].title}` : 'Live Activities', go: { dialog: 'live' }, rel: rest };
     case 'bootstrap': return { place: 'App Launch', go: { dialog: 'launch' }, rel: path.slice(1) };
@@ -127,7 +131,9 @@ export function targetOf(document: CompositionDocument, path: Path): Target {
   }
   const part = projectPart(document, path);
   const field = fieldName('project', part.rel);
-  return { place: part.place, go: part.go, rel: part.rel, field, owner: 'other', fieldPath: field ? path : undefined };
+  // A Logic Template's body is drawn by one row of its editor, not by a field per key: choosing the row focuses it.
+  const inBody = 'logic' in part.go && part.rel[0] === 'body';
+  return { place: part.place, go: part.go, rel: part.rel, field, owner: 'other', fieldPath: inBody ? ['logic-body'] : field ? path : undefined };
 }
 
 /** An emptied or missing text field: "Title is empty. Add a title." */

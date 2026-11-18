@@ -53,6 +53,7 @@ function expectNamed(document: CompositionDocument, issue: CompositionIssue, lab
   expect(go, label).toBeDefined();
   if ('select' in go) expect(buildDocumentIndex(document).get(go.select), label).toBeDefined();
   else if ('panel' in go) expect(panels, label).toContain(go.panel);
+  else if ('logic' in go) expect(document.logicLibrary?.map(entry => entry.id), label).toContain(go.logic);
   else expect(Object.keys(dialogTitles), label).toContain(go.dialog);
   return row;
 }

@@ -35,13 +35,13 @@ export function placeOf(document: CompositionDocument, path: readonly (string | 
 }
 
 /** What choosing a row does in the workspace: select an item, open a Project panel, or open a Project dialog. */
-export interface CheckHandlers { select: (key: SelectionKey) => void; panel: (panel: PanelKind) => void; dialog: (dialog: DialogKey) => void; /** Focuses the field at a `data-field-path` once the surface that holds it has opened. */ focus?: (fieldPath: string) => void }
+export interface CheckHandlers { select: (key: SelectionKey) => void; panel: (panel: PanelKind) => void; dialog: (dialog: DialogKey) => void; /** Opens a Logic Template's editor. */ logic?: (id: string) => void; /** Focuses the field at a `data-field-path` once the surface that holds it has opened. */ focus?: (fieldPath: string) => void }
 
 /** Takes the person to what a row names (selecting a row goes there), and to the field it names. */
 export function followCheck(row: CheckRow, to: CheckHandlers): void {
   const go = row.go ?? (row.select ? { select: row.select } : undefined);
   if (!go) return;
-  if ('select' in go) to.select(go.select); else if ('panel' in go) to.panel(go.panel); else to.dialog(go.dialog);
+  if ('select' in go) to.select(go.select); else if ('panel' in go) to.panel(go.panel); else if ('logic' in go) to.logic?.(go.logic); else to.dialog(go.dialog);
   if (row.fieldPath) to.focus?.(row.fieldPath);
 }
 
