@@ -1,6 +1,8 @@
 import { MAX_CONDITION_DEPTH, MAX_CONDITION_NODES, MAX_EXPRESSION_DEPTH, MAX_EXPRESSION_NODES, operandKind, type Operand, type Predicate } from '../../shared/composition/expression';
 import type { Tri } from '../../shared/composition/evaluator';
 import type { Json } from '../../shared/types';
+import { isUse } from '../data/logic/logicModel';
+import { logicOperandName, useSentence, type LogicNames } from '../data/logic/logicNames';
 import { comparisonWords, groupCount, resultWords, words, type Comparison, type Place } from './words';
 
 /**
@@ -17,6 +19,8 @@ export interface NameContext {
   entityName?: (entityId: string) => string | undefined;
   /** Whether Home Assistant has the entity; absent when it is not connected, so nothing is called missing. */
   entityExists?: (entityId: string) => boolean;
+  /** The library and the open template's settings, so a use and a setting have names. */
+  logic?: LogicNames;
 }
 
 const fieldNames: Record<string, string> = {
@@ -94,6 +98,8 @@ export function entityOfSource(ctx: NameContext, sourceId: string): string | und
 
 /** The short name of what an operand gives: "Garage Door", "Garage Door · temperature", "Time", or its fixed text. */
 export function operandName(operand: Operand, ctx: NameContext): string {
+  const special = logicOperandName(operand, ctx.logic);
+  if (special !== undefined) return special;
   switch (operand.type) {
     case 'literal': return typeof operand.value === 'string' ? operand.value : String(JSON.stringify(operand.value));
     case 'read': {
@@ -315,6 +321,8 @@ export const closeSimple = closeLeaf;
 const joined = (values: Operand[], ctx: NameContext) => values.map(item => operandName(item, ctx)).join(', ');
 /** One condition drawn as a sentence: "Guest Mode is on", "Lights On is above 10". */
 export function sentence(predicate: Predicate, ctx: NameContext): string {
+  const asUse: unknown = predicate;
+  if (isUse(asUse)) return useSentence(asUse, ctx.logic, value => value && typeof value === 'object' ? operandName(value as Operand, ctx) : String(value ?? ''), id => { const entity = entityOfSource(ctx, id); return entity ? ctx.entityName?.(entity) ?? entity : id; });
   const group = groupOf(predicate);
   if (group) return groupCount(group.mode, conditionCount(predicate));
   switch (predicate.type) {

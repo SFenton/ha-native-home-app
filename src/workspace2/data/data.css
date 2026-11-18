@@ -75,3 +75,31 @@
 .w2-list-fixed { margin: 4px 0 0; }
 @media (prefers-reduced-motion: reduce) { .w2-data-step-row, .w2-data-panel, .w2-outline-item { transition: none; } }
 .w2-data-run-error { margin: 6px 0 0; font-size: 12px; }
+
+/* Logic templates (studio-logic): the Data group's rows, the editor, a use and a setting as tokens. */
+.w2-logic-row { display: flex; align-items: center; gap: 2px; }
+.w2-logic-row > .w2-data-row { flex: 1; min-width: 0; }
+.w2-logic-rowtext { display: flex; flex-direction: column; flex: 1; min-width: 0; text-align: start; }
+.w2-logic-second { font-size: 12px; color: var(--w2-muted); font-weight: 400; }
+.w2-logic-editor { display: flex; flex-direction: column; gap: 12px; }
+.w2-logic-setting { list-style: none; }
+.w2-logic-setting[data-open] { background: var(--w2-card); border-radius: 8px; }
+.w2-logic-settingopen { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.w2-logic-more { display: flex; justify-content: flex-end; }
+.w2-logic-name { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.w2-logic-rows { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 8px 0 0; }
+.w2-logic-checkrow { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.w2-logic-checktext { display: flex; flex-direction: column; }
+.w2-logic-uses { width: 320px; max-width: calc(100vw - 24px); padding: 8px; }
+.w2-logic-hits { padding: 0 12px; }
+.w2-link-button { border: 0; background: transparent; color: var(--w2-link); text-decoration: underline; padding: 0; min-height: 0; font: inherit; cursor: pointer; }
+.w2-logic-use, .w2-logic-valuesetting, .w2-logic-settings-group { display: flex; flex-direction: column; gap: 8px; }
+/* A use rests as a token with a template glyph and a solid outline; a setting inside a template has a dashed one, so neither rests on color alone. */
+.w2-token.w2-token-logic { outline: 1.5px solid color-mix(in srgb, var(--w2-primary) 60%, transparent); outline-offset: -1.5px; }
+.w2-token.w2-token-logic::before { content: "\2756\00a0"; font-size: 11px; }
+.w2-token.w2-token-setting { outline: 1.5px dashed var(--w2-primary); outline-offset: -1.5px; }
+@media (pointer: coarse) { .w2-logic-checkrow { min-height: 44px; } }
+
+/* A Logic Templates row in a pushed list (Project > Data on a phone): the push row, then its More menu. */
+.w2-list > .w2-logic-row { display: flex; align-items: center; }
+.w2-list > .w2-logic-row > .w2-push-row { flex: 1; min-width: 0; }

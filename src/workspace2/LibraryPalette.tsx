@@ -8,6 +8,8 @@ import { useDrag } from './dnd/DragLayer';
 import './repeats/repeats.css';
 import SavedComponents, { savedRows } from './SavedComponents';
 import type { Library } from './useLibrary';
+import { libraryOf } from './data/logic/logicModel';
+import { logicWords } from './data/logic/logicWords';
 import type { Workspace2 } from './useWorkspace2';
 
 /** A drag starts after this many pixels, as everywhere else in the Studio. */
@@ -32,6 +34,7 @@ export default function LibraryPalette({ ws, kind, library }: { ws: Workspace2; 
   const disabled = ws.mode !== 'edit';
   const grouped = Boolean(library);
   const saved = useMemo(() => grouped ? savedRows(ws.document) : [], [grouped, ws.document]);
+  const logicHits = useMemo(() => needle && ws.document ? libraryOf(ws.document).filter(entry => entry.name.toLowerCase().includes(needle)) : [], [needle, ws.document]);
   const repeats = ws.repeats;
   const findMatches = !needle || FIND_REPEATS.toLowerCase().includes(needle);
   const savedMatch = saved.filter(row => !needle || row.entry.name.toLowerCase().includes(needle)).length + (kind === 'components' && repeats && findMatches ? 1 : 0);
@@ -65,6 +68,7 @@ export default function LibraryPalette({ ws, kind, library }: { ws: Workspace2; 
   );
   return <div className="w2-palette" data-kind={kind}>
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder={`Find in ${kind === 'controls' ? 'controls' : 'components'}`} aria-label={`Find in ${kind === 'controls' ? 'controls' : 'components'}`} value={query} onChange={event => setQuery(event.target.value)}/></label>
+    {kind === 'components' && needle && logicHits.length > 0 && <div className="w2-logic-hits" data-testid="logic-hits">{logicHits.map(entry => <p key={entry.id} className="w2-caption">{entry.name} is a logic template. <button type="button" className="w2-link-button" onClick={() => { library?.press('data'); ws.openLogic(entry.id); }}>{logicWords.searchShow}</button></p>)}</div>}
     {disabled && <div className="w2-lib-notice" id={noticeId} data-testid="library-notice"><Info size={16} aria-hidden/><p>{`Switch to Edit to add ${noun}.`}</p>
       <button type="button" onClick={() => { focusFirst.current = true; ws.setMode('edit'); }}>Switch to Edit</button></div>}
     <div className="w2-lib-scroll" ref={gridRef}>

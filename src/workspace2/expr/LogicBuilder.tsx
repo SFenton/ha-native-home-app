@@ -6,12 +6,13 @@ import { SelectMenu } from '../SelectMenu';
 import { usePush } from '../kit';
 import { PickerRow } from '../pickers/PickerField';
 import type { Draft } from '../editors/draft';
-import { evaluatePredicate } from '../../preview2/evaluate';
+import { evaluatePredicate } from '../data/logic/logicEval';
 import ConditionRow from './ConditionRow';
 import ValuePicker, { type Picked } from './ValuePicker';
 import { conditionCount, groupAt, groupOf, groupPredicate, growProblem, markerOf, moveItem, replaceGroupAt, resultText, type Group, type Scope } from './condition';
 import { Marker, MoreMenu, type MenuCommand } from './ui';
 import { useDraftEnvironment, useNameContext } from './useExpr';
+import LogicTemplateButton from '../data/logic/LogicTemplateButton';
 import { useRule } from './useRule';
 import { groupCount, groupSentence, groupTitle, words, type Place } from './words';
 
@@ -105,6 +106,7 @@ function GroupView({ props, at, level }: { props: BuilderProps; at: readonly num
       {addProblem && <button type="button" className="w2-expr-add" disabled aria-describedby={limitId}>{words.addCondition}</button>}
       {!groupProblem && <AddButton draft={draft} label={words.addGroup} onPicked={picked => { setItems([...group.items, groupPredicate({ mode: 'all', items: [defaultFor(picked)] })], picked.document); setOpen(`${[...at, rows].join('.')}:0`); }}/>}
       {groupProblem && <button type="button" className="w2-expr-add" disabled aria-describedby={limitId}>{words.addGroup}</button>}
+      {!addProblem && <LogicTemplateButton draft={draft} onPick={(_, use) => { setItems([...group.items, use as unknown as Predicate]); setOpen(keyOf(rows)); }}/>}
     </div>
     {(addProblem || groupProblem) && <p id={limitId} className="w2-caption">{groupProblem ?? addProblem}</p>}
   </div>;

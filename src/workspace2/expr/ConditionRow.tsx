@@ -9,7 +9,7 @@ import { useWorkspaceData } from '../pickers/WorkspaceData';
 import JsonBlock from '../editors/JsonBlock';
 import type { Draft } from '../editors/draft';
 import { SelectMenu } from '../SelectMenu';
-import { evaluatePredicate } from '../../preview2/evaluate';
+import { evaluatePredicate } from '../data/logic/logicEval';
 import { ComparisonControls, leftKind, numericState } from './ComparisonControls';
 import { ReadRow } from './SimpleCondition';
 import ValuePicker, { ValuePickerRow, type Picked } from './ValuePicker';
@@ -19,6 +19,8 @@ import { useDraftEnvironment } from './useExpr';
 import { words } from './words';
 import type { Operand } from '../../shared/composition/expression';
 import { itemInfoOf, useFlowScope } from '../data/flowScope';
+import LogicUseSettings from '../data/logic/LogicUse';
+import { isUse, workedOut } from '../data/logic/logicModel';
 
 /** Splits "Garage Door is open" so the value's name is weight 600 ("**Garage Door** is open"). */
 function Sentence({ predicate, ctx }: { predicate: Predicate; ctx: NameContext }) {
@@ -81,7 +83,8 @@ export default function ConditionRow({ draft, item, index, ctx, open, onOpen, on
   const env = useDraftEnvironment(draft.get());
   const tri = env ? evaluatePredicate(item, env) : undefined;
   const leaf = openLeaf(item), person = item.type === 'viewer' || item.type === 'viewer-person';
-  const custom = !leaf && !person;
+  const asUse: unknown = item, use = isUse(asUse) ? asUse : undefined;
+  const custom = !leaf && !person && !use;
   const [json, setJson] = useState(false);
   const text = custom ? words.customCondition : sentence(item, ctx);
   const result = resultText('rule', tri) || 'Result unknown';
@@ -97,6 +100,10 @@ export default function ConditionRow({ draft, item, index, ctx, open, onOpen, on
       <h4 className="w2-expr-opentitle">{`${words.condition} ${index + 1}`}</h4>
       {leaf && <LeafEditor draft={draft} leaf={leaf} ctx={ctx} write={onChange}/>}
       {person && <ViewerEditor predicate={item as never} write={onChange}/>}
+      {use && <LogicUseSettings draft={draft} use={use} kind="condition" removeLabel={words.removeCondition}
+        onChange={(next, base) => onChange(next as unknown as Predicate, base)}
+        onUnlink={() => { const plain = workedOut(draft.get(), use) as Predicate | undefined; if (plain) onChange(plain); }}
+        onRemove={() => commands.find(command => command.label === words.removeCondition)?.run()}/>}
       {custom && <><p className="w2-caption">{words.customNote}</p>{json && <JsonBlock label={words.editJson} value={item as unknown as Json} onChange={next => onChange(next as unknown as Predicate)} validate={value => predicateSchema.safeParse(value).success ? undefined : 'That is not a valid condition.'}/>}</>}
     </div>}
   </li>;

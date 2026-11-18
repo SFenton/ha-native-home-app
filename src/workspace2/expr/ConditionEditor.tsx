@@ -10,6 +10,7 @@ import { Segmented } from './ui';
 import { fitsSimple, entityOfSource, inputsOf, operandName, type Scope } from './condition';
 import { useNameContext } from './useExpr';
 import { useRule } from './useRule';
+import SaveAsLogic from '../data/logic/SaveLogicDialog';
 import { policyChoices, words, type Place } from './words';
 
 type Mode = 'simple' | 'logic';
@@ -48,6 +49,7 @@ export default function ConditionEditor({ draft, path, place, scope = 'document'
   const reason = useId();
   const parentPolicy = policy ? ((valueAt(document, path.slice(0, -1)) as Record<string, unknown> | undefined)?.[policyKey] as WhenUnknown | undefined) : undefined;
   return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">
+    {rule && <SaveAsLogic draft={draft} path={path} kind="condition"/>}
     <Segmented label="Condition view" value={mode} options={[{ value: 'simple', label: words.simple, dimmed: !fit.fits }, { value: 'logic', label: words.logic }]} onChange={setMode} describedBy={reason}/>
     {!fit.fits && <p id={reason} className="w2-caption">{fit.reason}</p>}
     {mode === 'simple' ? <SimpleCondition draft={draft} rule={rule} ctx={ctx} write={write}/> : <LogicBuilder draft={draft} path={path} place={place} scope={scope} inlineDepth={inlineDepth} policyKey={policy ? policyKey : undefined}/>}

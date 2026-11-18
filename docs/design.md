@@ -131,3 +131,40 @@ row, or a field no parameter can fill (a number, a switch), never changes what a
 as Template is one undo step: the entry, and each kept place replaced by a reference with its own values.
 
 **The preview** draws what the app draws: the sources a template owns are read for each place under `<place id>~<source id>`.
+
+## Logic Templates
+
+People see **Logic Template**. The contract keeps its names (`logicLibrary`, `logic-ref`, `hole`) and they are never shown: no "operand", "predicate", "hole",
+"parameter" or "expression" in any copy. A Logic Template is one value or one condition, written once and used in many fields; a use is linked, so a change to the
+template shows in every use. The Data panel's Logic Templates group (a phone: Project > Data) lists them first, one 48 px row each: name over "Value · Used by 3" or
+"Condition · Used by 3". Its More menu has Rename, Show Uses, Duplicate and Delete, on a phone too. With none the group says "No logic templates yet. Choose Save as
+Logic Template from a value’s or a condition’s More menu."
+
+**The editor** is one level: Name; "Each use sets (n)" with one row for each setting (label, kind, "tried with" value) and Add Setting…; the body in the same
+value or condition editor every field has; the worked-out result with each setting's Try With value; "Used by" with the first two uses and "Show n More"; Delete
+Template. Setting kinds are Entity, Person, Text, Number, Time, Value and Condition. A kind changes only while the body does not use the setting. A template holds
+up to 8 settings (`MAX_LOGIC_PARAMS`) and a document 100 templates.
+
+**Person** is a text setting that holds a person's entity id (`display: 'person'`, a hint for the Studio only), drawn as a choice among the people Home Assistant
+has. An Entity setting gives a data source id, which cannot say who is using the app, so a template that asks "is this the person using the app" uses a Person
+setting: the picker offers "Is Sam" for it and the body compares the person using the app (`viewer personEntityId`) with the setting. It expands before compile, so
+it needs no capability id. (`viewer-person` is not that test: it compares the state of the signed-in person's entity, "home" or "not_home".) A saved component can
+set a Person setting per place (`sh.component-values@1`): the value lands in the use's argument and the binding is re-pointed through the logic.
+
+**Using one.** A value or condition field's More menu has Save as Logic Template…, which lifts the logic out and asks for a name and what each use sets (the
+entities, people, texts and numbers it reads; entities and people are ticked). The value picker lists "Logic Templates" first (inside a template, "Settings" first,
+then the rest); a condition's rules have "+ Template", and a comparison's Compare With a Value lists them. A use shows its template as one row ("Count or All ·
+Logic Template") with a field for each setting, Open Template (with "Back to Lights" at the top of the editor), Unlink From Template ("Unlinked from Count or All.")
+and the remove command. Unlinking turns the use back into its own logic and leaves the editor open for Done.
+
+**Delete** asks only when the template is used, and counts every use, including those in the bodies of other templates (listed as "Door Words · Logic Template", a press
+opens that template): "It is used by 3. Each use keeps its logic, unlinked." A use inside another template is unlinked with its template's own settings kept. An unused
+template goes at once, with an undo toast.
+
+**Counting cases.** "Add Cases for a Count…" and "How Many Are…" write three rules, is 0, is 1 and is more than 1, over the existing `math add` of `choose`
+(`sh.conditions@1`, `sh.operands@1`, `sh.rules@1`; no new capability id). It covers up to three entities (`COUNT_MAX_ENTITIES`): the count is written four times
+and each entity costs four nodes, so a fourth passes the 64-node operand limit. The starter says so ("Counts up to three entities.") and ticks no more than three; two counts added together would be written four times each and pass the limit too. When the one-node count operand (`sh.count@1`) lands, `howManyAre` in `logicModel.ts` is the one place that changes.
+
+**The preview** and every value editor work a use out with its template's body (`expandLogic`) before they compile, by the library as it is now, so an edit to a
+template shows in every use at once; publication refuses a leftover setting or a missing template. The Logic Gallery sample (`src/preview2/fixtures/logic-gallery.json`:
+Count or All, Yours or Theirs, Night Hours, `demo_` entities only) shows three templates used three times each.

@@ -1,0 +1,11 @@
+Count or All · Logic Template
+Count
+Use a Value…
+Word
+When None
+Open Template
+Unlink From Template
+Remove Value
+
+[names]
+Count or All

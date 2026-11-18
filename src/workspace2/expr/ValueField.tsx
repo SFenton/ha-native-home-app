@@ -3,7 +3,7 @@ import { ChevronRight, ListChecks, Link2 } from 'lucide-react';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import type { Operand } from '../../shared/composition/expression';
 import type { Json } from '../../shared/types';
-import { evaluateOperand, scalarText } from '../../preview2/evaluate';
+import { evaluateOperand, scalarText } from '../data/logic/logicEval';
 import EditorRow from '../editors/EditorRow';
 import { TextInput } from '../editors/controls';
 import { useRows } from '../rowsContext';

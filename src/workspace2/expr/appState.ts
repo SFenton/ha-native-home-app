@@ -29,7 +29,7 @@ export const appFieldKind = (item: AppItem) => appStateFields[item.topic][item.f
 /** The closed words of a field, when it has them (Orientation, Permission). */
 export const closedWords = (item: Pick<AppItem, 'field'>): readonly string[] | undefined => appStateValues[item.field];
 /** The group titles, in order (spec "Picker groups"). */
-export const groupTitles = { item: "This Item's Fields", inputs: 'Inputs', entities: 'Entities', counts: 'Counts', flows: 'Data Flows', time: 'Time', window: 'Window', phone: 'This Phone', notifications: 'Notifications', settings: 'App Settings', person: 'Person Using the App', models: 'Models' } as const;
+export const groupTitles = { templateSettings: 'Settings', logic: 'Logic Templates', item: "This Item's Fields", inputs: 'Inputs', entities: 'Entities', counts: 'Counts', flows: 'Data Flows', time: 'Time', window: 'Window', phone: 'This Phone', notifications: 'Notifications', settings: 'App Settings', person: 'Person Using the App', models: 'Models' } as const;
 export type PickerGroup = keyof typeof groupTitles;
 
 /** The `app-state@1` source of a topic, made on first use and part of the same document change. */

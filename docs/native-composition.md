@@ -419,7 +419,7 @@ Rules the corpus pins down:
   house-script check are gone; Home Assistant enforces what each person may call.
 - **Logic library** (Studio only, `src/shared/composition/logic-library.ts`). A draft may hold `logicLibrary`, up to 100 entries
   `{id, name, kind: 'operand' | 'condition', params[], body}` (up to 8 parameters of kind `source-id`, `text`, `number`,
-  `operand` or `condition`, each with an optional `label` and `sample`), and uses `{type: 'logic-ref', logicId, args}` wherever an operand or a condition stands. The body
+  `operand` or `condition`, each with an optional `label`, `sample` and, for a number the editor draws as a time of day, `display: 'time'`, and for a text that holds a person's entity id, `display: 'person'`; both are editor hints only and change nothing a use or an expansion does), and uses `{type: 'logic-ref', logicId, args}` wherever an operand or a condition stands. The body
   marks each argument with `{type: 'hole', name}` and may itself use other entries (a departure from the design proposal, which kept bodies flat). Before anything else reads the draft, `expandLogic` works every use out
   (an entry may use another to depth 4; a cycle is refused), so capabilities, the budgets (8 deep, 64 nodes, 32 condition
   nodes) and the 100,000-value cap all see plain operands and conditions. Expansion has its own budget of 100,000 values, which also

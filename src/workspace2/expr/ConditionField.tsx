@@ -3,7 +3,7 @@ import { valueAt, type EditorPath } from '../../composition-editor';
 import type { Predicate } from '../../shared/composition/expression';
 import EditorRow from '../editors/EditorRow';
 import { useRows } from '../rowsContext';
-import { evaluatePredicate } from '../../preview2/evaluate';
+import { evaluatePredicate } from '../data/logic/logicEval';
 import ConditionEditor from './ConditionEditor';
 import { conditionCount, groupOf, markerOf, missingEntity, resultText, summary, type Scope } from './condition';
 import { Marker } from './ui';

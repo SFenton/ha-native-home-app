@@ -1,0 +1,15 @@
+Logic Templates
+Count or All
+Value · Used by 3
+Yours or Theirs
+Value · Used by 3
+Night Hours
+Condition · Used by 3
+
+[names]
+Count or All, logic template, value, used by 3
+More for Count or All
+Yours or Theirs, logic template, value, used by 3
+More for Yours or Theirs
+Night Hours, logic template, condition, used by 3
+More for Night Hours

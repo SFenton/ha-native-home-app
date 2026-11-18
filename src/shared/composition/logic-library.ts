@@ -35,8 +35,11 @@ export type LogicParamKind = typeof logicParamKinds[number];
 const object = z.strictObject;
 const label = z.string().min(1).max(80).refine(value => Boolean(value.trim()) && !/[\p{Cc}\p{Cf}]/u.test(value));
 
-/** `sample` is an example argument of the parameter's kind, for an editor's preview; it also stands in for the argument when the library checks the entry's body. */
-export const logicParamSchema = object({ name: parameterName, kind: z.enum(logicParamKinds), label: label.optional(), sample: z.json().optional() });
+/**
+ * `sample` is an example argument of the parameter's kind, for an editor's preview; it also stands in for the argument when the library checks the entry's body.
+ * `display` is a hint for the editor only (a `number` that the Studio draws as a time of day, or a `text` that holds a person's entity id and is drawn as a person picker); it changes nothing a use or an expansion does.
+ */
+export const logicParamSchema = object({ name: parameterName, kind: z.enum(logicParamKinds), label: label.optional(), sample: z.json().optional(), display: z.enum(['time', 'person']).optional() });
 export const logicEntrySchema = object({
   id: identifierSchema,
   name: label,
@@ -156,6 +159,8 @@ class Expander {
   private produced = 0;
   /** Whether the budget has run out. */
   exhausted = false;
+  /** Names of holes that stay as they are where no use fills them (a template's own settings, while a use inside its body is worked out). */
+  keep?: ReadonlySet<string>;
   private marks = 0;
   constructor(private readonly library: ReadonlyMap<string, LogicEntry>) {}
 
@@ -185,6 +190,7 @@ class Expander {
     for (const key of extra) this.report('unknown_field', pointer(at, key), frame);
     const name = value.name;
     if (typeof name !== 'string' || !parameterName.safeParse(name).success) { this.report('invalid_value', pointer(at, 'name'), frame); return value; }
+    if (frame.stack.length === 0 && !frame.env && this.keep?.has(name)) return value;
     if (!frame.env || !Object.hasOwn(frame.env, name)) { this.report('invalid_reference', at, frame); return value; }
     // A hole copies its whole argument: charge it before copying, so a body with many holes and a large argument cannot grow past the budget.
     if (!this.charge(frame.sizes?.[name] ?? 1, at, frame)) return value;
@@ -211,7 +217,8 @@ class Expander {
       const slot = pointer(pointer(at, 'args'), param.name);
       if (!Object.hasOwn(rawArgs, param.name)) { this.report('missing_required', slot, frame); ok = false; continue; }
       const arg = this.walk(rawArgs[param.name], slot, frame);
-      if (!argFits(param.kind, arg)) { this.report('invalid_value', slot, frame); ok = false; continue; }
+      // While a template's own body is worked out, an argument that is one of its settings (a kept hole) is checked when the template is used.
+      if (!(this.keep && holdsKeptHole(arg, this.keep)) && !argFits(param.kind, arg)) { this.report('invalid_value', slot, frame); ok = false; continue; }
       real[param.name] = arg; env[param.name] = arg; sizes[param.name] = valueCount(arg);
     }
     if (!ok) return value;
@@ -243,6 +250,13 @@ class Expander {
   }
 }
 
+/** Whether `value` is, or holds, a hole named in `keep`. */
+function holdsKeptHole(value: unknown, keep: ReadonlySet<string>): boolean {
+  if (Array.isArray(value)) return value.some(item => holdsKeptHole(item, keep));
+  if (!isRecord(value)) return false;
+  if (value.type === 'hole') return typeof value.name === 'string' && keep.has(value.name);
+  return Object.values(value).some(item => holdsKeptHole(item, keep));
+}
 /** How many values (objects, arrays and scalars) `value` holds. */
 function valueCount(value: unknown): number {
   if (Array.isArray(value)) return value.reduce<number>((total, item) => total + valueCount(item), 1);
@@ -359,6 +373,20 @@ function bindingHooks(entry: Rec): Map<object, Hook[]> {
 export function expandLogic(document: unknown): LogicExpansion {
   assertCompositionBounds(document);
   return expandBounded(document);
+}
+
+/**
+ * Works out the uses inside `value`, one of a library entry's own body: the holes named in `keep` (that entry's settings) stay holes, so the result is still the
+ * entry's body. This is what unlinking a use inside a template needs; a document's own expansion never keeps a hole.
+ */
+export function expandKeepingHoles(library: readonly LogicEntry[], value: unknown, keep: ReadonlySet<string>): unknown {
+  const checked = checkLibrary(library);
+  if (checked.issues.length) throw new CompositionValidationError(checked.issues);
+  const expander = checked.expander ?? new Expander(new Map());
+  expander.keep = keep;
+  const out = expander.walk(value, '/x', { stack: [] });
+  if (expander.issues.length) throw new CompositionValidationError(expander.issues);
+  return out;
 }
 
 /** {@link expandLogic} for a document whose bounds were already asserted. */
