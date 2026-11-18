@@ -8,7 +8,7 @@ test.beforeEach(async ({ request }) => { await seed(request); });
 type Box = { left: number; right: number; top: number; bottom: number };
 const sizes = [[1440, 900], [1180, 820], [951, 669], [820, 1180], [669, 951], [600, 900]] as const;
 
-/** The boxes of the canvas, the device, the library rail and panel and the inspector, in px; a missing one is undefined. */
+/** The boxes of the canvas, the device, the simulator's rail slot (it glides on a 0.2 s transition), the library rail and panel and the inspector, in px; a missing one is undefined. */
 async function boxes(page: Page) {
   return page.evaluate(() => {
     const read = (selector: string, open = false) => {
@@ -17,12 +17,12 @@ async function boxes(page: Page) {
       const box = element.getBoundingClientRect();
       return box.width > 0 ? { left: box.left, right: box.right, top: box.top, bottom: box.bottom } : undefined;
     };
-    return { canvas: read('.w2-canvas'), device: read('.device-model'), rail: read('.w2-lib-rail'), panel: read('.w2-lib-panel', true), inspector: read('.w2-inspector', true) };
+    return { canvas: read('.w2-canvas'), device: read('.device-model'), slot: read('.w2-rail-slot'), rail: read('.w2-lib-rail'), panel: read('.w2-lib-panel', true), inspector: read('.w2-inspector', true) };
   });
 }
 const apart = (a: Box, b: Box) => a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5;
 
-/** Waits until the device holds still: the panel slid, the preview re-fitted once and the glide ended. */
+/** Waits until the device and its rail slot hold still: the panel slid, the preview re-fitted once and both glides ended. */
 async function settled(page: Page) {
   let last = '';
   await expect.poll(async () => {

@@ -5,11 +5,8 @@ import { isPhone, openWorkspace, previewRoot, seed, snap } from './workspace2-he
  * The gauge parts in the Studio (lane `wg-s4`): the Add picker offers Dial and Arc, each lands as a part that compiles, and the inspector shows the rows the
  * schema gives it, with an Opacity on every color. Desktop and phone, in a light and a dark color scheme.
  */
-test.beforeEach(async ({ request, page }) => {
+test.beforeEach(async ({ request }) => {
   await seed(request);
-  // The first page of a cold dev server takes a while to compile: warm it, so the helpers' short waits are enough.
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Publish' }).waitFor({ timeout: 45_000 }).catch(() => undefined);
 });
 
 const prefix = (page: Page) => isPhone(page) ? 'phone' : 'desktop';

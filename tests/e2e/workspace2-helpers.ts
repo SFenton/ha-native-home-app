@@ -75,11 +75,19 @@ export async function readableText(page: Page): Promise<string> {
   });
 }
 
+/**
+ * How long the app may take to boot: `index.html`, then the lazily loaded workspace chunk and the draft it fetches, which a development
+ * server transforms on demand and a loaded runner serves slowly. The wait is for the app itself (its Publish button exists only once the
+ * draft has arrived), so a quick boot returns at once; this is the budget for a slow one, not a pause. `warm-up.ts` has already paid
+ * for the server's first transform of the app before any test starts.
+ */
+const BOOT = 30_000;
+
 /** Opens the workspace at `/` and waits for the draft. */
 export async function openWorkspace(page: Page): Promise<void> {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible();
-  await expect(previewRoot(page)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible({ timeout: BOOT });
+  await expect(previewRoot(page)).toBeVisible({ timeout: BOOT });
 }
 
 /** Selects a tile by clicking it in the preview. */

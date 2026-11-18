@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { decodeCompositionPublication } from '../server/composition';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
@@ -141,9 +141,12 @@ describe('the initials of a person', () => {
 describe('the four ids over the whole corpus', () => {
   const files = ['accept', 'reject'].flatMap(folder => readdirSync(path.join(root, folder)).map(name => `${folder}/${name}`));
   const mine = /profile-badges-|badge-chrome-button/;
-  it('are declared only by a document that uses them, so every other case compiles byte for byte as before', () => {
-    let compiled = 0;
-    for (const file of files) {
+  // The corpus is compiled in slices of a few hundred files, each its own case, so no one case holds the whole run and a slow runner
+  // stretches the file, not a case past its limit. The count of what compiled is judged once, after the last slice.
+  const slice = 250, slices = Array.from({ length: Math.ceil(files.length / slice) }, (_, index) => index);
+  let compiled = 0;
+  it.each(slices)('are declared only by a document that uses them, so every other case compiles byte for byte as before (files from %i x 250)', index => {
+    for (const file of files.slice(index * slice, (index + 1) * slice)) {
       let document: unknown;
       try { document = JSON.parse(readFileSync(path.join(root, file), 'utf8')).document; } catch { continue; }
       let result;
@@ -154,8 +157,8 @@ describe('the four ids over the whole corpus', () => {
       // Nothing is worked out in a document that holds no setting: the compile hands back the document it was given.
       if (!mine.test(file)) expect(result.document, file).toEqual(document);
     }
-    expect(compiled).toBeGreaterThan(500);
   });
+  afterAll(() => { expect(compiled).toBeGreaterThan(500); });
   it('are each exercised by a case the Studio compiles', () => {
     for (const id of NEW_IDS) {
       const hit = files.filter(file => { try { return JSON.parse(readFileSync(path.join(root, file), 'utf8')).capabilities.includes(id); } catch { return false; } });
