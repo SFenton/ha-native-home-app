@@ -6,6 +6,7 @@ import { MOUSE_SLOP, useDrag } from './dnd/DragLayer';
 import { locateOnCanvas } from './dnd/geometry';
 import { after } from './add/insert';
 import { NodeMenu } from './PropertiesPanel';
+import { visibleCopy } from '../preview2/twin-scroll';
 import { moveNodeBy } from './nodeActions';
 import type { Workspace2 } from './useWorkspace2';
 
@@ -15,7 +16,7 @@ function useSlot(stage: HTMLElement | null, key: string | undefined): HTMLElemen
   useEffect(() => {
     if (!stage || !key) { setSlot(null); return; }
     const find = () => setSlot(old => {
-      const next = [...stage.querySelectorAll<HTMLElement>('[data-selected] > .sh-handle-slot')].find(element => element.getAttribute('data-handle-for') === key) ?? null;
+      const next = visibleCopy([...stage.querySelectorAll<HTMLElement>('[data-selected] > .sh-handle-slot')].filter(element => element.getAttribute('data-handle-for') === key)) ?? null;
       return next === old ? old : next;
     });
     find();

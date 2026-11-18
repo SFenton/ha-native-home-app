@@ -136,9 +136,11 @@ export default function AddHost({ ws, narrow, stage, onError, children }: { ws: 
     templates={narrow ? query => <SavedComponents ws={ws} query={query} disabled={false} onAdd={chooseTemplate}/> : undefined}/> : null;
   return <AddContext.Provider value={api}>
     {children}
-    {document && slots.map(({ element, owner }) => {
+    {document && slots.map(({ element, owner }, at) => {
       const destination = endOf(document, owner);
-      return destination && accepts(destination) ? createPortal(<button type="button" className="w2-add-slot" aria-label="Add" onClick={event => open(destination, event.currentTarget)}><Plus size={16} aria-hidden/>Add</button>, element, owner) : null;
+      // A partly folded Duo draws its page twice (once through each half), so an owner can have two slots: the key tells them apart, and the twin's is not for assistive technology.
+      const twin = element.closest('[data-twin]') !== null;
+      return destination && accepts(destination) ? createPortal(<button type="button" className="w2-add-slot" aria-label="Add" tabIndex={twin ? -1 : undefined} onClick={event => open(destination, event.currentTarget)}><Plus size={16} aria-hidden/>Add</button>, element, `${owner}#${at}`) : null;
     })}
     {state && !narrow && <Popover.Root open onOpenChange={next => { if (!next) close(); }}>
       <Popover.Portal><Popover.Positioner anchor={state.anchor ?? centre(stage)} sideOffset={8} align="center" className="w2-positioner"><Popover.Popup className="w2-scope w2-popover w2-add-pop" aria-label="Add" data-add-open>

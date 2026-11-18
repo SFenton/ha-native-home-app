@@ -6,7 +6,7 @@ import { demoHouse } from '../src/preview2/demo-house';
 import { foldReadout, windowFold } from '../src/preview2/fold';
 import { emptyOverlay } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props } from '../src/preview2/Preview2';
-import { DUO_CAMERA_CUTOUT, DUO_FOLDED_LANDSCAPE, DUO_FOLDED_RAIL_SIDE, DUO_ISLAND_AT, FOLDED_DUO_BODY, OPEN_DUO_BODY, PHONE_BODY, radiiCss, withPose, type PreviewWindow } from '../src/preview2/windows';
+import { DUO_ISLAND_AT, duoWindow, FOLDED_DUO_BODY, OPEN_DUO_BODY, PHONE_BODY, radiiCss, withPose, type PreviewWindow } from '../src/preview2/windows';
 import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 afterEach(cleanup);
@@ -88,10 +88,13 @@ describe('S5 the unfolded portrait Duo', () => {
   it('is flat by default, with no band, and offers the hinge as a pose', () => {
     expect(upright.hinge).toBeUndefined();
     expect(upright.bookHinge).toEqual({ axis: 'horizontal', start: 455.3, length: 40.4 });
-    expect(mount(base, { window: upright }).container.querySelector('.sh-fold')).toBeNull();
+    expect(mount(base, { window: upright }).container.querySelector('.sh-crease[data-on]')).toBeNull();
     cleanup();
     const hinged = withPose(upright, 'book');
-    expect(mount(base, { window: hinged }).container.querySelectorAll('.sh-fold[data-axis=horizontal]')).toHaveLength(1);
+    // Partly folded the 3D rig draws the screen through each half, so the crease is drawn once in each; a flat preview (no bezel) draws it once.
+    expect(mount(base, { window: hinged }).container.querySelectorAll('.sh-crease[data-on][data-axis=horizontal]')).toHaveLength(2);
+    cleanup();
+    expect(mount(base, { window: hinged, bezel: false }).container.querySelectorAll('.sh-crease[data-on][data-axis=horizontal]')).toHaveLength(1);
   });
 
   it('lays the page out the same flat and hinged: a horizontal hinge is not vertical', () => {
@@ -100,7 +103,7 @@ describe('S5 the unfolded portrait Duo', () => {
     expect(windowFold(hinged).vertical).toBe(false);
     expect(windowFold(hinged).band).toBeUndefined();
     cleanup();
-    const columns = (win: PreviewWindow) => [...mount(base, { window: win }).container.querySelectorAll<HTMLElement>('.sh-grid')].map(grid => grid.getAttribute('data-columns'));
+    const columns = (win: PreviewWindow) => [...mount(base, { window: win, bezel: false }).container.querySelectorAll<HTMLElement>('.sh-grid')].map(grid => grid.getAttribute('data-columns'));
     const flat = columns(upright);
     cleanup();
     expect(columns(hinged)).toEqual(flat);
@@ -124,25 +127,31 @@ describe('S6 the body drawn around each window', () => {
     expect(radiiCss([8, 59, 59, 8])).toBe('8px 59px 59px 8px');
   });
 
-  it('keeps what R1 has not measured unset', () => {
-    expect([DUO_CAMERA_CUTOUT, DUO_ISLAND_AT, DUO_FOLDED_RAIL_SIDE, DUO_FOLDED_LANDSCAPE]).toEqual([undefined, undefined, undefined, undefined]);
-    expect(FOLDED_DUO_BODY.camera).toBeUndefined();
-    expect(previewWindows.map(item => item.name)).not.toContain('Duo folded, sideways');
+  it('keeps the Dynamic Island unset, and gives the closed Duo a camera cutout in the corner of the rail edge at every turn', () => {
+    expect(DUO_ISLAND_AT).toBeUndefined();
+    expect(previewWindows.map(item => item.name)).toContain('Duo folded, sideways');
+    // Portrait, turn 0 (R1): the 37 x 37 occlusion region centred at (418.17, 47.83), top right. The turns carry it round the window (interim).
+    const at = (turn: 0 | 90 | 180 | 270) => duoWindow({ turn, fold: 'closed' }).camera!;
+    expect(at(0)).toMatchObject({ size: 37, corner: { horizontal: 'right', vertical: 'top' } });
+    expect(at(0).x).toBeCloseTo(418.17, 2); expect(at(0).y).toBeCloseTo(47.83, 2);
+    expect(at(90)).toMatchObject({ corner: { horizontal: 'right', vertical: 'bottom' } });
+    expect(at(90).x).toBeCloseTo(678 - 47.83, 2); expect(at(90).y).toBeCloseTo(418.17, 2);
+    expect(at(180)).toMatchObject({ corner: { horizontal: 'left', vertical: 'bottom' } });
+    expect(at(270)).toMatchObject({ corner: { horizontal: 'left', vertical: 'top' } });
+    expect(duoWindow({ turn: 0, fold: 'open' }).camera).toBeUndefined();
   });
 
-  it('sizes the model by the frame: bezel on four sides, plus the hinge strip that stands outside the folded body', () => {
-    const size = (win: PreviewWindow) => { const { container } = mount(base, { window: win }); const model = container.querySelector<HTMLElement>('.sh-bezel')!; const result = [model.style.width, model.style.height]; cleanup(); return result; };
+  it('sizes the model by the frame: bezel on four sides; the Duo is the part of its body that its pose shows', () => {
+    const size = (win: PreviewWindow) => { const { container } = mount(base, { window: win }); const model = container.querySelector<HTMLElement>('.sh-bezel, .sh-rig-model')!; const result = [model.style.width, model.style.height]; cleanup(); return result; };
     expect(size(named('iPhone'))).toEqual(['426px', '898px']);
-    expect(size(named('Duo folded'))).toEqual(['503px', '706px']);
+    // Closed: the half the cover lies on (495.5) and the hinge strip's 9 pt overhang, the open body's full height.
+    expect(size(named('Duo folded'))).toEqual(['504.5px', '709px']);
     expect(size(named('Duo open, upright'))).toEqual(['709px', '991px']);
-    const { container } = mount(base, { window: named('Duo folded') });
-    const model = container.querySelector<HTMLElement>('.sh-bezel')!;
-    expect(model.hasAttribute('data-strip')).toBe(true);
-    expect(model.style.getPropertyValue('--sh-screen-radius')).toBe('8px 59px 59px 8px');
-    expect(model.style.getPropertyValue('--sh-body-radius')).toBe('1px 69px 69px 1px');
-    expect(model.style.getPropertyValue('--sh-outside')).toBe('9px');
-    cleanup();
+    expect(size(named('Duo open, sideways'))).toEqual(['991px', '709px']);
+    expect(size(duoWindow({ turn: 90, fold: 'closed' }))).toEqual(['709px', '504.5px']);
     expect(mount(base, { window: named('iPhone') }).container.querySelector('.sh-bezel')!.hasAttribute('data-strip')).toBe(false);
+    cleanup();
+    expect(mount(base, { window: named('Duo folded') }).container.querySelector('.sh-bezel')).toBeNull();
     cleanup();
     expect(mount(base, { bezel: false }).container.querySelector('.sh-bezel')).toBeNull();
   });

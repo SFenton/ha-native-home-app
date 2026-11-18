@@ -18,12 +18,16 @@ import { SelectionLayer } from './SelectionLayer';
 import { createSelectionStore } from './selection-store';
 import { ComponentLibraryContext, previewSources } from './component-library';
 import { libraryById } from '../shared/composition/components';
-import { previewWindows, radiiCss, type PreviewWindow } from './windows';
+import { poseOfWindow, previewWindows, radiiCss, type PreviewWindow } from './windows';
+import { DuoRig, type ScreenCopy } from './DuoRig';
+import { footprintOf } from './rig-geometry';
+import { useFoldToken, useReducedMotion } from './fold-motion';
 import { markTitle, useUseMarker } from './use-marker';
 import { useRepeatMark } from './repeat-marker';
 import { tileInkDefault } from '../shared/composition/tile-ink-gate';
 import { markPerson } from './grid-groups';
 import './preview2.css';
+import './duo-rig.css';
 import './text-size.css';
 
 /** The text scale from which the simulator counts as one of the largest sizes (the last step of the Studio's text control). */
@@ -183,8 +187,13 @@ export default function Preview2(props: Preview2Props) {
   useAutoFit(host, true, measure);
   // The body the window draws around itself: its bezel, and the hinge strip that stands outside the folded Duo's body.
   const frame = bezel ? win.frame : undefined;
-  const modelWidth = win.width + (frame ? 2 * frame.bezel + (frame.hingeStrip?.outside ?? 0) : 0), modelHeight = win.height + (frame ? 2 * frame.bezel : 0);
-  const bodyStyle = frame ? {
+  // The Duo with a bezel is the 3D rig: its model is the part of the open body the pose shows, and the stage moves on the transition's own token.
+  const pose = bezel ? poseOfWindow(win) : undefined;
+  const reduced = useReducedMotion();
+  const token = useFoldToken(pose, reduced);
+  const footprint = pose ? footprintOf(pose) : undefined;
+  const modelWidth = footprint ? footprint.width : win.width + (frame ? 2 * frame.bezel + (frame.hingeStrip?.outside ?? 0) : 0), modelHeight = footprint ? footprint.height : win.height + (frame ? 2 * frame.bezel : 0);
+  const bodyStyle = frame && !pose ? {
     '--sh-bezel': `${frame.bezel}px`, '--sh-outside': `${frame.hingeStrip?.outside ?? 0}px`, '--sh-screen-radius': radiiCss(frame.screenRadii), '--sh-body-radius': radiiCss(frame.bodyRadii),
     ...(frame.hingeStrip ? { '--sh-strip-w': `${frame.hingeStrip.width}px`, '--sh-strip-h': `${frame.hingeStrip.height}px`, '--sh-strip-r': `${frame.hingeStrip.radius}px` } : {}),
   } as CSSProperties : undefined;
@@ -217,15 +226,18 @@ export default function Preview2(props: Preview2Props) {
     const tab = latest.current.document.navigation.tabs.find(item => item.id === tabId);
     if (tab) latest.current.onSurfaceChange({ kind: 'page', id: tab.pageId });
   }, []);
+  // One screen: the selection layer, the app's screen and the alert. The rig draws it once, or twice (each half of a partly folded Duo) and on the cover's back.
+  const renderScreen = (shown: PreviewWindow, _copy: ScreenCopy) => <SelectionLayer mode={mode} index={index} selection={selection} onSelect={props.onSelect} onTab={onTab}>
+    <Screen document={document} nav={nav} window={shown}/>
+    <AlertOverlay alert={mode === 'use' ? pending?.alert : props.alert} live={mode === 'use' && Boolean(pending)} onCancel={() => answer(false)} onConfirm={() => answer(true)}/>
+  </SelectionLayer>;
   const style = { '--sh-inset': `${bottomInset / zoom}px`, '--sh-zoom': zoom, ...(props.textScale && props.textScale !== 1 ? { '--sh-text-scale': props.textScale } : {}) } as CSSProperties;
   return <div ref={host} className="sh-preview2" data-preview-root data-ink={props.ink ?? (tileInkDefault ? 'primary' : 'muted')} data-mode={mode} data-text-scale={props.textScale && props.textScale !== 1 ? props.textScale : undefined} data-bezel={bezel ? '' : undefined} style={style}>
     <RenderCtx.Provider value={context}><ComponentLibraryContext.Provider value={library}>
       <DeviceFrame width={modelWidth} height={height} zoom={zoom} pan={mode === 'use'} padding={bezel ? STAGE_PADDING : { x: 0, y: 0 }}
-        modelClassName={`sh-model ${bezel ? 'sh-bezel' : 'sh-flat'}`} modelStyle={bodyStyle} modelProps={frame?.hingeStrip ? { 'data-strip': '' } : undefined}>
-        <SelectionLayer mode={mode} index={index} selection={selection} onSelect={props.onSelect} onTab={onTab}>
-          <Screen document={document} nav={nav} window={win}/>
-          <AlertOverlay alert={mode === 'use' ? pending?.alert : props.alert} live={mode === 'use' && Boolean(pending)} onCancel={() => answer(false)} onConfirm={() => answer(true)}/>
-        </SelectionLayer>
+        stageClassName={pose ? 'sh-rig-stage' : ''} stageProps={pose ? { style: { '--sh-fold-ms': `${token.ms}ms`, '--sh-fold-ease': token.ease } as CSSProperties } : undefined}
+        modelClassName={pose ? 'sh-model sh-rig-model' : `sh-model ${bezel ? 'sh-bezel' : 'sh-flat'}`} modelStyle={bodyStyle} modelProps={frame?.hingeStrip && !pose ? { 'data-strip': '' } : undefined}>
+        {pose ? <DuoRig pose={pose} token={token} reduced={reduced} renderScreen={renderScreen}/> : renderScreen(win, 'primary')}
       </DeviceFrame>
     </ComponentLibraryContext.Provider></RenderCtx.Provider>
     {mode === 'use' && <span className="sh-use-status" role="status">{marked ? `Showing ${marked} in the simulator.` : ''}</span>}

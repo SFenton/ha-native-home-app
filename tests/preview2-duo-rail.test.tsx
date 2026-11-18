@@ -7,6 +7,7 @@ import { emptyOverlay, houseFrom } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props } from '../src/preview2/Preview2';
 import { withPose } from '../src/preview2';
 import { inVerticalBar } from '../src/preview2/split';
+import { duoWindow } from '../src/preview2/windows';
 import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 /**
@@ -34,7 +35,7 @@ const labels = (root: Element | null) => [...(root?.querySelectorAll('button') ?
 const tabCount = base.navigation.tabs.length;
 
 /** What every pose in the vertical bar shares. */
-function expectRail(container: HTMLElement) {
+function expectRail(container: HTMLElement, inset = 83, bar = inset) {
   const rail = container.querySelector('.sh-rail-bar')!;
   expect(rail, 'the rail').not.toBeNull();
   // Order from the top: the header group, then the free space, then the tabs in their pill.
@@ -51,7 +52,8 @@ function expectRail(container: HTMLElement) {
   expect(labels(header)).toEqual([]);
   expect(container.querySelector('.sh-large-title')).toBeNull();
   // The rail is on the trailing edge, at the window's rail width.
-  expect(container.querySelector<HTMLElement>('.sh-screen')!.style.getPropertyValue('--sh-rail')).toBe('83px');
+  expect(container.querySelector<HTMLElement>('.sh-screen')!.style.getPropertyValue('--sh-rail')).toBe(`${inset}px`);
+  expect(container.querySelector<HTMLElement>('.sh-screen')!.style.getPropertyValue('--sh-rail-bar')).toBe(`${bar}px`);
 }
 
 describe('the Duo rail', () => {
@@ -61,20 +63,42 @@ describe('the Duo rail', () => {
 
   it('folded upright: Quick Links and Profile above the tabs pill, no hamburger, the title in the header row', () => {
     const { container } = mount(withChrome(), duoFolded);
-    expectRail(container);
-    expect(container.querySelector('.sh-fold')).toBeNull();
+    // R1: the closed portrait's rail inset is 84 pt and the UITabBar is 69 pt wide.
+    expectRail(container, 84, 69);
+    expect(container.querySelector('.sh-crease[data-on]')).toBeNull();
+  });
+
+  it('folded upright: the time and the connection stack on the rail in the keep-clear region, and no status bar crosses the top', () => {
+    const { container } = mount(withChrome(), duoWindow({ turn: 0, fold: 'closed' }));
+    const status = container.querySelector<HTMLElement>('.sh-rail-status')!;
+    expect(status, 'the rail status').not.toBeNull();
+    expect(container.querySelector('.sh-status')).toBeNull();
+    expect(status.querySelector('.sh-time')?.textContent).toBe('9:41');
+    expect(status.querySelector('.sh-wifi')).not.toBeNull();
+    // R1's keep-clear region: 84 x 170 at (382, 0).
+    expect([status.style.left, status.style.top, status.style.width, status.style.height]).toEqual(['382px', '0px', '84px', '170px']);
+    expect(status.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('a window with a status bar (the iPhone, the unfolded Duo) keeps it and has no rail status', () => {
+    for (const win of [iphone, duoUpright, duoSideways]) {
+      const { container, unmount } = mount(withChrome(), win);
+      expect(container.querySelector('.sh-status'), win.name).not.toBeNull();
+      expect(container.querySelector('.sh-rail-status'), win.name).toBeNull();
+      unmount();
+    }
   });
 
   it('unfolded sideways, flat: the same rail, no fold line', () => {
     const { container } = mount(withChrome(), duoSideways);
     expectRail(container);
-    expect(container.querySelector('.sh-fold')).toBeNull();
+    expect(container.querySelector('.sh-crease[data-on]')).toBeNull();
   });
 
   it('partly folded (book pose): the same rail, the fold at window x 455.3', () => {
     const { container } = mount(withChrome(), withPose(duoSideways, 'book'));
     expectRail(container);
-    expect(container.querySelector<HTMLElement>('.sh-fold[data-axis=vertical]')!.style.left).toBe('455.3px');
+    expect(container.querySelector<HTMLElement>('.sh-crease[data-on][data-axis=vertical]')!.style.left).toBe('455.3px');
   });
 
   it('unfolded upright: no rail; the hamburger leads, Quick Links and Profile trail, the large title sits below, the tab bar floats', () => {
@@ -85,7 +109,7 @@ describe('the Duo rail', () => {
     expect(labels(header)).toEqual(['Sections', 'Quick Links', 'Profile']);
     expect(container.querySelector('.sh-large-title')).not.toBeNull();
     expect(container.querySelectorAll('.sh-tabbar .sh-tab')).toHaveLength(tabCount);
-    expect(container.querySelector('.sh-fold')).toBeNull();
+    expect(container.querySelector('.sh-crease[data-on]')).toBeNull();
   });
 
   it('draws the initials disc in the rail as in the header, with or without a profile block; only look symbol draws the symbol', () => {

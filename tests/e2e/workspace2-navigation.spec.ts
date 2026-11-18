@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { closePagesList, expectOnPage, isPhone, openPagesList, openWorkspace, previewRoot, railButton, seed, snap } from './workspace2-helpers';
+import { closePagesList, expectOnPage, isPhone, openPagesList, openWorkspace, previewRoot, railButton, rigSettled, seed, snap } from './workspace2-helpers';
 
 test.beforeEach(async ({ request }) => { await seed(request); });
 
@@ -41,7 +41,7 @@ async function chooseWindow(page: Page, label: string) {
   if (isPhone(page)) { await page.getByRole('button', { name: device, exact: true }).click(); await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); }
   else await page.getByRole('menuitemradio', { name: device, exact: true }).click();
   const rail = page.getByTestId('simulator-rail');
-  if (label.endsWith('sideways')) await rail.getByRole('button', { name: 'Rotate' }).click();
+  if (label === 'iPad sideways') await rail.getByRole('button', { name: 'Rotate Right' }).click();
   if (label === 'Duo folded') await rail.getByRole('button', { name: 'Folded', exact: true }).click();
 }
 /** The split read-out line, read from the Window menu (or the Project sheet's Window page) and closed again. */
@@ -165,26 +165,32 @@ test('the Window menu lists the devices by name, and the rail turns and folds th
   await page.getByRole('menuitemradio', { name: 'iPad', exact: true }).click();
   const rail = page.getByTestId('simulator-rail');
   await expect(rail.getByRole('button', { name: 'Folded', exact: true })).toHaveCount(0);
-  await rail.getByRole('button', { name: 'Rotate' }).click();
+  await rail.getByRole('button', { name: 'Rotate Right' }).click();
   await expect(previewRoot(page).locator('.sh-tabbar')).toHaveCount(0);
   await expect(previewRoot(page).locator('.sh-flyout-layer')).toHaveCount(1);
   await page.getByRole('button', { name: 'Window' }).click();
   await page.getByRole('menuitemradio', { name: 'iPhone Duo', exact: true }).click();
-  // Opened upright the Duo is flat with no band; Partly Folded draws one across the page, and turning it keeps the pose as a book.
-  await expect(previewRoot(page).locator('.sh-fold')).toHaveCount(0);
+  // Opened the Duo is flat and sideways with no band; Partly Folded draws one down the page, and turning it keeps the pose as a book.
+  await rigSettled(page);
+  await expect(previewRoot(page).locator('.sh-crease[data-on]')).toHaveCount(0);
   await rail.getByRole('button', { name: 'Partly Folded' }).click();
-  await expect(previewRoot(page).locator('.sh-fold[data-axis=horizontal]')).toHaveCount(1);
-  await rail.getByRole('button', { name: 'Rotate' }).click();
-  await expect(previewRoot(page).locator('.sh-fold[data-axis=vertical]')).toHaveCount(1);
+  await rigSettled(page);
+  await expect(previewRoot(page).locator('.sh-crease[data-on][data-axis=vertical]').first()).toBeAttached();
   await page.getByRole('button', { name: 'Window' }).click();
   await expect(page.getByTestId('split-readout')).toHaveText('Split view: on, 455 and 372 pt');
+  await page.keyboard.press('Escape');
+  await rail.getByRole('button', { name: 'Rotate Right' }).click();
+  await rigSettled(page);
+  await expect(previewRoot(page).locator('.sh-rig[data-fold=partly][data-turn="90"]')).toHaveCount(1);
+  await expect(previewRoot(page).locator('.sh-crease[data-on][data-axis=horizontal]').first()).toBeAttached();
 });
 
 test('the rail steps the preview text size, and dims what the device cannot do where it stands', async ({ page }) => {
   test.skip(isPhone(page), 'The rail sits beside the device on a desk');
   await openWorkspace(page);
   const rail = page.getByTestId('simulator-rail');
-  await expect(rail.getByRole('button', { name: 'Rotate' })).toBeDisabled();
+  await expect(rail.getByRole('button', { name: 'Rotate Left' })).toBeDisabled();
+  await expect(rail.getByRole('button', { name: 'Rotate Right' })).toBeDisabled();
   const title = previewRoot(page).locator('.sh-tile-title').first();
   const before = await title.evaluate(element => parseFloat(getComputedStyle(element).fontSize));
   await rail.getByRole('button', { name: 'Larger Text' }).click();
@@ -269,12 +275,12 @@ function withHeader(): object {
     { id: 'demo_utilities', placement: 'trailing', horizontal: 'separate-circles@1', vertical: 'shared@1', items: [{ id: 'demo_header', type: 'shell-header', visibility: 'always', quickLinksAction: present, profileAction: present }] }] } } };
 }
 
-/** The poses of the Duo, each taken through the simulator rail the way a person does: Folded, Unfolded, Rotate, Partly Folded. */
+/** The poses of the Duo, each taken through the simulator rail the way a person does: Folded, Unfolded, Rotate Left and Right, Partly Folded. */
 const poses = [
   { name: 'folded upright', rail: true, steps: ['Folded'] },
-  { name: 'unfolded upright', rail: false, steps: [] },
-  { name: 'unfolded sideways', rail: true, steps: ['Rotate'] },
-  { name: 'partly folded', rail: true, steps: ['Rotate', 'Partly Folded'] },
+  { name: 'unfolded upright', rail: false, steps: ['Rotate Right'] },
+  { name: 'unfolded sideways', rail: true, steps: [] },
+  { name: 'partly folded', rail: true, steps: ['Partly Folded'] },
 ] as const;
 
 for (const pose of poses) {
@@ -286,13 +292,26 @@ for (const pose of poses) {
     await page.getByRole('menuitemradio', { name: 'iPhone Duo', exact: true }).click();
     const controls = page.getByTestId('simulator-rail');
     for (const step of pose.steps) await controls.getByRole('button', { name: step, exact: true }).click();
-    await page.waitForTimeout(600);
+    await rigSettled(page);
     const root = previewRoot(page);
-    const screen = (await root.locator('.sh-screen').boundingBox())!;
+    const screen = (await root.locator('.sh-screen').first().boundingBox())!;
     if (!pose.rail) {
       await expect(root.locator('.sh-rail-bar')).toHaveCount(0);
       await expect(root.getByRole('button', { name: 'Sections' })).toBeVisible();
       await expect(root.locator('.sh-page[data-current] .sh-large-title')).toBeVisible();
+      return;
+    }
+    if (pose.name === 'partly folded') {
+      // Two live halves: the page's chrome is checked in the flat pose; here the band is down the page at the hinge.
+      await expect(root.locator('.sh-rig[data-fold=partly][data-turn="0"]')).toHaveCount(1);
+      const fold = (await root.locator('.sh-crease[data-on][data-axis=vertical]').first().boundingBox())!;
+      // The halves are tilted 18 degrees toward the viewer, so the band's place in the first half's own box is foreshortened a few percent.
+      expect(Math.abs((fold.x - screen.x) / screen.width - 455.3 / 951)).toBeLessThan(0.06);
+      // The page's chrome in the partly folded pose: the rail's Quick Links and Profile are reachable once, in the copy that shows the rail.
+      await expect(root.locator('.sh-rail-group button:not([aria-hidden=true])')).toHaveCount(2);
+      expect(await root.locator('.sh-rail-group button:not([aria-hidden=true])').evaluateAll(items => items.map(item => item.getAttribute('aria-label')))).toEqual(['Quick Links', 'Profile']);
+      await expect(root.locator('.sh-rail-bar').first()).toBeAttached();
+      await snap(page, 'duo-partly-folded');
       return;
     }
     await expect(root.getByRole('button', { name: 'Sections' })).toHaveCount(0);
@@ -302,18 +321,14 @@ for (const pose of poses) {
     // The rail ends at the window's trailing edge, 83 pt wide, from the status strip down; the group is over the tabs pill, which has rounded ends.
     const bar = (await root.locator('.sh-rail-bar').boundingBox())!;
     expect(Math.abs((bar.x + bar.width) - (screen.x + screen.width))).toBeLessThan(1.5);
-    expect(Math.abs(bar.width / screen.width - 83 / (pose.name === 'folded upright' ? 466 : 951))).toBeLessThan(0.004);
+    // R1: the closed portrait's bar is 69 pt wide in an 84 pt inset; the open Duo's rail keeps its 83.
+    expect(Math.abs(bar.width / screen.width - (pose.name === 'folded upright' ? 69 / 466 : 83 / 951))).toBeLessThan(0.004);
     const group = (await root.locator('.sh-rail-group').boundingBox())!;
     const pill = (await root.locator('.sh-tabbar').boundingBox())!;
     expect(group.y + group.height).toBeLessThan(pill.y);
     expect(await root.locator('.sh-tabbar').evaluate(item => parseFloat(getComputedStyle(item).borderTopLeftRadius))).toBeGreaterThanOrEqual(24);
     await expect(root.locator('.sh-rail-group').getByRole('button')).toHaveText(['', '']);
     expect(await root.locator('.sh-rail-group button').evaluateAll(items => items.map(item => item.getAttribute('aria-label')))).toEqual(['Quick Links', 'Profile']);
-    if (pose.name === 'partly folded') {
-      const fold = (await root.locator('.sh-fold[data-axis=vertical]').boundingBox())!;
-      expect(Math.abs((fold.x - screen.x) / screen.width - 455.3 / 951)).toBeLessThan(0.004);
-      expect(Math.abs(fold.width / screen.width - 40.4 / 951)).toBeLessThan(0.004);
-    }
     await snap(page, `duo-${pose.name.replace(' ', '-')}`);
   });
 }

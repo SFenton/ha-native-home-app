@@ -56,7 +56,7 @@ describe('Preview2 windows', () => {
     cleanup();
     const book = mount(document, { window: withPose(duoSideways, 'book') });
     expect([...book.container.querySelectorAll<HTMLElement>('.sh-pane')].map(pane => pane.style.width)).toEqual(['455.3px', '372.3px']);
-    expect(book.container.querySelector('.sh-fold[data-axis=vertical]')).not.toBeNull();
+    expect(book.container.querySelector('.sh-crease[data-on][data-axis=vertical]')).not.toBeNull();
   });
 
   it('keeps one pane when the host starts with one pane, and in a window that cannot split', () => {
@@ -109,12 +109,12 @@ describe('Preview2 windows', () => {
   it('keeps the tab bar on a Duo opened upright, flat with no band, and draws the band across the page only when partly folded', () => {
     const { container } = mount(base, { window: duoUpright });
     expect(container.querySelector('.sh-tabbar')).not.toBeNull();
-    expect(container.querySelector('.sh-fold')).toBeNull();
+    expect(container.querySelector('.sh-crease[data-on]')).toBeNull();
     cleanup();
     const hinged = mount(base, { window: withPose(duoUpright, 'book') });
     expect(hinged.container.querySelector('.sh-tabbar')).not.toBeNull();
-    expect(hinged.container.querySelector('.sh-fold[data-axis=horizontal]')).not.toBeNull();
-    expect(hinged.container.querySelector('.sh-fold[data-axis=vertical]')).toBeNull();
+    expect(hinged.container.querySelector('.sh-crease[data-on][data-axis=horizontal]')).not.toBeNull();
+    expect(hinged.container.querySelector('.sh-crease[data-on][data-axis=vertical]')).toBeNull();
   });
 
   it('puts the Duo rail on the trailing edge and the fold at window x 455.3, so the panes are 455.3, 40.4 and 372.3 of 868 pt', () => {
@@ -123,7 +123,7 @@ describe('Preview2 windows', () => {
     const screen = container.querySelector<HTMLElement>('.sh-screen')!;
     expect(screen.hasAttribute('data-rail')).toBe(true);
     expect(screen.style.getPropertyValue('--sh-rail')).toBe('83px');
-    expect(container.querySelector<HTMLElement>('.sh-fold[data-axis=vertical]')!.style.left).toBe('455.3px');
+    expect(container.querySelector<HTMLElement>('.sh-crease[data-on][data-axis=vertical]')!.style.left).toBe('455.3px');
     expect([...container.querySelectorAll<HTMLElement>('.sh-pane, .sh-band')].map(item => item.style.width)).toEqual(['455.3px', '40.4px', '372.3px']);
     expect(455.3 + 40.4 + 372.3).toBeCloseTo(868, 5);
   });

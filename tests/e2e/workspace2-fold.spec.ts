@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { isPhone, openWorkspace, previewRoot, previewTile, seed, snap } from './workspace2-helpers';
+import { isPhone, openWorkspace, previewRoot, previewTile, rigSettled, seed, snap } from './workspace2-helpers';
 
 const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: Record<string, any> };
 
@@ -33,8 +33,8 @@ test('the Duo reflows a fold: page grid from four 200 pt cells flat to 2 + 2 aro
   await page.getByRole('button', { name: 'Window' }).click();
   await page.getByRole('menuitemradio', { name: 'iPhone Duo', exact: true }).click();
   const rail = page.getByTestId('simulator-rail');
-  await rail.getByRole('button', { name: 'Rotate' }).click();
-  await rail.getByRole('button', { name: 'Unfolded' }).click();
+  // Choosing iPhone Duo opens it flat and sideways.
+  await rigSettled(page);
   const grid = previewRoot(page).locator('[data-sel="node:fold-page-grid"] .sh-grid');
   await expect(grid).toHaveAttribute('data-columns', '4');
   await expect.poll(async () => (await tracks(page, 'fold-page-grid')).widths.map(Math.round)).toEqual([200, 200, 200, 200]);
@@ -42,6 +42,7 @@ test('the Duo reflows a fold: page grid from four 200 pt cells flat to 2 + 2 aro
   await snap(page, 'duo-flat-fold-page-grid');
 
   await rail.getByRole('button', { name: 'Partly Folded' }).click();
+  await rigSettled(page);
   await expect.poll(async () => (await tracks(page, 'fold-page-grid')).banded).toBe(true);
   // Two tracks a side, 214 pt before the band and 172 pt after it, the band's own 16 pt track (its 40 pt less the gaps) between.
   expect((await tracks(page, 'fold-page-grid')).widths.map(Math.round)).toEqual([214, 214, 16, 172, 172]);

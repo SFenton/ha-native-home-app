@@ -1,4 +1,4 @@
-import { isRegularWidth } from './split';
+import { contentOrigin, isRegularWidth } from './split';
 import type { PreviewWindow } from './windows';
 
 /** The 580 x 660 form sheet on iPad (`HassFormSheetSize`, measured on iOS 26 and 27). */
@@ -43,7 +43,8 @@ export interface SheetPresentation { width: 'form' | 'page'; fullScreen?: boolea
 export function leadingHalfWidth(win: PreviewWindow): number {
   const free = win.width - (win.rail ?? 0);
   const hinge = win.hinge?.axis === 'vertical' ? win.hinge : undefined;
-  const end = hinge ? hinge.start : (free - HALF_MIDPOINT_BAND) / 2;
+  // The leading half starts after a leading rail, so the hinge's place is counted from there.
+  const end = hinge ? hinge.start - contentOrigin(win) : (free - HALF_MIDPOINT_BAND) / 2;
   return Math.max(0, Math.floor(end - HALF_MARGIN));
 }
 

@@ -293,6 +293,8 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
   }, [stage, ws.mode, ws.document, begin, move, end, cancel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => stopScroll(), []);
+  // The Duo's 3D rig flattens only while a drag runs (`duo-rig.css`), so drop targets can be hit-tested to the pixel.
+  useEffect(() => { stage?.toggleAttribute('data-dragging', Boolean(session)); return () => stage?.removeAttribute('data-dragging'); }, [stage, session]);
   useEffect(() => { const host = ghostHost.current; if (host && session?.ghost) { host.replaceChildren(session.ghost); } else host?.replaceChildren(); }, [session?.ghost]);
 
   const locateNew = useCallback((type: string): Locator => (x, y) => stage && latest.current.ws.document ? locateOnCanvas(stage, latest.current.ws.document, 'node:__new__' as SelectionKey, x, y, type) : undefined, [stage]);

@@ -3,6 +3,7 @@ import { Menu } from '@base-ui/react/menu';
 import { selectionKeyAt } from '../preview2/SelectionLayer';
 import type { SelectionKey } from '../preview2/model';
 import { NodeMenuItems } from './PropertiesPanel';
+import { visibleCopy } from '../preview2/twin-scroll';
 import type { Workspace2 } from './useWorkspace2';
 
 /** Where the menu opened and for which element. */
@@ -35,7 +36,7 @@ export default function ElementContextMenu({ ws, stage, onError }: { ws: Workspa
       if (!(event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))) return;
       const key = ws.target?.kind === 'node' ? ws.target.key : undefined;
       if (!isNode(key)) return;
-      const element = [...stage.querySelectorAll<HTMLElement>('[data-sel]')].find(item => item.getAttribute('data-sel') === key);
+      const element = visibleCopy([...stage.querySelectorAll<HTMLElement>('[data-sel]')].filter(item => item.getAttribute('data-sel') === key));
       if (!element) return;
       event.preventDefault();
       const box = element.getBoundingClientRect();

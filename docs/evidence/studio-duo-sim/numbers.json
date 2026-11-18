@@ -1,0 +1,226 @@
+{
+  "reducedMotion": {
+    "slotsMax": 2,
+    "oldRemovedAtMs": 257
+  },
+  "foldPose": {
+    "settleMs": 300,
+    "distinctFrames": 27,
+    "target": "317 +- 40"
+  },
+  "foldSwing": {
+    "settleMs": 517,
+    "distinctFrames": 44,
+    "target": "528 +- 60"
+  },
+  "framePacing": {
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)",
+    "software": false,
+    "transitions": {
+      "fold": {
+        "medianMs": 16.7,
+        "p90Ms": 16.7,
+        "over25": 0,
+        "over33": 0,
+        "worstMs": 16.7,
+        "frames": 28,
+        "clickToFirstFrameMs": 15.7,
+        "movedAtMs": 15.7
+      },
+      "unfold": {
+        "medianMs": 16.7,
+        "p90Ms": 16.8,
+        "over25": 0,
+        "over33": 0,
+        "worstMs": 16.8,
+        "frames": 27,
+        "clickToFirstFrameMs": 23.4,
+        "movedAtMs": 23.4
+      },
+      "swingToClosed": {
+        "medianMs": 16.7,
+        "p90Ms": 16.7,
+        "over25": 0,
+        "over33": 0,
+        "worstMs": 16.8,
+        "frames": 46,
+        "clickToFirstFrameMs": 29.1,
+        "movedAtMs": 29.1
+      },
+      "swingToPartly": {
+        "medianMs": 16.7,
+        "p90Ms": 16.7,
+        "over25": 0,
+        "over33": 0,
+        "worstMs": 16.8,
+        "frames": 46,
+        "clickToFirstFrameMs": 1.8,
+        "movedAtMs": 1.8
+      },
+      "rotateRight": {
+        "medianMs": 16.7,
+        "p90Ms": 16.7,
+        "over25": 0,
+        "over33": 0,
+        "worstMs": 16.8,
+        "frames": 28,
+        "clickToFirstFrameMs": 1.3,
+        "movedAtMs": 1.3
+      },
+      "rotateLeft": {
+        "medianMs": 16.7,
+        "p90Ms": 16.8,
+        "over25": 0,
+        "over33": 0,
+        "worstMs": 16.8,
+        "frames": 28,
+        "clickToFirstFrameMs": 10,
+        "movedAtMs": 10
+      }
+    }
+  },
+  "oneSurface-dark": {
+    "deviceScale": 1,
+    "sideLuma": 22.3,
+    "darkestCentreLuma": 19,
+    "ratio": 0.853,
+    "largestColumnStep": 0.93,
+    "dividerRows": [
+      109,
+      109
+    ]
+  },
+  "oneSurface-light": {
+    "deviceScale": 1,
+    "sideLuma": 22.3,
+    "darkestCentreLuma": 19,
+    "ratio": 0.853,
+    "largestColumnStep": 0.93,
+    "dividerRows": [
+      109,
+      109
+    ]
+  },
+  "twinCopy": {
+    "mountedMs": 8,
+    "readyMs": 34,
+    "longestTaskMs": 0
+  },
+  "framePacingPooled": {
+    "gaps": 197,
+    "p90Ms": 16.7
+  },
+  "oneSurface-2x-gpu": {
+    "deviceScale": 2,
+    "sideLuma": 22.3,
+    "darkestCentreLuma": 19,
+    "ratio": 0.853,
+    "largestColumnStep": 0.93,
+    "dividerRows": [
+      109,
+      109
+    ]
+  },
+  "camera-turn-0-right": {
+    "centreLuma": 0,
+    "outsideLuma": 15
+  },
+  "camera-turn-90-right": {
+    "centreLuma": 0,
+    "outsideLuma": 16
+  },
+  "camera-turn-180-right": {
+    "centreLuma": 0,
+    "outsideLuma": 9
+  },
+  "camera-turn-270-right": {
+    "centreLuma": 0,
+    "outsideLuma": 33
+  },
+  "camera-turn-0-left": {
+    "centreLuma": 0,
+    "outsideLuma": 15
+  },
+  "camera-turn-270-left": {
+    "centreLuma": 0,
+    "outsideLuma": 33
+  },
+  "camera-turn-180-left": {
+    "centreLuma": 0,
+    "outsideLuma": 9
+  },
+  "camera-turn-90-left": {
+    "centreLuma": 0,
+    "outsideLuma": 16
+  },
+  "framePacingSoftwareRun": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+    "software": true,
+    "transitions": {
+      "fold": {
+        "medianMs": 33.3,
+        "p90Ms": 33.4,
+        "over25": 13,
+        "over33": 0,
+        "worstMs": 33.4,
+        "frames": 15,
+        "clickToFirstFrameMs": 45.1,
+        "movedAtMs": 45.1
+      },
+      "unfold": {
+        "medianMs": 33.4,
+        "p90Ms": 33.4,
+        "over25": 13,
+        "over33": 1,
+        "worstMs": 50,
+        "frames": 14,
+        "clickToFirstFrameMs": 61.1,
+        "movedAtMs": 61.1
+      },
+      "swingToClosed": {
+        "medianMs": 50,
+        "p90Ms": 66.7,
+        "over25": 14,
+        "over33": 12,
+        "worstMs": 66.7,
+        "frames": 16,
+        "clickToFirstFrameMs": 45.6,
+        "movedAtMs": 45.6
+      },
+      "swingToPartly": {
+        "medianMs": 50,
+        "p90Ms": 66.6,
+        "over25": 14,
+        "over33": 12,
+        "worstMs": 66.7,
+        "frames": 16,
+        "clickToFirstFrameMs": 40,
+        "movedAtMs": 40
+      },
+      "rotateRight": {
+        "medianMs": 66.6,
+        "p90Ms": 66.7,
+        "over25": 7,
+        "over33": 6,
+        "worstMs": 66.7,
+        "frames": 10,
+        "clickToFirstFrameMs": 57.7,
+        "movedAtMs": 57.7
+      },
+      "rotateLeft": {
+        "medianMs": 66.6,
+        "p90Ms": 66.8,
+        "over25": 6,
+        "over33": 5,
+        "worstMs": 66.8,
+        "frames": 10,
+        "clickToFirstFrameMs": 42.5,
+        "movedAtMs": 42.5
+      }
+    }
+  },
+  "framePacingSoftwarePooled": {
+    "gaps": 75,
+    "p90Ms": 66.7
+  }
+}

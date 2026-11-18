@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openWorkspace, previewRoot, seed, snap } from './workspace2-helpers';
+import { openWorkspace, previewRoot, rigSettled, seed, snap } from './workspace2-helpers';
 
 /**
  * The Duo simulator's parity with the app (`build/research/studio-duosim.md`, S1 to S6): the navigation tile's chevron, the
@@ -38,9 +38,10 @@ async function start(page: Page, choice: Choice) {
   await page.keyboard.press('Escape');
   const rail = page.getByTestId('simulator-rail');
   if (choice === 'Duo folded') await rail.getByRole('button', { name: 'Folded', exact: true }).click();
-  if (choice === 'Duo sideways') await rail.getByRole('button', { name: 'Rotate' }).click();
+  // Choosing iPhone Duo opens it flat and sideways; one Rotate Right stands it upright.
+  if (choice === 'Duo upright') await rail.getByRole('button', { name: 'Rotate Right' }).click();
   await expect(previewRoot(page).locator('.sh-page[data-current] .sh-large-title, .sh-page[data-current] .sh-inline-title').first()).toBeVisible();
-  await page.waitForTimeout(500);
+  await rigSettled(page);
 }
 const root = (page: Page) => previewRoot(page);
 const box = async (locator: Locator) => (await locator.boundingBox())!;
@@ -102,23 +103,29 @@ test('S5 the unfolded portrait Duo is flat with no hinge band, and Partly Folded
   await start(page, 'Duo upright');
   const rail = page.getByTestId('simulator-rail');
   await snap(page, 'g7-duo-upright-flat');
-  await expect(root(page).locator('.sh-fold')).toHaveCount(0);
+  await expect(root(page).locator('.sh-crease[data-on]')).toHaveCount(0);
   await expect(rail.getByRole('button', { name: 'Partly Folded' })).toBeEnabled();
-  const grid = root(page).locator('[data-sel="node:hc-climate-openers"] .sh-grid');
+  // The band's place (455.3 pt from the top, 40.4 pt tall): the hinge is the tilt's axis, so it sits where it does flat, whatever the tilt.
+  const flatScreen = await box(root(page).locator('.sh-screen').first());
+  const zoom = flatScreen.width / 669;
+  const grid = root(page).locator('[data-sel="node:hc-climate-openers"] .sh-grid').first();
   const flat = await grid.evaluate(element => getComputedStyle(element).gridTemplateColumns);
   await rail.getByRole('button', { name: 'Partly Folded' }).click();
-  await expect(root(page).locator('.sh-fold[data-axis=horizontal]')).toHaveCount(1);
-  await expect(root(page).locator('.sh-fold[data-axis=vertical]')).toHaveCount(0);
+  await rigSettled(page);
+  await expect(root(page).locator('.sh-rig[data-fold=partly][data-turn="90"]')).toHaveCount(1);
+  await expect(root(page).locator('.sh-crease[data-on][data-axis=horizontal]').first()).toBeAttached();
+  await expect(root(page).locator('.sh-crease[data-on][data-axis=vertical]')).toHaveCount(0);
   await snap(page, 'g7-duo-upright-partly-folded');
+  const crease = await box(root(page).locator('.sh-crease[data-on][data-axis=horizontal]').first());
+  expect(Math.abs((crease.y + crease.height / 2 - flatScreen.y) / zoom - (455.3 + 20.2))).toBeLessThan(4);
+  // Upright partly folded leaves the page as it was (D2): the same tracks in the same copy.
   expect(await grid.evaluate(element => getComputedStyle(element).gridTemplateColumns)).toBe(flat);
-  const screen = await box(root(page).locator('.sh-screen')), band = await box(root(page).locator('.sh-fold'));
-  const zoom = await zoomOf(page, 669);
-  expect(Math.abs((band.y - screen.y) / zoom - 455.3)).toBeLessThan(1.5);
   await page.getByRole('button', { name: 'Window', exact: true }).click();
   await expect(page.getByTestId('fold-readout')).toHaveText('Fold: hinge across the page, layout unchanged');
   await page.keyboard.press('Escape');
   await rail.getByRole('button', { name: 'Unfolded' }).click();
-  await expect(root(page).locator('.sh-fold')).toHaveCount(0);
+  await rigSettled(page);
+  await expect(root(page).locator('.sh-crease[data-on]')).toHaveCount(0);
 });
 
 test('S3 the iPhone draws its Dynamic Island and no Duo window does', async ({ page }) => {
@@ -154,22 +161,22 @@ test('S4 the Duo opened upright presents a sheet from the bottom edge, full widt
 test('S6 the folded Duo has its own body: tight corners on the hinge side, wide on the free side, and a hinge strip', async ({ page }) => {
   await start(page, 'Duo folded');
   await snap(page, 'g5-duo-folded-body');
-  const model = root(page).locator('.sh-bezel');
-  const radii = await model.evaluate(element => {
-    const layer = getComputedStyle(element.querySelector('.sh-layer')!), body = getComputedStyle(element, '::before'), strip = getComputedStyle(element, '::after');
-    return { screen: [layer.borderTopLeftRadius, layer.borderTopRightRadius, layer.borderBottomRightRadius, layer.borderBottomLeftRadius],
-      body: [body.borderTopLeftRadius, body.borderTopRightRadius, body.borderBottomRightRadius, body.borderBottomLeftRadius], strip: strip.width };
+  const face = root(page).locator('.sh-outer');
+  const radii = await face.evaluate(element => {
+    const clip = getComputedStyle(element.querySelector('.sh-clip')!), body = getComputedStyle(element.querySelector('.sh-body')!), strip = getComputedStyle(element.querySelector('.sh-strip')!);
+    const corners = (style: CSSStyleDeclaration) => [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius];
+    return { screen: corners(clip), body: corners(body), strip: strip.width };
   });
   expect(radii.screen).toEqual(['8px', '59px', '59px', '8px']);
   expect(radii.body).toEqual(['1px', '69px', '69px', '1px']);
   expect(radii.strip).toBe('14px');
   // The pixels agree: a point just inside the top-left corner of the screen is screen, the same point at the top-right is the body.
-  const tone = await model.evaluate(async element => {
-    const rect = element.getBoundingClientRect(), layerRect = element.querySelector('.sh-layer')!.getBoundingClientRect();
-    return { rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height }, layer: { x: layerRect.x, y: layerRect.y, w: layerRect.width } };
+  const tone = await face.evaluate(element => {
+    const rect = element.getBoundingClientRect(), clip = element.querySelector('.sh-clip')!.getBoundingClientRect();
+    return { rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height }, layer: { x: clip.x, y: clip.y, w: clip.width } };
   });
   const png = await page.screenshot({ clip: { x: tone.rect.x, y: tone.rect.y, width: tone.rect.w, height: tone.rect.h } });
-  const zoom = await zoomOf(page, 466), probe = 12 * zoom;
+  const zoom = tone.layer.w / 466, probe = 12 * zoom;
   const lum = await page.evaluate(async ({ data, points }) => {
     const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${data}`)).blob());
     const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
