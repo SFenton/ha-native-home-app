@@ -7,6 +7,7 @@ import LibraryPalette from './LibraryPalette';
 import LibraryTree from './LibraryTree';
 import DataPanel from './data/DataPanel';
 import RepeatsLevel from './repeats/RepeatsLevel';
+import TemplateUsesLevel from './TemplateUses';
 import { categoryInfo } from './LibraryRail';
 import { categories, isTreeCategory, type Category, type Tier } from './layout';
 import type { Library } from './useLibrary';
@@ -34,7 +35,7 @@ export default function LibraryPanel({ ws, document, tier, category, open, shown
     if (flyout && open && !wasOpen.current) window.requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>('.w2-lib-picker')?.focus());
     wasOpen.current = open;
   }, [flyout, open]);
-  const close = () => { ws.repeats?.setOpen(false); onClose(); railButton(category)?.focus(); };
+  const close = () => { ws.repeats?.setOpen(false); ws.setUsesId(undefined); onClose(); railButton(category)?.focus(); };
   const keys = (event: KeyboardEvent<HTMLElement>) => {
     const typing = event.target instanceof HTMLInputElement && event.target.value !== '';
     if (event.key === 'Escape' && !event.defaultPrevented && !typing) { event.stopPropagation(); close(); }
@@ -45,12 +46,15 @@ export default function LibraryPanel({ ws, document, tier, category, open, shown
   const repeatsOpen = category === 'components' && Boolean(repeats?.open);
   // The level belongs to Components: leaving that rail item leaves it.
   useEffect(() => { if (category !== 'components' && repeats?.open) repeats.setOpen(false); }, [category]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The Uses level belongs to Components too.
+  useEffect(() => { if (category !== 'components' && ws.usesId) ws.setUsesId(undefined); }, [category]); // eslint-disable-line react-hooks/exhaustive-deps
   const backToRow = () => { repeats?.setOpen(false); window.requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>('[data-testid="find-repeats"]')?.focus()); };
-  const content = repeatsOpen ? <RepeatsLevel ws={ws} onBack={backToRow} onClose={flyout ? undefined : close}/>
+  const usesEntry = category === 'components' && ws.usesId ? document.componentLibrary?.find(item => item.id === ws.usesId) : undefined;
+  const backFromUses = () => { const id = ws.usesId; ws.setUsesId(undefined); window.requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>(`[data-component="${id}"] .w2-tpl-row`)?.focus()); };
+  const content = usesEntry ? <TemplateUsesLevel ws={ws} entry={usesEntry} onBack={backFromUses} onKeepPanel={onKeepPanel} onClose={flyout ? undefined : close}/> : repeatsOpen ? <RepeatsLevel ws={ws} onBack={backToRow} onClose={flyout ? undefined : close}/>
     : isTreeCategory(category)
     ? <LibraryTree ws={ws} category={category} library={library} trailApi={trailApi} onCategory={onCategory} onKeepPanel={onKeepPanel} onError={onError} onClose={flyout ? undefined : close}/>
     : category === 'data' ? <DataPanel ws={ws} onError={onError}/> : <LibraryPalette ws={ws} kind={category} library={library}/>;
-  void document;
   return <aside ref={panel} className="w2-lib-panel" data-tier={tier} data-open={shown ? '' : undefined} aria-label={info.label} onKeyDown={keys} inert={!open} data-testid="library-panel">
     {flyout && <header className="w2-lib-head w2-lib-flyout-head">
       <Menu.Root>
@@ -61,7 +65,7 @@ export default function LibraryPanel({ ws, document, tier, category, open, shown
       </Menu.Root>
       <button type="button" className="w2-icon-button" aria-label="Close" onClick={close}><X size={18} aria-hidden/></button>
     </header>}
-    {!flyout && !tree && !repeatsOpen && <header className="w2-lib-head"><h2>{info.label}</h2><button type="button" className="w2-icon-button" aria-label="Close" onClick={close}><X size={18} aria-hidden/></button></header>}
+    {!flyout && !tree && !repeatsOpen && !usesEntry && <header className="w2-lib-head"><h2>{info.label}</h2><button type="button" className="w2-icon-button" aria-label="Close" onClick={close}><X size={18} aria-hidden/></button></header>}
     <div className="w2-lib-body" id="w2-lib-body">{content}</div>
   </aside>;
 }

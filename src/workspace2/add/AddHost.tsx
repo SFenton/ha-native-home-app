@@ -133,7 +133,7 @@ export default function AddHost({ ws, narrow, stage, onError, children }: { ws: 
   const api = useMemo<AddApi>(() => ({ open, openDefault, addType, addSaved, accepts }), [open, openDefault, addType, addSaved, accepts]);
   const slots = useAddSlots(mode === 'edit' ? stage : null);
   const content = state && document ? <AddPicker document={document} destination={state.destination} onChoose={choose} onClose={close} initialType={state.type}
-    templates={narrow ? query => <SavedComponents ws={ws} query={query} disabled={false} onAdd={chooseTemplate}/> : undefined}/> : null;
+    templates={narrow ? query => <SavedComponents ws={ws} query={query} disabled={false} onAdd={chooseTemplate} onEdit={id => { setState(undefined); ws.openTemplate(id); }}/> : undefined}/> : null;
   return <AddContext.Provider value={api}>
     {children}
     {document && slots.map(({ element, owner }, at) => {

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import LibraryPalette from '../src/workspace2/LibraryPalette';
+import SavedComponents from '../src/workspace2/SavedComponents';
 import { insertPlace, saveAsComponent } from '../src/workspace2/linked';
 import { endOf } from '../src/workspace2/add/insert';
 import { useLibrary } from '../src/workspace2/useLibrary';
@@ -42,7 +43,8 @@ describe('the Templates group', () => {
     render(<Harness document={document} apply={vi.fn()} say={vi.fn()}/>);
     const row = screen.getByTestId('saved-row');
     expect(row.textContent).toContain('Door Note');
-    expect(row.textContent).toContain('2 places');
+    expect(row.textContent).toContain('2');
+    expect(screen.getByRole('button', { name: 'Door Note, template, used in 2 places' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Templates/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Layout/ })).toBeTruthy();
   });
@@ -91,7 +93,7 @@ describe('the Templates group', () => {
     fireEvent.click(await screen.findByText('Delete'));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog.textContent).toContain('Delete “Door Note”?');
-    expect(dialog.textContent).toContain('It is used in 2 places. Each one stays where it is, unlinked.');
+    expect(dialog.textContent).toContain('It is used in 2 places. Each one becomes its own copy, with the settings it has now');
     expect(second).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByText('Delete Template'));
     expect(second).toHaveBeenCalledTimes(1);
@@ -102,7 +104,63 @@ describe('the Templates group', () => {
   it('disables the rows in Use', () => {
     const { document } = documentWith(2);
     render(<Harness document={document} mode="use" apply={vi.fn()} say={vi.fn()}/>);
-    expect(screen.getByRole('button', { name: /^Door Note\./ }).getAttribute('aria-disabled')).toBe('true');
+    expect((screen.getByRole('button', { name: /^Add Door Note/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: /^Door Note, template/ }).getAttribute('aria-disabled')).toBeNull();
+  });
+});
+
+describe('what a row does', () => {
+  const wsOf = (document: CompositionDocument) => ({ document, mode: 'edit', setMode: vi.fn(), studio: { apply: vi.fn() }, linked: { say: vi.fn() }, selectAnywhere: vi.fn(), index: undefined, templateId: undefined, openTemplate: vi.fn(), usesId: undefined, setUsesId: vi.fn() }) as any;
+
+  it('a click opens the template in the editor and never adds a place', () => {
+    const { document, entryId } = documentWith(2);
+    const ws = wsOf(document);
+    render(<SavedComponents ws={ws} query="" disabled={false}/>);
+    fireEvent.click(screen.getByRole('button', { name: /^Door Note, template/ }));
+    expect(ws.openTemplate).toHaveBeenCalledWith(entryId);
+    expect(ws.studio.apply).not.toHaveBeenCalled();
+  });
+
+  it('in the phone Add sheet a tap adds, and More offers Edit Template', async () => {
+    const { document, entryId } = documentWith(2);
+    const ws = wsOf(document), onAdd = vi.fn(), onEdit = vi.fn();
+    render(<SavedComponents ws={ws} query="" disabled={false} onAdd={onAdd} onEdit={onEdit}/>);
+    fireEvent.click(screen.getByRole('button', { name: /^Door Note, template/ }));
+    expect(onAdd).toHaveBeenCalledWith(entryId);
+    fireEvent.click(screen.getByRole('button', { name: 'More for Door Note' }));
+    fireEvent.click(await screen.findByText('Edit Template'));
+    expect(onEdit).toHaveBeenCalledWith(entryId);
+    expect(ws.openTemplate).not.toHaveBeenCalled();
+  });
+
+  it('in the phone Add sheet Show Uses opens the editor, where the uses row pushes Uses', async () => {
+    const { document, entryId } = documentWith(2);
+    const ws = wsOf(document), onEdit = vi.fn();
+    render(<SavedComponents ws={ws} query="" disabled={false} onAdd={vi.fn()} onEdit={onEdit}/>);
+    fireEvent.click(screen.getByRole('button', { name: 'More for Door Note' }));
+    fireEvent.click(await screen.findByText('Show Uses'));
+    expect(onEdit).toHaveBeenCalledWith(entryId);
+    expect(ws.setUsesId).not.toHaveBeenCalled();
+  });
+
+  it('the list is one tab stop: the first row, then the row last focused', () => {
+    const { document } = documentWith(2);
+    const first = document.componentLibrary![0];
+    const second = { ...document, componentLibrary: [first, { ...first, id: 'demo-second-note', name: 'Second Note' }] } as CompositionDocument;
+    render(<SavedComponents ws={wsOf(second)} query="" disabled={false}/>);
+    const rows = screen.getAllByRole('button', { name: /, template, / });
+    expect(rows.map(row => row.tabIndex)).toEqual([0, -1]);
+    fireEvent.focus(rows[1]);
+    expect(screen.getAllByRole('button', { name: /, template, / }).map(row => row.tabIndex)).toEqual([-1, 0]);
+  });
+
+  it('Show Uses in More opens the Uses level', async () => {
+    const { document, entryId } = documentWith(2);
+    const ws = wsOf(document);
+    render(<SavedComponents ws={ws} query="" disabled={false}/>);
+    fireEvent.click(screen.getByRole('button', { name: 'More for Door Note' }));
+    fireEvent.click(await screen.findByText('Show Uses'));
+    expect(ws.setUsesId).toHaveBeenCalledWith(entryId);
   });
 });
 

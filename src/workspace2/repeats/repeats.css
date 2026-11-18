@@ -6,10 +6,14 @@
 .w2-repeats-empty p { margin: 0; color: var(--w2-muted); }
 .w2-repeats-note { margin: 4px 12px 0; font-size: 13px; color: var(--w2-muted); }
 .w2-repeats-list { padding-inline: 4px; }
-.w2-repeats-list .w2-saved-main, .w2-find-repeats { justify-content: flex-start; }
-.w2-repeats-list .w2-saved-main { border-color: transparent; background: none; }
-.w2-repeats-list .w2-saved-main[aria-current=true] { background: var(--w2-field); }
-.w2-find-repeats { border-color: transparent; }
+.w2-repeats-list .w2-saved-row { min-height: 48px; border-radius: 10px; }
+.w2-scope .w2-repeat-main { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-height: 48px; padding: 0 8px; background: none; border: 0; border-radius: 10px; text-align: start; color: inherit; font: inherit; cursor: pointer; }
+.w2-scope .w2-repeat-main[aria-current=true] { background: var(--w2-field); }
+.w2-repeat-glyph { display: inline-flex; flex: none; }
+.w2-repeat-text { display: grid; min-width: 0; }
+.w2-repeat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-repeat-places { font-size: 12px; opacity: 0.7; }
+@media (pointer: coarse) { .w2-repeats-list .w2-saved-row, .w2-scope .w2-repeat-main { min-height: 56px; } }
 
 .w2-repeat-proposal { display: grid; gap: 12px; padding: 4px 16px 16px; }
 .w2-repeat-name { display: grid; gap: 4px; }
@@ -31,13 +35,10 @@
 @media (pointer: coarse) { .w2-repeat-more { min-height: 44px; min-width: 44px; } .w2-repeat-row-item { min-height: 56px; } .w2-repeat-row-item > input[type=checkbox] { width: 24px; height: 24px; } .w2-repeat-label { min-height: 44px; } }
 
 /* The row at the foot of the Templates group. */
-.w2-find-repeats { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 8px; background: none; border: 0; border-radius: 10px; color: inherit; font: inherit; text-align: start; cursor: pointer; }
-.w2-find-repeats:hover { background: var(--w2-field); }
-.w2-find-repeats svg { flex: none; }
-.w2-find-repeats-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.w2-find-repeats-count { flex: none; min-width: 24px; padding: 2px 8px; border-radius: 10px; text-align: center; font-size: 12px; background: var(--w2-field); color: var(--w2-muted); }
-@media (pointer: coarse) { .w2-find-repeats { min-height: 56px; } }
 
 /* The phone sheet: the part of the popup below the screen is padding, so the last row and Save as Template can scroll into view above it. */
 .w2-repeats-sheet .w2-pushed-body { padding-bottom: calc(var(--w2-sheet-hidden, 0px) + 16px); }
 .w2-repeats-sheet .w2-level-scroll { padding-bottom: calc(var(--w2-sheet-hidden, 0px) + 8px); }
+
+.w2-repeats-level .w2-repeats-grouphead { cursor: default; }
+.w2-repeats-level [data-group] > .w2-tree-group, .w2-repeats-sheet [data-group] > .w2-tree-group { margin-inline: 6px; }

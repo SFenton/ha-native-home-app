@@ -22,6 +22,6 @@ export function Children({ nodes, owner }: { nodes: readonly CompositionNode[]; 
   return <>{nodes.filter(node => !isHiddenNode(node)).map(node => {
     if (node.type !== 'component-ref') return <NodeFrame key={node.id} node={node}/>;
     const entry = library.get(node.componentId);
-    return entry ? <NodeFrame key={node.id} node={expandRef(node, entry) as PlainNode} linked={entry.name}/> : <MissingComponent key={node.id} id={node.id} span={node.layout.span ?? 1}/>;
+    return entry ? <NodeFrame key={node.id} node={expandRef(node, entry) as PlainNode} linked={entry.name} linkedId={entry.id}/> : <MissingComponent key={node.id} id={node.id} span={node.layout.span ?? 1}/>;
   })}{owner && mode === 'edit' && <div className="sh-add-slot" data-add-for={owner}/>}</>;
 }

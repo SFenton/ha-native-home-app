@@ -8,6 +8,12 @@ import type { ComponentEntry, CompositionDocument } from '../shared/composition/
  */
 export const ComponentLibraryContext = createContext<ReadonlyMap<string, ComponentEntry>>(new Map());
 
+/**
+ * Opens a template in the Studio's editor (the link badge of a place, in Edit). A context of its own for the same reason: the render context is rebuilt on
+ * every house change, and a badge is not worth that. Absent (the app, a test harness) the badge is a plain mark.
+ */
+export const OpenTemplateContext = createContext<((componentId: string) => void) | undefined>(undefined);
+
 const sourcesOf = new WeakMap<object, CompositionDocument['dataSources']>();
 
 /**

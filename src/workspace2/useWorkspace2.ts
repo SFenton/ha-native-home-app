@@ -40,6 +40,8 @@ export type PropertiesTarget =
   | { kind: 'area'; key: SelectionKey; path: (string | number)[] }
   /** A Data Flow open in the inspector (studio-ux2, L-data): opening one deselects the node, selecting a node closes it. */
   | { kind: 'flow'; id: string }
+  /** A template open in the inspector (studio-tpl-ux): opened from its row or its badge; selecting anything else closes it. */
+  | { kind: 'template'; id: string }
   /** Any other data source (an entity, an app topic or a model) open in the inspector the same way, so its fields stay reachable on a wide window. */
   | { kind: 'source'; id: string }
   /** A repeated piece's proposal (templates spec 5): open in the inspector while the Repeated Pieces level is, so the canvas can mark the piece beside it. */
@@ -81,6 +83,10 @@ export function useWorkspace2(active: boolean) {
   const [flowId, setFlowId] = useState<string>();
   /** The logic template open in the inspector. */
   const [logicId, setLogicId] = useState<string>();
+  /** The template open in the inspector. */
+  const [templateId, setTemplateId] = useState<string>();
+  /** The template whose Uses level the Components panel shows. */
+  const [usesId, setUsesId] = useState<string>();
   /** The page a logic template was opened from, for the editor's back button. */
   const [logicFrom, setLogicFrom] = useState<{ key: SelectionKey; title: string }>();
   const [revealKey, setRevealKey] = useState<SelectionKey>();
@@ -93,11 +99,12 @@ export function useWorkspace2(active: boolean) {
     const exists = surfaceState && (surfaceState.kind === 'page' ? document.pages : document.modals).some(item => item.id === surfaceState.id);
     return exists ? surfaceState : firstSurface(document);
   }, [document, surfaceState]);
-  const select = useCallback((next: SelectionKey | undefined) => { setSelectionState(next); setPanel(undefined); setFlowId(undefined); setLogicId(undefined); if (next) { setRevealKey(next); pickRepeat(undefined); } }, [pickRepeat]);
+  const select = useCallback((next: SelectionKey | undefined) => { setSelectionState(next); setPanel(undefined); setFlowId(undefined); setLogicId(undefined); setTemplateId(undefined); if (next) { setRevealKey(next); pickRepeat(undefined); } }, [pickRepeat]);
   /** Opens a Data Flow in the inspector; the node selection ends (spec "Selection"). */
-  const openFlow = useCallback((id: string | undefined) => { setSelectionState(undefined); setPanel(undefined); setLogicId(undefined); setFlowId(id); }, []);
+  const openFlow = useCallback((id: string | undefined) => { setSelectionState(undefined); setPanel(undefined); setLogicId(undefined); setTemplateId(undefined); setFlowId(id); }, []);
+  const openTemplate = useCallback((id: string | undefined) => { setSelectionState(undefined); setPanel(undefined); setLogicId(undefined); setFlowId(undefined); setTemplateId(id); }, []);
   /** Opens a logic template in the inspector; `from` names the page it was opened from, so the editor can offer a way back. */
-  const openLogic = useCallback((id: string | undefined, from?: { key: SelectionKey; title: string }) => { setSelectionState(undefined); setPanel(undefined); setFlowId(undefined); setLogicId(id); setLogicFrom(id ? from : undefined); }, []);
+  const openLogic = useCallback((id: string | undefined, from?: { key: SelectionKey; title: string }) => { setSelectionState(undefined); setPanel(undefined); setFlowId(undefined); setTemplateId(undefined); setLogicId(id); setLogicFrom(id ? from : undefined); }, []);
   // A change that removes the selected node (Undo of an add) ends the selection; any other change keeps it.
   useEffect(() => { setSelectionState(held => survivingSelection(held, index)); }, [index]);
   const changeSurface = useCallback((next: PreviewSurface) => { setSurfaceState(next); }, []);
@@ -109,11 +116,12 @@ export function useWorkspace2(active: boolean) {
   useEffect(() => { if (mark) { setSurfaceState({ kind: mark.surface.kind, id: mark.surface.id }); setRevealKey(mark.key); } }, [mark?.key, mark?.surface.id, mark?.surface.kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The edit question: every edit that reaches a saved component other places use is held until the person answers (see `useLinkedGate`).
-  const linked = useLinkedGate({ studio, document, index, selection, surface, select });
+  const linked = useLinkedGate({ studio, document, index, selection, surface, select, templateId });
   const gatedStudio = useMemo(() => ({ ...studio, apply: linked.apply }), [studio, linked.apply]);
 
   const target = useMemo<PropertiesTarget | undefined>(() => {
     if (panel) return { kind: panel };
+    if (templateId && document?.componentLibrary?.some(entry => entry.id === templateId)) return { kind: 'template', id: templateId };
     if (logicId && document?.logicLibrary?.some(entry => entry.id === logicId)) return { kind: 'logic', id: logicId };
     const open = flowId ? document?.dataSources.find(source => source.id === flowId) : undefined;
     if (open) return { kind: open.kind === 'model' && open.model === 'pipeline@1' ? 'flow' : 'source', id: open.id };
@@ -126,7 +134,7 @@ export function useWorkspace2(active: boolean) {
     if (entry.kind === 'local-tab') return { kind: 'area', key: selection, path: entry.path };
     if (entry.kind === 'chrome-group' || entry.kind === 'chrome-item') return { kind: 'header', key: selection };
     return undefined;
-  }, [panel, flowId, logicId, document, selection, index, repeats.selected, repeats.where]);
+  }, [panel, flowId, logicId, templateId, document, selection, index, repeats.selected, repeats.where]);
 
   // --- Autosave -----------------------------------------------------------------------------------------------
   const [failedFor, setFailedFor] = useState<CompositionDocument>();
@@ -259,7 +267,7 @@ export function useWorkspace2(active: boolean) {
   return {
     studio: gatedStudio, linked, document, previewDocument, lastGoodDocument, index, checks, problemCount,
     mode, setMode: changeMode, surface, setSurface: changeSurface,
-    repeats, selection, select, panel, setPanel, flowId, openFlow, logicId, logicFrom, openLogic, target, revealKey, alertPreview, setAlertPreview, statePreview, setStatePreview,
+    repeats, selection, select, panel, setPanel, flowId, openFlow, logicId, logicFrom, openLogic, templateId, openTemplate, usesId, setUsesId, target, revealKey, alertPreview, setAlertPreview, statePreview, setStatePreview,
     status, saveNow, persist, failedSave: failedFor !== undefined && failedFor === document, saveReason,
     retrySave: () => { setFailedFor(undefined); studio.setError(''); setSaveReason(''); },
     publication, publicationError, liveRevision, refreshPublication, publishedJson, phase, publishError, openPublish, closePublish, publish,

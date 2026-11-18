@@ -83,7 +83,7 @@ export function useRepeats(document: CompositionDocument | undefined): Repeats {
   }, [open, document, done]);
 
   const result = done?.value;
-  const selected = useMemo(() => result?.classes.find(item => item.id === chosen.id), [result, chosen.id]);
+  const selected = useMemo(() => result ? [...result.classes, ...result.tiles].find(item => item.id === chosen.id) : undefined, [result, chosen.id]);
   // A piece that is no longer there (saved, edited away) closes its proposal.
   useEffect(() => { if (chosen.id && fresh && !selected) setChosen({}); }, [chosen.id, fresh, selected]);
 

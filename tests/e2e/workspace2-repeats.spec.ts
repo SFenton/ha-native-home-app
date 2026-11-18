@@ -26,7 +26,8 @@ const drawn = (page: Page) => previewRoot(page).evaluate(element => { const copy
 async function openLevel(page: Page) {
   if (isPhone(page)) {
     await page.getByRole('button', { name: 'Project', exact: true }).click();
-    await page.getByTestId('repeated-pieces-row').click();
+    await page.getByTestId('templates-row').click();
+    await find(page).click();
   } else {
     await openLibrary(page, 'Components');
     await find(page).click();
@@ -133,7 +134,7 @@ test('Save as Template adds the template with its use count, removes the row, dr
   const saved = page.getByTestId('saved-row');
   await expect(saved).toHaveCount(1);
   await expect(saved).toContainText('Lamp Grid');
-  await expect(saved).toContainText('Used in 2 places');
+  await expect(saved.getByRole('button', { name: 'Lamp Grid, template, used in 2 places' })).toBeVisible();
   if (isPhone(page)) await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Undo' }).click();
   if (!isPhone(page)) await expect(page.getByTestId('saved-empty')).toBeVisible();
@@ -148,19 +149,21 @@ test('with nothing repeated the level shows the empty line', async ({ page, requ
   await openLevel(page);
   await expect(level(page).getByTestId('repeats-empty')).toBeVisible();
   await expect(level(page).getByTestId('repeats-empty')).toContainText('Nothing found');
-  await expect(level(page).getByTestId('repeats-empty')).toContainText('Nothing repeats yet. A piece of 3 or more parts that appears twice shows here.');
+  await expect(level(page).getByTestId('repeats-empty')).toContainText('Nothing repeats yet. A tile that appears twice, or a piece of 3 or more parts that appears twice, shows here.');
   await expect(level(page).getByTestId('repeats-summary')).toHaveText('0 found in 0 places');
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-repeats-empty`);
 });
 
-test('on a phone, Project > Repeated Pieces opens the list, and a row pushes the proposal with the page visible above the sheet', async ({ page, request }) => {
+test('on a phone, Project > Templates > Find Repeated Pieces opens the list, and a row pushes the proposal with the page visible above the sheet', async ({ page, request }) => {
   test.skip(!isPhone(page), 'The Project sheet is the phone layout');
   await seed(request, repeats.document);
   await openWorkspace(page);
   await page.getByRole('button', { name: 'Project', exact: true }).click();
-  await expect(page.getByTestId('repeated-pieces-row')).toHaveText('Repeated Pieces');
+  await expect(page.getByTestId('templates-row')).toHaveText('Templates');
   await snap(page, 'phone-repeats-project');
-  await page.getByTestId('repeated-pieces-row').click();
+  await page.getByTestId('templates-row').click();
+  await snap(page, 'phone-templates-page');
+  await find(page).click();
   const sheet = level(page);
   await expect(sheet.getByTestId('repeats-summary')).toHaveText('2 found in 5 places');
   await expect(sheet.getByTestId('repeats-list').getByRole('button')).toHaveCount(2);
@@ -184,7 +187,7 @@ test('the level, the checkboxes and the foot are named for assistive technology,
   await openWorkspace(page);
   await openList(page);
   await expect(page.getByRole(isPhone(page) ? 'dialog' : 'region', { name: 'Repeated Pieces' })).toBeVisible();
-  const list = level(page).getByRole('list', { name: 'Repeated pieces' });
+  const list = level(page).getByRole('list', { name: 'Groups' });
   await expect(list).toBeVisible();
   const first = list.getByRole('button').nth(0), second = list.getByRole('button').nth(1);
   await expect(first).toHaveAttribute('aria-label', 'Tile grid, 3 tiles. 3 places');
@@ -215,4 +218,18 @@ test('Choose Fields… on a template\'s field opens the bar and a box on every r
   await expect(panel(page).getByTestId('choose-bar')).toBeVisible();
   await expect(panel(page).getByRole('checkbox', { name: 'Set Title per place' })).toBeVisible();
   await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-choose-fields`);
+});
+
+test('Single Tiles lists a tile that appears twice, apart from Groups, and a row opens its proposal', async ({ page, request }) => {
+  await seed(request, lamps.document);
+  await openWorkspace(page);
+  await openList(page);
+  const tiles = level(page).getByTestId('repeats-tiles');
+  await expect(level(page).getByRole('region', { name: 'Single Tiles' })).toBeVisible();
+  await expect(level(page).getByRole('region', { name: 'Groups' })).toBeVisible();
+  const door = tiles.getByRole('button', { name: /^Door tile.*2 places$/ });
+  await expect(door).toBeVisible();
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-repeats-single-tiles`);
+  await door.click();
+  await expect(proposal(page)).toBeVisible();
 });

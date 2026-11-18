@@ -46,9 +46,11 @@ export const linkedStatus = {
  * person has not already said Update Template for this place, it holds the edit, writes nothing and opens the question. Undo and redo never come
  * through here: they restore documents.
  *
- * The session belongs to one place and lasts while the selection is that place or anything inside it.
+ * The session belongs to one place and lasts while the selection is that place or anything inside it. The template's own editor (`templateId`) is a session
+ * of its own: a person who opened the template to change it has said "everywhere" already, so its edits go through without a question until the editor closes.
  */
-export function useLinkedGate({ studio, document, index, selection, surface, select }: {
+export function useLinkedGate({ studio, document, index, selection, surface, select, templateId }: {
+  /** The template open in the inspector, if any. */ templateId?: string;
   studio: Studio; document: CompositionDocument | undefined; index: DocumentIndex | undefined; selection: SelectionKey | undefined;
   surface: PreviewSurface | undefined; select: (key: SelectionKey | undefined) => void;
 }) {
@@ -57,11 +59,11 @@ export function useLinkedGate({ studio, document, index, selection, surface, sel
   const [session, setSession] = useState<LinkedSession>();
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState<SaveRequest>();
-  const latest = useRef({ studio, document, selection, session, held });
-  latest.current = { studio, document, selection, session, held };
+  const latest = useRef({ studio, document, selection, session, held, templateId });
+  latest.current = { studio, document, selection, session, held, templateId };
 
   const apply = useCallback((next: CompositionDocument, group?: string) => {
-    const { studio: current, selection: selected, session: open } = latest.current;
+    const { studio: current, selection: selected, session: open, templateId: editing } = latest.current;
     const before = current.latestDocument() ?? current.document;
     const touched = before ? touchedEntries(before, next) : [];
     if (!before || !touched.length) { current.apply(next, group); return; }
@@ -70,6 +72,7 @@ export function useLinkedGate({ studio, document, index, selection, surface, sel
       return;
     }
     const entryId = touched[0];
+    if (editing === entryId) { current.apply(next, group); return; }
     const uses = componentReferences(before).filter(use => use.ref.componentId === entryId);
     // A component with no other use asks nothing (D7).
     if (uses.length < 2) { current.apply(next, group); return; }
