@@ -20,7 +20,7 @@ export type AddChoice = { made: Made; type: string };
 
 export const lucide: Record<string, string> = { power: 'bolt', 'arrow-right-circle': 'play', 'rows-3': 'layers', 'layout-list': 'list', repeat: 'layers', shapes: 'sparkles', sparkles: 'sparkles', chart: 'activity', gauge: 'circlegauge', 'layout-grid': 'grid', 'gallery-horizontal': 'layers', list: 'list', 'rectangle-horizontal': 'plus', type: 'message', settings: 'settings', 'toggle-right': 'toggle' };
 // The Add glyphs of the gauge parts (`sh.dial@1`, `sh.arc-track@1`).
-Object.assign(lucide, { dial: 'circlegauge', 'arc-track': 'sunrise' });
+Object.assign(lucide, { dial: 'circlegauge', 'dial-control': 'circlegauge', 'arc-track': 'sunrise' });
 
 /** Tile types the destination accepts, most recently used first (types it cannot hold are left out, not disabled). */
 export function offeredTypes(document: CompositionDocument, destination: Destination, used: readonly string[]): TileType[] {

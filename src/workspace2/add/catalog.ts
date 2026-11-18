@@ -3,6 +3,7 @@ import { createId as uid } from '../../shared/ids';
 import { builtInStyles, type StateStyleDefinition } from '../../shared/composition/state-styles';
 import { newStateTile } from '../../shared/composition/state-style-library';
 import { newRepeat } from './repeat';
+import { newDialControl } from '../../shared/composition/dial-control-edit';
 
 /** An SF Symbol reference as the document stores it. */
 export const symbol = (name: string) => ({ type: 'sf-symbol' as const, name, rendering: 'canonical' as const, unavailable: 'fallback' as const });
@@ -114,6 +115,8 @@ const entries: readonly Entry[] = [
     sweep: { start: 145, length: 250 }, aspect: 1.4, centerY: 0.56,
     ticks: { count: 25, inner: 0.78, outer: 0.92, width: 1.4, ink: { type: 'rgba', red: 142, green: 142, blue: 147, alpha: 0.6 } },
     pointer: { kind: 'tick', value: { type: 'literal', value: 0.5 }, inner: 0.7, outer: 0.98, width: 3, ink: { type: 'solid-rgb', red: 255, green: 159, blue: 10 } } }, a11y: { element: 'hidden' } } }) },
+  // A control the person drags (`sh.dial-control@1`): it starts as One Value, one stopper with a call that names nothing yet; Start From in its inspector picks the others.
+  { type: 'dial-control', name: 'Dial Control', glyph: 'dial', make: () => ({ sources: [], node: newDialControl('one', base('dial-control', 'New dial control')) as unknown as CompositionNode }) },
   { type: 'arc-track', name: 'Arc', glyph: 'arc-track', make: () => ({ sources: [], node: { ...base('arc', 'New arc'), type: 'arc-track', props: {
     curve: { from: [8, 40], control: [50, 4], to: [92, 40] }, box: [100, 48], maxWidth: 200, ink: { type: 'rgba', red: 142, green: 142, blue: 147, alpha: 0.8 }, width: 2, dash: [3, 4],
     progress: { type: 'literal', value: 0.5 }, marker: { size: 10, ink: { type: 'solid-rgb', red: 255, green: 204, blue: 0 } } }, a11y: { element: 'hidden' } } }) },
@@ -183,7 +186,7 @@ export const paletteGroups: Record<PaletteKind, readonly { id: string; title: st
   components: [
     { id: 'layout', title: 'Layout', keys: ['section', 'tile-grid', 'status-rail', 'local-tabs', 'overlay', 'stack', 'repeat'] },
     { id: 'tiles', title: 'Tiles', keys: ['action-tile', 'navigation-tile', 'state-tile'] },
-    { id: 'content', title: 'Content', keys: ['row', 'text', 'readout', 'map', 'symbol', 'shape', 'chart', 'linear-gauge', 'dial', 'arc-track'] },
+    { id: 'content', title: 'Content', keys: ['row', 'text', 'readout', 'map', 'symbol', 'shape', 'chart', 'linear-gauge', 'dial', 'dial-control', 'arc-track'] },
   ],
   controls: [{ id: 'controls', title: 'Controls', keys: ['bound-control', 'command', 'choice', 'primary-button', 'settings-link'] }],
 };

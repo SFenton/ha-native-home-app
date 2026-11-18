@@ -1,5 +1,34 @@
 Demo Room 1
-Thermostat dial · Demo Room 1
+Dial Control · Demo Room 1
+Start From
+Preset
+Thermostat
+Thermostat
+Thermostat
+climate.thermostat_contact_sensors_demo_room_1_virtual_thermostat
+Range
+Lowest
+Highest
+Step
+Unit
+°F
+°C
+Size
+Page
+Sheet
+Compact
+Stoppers
+Heat to and Cool to
+Set by the thermostat
+Between Stoppers
+Rule
+Set by the thermostat
+When Released
+Sends
+Set by the thermostat
+Middle
+Large Value
+Set by the thermostat
 Title
 Width
 Automatic
@@ -19,7 +48,36 @@ Only show when: Always.
 
 [advanced]
 Demo Room 1
-Thermostat dial · Demo Room 1
+Dial Control · Demo Room 1
+Start From
+Preset
+Thermostat
+Thermostat
+Thermostat
+climate.thermostat_contact_sensors_demo_room_1_virtual_thermostat
+Range
+Lowest
+Highest
+Step
+Unit
+°F
+°C
+Size
+Page
+Sheet
+Compact
+Stoppers
+Heat to and Cool to
+Set by the thermostat
+Between Stoppers
+Rule
+Set by the thermostat
+When Released
+Sends
+Set by the thermostat
+Middle
+Large Value
+Set by the thermostat
 Title
 Width
 Automatic

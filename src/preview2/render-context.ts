@@ -26,7 +26,7 @@ export interface RenderContext {
   /** The current value of a local field: the overlay's write, else its initial value. */
   local(stateId: string): LocalValue | undefined;
   /** Runs an action in Use mode; a no-op in Edit. `control` is the new value of the control that sent it; `scope` is the cell of a repeat the action is in. */
-  run(action: CompositionActionSlot, control?: Json, scope?: ItemScope): void;
+  run(action: CompositionActionSlot, control?: Json, scope?: ItemScope, controlValues?: Record<string, Json>): void;
   store: SelectionStore;
   /** The document's state style library, which `state-tile` nodes apply by id. */
   stateStyles?: StateStyleLibrary;

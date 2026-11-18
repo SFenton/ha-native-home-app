@@ -1,0 +1,78 @@
+Study humidity
+Dial Control · Canvas
+Start From
+Preset
+Range
+Range
+Lowest
+Highest
+Step
+Size
+Page
+Sheet
+Compact
+Stoppers
+Low
+35
+High
+65
+Between Stoppers
+Rule
+Stay Apart
+Gap
+Use a Value…
+A stopper stops this far from the other. Reported values that are closer are drawn as they are.
+When Released
+Sends
+One Call for the Dial
+Call
+input_number.set_value
+Reading, Bands, Ticks
+Reading
+None
+Add Band
+Ticks
+Every
+Every
+In value units. At most 60 dots.
+Middle
+Top Line
+None
+Large Value
+Low
+Unit
+Decimals
+Caption
+Stopper Values
+States
+Dimmed When
+Never
+Enabled When
+Always
+Unavailable Text
+Failure Text
+{value} is the number that was refused.
+Title
+Spoken name
+Spoken value
+None
+Width
+Automatic
+Half
+Full
+Behavior
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Use a Value for Gap
+Add Reading
+Add Top Line
+Dimmed When: Never.
+Enabled When: Always.
+Spoken name value: Fixed
+Add Spoken value
+Only show when: Always.

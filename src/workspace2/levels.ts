@@ -227,7 +227,7 @@ export const typeGlyphs: Readonly<Record<string, string>> = {
   'climate-control': 'Thermometer', 'weather-panel': 'CloudSun', 'alarm-panel': 'ShieldAlert', 'door-tile': 'DoorClosed', 'camera-tile': 'Cctv', 'camera-viewer': 'Cctv',
   'camera-video': 'Video', 'camera-controls': 'Video', 'remote-control': 'Gamepad2', 'bedroom-control': 'BedDouble', 'account-header': 'CircleUser', form: 'ClipboardList',
   'pinned-actions': 'Pin', 'recipe-part': 'Puzzle', 'bootstrap-message': 'MessageSquare', 'notification-permission-banner': 'BellRing',
-  dial: 'CircleGauge', 'arc-track': 'Spline',
+  dial: 'CircleGauge', 'dial-control': 'CircleGauge', 'arc-track': 'Spline',
 };
 /** The glyph name of a type: its table entry, else `Component`. */
 export const typeGlyph = (type: string): string => typeGlyphs[type] ?? 'Component';

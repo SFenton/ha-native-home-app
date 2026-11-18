@@ -1,0 +1,27 @@
+/* The dial control (`sh.dial-control@1`): the thermostat's ring made generic. Under `.sh-preview2` like the rest; colours come from the document's inks. */
+.sh-preview2 {
+  .sh-dc { position: relative; display: grid; justify-items: center; padding: 8px 0; margin: 0 auto; width: var(--dc-px); max-width: 100%; }
+  .sh-dc svg { display: block; overflow: visible; max-width: 100%; height: auto; }
+  .sh-dc-track { stroke: color-mix(in srgb, var(--ink) 43%, transparent); }
+  @media (prefers-contrast: more) { .sh-dc-track { stroke: color-mix(in srgb, var(--ink) 60%, transparent); } }
+  .sh-dc[data-dimmed] svg { opacity: .45; }
+  .sh-dc[data-state=unavailable] svg { opacity: .45; }
+  .sh-dc-tick { fill: var(--ink); } .sh-dc-tick[data-on-ink] { fill: #fff; }
+  .sh-dc-knob { fill: #fff; filter: drop-shadow(0 4px 3px rgba(0, 0, 0, .2)); }
+  .sh-dc-reading { stroke: #141414; }
+  .sh-dc-stop { stroke: var(--ink); stroke-linecap: butt; animation: sh-dc-fade .15s ease-out; }
+  @keyframes sh-dc-fade { from { opacity: 0; } to { opacity: 1; } }
+  .sh-dc-readout { position: absolute; left: 0; right: 0; top: 8px; height: var(--dc-px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; pointer-events: none; text-align: center; }
+  .sh-dc-readout small { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+  .sh-dc-readout strong { font: 200 72px/1 -apple-system, system-ui, sans-serif; }
+  .sh-dc-readout sup { font-size: 20px; font-weight: 600; vertical-align: top; margin-left: 2px; }
+  .sh-dc-readout span { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .sh-dc-compact .sh-dc-readout strong { font-size: 48px; }
+  /* A handle's target is 64 pt at every size, centred on the knob. */
+  .sh-dc-handle { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; margin-top: calc(-32px + 8px); border-radius: 50%; touch-action: none; outline: none; }
+  .sh-dc[data-use] .sh-dc-handle { cursor: grab; }
+  .sh-dc:not([data-use]) .sh-dc-handle { pointer-events: none; }
+  .sh-dc-handle:focus-visible { outline: 3px solid var(--action); outline-offset: -8px; }
+  .sh-dc-failure { margin: 4px 0 0; font-size: 13px; color: var(--danger); text-align: center; }
+  @media (prefers-reduced-motion: reduce) { .sh-dc-stop { animation: none; } }
+}

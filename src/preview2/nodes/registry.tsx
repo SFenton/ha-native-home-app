@@ -7,6 +7,7 @@ import { ShapeNode, StackNode, SymbolPartNode } from './parts';
 import { ChartNode } from './chart';
 import { GaugeNode } from './gauge';
 import { ArcTrackNode, DialNode } from './dial';
+import { DialControlNode } from './dial-control';
 import { LocalTabsNode, PagedRowNode, RoomSectionNode, SectionNode, StatusRailNode, TileGridNode } from './layout';
 import { ClimateControlNode } from './climate';
 import { CustomLightControlNode } from './custom-lights';
@@ -38,7 +39,7 @@ export const registry: Registry = {
   'weather-panel': WeatherPanelNode, 'alarm-panel': AlarmPanelNode, 'door-tile': DoorTileNode, 'room-navigation-grid': RoomNavigationGridNode, 'room-device-control': RoomDeviceControlNode,
   'bedroom-control': BedroomControlNode, 'camera-video': CameraVideoNode, 'camera-controls': CameraControlsNode, 'camera-viewer': CameraViewerNode, 'row-collection': RowCollectionNode,
   stack: StackNode, shape: ShapeNode, symbol: SymbolPartNode, repeat: RepeatNode,
-  chart: ChartNode, 'linear-gauge': GaugeNode, dial: DialNode, 'arc-track': ArcTrackNode, avatar: AvatarNode,
+  chart: ChartNode, 'linear-gauge': GaugeNode, dial: DialNode, 'dial-control': DialControlNode, 'arc-track': ArcTrackNode, avatar: AvatarNode,
   collection: CollectionNode, form: FormNode, 'recipe-part': RecipePartNode, 'pinned-actions': PinnedActionsNode, 'bootstrap-message': BootstrapMessageNode,
 };
 /** The types the preview draws. */

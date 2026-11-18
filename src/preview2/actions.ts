@@ -27,6 +27,8 @@ export interface ActionInput {
   overlay: Overlay;
   /** The new value of the control that sent the action. */
   control?: Json;
+  /** The new value of each stopper of a dial control, by id (`control` with a `stopper`). */
+  controlValues?: Record<string, Json>;
   /** The person already answered the alert: plan the action itself. */
   confirmed?: boolean;
   /** The cell of a repeat the action is in: `item` and `index` read it. */
@@ -55,6 +57,7 @@ const summary = (call: ResolvedCall, input: ActionInput) => callSummary(call, in
  */
 export function planAction(slot: CompositionActionSlot, input: ActionInput): ActionPlan {
   const env = createEnvironment(input.document, input.house, input.overlay, input.control);
+  if (input.controlValues) env.controlValues = input.controlValues;
   if (input.scope) { env.item = input.scope.item; env.index = input.scope.index; }
   // An action chosen by rule runs the case that holds now; a rule that is stalled, or whose answer is `none`, runs nothing (`sh.action-rules@1`).
   const action = resolveAction(slot, env);

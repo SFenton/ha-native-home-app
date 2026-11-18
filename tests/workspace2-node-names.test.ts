@@ -19,7 +19,7 @@ describe('node display names', () => {
   });
 
   it('names a climate control by its kind and falls back to the type in words', () => {
-    expect(typeName({ type: 'climate-control', props: { kind: 'dial' } })).toBe('Thermostat dial');
+    expect(typeName({ type: 'climate-control', props: { kind: 'dial' } })).toBe('Dial Control');
     expect(typeName({ type: 'climate-control', props: { kind: 'nonsense' } })).toBe('Climate');
     expect(typeName({ type: 'vacuum-control', props: {} })).toBe('Vacuum control');
     expect(typeName({ type: 'status-chip' })).toBe('Status chip');

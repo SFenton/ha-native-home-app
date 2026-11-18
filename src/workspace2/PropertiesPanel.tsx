@@ -52,6 +52,8 @@ import RepeatProposal from './repeats/RepeatProposal';
 import { pieceText, repeatedText } from './repeats/repeatWords';
 import MapOrientation from './controls/MapOrientation';
 import MapButtons from './controls/MapButtons';
+import { DialControlInspector, ThermostatInspector } from './dial/DialControlInspector';
+import { isThermostatDial } from '../shared/composition/dial-control-edit';
 
 /** The header every properties surface has: icon, title, one line of context, tags, More, Close (spec 5.2). */
 function Header({ icon, title, line, tags, more, onClose, grab }: { icon: string; title: string; line: string; tags?: ReactNode; more?: ReactNode; onClose: () => void; grab?: boolean }) {
@@ -101,7 +103,11 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
   // A map draws its Orientation and Map Buttons groups itself: `locate` follows the buttons and `controls` is the list they edit.
   const isMap = nodeType === 'vacuum-control' && (node as { props?: { primitive?: { kind?: string } } }).props?.primitive?.kind === 'map';
   const drawn = (at: EditorPath) => { const rel = at.slice(path.length).join('.'); return (nodeType === 'local-tabs' && (rel === 'tabs' || rel === 'blocks' || rel === 'props.pinned' || rel.startsWith('props.tabBar'))) || (nodeType === 'overlay' && rel.startsWith('props.anchors')) || (nodeType === 'state-tile' && (rel === 'props.progress' || rel === 'props.discs' || rel === 'layout.span' || rel.startsWith('props.swipe'))) || ((nodeType === 'light-group-tile' || nodeType === 'room-overview-tile') && rel.startsWith('props.words')) || (nodeType === 'light-group-tile' && rel.startsWith('props.swipe')) || (nodeType === 'tile-grid' && rel.startsWith('props.groups')) || (nodeType === 'status-pill' && rel === 'props.tone') || (isMap && (rel === 'props.primitive.controls' || rel === 'props.primitive.locate')) || (nodeType === 'bound-control' && (rel === 'props.options' || rel === 'props.optionsFrom' || rel.startsWith('props.optionsFrom.'))); };
-  const hidden = (at: EditorPath) => notChildren(at) || drawn(at) || !boundControlShows(document, path, at) || (at.at(-1) === 'whenUnknown' && !('visibleWhen' in node && node.visibleWhen))
+  // A dial control draws its own groups (stoppers, between, when released...); a thermostat dial draws its range, and the model owns the rest.
+  const dialRel = (at: EditorPath) => at.slice(path.length).join('.');
+  const isDialControl = nodeType === 'dial-control', isThermostat = isThermostatDial(node as never);
+  const dialDrawn = (at: EditorPath) => (isDialControl && /^(props|action|enabledWhen)(\.|$)/.test(dialRel(at))) || (isThermostat && /^props\.(dial|kind)(\.|$)/.test(dialRel(at)));
+  const hidden = (at: EditorPath) => notChildren(at) || drawn(at) || dialDrawn(at) || !boundControlShows(document, path, at) || (at.at(-1) === 'whenUnknown' && !('visibleWhen' in node && node.visibleWhen))
     || (placePath !== undefined && at.length > path.length && at[path.length] === 'layout');
   // A row of a template that is set per place carries its line, and an entity or state row that is not carries "Set Per Place" (Edit); in Use the line is a caption.
   const perPlace = template ? (rel: EditorPath) => {
@@ -114,6 +120,8 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
     return choosing ? <ChooseRow key={field} choose={choose} rel={rel} below={perPlace?.(rel)}>{group}</ChooseRow> : <>{group}{perPlace?.(rel)}</>;
   };
   const rows = <>
+    {isDialControl && <DialControlInspector path={path}/>}
+    {isThermostat && <ThermostatInspector path={path}/>}
     <ObjectRows path={path} owner={nodeType} skip={hidden} overrides={overrides} below={perPlace} choose={choosing ? choose : undefined} groups={nodeType === 'state-tile' ? ['what', 'look', 'states', 'behaviour'] : isList(nodeType) || nodeType === 'repeat' ? ['what', 'look', 'behaviour', 'states'] : ['what', 'look', 'behaviour']}
       extra={nodeType === 'state-tile' ? { what: <>{own('props/progress', <ProgressRow path={path}/>)}{own('props/discs', <ButtonsGroup path={path}/>)}</>, look: own('layout/span', <WidthRow path={path}/>), states: <StatesGroup path={path}/>, behaviour: <><StateTapRow path={path}/>{own('props/swipe', <SwipeRow path={path}/>)}</> } : nodeType === 'light-group-tile' ? { behaviour: own('props/swipe', <SwipeRow path={path}/>), what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'room-overview-tile' ? { what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'tile-grid' ? { look: own('props/groups', <GroupsRow path={path}/>) } : nodeType === 'status-pill' ? { what: own('props/tone', <ToneField path={path}/>) } : nodeType === 'bound-control' && (node as { props?: { kind?: string } }).props?.kind === 'choice' ? { what: own('props/options', <ChoicesGroup path={path}/>) } : nodeType === 'local-tabs' ? { what: <><TabsList path={path}/>{own('props/tabBar', <TabBarGroup path={path}/>)}</> } : nodeType === 'overlay' ? { what: <OverlayPosition path={path}/> } : isList(nodeType) ? { states: <><ShowStateRow path={path}/><FixedTextsNote path={path}/></> } : nodeType === 'repeat' ? { states: <ShowStateRow path={path}/> } : undefined}/>
     {isMap && <><MapOrientation path={path}/><MapButtons path={path}/></>}

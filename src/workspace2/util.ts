@@ -32,7 +32,7 @@ export const typeNames: Record<string, string> = {
   'action-tile': 'Action tile', 'navigation-tile': 'Navigation tile', 'status-chip': 'Status chip', 'status-rail': 'Status rail', section: 'Section',
   'tile-grid': 'Tile grid', row: 'Row', 'primary-button': 'Button', text: 'Text', 'camera-tile': 'Camera tile', 'climate-control': 'Climate',
   'weather-panel': 'Weather', stack: 'Stack', repeat: 'Repeat', shape: 'Shape', symbol: 'Symbol', chart: 'Chart', 'linear-gauge': 'Gauge', 'room-card': 'Room card', 'settings-link': 'Settings link', 'account-header': 'Account header', 'local-tabs': 'Tabs', overlay: 'Overlay',
-  dial: 'Dial', 'arc-track': 'Arc',
+  dial: 'Dial', 'arc-track': 'Arc', 'dial-control': 'Dial Control',
 };
 const plainType = (type: string) => type.replace(/-/g, ' ').replace(/^\w/, letter => letter.toUpperCase());
 
@@ -47,7 +47,7 @@ export const primitiveNames: Record<string, Record<string, string>> = {
     'clear-area': 'Clear area', 'area-editor': 'Area editor',
   },
   'climate-control': {
-    dial: 'Thermostat dial', toggle: 'Climate switch', 'explicit-switch': 'Climate switch', check: 'Climate check', mode: 'Mode picker', fan: 'Fan picker', preset: 'Preset picker',
+    dial: 'Dial Control', toggle: 'Climate switch', 'explicit-switch': 'Climate switch', check: 'Climate check', mode: 'Mode picker', fan: 'Fan picker', preset: 'Preset picker',
     options: 'Climate options', hub: 'Climate hub', notice: 'Climate notice', status: 'Climate status', link: 'Climate link', 'room-tile': 'Room climate tile',
   },
 };

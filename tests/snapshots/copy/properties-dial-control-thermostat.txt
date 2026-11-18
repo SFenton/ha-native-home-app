@@ -1,0 +1,47 @@
+Study humidity
+Dial Control · Canvas
+Start From
+Preset
+Thermostat
+Thermostat
+Thermostat
+climate.demo_hall
+Range
+Lowest
+Highest
+Step
+Unit
+°F
+°C
+Size
+Page
+Sheet
+Compact
+Stoppers
+Heat to and Cool to
+Set by the thermostat
+Between Stoppers
+Rule
+Set by the thermostat
+When Released
+Sends
+Set by the thermostat
+Middle
+Large Value
+Set by the thermostat
+Title
+Width
+Automatic
+Half
+Full
+Behavior
+When tapped
+Nothing
+Only show when
+Always
+Advanced
+
+[names]
+More
+Close
+Only show when: Always.
