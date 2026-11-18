@@ -18232,6 +18232,339 @@
         "code": "invalid_value",
         "pointer": "/document/pages/2/components/0/props/textAt/offset"
       }
+    },
+    {
+      "file": "reject/pending-count-operand-doors-line.json",
+      "outcome": "reject",
+      "note": "A sentence that follows how many doors and windows are open: \"All closed\", \"One open\", or the number. The count stands in each case, one node plus its tests every time.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-count-operand-shown-when-any.json",
+      "outcome": "reject",
+      "note": "A node shown while at least one is open: the count above zero, as a condition.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-count-operand-numeric-tests.json",
+      "outcome": "reject",
+      "note": "Entries may test a number: how many batteries are below 20, drawn as text.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-count-operand-attribute-and-all.json",
+      "outcome": "reject",
+      "note": "An entry tests an attribute, or a few things at once: a fan on and in its auto preset, a sensor above a level, a door open.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-count-operand-viewer-filter.json",
+      "outcome": "reject",
+      "note": "A count that follows who is looking: each person's own entries, and one entry for everyone (no viewer). Person entity ids are person.*.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-count-operand-sum-of-counts.json",
+      "outcome": "reject",
+      "note": "An app icon's number: a sum of two counts, each over its own list, so a few kinds of thing add up.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-count-operand-thirty-two.json",
+      "outcome": "reject",
+      "note": "The most entries: 32 entities in one operand, 33 nodes of the 64 an expression may hold (the math form costs four nodes an entity and ends at three).",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/count-operand-empty.json",
+      "outcome": "reject",
+      "note": "A count has at least one entry.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/value/value/of"
+      }
+    },
+    {
+      "file": "reject/count-operand-over-32.json",
+      "outcome": "reject",
+      "note": "A count has at most 32 entries.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/value/value/of"
+      }
+    },
+    {
+      "file": "reject/count-operand-over-budget.json",
+      "outcome": "reject",
+      "note": "The 64-node limit still holds: 32 entries whose tests each hold an operand are 97 nodes.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/31/test/above"
+      }
+    },
+    {
+      "file": "reject/count-operand-no-of.json",
+      "outcome": "reject",
+      "note": "The entries are required.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/value/value/of"
+      }
+    },
+    {
+      "file": "reject/count-operand-entry-without-test.json",
+      "outcome": "reject",
+      "note": "Every entry has a test.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/test"
+      }
+    },
+    {
+      "file": "reject/count-operand-test-not-a-condition.json",
+      "outcome": "reject",
+      "note": "A test is a condition: an operand is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/test/type"
+      }
+    },
+    {
+      "file": "reject/count-operand-unknown-source.json",
+      "outcome": "reject",
+      "note": "A test names a declared source.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_reference",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/test/sourceId"
+      }
+    },
+    {
+      "file": "reject/count-operand-unknown-entry-field.json",
+      "outcome": "reject",
+      "note": "An entry has a test and a viewer, nothing else.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/weight"
+      }
+    },
+    {
+      "file": "reject/count-operand-unknown-field.json",
+      "outcome": "reject",
+      "note": "The count itself has `of` only: a viewer stands on an entry.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/value/value/viewer"
+      }
+    },
+    {
+      "file": "reject/count-operand-viewer-not-a-person.json",
+      "outcome": "reject",
+      "note": "A viewer filter lists person entities.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/viewer/personEntityIds/0"
+      }
+    },
+    {
+      "file": "reject/count-operand-viewer-empty.json",
+      "outcome": "reject",
+      "note": "A viewer filter lists at least one person.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/viewer/personEntityIds"
+      }
+    },
+    {
+      "file": "reject/count-operand-viewer-unknown-field.json",
+      "outcome": "reject",
+      "note": "A viewer filter lists person entities, not user ids.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/viewer/userIds"
+      }
+    },
+    {
+      "file": "reject/count-operand-compared-as-text.json",
+      "outcome": "reject",
+      "note": "A count is a number: comparing it as text is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/7",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/pages/2/components/0/visibleWhen/right"
+      }
+    },
+    {
+      "file": "reject/count-operand-test-too-deep.json",
+      "outcome": "reject",
+      "note": "A test is a condition with the rule limit of six levels: seven nested nots are refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/props/value/value/of/0/test/of/of/of/of/of/of"
+      }
+    },
+    {
+      "file": "reject/count-operand-stray-id.json",
+      "outcome": "reject",
+      "note": "An operand has no id: a stray one is an unknown field, not the profile count node.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/value/value/id"
+      }
+    },
+    {
+      "file": "reject/count-operand-profile-node-is-not-the-operand.json",
+      "outcome": "reject",
+      "note": "A `count` node (an id, a layout) is the unsupported profile count, `sh.profile-count@1`: the name is shared, so the record with an id and no `of` is the node.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unsupported_capability",
+        "pointer": "/document/pages/2/components/0",
+        "capability": "sh.profile-count@1"
+      }
+    },
+    {
+      "file": "reject/count-operand-in-a-flow.json",
+      "outcome": "reject",
+      "note": "A flow reads no document source: it runs on what it was given, so a count is refused there.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.count@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/dataSources/9/inputs/request/value"
+      }
     }
   ]
 }

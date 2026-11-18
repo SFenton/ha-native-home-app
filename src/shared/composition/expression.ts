@@ -25,6 +25,10 @@ export const parameterName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,31}$/);
 export const MAX_CONDITION_NODES = 32;
 export const MAX_CONDITION_DEPTH = 6;
 export const MAX_RULE_CASES = 16;
+/** The most entries a `count` operand tests (`sh.count@1`). One test each, so a full count is 33 nodes of the 64 an expression may hold. */
+export const MAX_COUNT_ENTRIES = 32;
+/** A `person.*` entity id, the form a `count` entry's viewer filter lists (`sh.count@1`). */
+export const PERSON_ENTITY_ID = /^person\.[a-z0-9_]+$/;
 export const whenUnknownPolicies = ['show', 'hide', 'keep'] as const;
 /** What `enabledWhen` does while its condition cannot be answered (`sh.enabled-when@1`): enabled, disabled, or keep what it was. */
 export const enabledUnknownPolicies = ['enabled', 'disabled', 'keep'] as const;
@@ -65,6 +69,13 @@ export const mathArity: Record<typeof mathOperations[number], [number, number]> 
 
 // MARK: Types
 
+/**
+ * One entry of a `count` operand (`sh.count@1`): a condition over one or more entities' state or attributes, counted once when it holds, and an optional
+ * viewer filter. With `viewer`, the entry is considered only while the signed-in person is one of the listed `person.*` entities, so one list can give
+ * each person a different count.
+ */
+export type CountEntry = { test: Predicate; viewer?: { personEntityIds: string[] } };
+
 export type Operand =
   | { type: 'literal'; value: Json }
   | { type: 'read'; from: { type: 'source'; sourceId: string; path: string[] }; as: 'string' | 'number' | 'boolean' | 'entity-id'; missing: 'unavailable' }
@@ -81,6 +92,12 @@ export type Operand =
   | { type: 'list-count'; from: { type: 'source'; sourceId: string; path: string[] } }
   /** Whether the list attribute of an `ha-entity` source holds an item equal to `value` (`sh.list-read@1`): yes or no. */
   | { type: 'list-includes'; from: { type: 'source'; sourceId: string; path: string[] }; value: Operand }
+  /**
+   * How many of its entries' conditions hold (`sh.count@1`): a number from 0 to the number of entries, evaluated once. It costs one node plus the nodes of
+   * its tests, so 32 entities is 33 nodes. An entry that cannot be answered is not counted; the count is itself unavailable (or loading) only when every
+   * entry in play cannot be answered. Never inside a flow.
+   */
+  | { type: 'count'; of: CountEntry[] }
   | { type: 'map'; of: Operand; cases: { equals: string | number | boolean; then: Operand }[]; otherwise: Operand }
   | { type: 'math'; op: typeof mathOperations[number]; args: Operand[] }
   | { type: 'object'; fields: Record<string, Operand> }
@@ -134,6 +151,13 @@ export const operandBase: z.ZodType<Operand> = z.lazy(() => z.discriminatedUnion
   object({ type: z.literal('last-changed'), sourceId: id }),
   object({ type: z.literal('list-count'), from: object({ type: z.literal('source'), sourceId: id, path: sourcePath }) }),
   object({ type: z.literal('list-includes'), from: object({ type: z.literal('source'), sourceId: id, path: sourcePath }), value: operandBase }),
+  object({
+    type: z.literal('count'),
+    of: z.array(object({
+      test: predicateBase,
+      viewer: object({ personEntityIds: z.array(z.string().min(1).max(255)).min(1).max(MAX_COUNT_ENTRIES) }).optional(),
+    })).min(1).max(MAX_COUNT_ENTRIES),
+  }),
   object({
     type: z.literal('map'), of: operandBase,
     cases: z.array(object({ equals: z.union([z.string(), z.number(), z.boolean()]), then: operandBase })).max(32),
@@ -320,6 +344,23 @@ class Checker implements ExpressionFacts {
           if (operandKind(value.value) === 'structure') this.add('binding_type', at('value'));
         }
         break;
+      case 'count': {
+        this.needs.add('count');
+        // The tests read sources of the document, which a flow does not have: its reads are its own.
+        if (this.flow) this.add('invalid_combination', pointer);
+        if (!value.of.length || value.of.length > MAX_COUNT_ENTRIES) this.add('limit_exceeded', at('of'));
+        const outer = this.conditionBudget;
+        value.of.forEach((entry, index) => {
+          // Each test has the condition budget a rule's case has.
+          this.conditionBudget = MAX_CONDITION_NODES;
+          this.predicate(entry.test, at('of', index, 'test'), depth + 1, 1);
+          entry.viewer?.personEntityIds.forEach((person, slot) => {
+            if (!PERSON_ENTITY_ID.test(person)) this.add('invalid_value', at('of', index, 'viewer', 'personEntityIds', slot));
+          });
+        });
+        this.conditionBudget = outer;
+        break;
+      }
       case 'map':
         this.operand(value.of, at('of'), depth + 1);
         this.operand(value.otherwise, at('otherwise'), depth + 1);
@@ -481,7 +522,7 @@ export function operandKind(value: Operand): 'string' | 'number' | 'boolean' | '
     case 'read': return value.as === 'entity-id' ? 'string' : value.as;
     case 'viewer': return value.field === 'isAdmin' ? 'boolean' : 'string';
     case 'format': case 'clock': case 'raw-state': case 'last-changed': return 'string';
-    case 'math': case 'date': case 'list-count': case 'index': return 'number';
+    case 'math': case 'date': case 'list-count': case 'count': case 'index': return 'number';
     case 'list-includes': return 'boolean';
     case 'object': case 'list': return 'structure';
     case 'map': return operandKind(value.otherwise);

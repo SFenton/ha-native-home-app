@@ -205,7 +205,7 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
       }
       return objectOf(fields);
     }
-    case 'control': case 'raw-state': case 'last-changed': case 'list-count': case 'list-includes': report(facts, 'invalid_combination', at); return ANY;
+    case 'control': case 'raw-state': case 'last-changed': case 'list-count': case 'list-includes': case 'count': report(facts, 'invalid_combination', at); return ANY;
     case 'choose': {
       facts.usesRules = true;
       if (!operand.cases.length || operand.cases.length > MAX_RULE_CASES) report(facts, 'limit_exceeded', join(at, 'cases'));

@@ -20,7 +20,7 @@ const directory = path.resolve(__dirname, '../contract/corpus/evaluation');
 type Subject = Record<string, any>;
 interface Case {
   format: number; name: string; note: string; subject: Subject;
-  env: { reads?: Record<string, ReadResult>; /** What `readRaw` gives per source id; a source not listed has no entity. */ raw?: Record<string, ReadResult>; /** What `readChanged` gives per source id (`last-changed`); a source not listed has no entity. */ changed?: Record<string, ReadResult>; viewer?: Environment['viewer']; clock?: Environment['clock']; item?: Json; index?: number; params?: Record<string, Json>; flow?: boolean;
+  env: { reads?: Record<string, ReadResult>; /** What `readRaw` gives per source id; a source not listed has no entity. */ raw?: Record<string, ReadResult>; /** What `readChanged` gives per source id (`last-changed`); a source not listed has no entity. */ changed?: Record<string, ReadResult>; viewer?: Environment['viewer']; /** What `viewerPersonState` gives (the state of the viewer's `person.*` entity); absent means the host has none. */ viewerPerson?: ReadResult; clock?: Environment['clock']; item?: Json; index?: number; params?: Record<string, Json>; flow?: boolean;
     /** What `control` reads: the one value being sent, and each stopper's value of a dial control. */ controlValue?: Json; controlValues?: Record<string, Json>;
     /** The locale the date styles are pinned to; the Studio draws `en_US` only and the app uses its formatters for others. */ locale?: string; undrawnSymbols?: string[] };
   expected: Record<string, any>;
@@ -32,6 +32,7 @@ const cases: Case[] = files.map(name => JSON.parse(readFileSync(path.join(direct
 const environmentOf = (entry: Case): Environment => ({
   read: (sourceId, segments) => entry.env.reads?.[`${sourceId}/${segments.join('/')}`] ?? { status: 'unavailable' },
   readRaw: sourceId => entry.env.raw?.[sourceId] ?? { status: 'unavailable' },
+  ...(entry.env.viewerPerson ? { viewerPersonState: () => entry.env.viewerPerson! } : {}),
   readChanged: sourceId => entry.env.changed?.[sourceId] ?? { status: 'unavailable' },
   controlValue: entry.env.controlValue, controlValues: entry.env.controlValues,
   viewer: entry.env.viewer, clock: entry.env.clock, item: entry.env.item, index: entry.env.index, flow: entry.env.flow,
