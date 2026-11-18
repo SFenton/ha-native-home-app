@@ -2,6 +2,7 @@ import { z } from 'zod/v4';
 import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from './shared/composition/schema';
 import { compileCompositionDocument } from './shared/composition/compiler';
 import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON, type CompositionIssue } from './shared/composition/json';
+import { omitFoldSide } from './shared/composition/fold-sides';
 import { createId as uid } from './shared/ids';
 import type { Json } from './shared/types';
 import { formatCompositionIssue } from './shared/composition/workspace';
@@ -190,18 +191,24 @@ export function replaceAt<T>(root: T, path: EditorPath, value: unknown): T {
 }
 /** What compiling said about a document, by document: a document is never changed in place, and every caller wants the same answer. */
 const compiled = new WeakMap<object, CompositionIssue[]>();
+const manifests = new WeakMap<object, string[]>();
 /** The compiler's issues for a document, or none when it compiles. Compiling a large document is the costly step, so it happens once per document. */
 export function compilerIssuesOf(document: unknown): CompositionIssue[] {
   const known = typeof document === 'object' && document ? compiled.get(document) : undefined;
   if (known) return known;
   let issues: CompositionIssue[] = [];
-  try { compileCompositionDocument(document); }
+  try { const result = compileCompositionDocument(document); if (typeof document === 'object' && document) manifests.set(document, result.capabilities); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
     issues = error.issues;
   }
   if (typeof document === 'object' && document) compiled.set(document, issues);
   return issues;
+}
+/** The capabilities a document declares, from the same compile as `compilerIssuesOf` (one compile per document); none for a document that does not compile. */
+export function capabilitiesOf(document: object): string[] {
+  compilerIssuesOf(document);
+  return manifests.get(document) ?? [];
 }
 export function compositionErrors(document: unknown): string[] {
   return compilerIssuesOf(document).map(formatCompositionIssue);
@@ -288,7 +295,10 @@ export function moveCompositionNode(document: CompositionDocument, id: string, p
     : container?.type === 'local-tabs' ? (container.blocks ? container.blocks.find(block => block.id === parent.tabId)?.children : container.tabs.find(tab => tab.id === parent.tabId)?.children)
     : container?.type === 'overlay' ? container.children : undefined);
   if (!children) throw new Error('Choose a page, modal, grid, section or local tab as the parent');
+  // A side belongs to a component at the top level of a page: a move into a modal or a container drops it.
+  const onPage = surface !== undefined && next.pages.some(page => page.id === surface.id);
   const moved = structuredClone(entry.node);
+  if (!onPage) moved.layout = omitFoldSide(moved.layout) as typeof moved.layout;
   if (container?.type !== 'tile-grid') moved.layout.span = 1;
   children.push(moved);
   return next;

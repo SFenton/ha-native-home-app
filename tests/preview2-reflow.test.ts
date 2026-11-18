@@ -16,10 +16,12 @@ describe('planning a reflow', () => {
     expect(move).toEqual({ id: 't', dx: -100, dy: -200 });
   });
 
-  it('resizes only an element with no node inside it, so text is never drawn scaled and a container does not thrash its grid', () => {
+  it('never animates a size: an element is laid out at its final size, so its text takes its final wrapping on the first frame', () => {
     const before = new Map([['tile', at(0, 0, 200, 80)], ['box', at(0, 100, 400, 80, undefined, false)]]);
     const after = new Map([['tile', at(0, 0, 100, 80)], ['box', at(0, 100, 200, 80, undefined, false)]]);
-    expect(planReflow(before, after)).toEqual([{ id: 'tile', dx: 0, dy: 0, width: { from: 200, to: 100 }, height: { from: 80, to: 80 } }]);
+    expect(planReflow(before, after)).toEqual([]);
+    const moved = planReflow(new Map([['tile', at(0, 0, 200, 80)]]), new Map([['tile', at(60, 0, 100, 80)]]));
+    expect(moved).toEqual([{ id: 'tile', dx: -60, dy: 0 }]);
   });
 
   it('measures a child against its parent, because it rides in the parent\'s own movement', () => {

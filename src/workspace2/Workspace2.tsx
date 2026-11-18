@@ -31,6 +31,7 @@ import { newPageFlow, newSheetFlow } from './navigation';
 import { WorkspaceDataProvider, type CreateFlow } from './pickers/WorkspaceData';
 import TopBar from './TopBar';
 import PropertiesPanel from './PropertiesPanel';
+import { SimulatorWindowContext } from './simulatorWindow';
 import PreviewGuard from './PreviewGuard';
 import HandleSlot from './HandleSlot';
 import ElementContextMenu from './ElementContextMenu';
@@ -82,6 +83,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const [window_, setWindow] = useState<PreviewWindow>(previewWindows[0]);
   /** The rail's moves render as a transition: the new display mounts in slices between frames, so a fold or a turn does not hold a frame (`studio-duo-sim`, frame pacing). */
   const moveWindow = useCallback((next: PreviewWindow) => startTransition(() => setWindow(next)), []);
+  const simulator = useMemo(() => ({ window: window_, move: moveWindow }), [window_, moveWindow]);
   const [pagesOpen, setPagesOpen] = useState(false), [projectOpen, setProjectOpen] = useState(false), [checksOpen, setChecksOpen] = useState(false), [levelOpen, setLevelOpen] = useState(false);
   const [textStep, setTextStep] = useState(defaultTextStep);
   const [dialog, setDialog] = useState<DialogKey>();
@@ -152,6 +154,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
     <SelectMenusContext.Provider value>
+    <SimulatorWindowContext.Provider value={simulator}>
     <ToastHost>
       <WorkspaceDataProvider document={document} house={ws.houseStates.house} live={ws.houseStates.live} environment={ws.houseStates.environment} overlay={ws.houseStates.overlay} tried={ws.tried} onCreatePage={onCreatePage ?? newPageFlow} onCreateSheet={onCreateSheet ?? newSheetFlow}>
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
@@ -200,6 +203,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
       </AddHost>
       </WorkspaceDataProvider>
     </ToastHost>
+    </SimulatorWindowContext.Provider>
     </SelectMenusContext.Provider>
   </div>;
 }

@@ -202,3 +202,12 @@ template goes at once, with an undo toast.
 **The preview** and every value editor work a use out with its template's body (`expandLogic`) before they compile, by the library as it is now, so an edit to a
 template shows in every use at once; publication refuses a leftover setting or a missing template. The Logic Gallery sample (`src/preview2/fixtures/logic-gallery.json`:
 Count or All, Yours or Theirs, Night Hours, `demo_` entities only) shows three templates used three times each.
+
+## Partly Folded
+
+One pending capability id, `sh.fold-sides@1` (`contract/corpus/capabilities.pending.json`), declared only by a document that uses it. The contract is in `docs/native-composition.md` ("Sections on the two sides of the fold").
+
+- **Page.** Page Settings has a Partly Folded row: Two Sides (`layout.foldSides: auto`) or One Column (the field gone). Under it, Reset Sides clears every section's own side in one undo step (disabled while none has one). While the id is pending the rows say "The app can’t show this yet. Publishing it waits for an app update.", a new page starts on One Column, Checks carries a suggestion and the Publish dialog warns. Once the id ships a new page starts on Two Sides and, once, Use Two Sides on Every Page is offered (one undo step for all pages).
+- **Section.** A top-level section's Partly Folded row is Automatic, Across the Top, Leading Side or Trailing Side. Automatic names the side the rule gives ("Automatic (Leading)"), and plain "Automatic" on a page that would stay one column. A tile grid's Around the Fold row sits directly above it. An order the compiler refuses shows its message under the row. A nested component's row is dimmed and says "Only a page’s top-level sections take a side."; a bar pinned over the page says it takes none.
+- **Show Partly Folded.** While the simulator is in another pose, the caption carries a link that moves it to the Duo partly folded sideways, where the rows can be seen working.
+- **Preview.** The Duo rig draws the sides in the app's widths (455.3, the band, 372.3 less each side's padding) with the status strip across the top and one scroll; a fold, an unfold or a half fold glides each section on the rig's existing `fold-pose` move, and text is never scaled.

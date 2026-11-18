@@ -16,10 +16,16 @@ Equal row heights
 Short row
 Share
 Leading
-Fold
-Page
-Container
-Page: avoids the Duo’s hinge. Container: ignores it.
+Around the Fold
+Divide Evenly
+Keep Together
+Divide Evenly: tiles share the two sides of the fold. Keep Together: the grid ignores it. It matters for a section that spans the fold.
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Group by State
 Off
 Behavior
@@ -53,10 +59,16 @@ Equal row heights
 Short row
 Share
 Leading
-Fold
-Page
-Container
-Page: avoids the Duo’s hinge. Container: ignores it.
+Around the Fold
+Divide Evenly
+Keep Together
+Divide Evenly: tiles share the two sides of the fold. Keep Together: the grid ignores it. It matters for a section that spans the fold.
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Group by State
 Off
 Behavior

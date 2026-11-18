@@ -29,6 +29,7 @@ import { badgeNodeKinds, expandBadgeSettings, initialsReadable, MAX_BADGE_TEXT, 
 import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
 import { groupProblems } from './grid-groups';
+import { lateSpans, type FoldSide } from './fold-sides';
 import { PIPELINE_LIMITS } from './pipeline/schema';
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
@@ -284,6 +285,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     issues.push({ code, pointer: path, ...(capability ? { capability } : {}) });
   };
   const require = (name: string) => capabilities.add(`sh.${name}@1`);
+  /** Whether the components being walked are the top level of a page (`sh.fold-sides@1` is meaningful nowhere else). */
+  let onPage = false;
   if (usesSolidAppearance(document)) require('solid-appearance');
   if (usesRgba(document)) require('text-style');
   if (document.pages.some(page => page.navigation.type === 'navigation-columns')) require('navigation-columns');
@@ -1102,6 +1105,11 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       register('node', item.id, `${p}/id`);
       visibility(item as Visibility, p);
       if (!grid && item.layout.span !== undefined && item.layout.span !== 1) add('invalid_combination', `${p}/layout/span`);
+      // Which side of the hinge a section sits on while the Duo is partly folded (`sh.fold-sides@1`): a page's top-level components say it, nothing nested does, and a saved component's body does not (the place says it).
+      if ((item.layout as { foldSide?: FoldSide }).foldSide !== undefined) {
+        require('fold-sides');
+        if (depth !== 1 || !onPage || inBody) add('invalid_combination', `${p}/layout/foldSide`);
+      }
       if (depth > 1 && ['form', 'pinned-actions'].includes(item.type)) add('invalid_combination', `${p}/type`);
       // A badge on a kind that could not carry one (`sh.badge-nodes@1`): the capability is needed whenever the field is present.
       if (badgeNodeKinds.includes(item.type) && 'badge' in item && item.badge) badge(item.badge, `${p}/badge`, true);
@@ -1681,7 +1689,15 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       }
       if (surface.toolbar.type === 'replace') chrome(surface.toolbar.groups, `${p}/toolbar/groups`);
       else if (kind === 'modal') add('invalid_combination', `${p}/toolbar`);
+      if (kind === 'page') {
+        const { foldSides } = (surface as CompositionDocument['pages'][number]).layout;
+        if (foldSides !== undefined) require('fold-sides');
+        // `span` is Across the Top: it has to come before the first section that takes a side. The expanded page holds each place's own words, so a saved component counts as what it is.
+        for (const late of lateSpans(expanded.pages[index].components)) add('invalid_combination', `${p}/components/${late}/layout/foldSide`);
+      }
+      onPage = kind === 'page';
       components(surface.components, `${p}/components`);
+      onPage = false;
     });
   }
   if (document.pages.length + document.modals.length > 512) add('limit_exceeded', '/document/pages');

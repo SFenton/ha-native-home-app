@@ -21,6 +21,12 @@ None
 Selected
 Navigation path
 None
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 When tapped
 Opens Advanced Controls
@@ -58,6 +64,12 @@ None
 Selected
 Navigation path
 None
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 When tapped
 Opens Advanced Controls

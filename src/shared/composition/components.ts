@@ -1,4 +1,5 @@
 import { COMPONENT_ENTRY_LIMITS, type ComponentEntry, type ComponentStringKind, type ComponentRefNode, type CompositionDocument, type CompositionNode } from './schema';
+import { omitFoldSide } from './fold-sides';
 
 /**
  * Saved components (`sh.component-ref@1`): a document-level library of nodes, and `component-ref` nodes that stand for one of them. A reference is
@@ -222,6 +223,7 @@ export const fieldsOverlap = (first: string, second: string): boolean => {
   return a.slice(0, shared).every((step, index) => step === b[index]);
 };
 
+
 const expansions = new WeakMap<object, Map<string, CompositionNode>>();
 
 /**
@@ -232,7 +234,7 @@ const expansions = new WeakMap<object, Map<string, CompositionNode>>();
  * identity and then the reference's id, width and arguments, so an unchanged component is expanded once.
  */
 export function expandRef(ref: ComponentRefNode, entry: ComponentEntry): CompositionNode {
-  const key = `${ref.id}\0${ref.layout.span}\0${ref.args ? JSON.stringify(ref.args) : ''}\0${ref.values ? JSON.stringify(ref.values) : ''}\0${entry.bindings ? JSON.stringify(entry.bindings) : ''}\0${entry.sources ? JSON.stringify(entry.sources) : ''}\0${entry.flows ? JSON.stringify(entry.flows) : ''}`;
+  const key = `${ref.id}\0${ref.layout.span}\0${ref.layout.foldSide ?? ''}\0${ref.args ? JSON.stringify(ref.args) : ''}\0${ref.values ? JSON.stringify(ref.values) : ''}\0${entry.bindings ? JSON.stringify(entry.bindings) : ''}\0${entry.sources ? JSON.stringify(entry.sources) : ''}\0${entry.flows ? JSON.stringify(entry.flows) : ''}`;
   const cache = expansions.get(entry.node) ?? new Map<string, CompositionNode>();
   const known = cache.get(key);
   if (known) return known;
@@ -255,7 +257,8 @@ export function expandRef(ref: ComponentRefNode, entry: ComponentEntry): Composi
     for (const { field, value, whole } of bindings.get(node.id) ?? []) next = whole ? writeValue(next, field, value) : writeField(next, field, value);
     next = mapChildren(next, child => rename(child, false));
     const id = instanceNodeId(ref.id, node.id, root);
-    const layout = root ? { ...next.layout, span: ref.layout.span } : next.layout;
+    // The root takes the reference's width and its side of the hinge (`sh.fold-sides@1`); a body's own side is not read, the place says where it sits.
+    const layout = root ? { ...omitFoldSide(next.layout), span: ref.layout.span, ...(ref.layout.foldSide !== undefined ? { foldSide: ref.layout.foldSide } : {}) } : next.layout;
     return next.id === id && layout === next.layout ? next : { ...next, id, layout } as CompositionNode;
   };
   // Private source names are rewritten first, so an argument that happens to equal one (a `source-id` parameter) is never rewritten.

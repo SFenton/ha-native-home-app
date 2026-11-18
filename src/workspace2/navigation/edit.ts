@@ -5,6 +5,7 @@ import { compilerIssues } from '../checks';
 import { collectLinks, type SurfaceRef } from '../outline';
 import { groupWithRoom } from '../capacity';
 import { cloneNode } from '../util';
+import { foldSidesShipped } from '../layout/fold-sides-edit';
 
 type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
@@ -23,13 +24,16 @@ export function freshName(taken: readonly string[], wanted: string): string {
   return `${base} ${at}`;
 }
 
-/** A page with nothing on it, laid out like the document's first page when there is one. */
-export function blankPage(document: CompositionDocument, title: string): Page {
+/**
+ * A page with nothing on it, laid out like the document's first page when there is one. It is on two sides while the Duo is partly folded (`sh.fold-sides@1`) only once the app has shipped
+ * that id (`shipped`): until then the field would make every publication refused by the app, so a new page never carries it.
+ */
+export function blankPage(document: CompositionDocument, title: string, shipped = foldSidesShipped()): Page {
   const model = document.pages[0];
   const spacing = { type: 'token' as const, name: 'l' as const };
   return {
     id: uid('page'), title, icon: symbol('square.grid.2x2'), parameters: {}, toolbar: { type: 'inherit' }, navigation: { type: 'stack' },
-    layout: model ? structuredClone(model.layout) : { type: 'column', padding: { top: spacing, leading: spacing, bottom: spacing, trailing: spacing }, spacing, maxWidth: { type: 'unbounded' }, scroll: 'content-fit@1', chrome: 'canonical-page@1', ground: 'host' },
+    layout: (({ foldSides: _sides, ...layout }) => ({ ...layout, ...(shipped ? { foldSides: 'auto' as const } : {}) }))((model ? structuredClone(model.layout) : { type: 'column', padding: { top: spacing, leading: spacing, bottom: spacing, trailing: spacing }, spacing, maxWidth: { type: 'unbounded' }, scroll: 'content-fit@1', chrome: 'canonical-page@1', ground: 'host' }) as Page['layout']),
     components: [],
   } as Page;
 }
@@ -38,7 +42,7 @@ export function blankPage(document: CompositionDocument, title: string): Page {
 export function blankSheet(document: CompositionDocument, title: string, height: 'fitted' | 'full', fullScreen = false): Modal {
   const model = blankPage(document, title);
   return {
-    id: uid('modal'), title, icon: symbol('rectangle.stack'), parameters: {}, toolbar: { type: 'replace', groups: [] }, layout: model.layout, components: [],
+    id: uid('modal'), title, icon: symbol('rectangle.stack'), parameters: {}, toolbar: { type: 'replace', groups: [] }, layout: (({ foldSides: _sides, ...layout }) => layout)(model.layout), components: [],
     presentation: {
       type: 'sheet', width: 'form', ...(fullScreen ? { fullScreen: true } : {}), appearance: 'system', placement: 'canonical-sheet@1', grabber: 'canonical', navigation: 'local-stack@1',
       height: height === 'full' || fullScreen ? { type: 'full' } : { type: 'fitted', follows: 'root', firstOpen: 'canonical@1' },

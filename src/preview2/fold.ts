@@ -1,5 +1,6 @@
 import type { FoldBand, GridFold } from './grid';
-import { isRegularWidth } from './split';
+import type { SidesGeometry } from '../shared/composition/fold-sides';
+import { isRegularWidth, splitGeometry } from './split';
 import type { PreviewWindow } from './windows';
 
 /**
@@ -19,12 +20,19 @@ export interface WindowFold {
   book: boolean;
   /** Whether the window is regular width, the size class the room sections read. */
   regular: boolean;
+  /**
+   * The widths of the two sides of a page that sits on them (`sh.fold-sides@1`), only while the hinge band divides the window and the container passes the
+   * app's test (`FoldColumns.resolve`: wider than tall, each side at least 360 pt). Points of the content area, as the app's `SplitGeometry`.
+   */
+  sides?: SidesGeometry;
 }
 
 /** The fold of a preview window: what every drawn grid reads from the render context. */
 export function windowFold(win: PreviewWindow): WindowFold {
   const band = win.hinge?.axis === 'vertical' ? win.hinge : undefined;
+  const split = band ? splitGeometry(win) : undefined;
   return {
+    sides: split?.hinge ? { leading: split.leading, band: split.band, trailing: split.trailing } : undefined,
     width: win.width, rail: win.rail ?? 0, vertical: band !== undefined || win.bookHinge?.axis === 'vertical', book: band !== undefined,
     band: band ? { lower: band.start, upper: band.start + band.length } : undefined, regular: isRegularWidth(win.width),
   };

@@ -22,7 +22,7 @@ export interface TileCase {
   expect?: { code: string; pointer: string };
 }
 
-const root = path.resolve(import.meta.dirname, '../contract/corpus');
+export const root = path.resolve(import.meta.dirname, '../contract/corpus');
 const base: J = JSON.parse(readFileSync(path.join(root, 'accept/fixture-composition-first-slice.json'), 'utf8'));
 /** The page the cases fill: the third page of the first-slice fixture. */
 export const PAGE = 2;

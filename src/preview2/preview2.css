@@ -61,6 +61,23 @@
     -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent var(--bar-bottom), #000 calc(var(--bar-bottom) + var(--sh-ramp, 0px))); mask-image: linear-gradient(180deg, transparent 0, transparent var(--bar-bottom), #000 calc(var(--bar-bottom) + var(--sh-ramp, 0px))); }
   .sh-scroll::-webkit-scrollbar { display: none; }
   .sh-column { display: flex; flex-direction: column; gap: var(--gap, 12px); margin: 0 auto; padding: var(--pad-top, 0) var(--pad-trail, 16px) var(--pad-bottom, 0) var(--pad-lead, 16px); }
+  /* Sections on the two sides of the hinge (`sh.fold-sides@1`). The groups hold the same nodes in every pose, so the page keeps one DOM and a fold only moves frames: outside the
+     book pose they draw no box and the nodes are items of the one column, in document order (`order`). Partly folded sideways the column is a grid of the app's three tracks, the
+     leading side, the band and the trailing side (`FoldColumns`): the strip spans (or, at the largest text sizes, heads the leading side), each side stacks its own sections, and
+     the page has one scroll. Each side keeps the page's own padding at both its edges, as the app's `sideInset` does. */
+  .sh-column[data-fold-sides] :is(.sh-fold-strip, .sh-fold-lower, .sh-fold-side) { display: contents; }
+  .sh-column[data-fold-sides] > .sh-add-slot { order: 9999; }
+  .sh-column[data-sides] { display: grid; grid-template-columns: var(--fold-lead) var(--fold-band) var(--fold-trail); row-gap: var(--gap, 12px); column-gap: 0; align-content: start; align-items: start; margin: 0; padding-left: 0; padding-right: 0; }
+  .sh-column[data-sides] > .sh-large-title { grid-column: 1 / -1; }
+  .sh-column[data-sides] .sh-fold-strip { display: flex; flex-direction: column; gap: var(--gap, 12px); box-sizing: border-box; min-width: 0; grid-column: 1 / -1; grid-row: 1; padding: 0 var(--pad-trail, 16px) 0 var(--pad-lead, 16px); }
+  .sh-column[data-sides] .sh-fold-lower { display: contents; }
+  .sh-column[data-sides] .sh-fold-side { display: flex; flex-direction: column; gap: var(--gap, 12px); box-sizing: border-box; min-width: 0; grid-row: 2; padding: 0 var(--pad-trail, 16px) 0 var(--pad-lead, 16px); }
+  .sh-column[data-sides] .sh-fold-side[data-side=leading] { grid-column: 1; }
+  .sh-column[data-sides] .sh-fold-side[data-side=trailing] { grid-column: 3; }
+  .sh-column[data-sides]:not([data-strip]) .sh-fold-side { grid-row: 1; }
+  .sh-column[data-sides] > .sh-add-slot { grid-column: 1 / -1; }
+  .sh-column[data-sides=head] .sh-fold-strip { grid-column: 1; }
+  .sh-column[data-sides=head][data-strip] .sh-fold-side[data-side=trailing] { grid-row: 1 / span 2; }
   .sh-large-title { font: 700 34px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: .01em; padding: 8px 0 6px; transform-origin: left top;
     opacity: calc(1 - var(--sh-progress, 0)); transform: translateY(calc(-8px * var(--sh-progress, 0))) scale(calc(1 - .15 * var(--sh-progress, 0))); }
   .sh-empty { color: var(--ink-3); font-size: 15px; padding: 24px 0; text-align: center; }

@@ -78,11 +78,11 @@ export function PlainSelect({ label, value, options, onChange }: { label: string
   return menus ? <SelectMenu label={label} value={value} options={options} onChange={onChange}/>
     : <select aria-label={label} value={value} onChange={event => onChange(event.target.value)}>{options.map(option => typeof option === 'string' ? <option value={option} key={option}>{option}</option> : <option value={option.value} key={option.value}>{option.label}</option>)}</select>;
 }
-export function SelectField({ label, value, options, onChange }: { label: string; value: string; options: (string | { value: string; label: string })[]; onChange: (value: string) => void }) {
+export function SelectField({ label, value, options, onChange, disabled }: { label: string; value: string; options: (string | { value: string; label: string })[]; onChange: (value: string) => void; disabled?: boolean }) {
   // Inside the workspace a menu is the Studio's own filled field; a bare form (the generated editors on their own) keeps the native select.
   const menus = useContext(SelectMenusContext);
-  return <Field label={label}>{menus ? <SelectMenu label={label} value={value} options={options} onChange={onChange}/>
-    : <select value={value} onChange={event => onChange(event.target.value)}>{options.map(option => typeof option === 'string' ? <option value={option} key={option}>{option}</option> : <option value={option.value} key={option.value}>{option.label}</option>)}</select>}</Field>;
+  return <Field label={label}>{menus ? <SelectMenu label={label} value={value} options={options} onChange={onChange} disabled={disabled}/>
+    : <select value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>{options.map(option => typeof option === 'string' ? <option value={option} key={option}>{option}</option> : <option value={option.value} key={option.value}>{option.label}</option>)}</select>}</Field>;
 }
 export function IconField({ value, onChange, label = 'Icon' }: { value?: string; onChange: (value: string) => void; label?: string }) {
   const listId = useId();

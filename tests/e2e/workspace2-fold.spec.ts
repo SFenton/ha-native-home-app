@@ -58,12 +58,12 @@ test('the Duo reflows a fold: page grid from four 200 pt cells flat to 2 + 2 aro
   await expect.poll(async () => (await tracks(page, 'fold-page-grid')).widths.map(Math.round)).toEqual([200, 200, 200, 200]);
 });
 
-test('the Fold row of a tile grid says what Page and Container do', async ({ page }) => {
+test('the Around the Fold row of a tile grid says what Divide Evenly and Keep Together do', async ({ page }) => {
   test.skip(isPhone(page), 'The phone opens the properties as a sheet; the words are covered by the label map test');
   await openWorkspace(page);
   // A tile is selected by its words; Escape selects its parent, the grid.
   await previewTile(page, 'page 1').click();
   await page.keyboard.press('Escape');
   await expect(page.getByLabel('Properties').getByRole('heading', { name: 'Page grid', exact: true })).toBeVisible();
-  await expect(page.getByLabel('Properties').getByText('Page: avoids the Duo’s hinge. Container: ignores it.')).toBeVisible();
+  await expect(page.getByLabel('Properties').getByText('Divide Evenly: tiles share the two sides of the fold. Keep Together: the grid ignores it. It matters for a section that spans the fold.')).toBeVisible();
 });

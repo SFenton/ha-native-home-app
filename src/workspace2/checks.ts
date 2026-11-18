@@ -10,6 +10,7 @@ import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { buildOutline, collectLinks } from './outline';
 import { tabGroups } from './capacity';
 import { labelFor } from './labels';
+import { pendingUseWords } from './pendingUse';
 
 /** One row of the Checks popover: a sentence, where it is, and what choosing it selects. */
 export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey; /** Where choosing the row goes; every problem has one. */ go?: Destination;
@@ -103,6 +104,8 @@ export function runChecks(document: CompositionDocument): Checks {
       }
     }
   }
+  const waiting = pendingUseWords(document);
+  if (waiting) suggestions.push({ id: 'pending-capabilities', sentence: waiting, place: 'Project' });
   const warned = new Map<string, number>();
   for (const warning of compositionWarnings(document)) {
     const { place, select, go, fieldPath } = placeOf(document, pointerPath(warning.pointer));

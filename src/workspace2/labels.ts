@@ -41,6 +41,8 @@ const authored: Record<string, FieldLabel> = {
   '*.icon': entry('Icon', { order: 3 }),
   '*.binding.sourceId': entry('Entity', { order: 4 }), '*.props.sourceId': entry('Entity', { order: 4 }), '*.entityId': entry('Entity', { order: 4 }),
   '*.layout.span': entry('Width', { group: 'look', order: 1 }),
+  // Which side of the hinge a section sits on while the Duo is partly folded (`sh.fold-sides@1`): the inspector draws the rows itself (`layout/FoldSides.tsx`).
+  '*.layout.foldSide': entry('Partly Folded', { group: 'look', order: 2, hidden: true }), 'page.layout.foldSides': entry('Partly Folded', { group: 'look', order: 2, hidden: true }),
   '*.props.family': entry('Color', { group: 'look', order: 2, options: { neutral: 'Neutral', lights: 'Lights', occupancy: 'Occupancy' } }),
   '*.action': behaviour('When tapped', 1), '*.onAction': behaviour('When turned on', 1), '*.offAction': behaviour('When turned off', 2), '*.visibleWhen': behaviour('Only show when', 2), '*.enabledWhen': behaviour('Only enabled when', 2.5),
   '*.badge': entry('Badge', { group: 'look', order: 8 }),
@@ -179,7 +181,7 @@ const authored: Record<string, FieldLabel> = {
   'chrome.groups': entry('Header Buttons', { add: 'Add Button' }), 'chrome.groups.items': entry('Buttons', { add: 'Add Button' }),
   'tab.tabs': entry('Tabs', { add: 'Add Tab' }),
   // Project > Live Activities and its camera notifications.
-  'tile-grid.props.fold': entry('Fold', { group: 'look', caption: 'Page: avoids the Duo’s hinge. Container: ignores it.' }),
+  'tile-grid.props.fold': entry('Around the Fold', { group: 'look', options: { page: 'Divide Evenly', container: 'Keep Together' }, caption: 'Divide Evenly: tiles share the two sides of the fold. Keep Together: the grid ignores it. It matters for a section that spans the fold.' }),
   'activity.jobId': entry('Job ID', { order: 1, caption: 'Matches the job’s tag without “job.”.' }),
   'activity.glyph': entry('Glyph', { group: 'look', order: 1, options: { fan: 'Fan', dishwasher: 'Dishwasher', dryer: 'Dryer', washer: 'Washer', vacuum: 'Vacuum', hot_flash: 'Hot flash', generic: 'Generic' } }),
   'activity.tint': entry('Tint', { group: 'look', order: 2, options: { engine: 'Engine', neutral: 'Neutral', air: 'Air', cleaning: 'Cleaning', water: 'Water', cooling: 'Cooling' } }),

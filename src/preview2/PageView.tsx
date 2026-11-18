@@ -1,7 +1,9 @@
 import { isHiddenNode } from './model';
-import { memo, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { memo, useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { CompositionDocument, CompositionGroups } from '../shared/composition/schema';
 import { HeaderBar, headerGroups } from './Chrome';
+import { ComponentLibraryContext } from './component-library';
+import { planFoldSides } from './fold-sides-plan';
 import { Children } from './nodes/Children';
 import { points, useSourceText } from './nodes/shared';
 import { useRender } from './render-context';
@@ -25,12 +27,20 @@ export interface PageBodyProps {
   largeTitle: boolean;
   /** Asks for a smooth scroll to the top each time the number grows (a tab reselect). */
   scrollToTop?: number;
+  /** A page of the deck may lay its sections out on the two sides of the hinge while the Duo is partly folded (`sh.fold-sides@1`); a sheet and a pane of a split do not. */
+  sides?: boolean;
 }
 /** The scroller of a page or sheet: the title, then the surface's nodes in its column layout. */
-export function PageBody({ surface, largeTitle, scrollToTop = 0 }: PageBodyProps) {
+export function PageBody({ surface, largeTitle, scrollToTop = 0, sides = false }: PageBodyProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const dock = useRef<HTMLDivElement>(null);
-  const { mode } = useRender();
+  const { mode, fold, largeText } = useRender();
+  const library = useContext(ComponentLibraryContext);
+  // Whether the page is laid out in sides is the document's word and never the window's: the drawing keeps one DOM in every pose, so a fold moves frames and re-creates nothing.
+  const page = 'presentation' in surface ? undefined : surface;
+  const plan = useMemo(() => page ? planFoldSides(page, library) : undefined, [page, library]);
+  const grouped = sides && plan?.active ? plan : undefined;
+  const geometry = grouped ? fold?.sides : undefined;
   const title = useSourceText(surface.titleSourceId, surface.title);
   useEffect(() => {
     if (scrollToTop > 0) scroller.current?.scrollTo({ top: 0, behavior: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -70,12 +80,26 @@ export function PageBody({ surface, largeTitle, scrollToTop = 0 }: PageBodyProps
   const column = {
     '--pad-top': `${points(layout.padding.top, 0)}px`, '--pad-lead': `${points(layout.padding.leading, 16)}px`,
     '--pad-bottom': `${points(layout.padding.bottom, 0)}px`, '--pad-trail': `${points(layout.padding.trailing, 16)}px`,
-    '--gap': `${points(layout.spacing, 12)}px`, maxWidth: layout.maxWidth.type === 'points' ? layout.maxWidth.value : undefined,
+    '--gap': `${points(layout.spacing, 12)}px`, maxWidth: layout.maxWidth.type === 'points' && !geometry ? layout.maxWidth.value : undefined,
+    ...(geometry ? { '--fold-lead': `${geometry.leading}px`, '--fold-band': `${geometry.band}px`, '--fold-trail': `${geometry.trailing}px` } : {}),
   } as CSSProperties;
+  const owner = `${'presentation' in surface ? 'modal' : 'page'}:${surface.id}` as const;
+  const inSide = (side: 'span' | 'leading' | 'trailing') => flow.filter(node => grouped?.sides.get(node.id) === side);
+  const topNodes = inSide('span');
+  const body = grouped
+    ? <>
+      {topNodes.length > 0 && <div className="sh-fold-strip" data-fold-group=""><Children nodes={topNodes} orders={grouped.order}/></div>}
+      <div className="sh-fold-lower" data-fold-group="">
+        <div className="sh-fold-side" data-side="leading" data-fold-group=""><Children nodes={inSide('leading')} orders={grouped.order}/></div>
+        <div className="sh-fold-side" data-side="trailing" data-fold-group=""><Children nodes={inSide('trailing')} orders={grouped.order}/></div>
+      </div>
+      {mode === 'edit' && <div className="sh-add-slot" data-add-for={owner}/>}
+    </>
+    : <Children nodes={flow} owner={owner}/>;
   return <TabDockContext value={tabDock}><div ref={scroller} className="sh-scroll" onScroll={event => { const page = event.currentTarget.closest<HTMLElement>('.sh-page, .sh-sheet'); if (page) setProgress(page, event.currentTarget.scrollTop); }}>
-    <div className="sh-column" style={column}>
+    <div className="sh-column" style={column} data-fold-sides={grouped ? '' : undefined} data-sides={geometry ? (largeText ? 'head' : 'top') : undefined} data-strip={geometry && topNodes.length > 0 ? '' : undefined}>
       {largeTitle && <h1 className="sh-large-title">{title.state === 'ready' && title.text ? title.text : surface.title}</h1>}
-      {flow.some(node => !isHiddenNode(node)) ? <Children nodes={flow} owner={`${'presentation' in surface ? 'modal' : 'page'}:${surface.id}`}/> : <><p className="sh-empty">Nothing on this page yet.</p>{mode === 'edit' && <div className="sh-add-slot" data-add-for={`${'presentation' in surface ? 'modal' : 'page'}:${surface.id}`}/>}</>}
+      {flow.some(node => !isHiddenNode(node)) ? body : <><p className="sh-empty">Nothing on this page yet.</p>{mode === 'edit' && <div className="sh-add-slot" data-add-for={owner}/>}</>}
     </div>
   </div>{docked && <div ref={dock} className="sh-dock"><Children nodes={pinned}/></div>}
     <div ref={setTabDock} className="sh-tab-dock" data-tab-dock=""/></TabDockContext>;
@@ -93,18 +117,20 @@ export interface PageViewProps {
   current: boolean;
   /** The detail pane of a split: no back button and no menu. */
   detail?: boolean;
+  /** The page may sit on the two sides of the hinge while the Duo is partly folded (`sh.fold-sides@1`): a page of the deck, never a pane of a split. */
+  sides?: boolean;
 }
 /**
  * One page of the stack: its header over its scroller. The selection key of the page itself rides on this element. Memoised, so
  * the page a push leaves, and the page a window resize or a flyout toggle does not touch, is not drawn again.
  */
-export const PageView = memo(function PageView({ document, page, root, onBack, scrollToTop, motion = '', current, detail }: PageViewProps) {
+export const PageView = memo(function PageView({ document, page, root, onBack, scrollToTop, motion = '', current, detail, sides }: PageViewProps) {
   const groups: CompositionGroups = headerGroups(document, page);
   const { verticalBar } = useRender();
   const title = useSourceText(page.titleSourceId, page.title);
   return <div className={`sh-page ${motion}`.trim()} data-sel={`page:${page.id}`} data-page={page.id} data-current={current ? '' : undefined}
     aria-hidden={current ? undefined : true} inert={!current || undefined}>
-    <PageBody surface={page} largeTitle={!verticalBar} scrollToTop={root ? scrollToTop : 0}/>
+    <PageBody surface={page} largeTitle={!verticalBar} scrollToTop={root ? scrollToTop : 0} sides={sides}/>
     <HeaderBar groups={groups} root={root} onBack={onBack} detail={detail} title={title.state === 'ready' && title.text ? title.text : page.title}/>
   </div>;
 });

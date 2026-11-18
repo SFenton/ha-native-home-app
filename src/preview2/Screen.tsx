@@ -78,9 +78,9 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
       </div>
     </div>
     : <div className="sh-deck" onAnimationEnd={event => { if ((event.target as HTMLElement).classList.contains(`sh-in-${motion}`)) endMove(leaving?.id); }}>
-      {out && <PageView key={out.id} document={document} page={out} root={stack[0] === out.id} current={false} motion={`sh-out-${motion}`}/>}
+      {out && <PageView key={out.id} document={document} page={out} root={stack[0] === out.id} current={false} motion={`sh-out-${motion}`} sides/>}
       {page && !nav.emptyBase && <PageView key={page.id} document={document} page={page} root={stack.length <= 1} current onBack={back}
-        scrollToTop={nav.scrollTop} motion={leaving ? `sh-in-${motion}` : ''}/>}
+        scrollToTop={nav.scrollTop} motion={leaving ? `sh-in-${motion}` : ''} sides/>}
     </div>;
   // The fold's crease: drawn wherever the window can fold, lit only while it is (the book pose), so it fades with the tilt rather than appearing.
   const crease = win.bookHinge;

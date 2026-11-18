@@ -19,11 +19,12 @@ import { Placeholder } from './Placeholder';
  * One node on the page: the `data-sel` wrapper the selection layer finds, the rule check and the drawing. Memoised by node
  * identity (the document shares structure across edits), so an edit to one title re-renders that node and its ancestors only.
  * In Edit a node hidden by its rule is drawn at 45% with a dashed edge and a tag; in Use it is not drawn.
+ * `order` is the node's place in a page that draws its sections in groups (`sh.fold-sides@1`): flex `order`, so one column reads in document order.
  * `linked` (the saved component's name) marks the root of a use of a saved component: `data-linked`, the "Linked component" title and the round badge.
  * The badge is an Edit mark only: in Use it is not drawn. In Edit it is a button ("Edit template Name", `linkedId` is the template) that opens the template in the
  * editor, with its own hit target (28 px on a fine pointer, 44 px on a coarse one); the tile around it still selects the place.
  */
-export const NodeFrame = memo(function NodeFrame({ node, linked, linkedId }: { node: PlainNode; linked?: string; linkedId?: string }) {
+export const NodeFrame = memo(function NodeFrame({ node, linked, linkedId, order }: { node: PlainNode; linked?: string; linkedId?: string; order?: number }) {
   const openTemplate = useContext(OpenTemplateContext);
   renderProbe.onNode?.(node.id);
   const ctx = useRender();
@@ -37,7 +38,7 @@ export const NodeFrame = memo(function NodeFrame({ node, linked, linkedId }: { n
   if (!visible && ctx.mode === 'use') return null;
   const Draw = registry[node.type] as ((props: { node: PlainNode }) => React.JSX.Element) | undefined;
   const selectedInEdit = selected && ctx.mode === 'edit' && !copy;
-  return <div className="sh-node" data-sel={copy ? undefined : key} data-copy={copy ? '' : undefined} inert={copy && ctx.mode === 'edit' ? true : undefined} data-group-item={grouped ? node.id : undefined} data-type={node.type} style={lineStyle(placed) ?? { gridColumn: `span ${node.layout.span ?? 1}` }}
+  return <div className="sh-node" data-sel={copy ? undefined : key} data-copy={copy ? '' : undefined} inert={copy && ctx.mode === 'edit' ? true : undefined} data-group-item={grouped ? node.id : undefined} data-type={node.type} style={{ ...(lineStyle(placed) ?? { gridColumn: `span ${node.layout.span ?? 1}` }), ...(order !== undefined ? { order } : {}) }}
     data-selected={selectedInEdit ? '' : undefined} data-hidden={!visible ? '' : undefined}
     data-linked={linked !== undefined ? '' : undefined} title={linked !== undefined ? 'Linked component' : undefined}>
     {linked !== undefined && ctx.mode === 'edit' && (!copy && linkedId !== undefined && openTemplate

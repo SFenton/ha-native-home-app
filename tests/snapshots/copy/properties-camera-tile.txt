@@ -8,6 +8,12 @@ Width
 Automatic
 Half
 Full
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 When tapped
 Opens Demo Camera
@@ -31,6 +37,12 @@ Width
 Automatic
 Half
 Full
+Partly Folded
+Automatic
+Across the Top
+Leading Side
+Trailing Side
+Only a page’s top-level sections take a side.
 Behavior
 When tapped
 Opens Demo Camera

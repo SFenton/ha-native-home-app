@@ -21,6 +21,7 @@ import { stateWordsSchema } from './state-words';
 import { gridGroupsSchema } from './grid-groups';
 import { avatarLooks, avatarPersonSchema, avatarSizes, badgeSchema, shellProfileSchema } from './profile-badges';
 import { dialControlPropsSchema } from './dial-control';
+import { foldSideSchema, foldSidesSchema, type FoldSide } from './fold-sides';
 
 export { badgeSchema };
 
@@ -116,7 +117,9 @@ const toolbar = z.discriminatedUnion('type', [
   object({ type: z.literal('inherit') }),
   object({ type: z.literal('replace'), groups }),
 ]);
-const node = { id, title, layout: object({ span: integer(1, 4).optional() }), ...visibilityFields };
+/** A node's `layout`: its width, and (on a page's top-level components only, `sh.fold-sides@1`) the side of the hinge it sits on while the Duo is partly folded. */
+const nodeLayout = object({ span: integer(1, 4).optional(), foldSide: foldSideSchema.optional() });
+const node = { id, title, layout: nodeLayout, ...visibilityFields };
 const infoBox = object({ ...node, type: z.literal('info-box'),
   props: object({ message: textValue(2000, true), tone: z.enum(['neutral', 'success']), unavailableText: label }) });
 /** The six tones of a readout (`status-pill`): the stored words; the Studio says Neutral, Good, Active, Warning, Problem and Unavailable. */
@@ -604,7 +607,7 @@ const repeatProps = object({
 });
 export type RepeatProps = z.infer<typeof repeatProps>;
 export type RepeatNode = {
-  id: string; title: string; type: 'repeat'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown; props: RepeatProps; children: CompositionNode[];
+  id: string; title: string; type: 'repeat'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown; props: RepeatProps; children: CompositionNode[];
 };
 export type RepeatPaging = z.infer<typeof repeatPaging>;
 
@@ -692,7 +695,7 @@ export type LinearGaugeNode = z.infer<typeof gaugeNode>;
  * entry it names, its width and the argument of each parameter the entry declares. It has no title, rule, props or children: the entry's body is all of them.
  */
 const componentRef = object({
-  id, type: z.literal('component-ref'), componentId: id, layout: object({ span: integer(1, 4).optional() }),
+  id, type: z.literal('component-ref'), componentId: id, layout: nodeLayout,
   /** One argument per declared parameter, by parameter name (up to 16): the value each bound field takes in this use. */
   args: z.record(z.string().max(80), text(240)).optional(),
   /**
@@ -804,16 +807,16 @@ export type TabBlock = { id: string; tabs: 'all' | string[]; visibleWhen?: Predi
 export type CompositionNode = ComponentRefNode | z.infer<typeof settingsControl> | z.infer<typeof customLightControl> | z.infer<typeof sprinklerControl>
  | z.infer<typeof infoBox> | z.infer<typeof statusPill> | z.infer<typeof textNode> | z.infer<typeof collection> | z.infer<typeof recordForm>
  | z.infer<typeof recipePart> | (z.infer<typeof pinnedActions> & { children?: CompositionNode[] }) | z.infer<typeof navigationTile> | z.infer<typeof actionTile> | z.infer<typeof stateTile> | z.infer<typeof row> | z.infer<typeof localControl> | z.infer<typeof boundControl> | z.infer<typeof button> | z.infer<typeof rowCollection> | z.infer<typeof statusChip> | z.infer<typeof roomOverviewTile> | z.infer<typeof lightGroupTile> | z.infer<typeof weatherPanel> | z.infer<typeof alarmPanel> | z.infer<typeof doorTile> | z.infer<typeof climateNode> | z.infer<typeof settingsLink> | z.infer<typeof roomCard> | z.infer<typeof roomChip> | z.infer<typeof roomNavigationGrid> | z.infer<typeof roomDeviceControlSchema> | z.infer<typeof bedroomControl> | z.infer<typeof remoteNode> | VacuumControl | z.infer<typeof accountHeader> | z.infer<typeof cameraTile> | z.infer<typeof cameraVideo> | z.infer<typeof cameraControls> | z.infer<typeof cameraViewer> | z.infer<typeof bootstrapMessage> | z.infer<typeof notificationBanner> | {
-  id: string; title: string; type: 'tile-grid'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'tile-grid'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof gridProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'section'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'section'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof sectionProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'paged-row'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'paged-row'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof pagedRowProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'local-tabs'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'local-tabs'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: { stateId: string; transition: 'canonical-swap@1'; resetOnPresentation?: boolean; pinned?: boolean;
     scopeProviderId?: string; showsSelector?: boolean; retainsAutomaticSelection?: boolean;
     automatic?: { tabId: string; selectedWhen: Predicate }[]; fallbackTabId?: string; tabBar?: TabBar };
@@ -821,15 +824,15 @@ export type CompositionNode = ComponentRefNode | z.infer<typeof settingsControl>
   /** The areas, in draw order (`sh.tab-blocks@1`); when present every tab's own `children` is empty. */
   blocks?: TabBlock[];
 } | {
-  id: string; title: string; type: 'overlay'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'overlay'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: { anchors: { childId: string; anchor: OverlayAnchor; inset: z.infer<typeof space> }[] }; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'status-rail'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown; props: Record<string, never>; children: CompositionNode[];
+  id: string; title: string; type: 'status-rail'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown; props: Record<string, never>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'room-section'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'room-section'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: z.infer<typeof roomSectionProps>; children: CompositionNode[];
 } | {
-  id: string; title: string; type: 'stack'; layout: { span?: number }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
+  id: string; title: string; type: 'stack'; layout: { span?: number; foldSide?: FoldSide }; visibleWhen?: Predicate; whenUnknown?: WhenUnknown;
   props: StackProps; action?: CompositionActionSlot; a11y?: StackA11y; children: CompositionNode[];
 } | z.infer<typeof shapeNode> | z.infer<typeof symbolPart> | RepeatNode
  | z.infer<typeof chartNode> | z.infer<typeof gaugeNode>
@@ -918,7 +921,13 @@ const surface = {
   }),
   components: z.array(compositionNodeSchema).max(100),
 };
-const page = object({ ...surface, navigation: z.discriminatedUnion('type', [
+/** A page's column, with the switch that lays its sections out in two sides while the Duo is partly folded (`sh.fold-sides@1`). A sheet has no such switch. */
+const pageLayout = object({
+  type: z.literal('column'), padding: insets, spacing: space, maxWidth: width,
+  scroll: z.literal('content-fit@1'), chrome: z.literal('canonical-page@1'), ground: z.literal('host'),
+  foldSides: foldSidesSchema.optional(),
+});
+const page = object({ ...surface, layout: pageLayout, navigation: z.discriminatedUnion('type', [
   object({ type: z.literal('stack') }),
   object({ type: z.literal('navigation-columns'), placeholder: title, standalone: z.boolean(), onDemand: z.boolean().optional() }),
 ]) });

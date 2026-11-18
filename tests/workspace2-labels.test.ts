@@ -49,6 +49,6 @@ describe('nested field labels', () => {
 
 describe('the Fold row of a tile grid (S5)', () => {
   it('says what Page and Container do, under the control', () => {
-    expect(labelFor('tile-grid', ['props', 'fold'])).toMatchObject({ label: 'Fold', group: 'look', caption: 'Page: avoids the Duo’s hinge. Container: ignores it.' });
+    expect(labelFor('tile-grid', ['props', 'fold'])).toMatchObject({ label: 'Around the Fold', group: 'look', options: { page: 'Divide Evenly', container: 'Keep Together' }, caption: 'Divide Evenly: tiles share the two sides of the fold. Keep Together: the grid ignores it. It matters for a section that spans the fold.' });
   });
 });

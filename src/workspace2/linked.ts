@@ -1,5 +1,6 @@
 import { replaceAt, valueAt, type EditorPath } from '../composition-editor';
 import { bodyIdOf, componentReferences, componentUses, expandRef, expandSources, libraryById, mapChildren, ownedSources, privateNames, readField, renameSources, type ComponentUse } from '../shared/composition/components';
+import { omitFoldSide } from '../shared/composition/fold-sides';
 import { createId as uid } from '../shared/ids';
 import { compositionChildren, type ComponentEntry, type ComponentRefNode, type CompositionDocument, type CompositionNode } from '../shared/composition/schema';
 import { tileTypes } from '../shared/composition/repeats';
@@ -169,8 +170,10 @@ export function saveAsComponent(document: CompositionDocument, path: EditorPath,
   if (!nameValid(label)) throw new Error('Name the template in 1 to 80 characters');
   if (nameTaken(document, label)) throw new Error(`A template named ${label} already exists.`);
   const body = unlinkInside(node, libraryById(document));
-  const entry: ComponentEntry = { id: uid('component'), name: label, node: { ...body, id: uid('native'), layout: { ...body.layout, span: 1 } } as CompositionNode };
-  const ref: ComponentRefNode = { id: node.id, type: 'component-ref', componentId: entry.id, layout: { span: node.layout.span } };
+  const entry: ComponentEntry = { id: uid('component'), name: label, node: { ...body, id: uid('native'), layout: { ...omitFoldSide(body.layout), span: 1 } } as CompositionNode };
+  // The fold side (`sh.fold-sides@1`) belongs to the place on the page: the reference carries it and the template root holds none.
+  const side = (node.layout as { foldSide?: unknown }).foldSide;
+  const ref = { id: node.id, type: 'component-ref', componentId: entry.id, layout: { span: node.layout.span, ...(side !== undefined ? { foldSide: side } : {}) } } as ComponentRefNode;
   const next = replaceAt(document, path, ref);
   // A records flow only this body reads goes with it (`sh.repeat@1`, D2): each place then runs a copy of its own. One a page still reads stays in the document.
   const adopted = adoptFlows(next, body);

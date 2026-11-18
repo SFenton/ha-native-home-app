@@ -3,6 +3,7 @@ import { identifierSchema as id } from '../validation';
 import { visibilityFields } from './expression';
 import { symbolUnavailable } from './symbol-unavailable';
 import { surfaceControlsSchema, surfaceOrientationSchema, validateSurfaceControls } from './surface-controls';
+import { foldSideSchema } from './fold-sides';
 
 const object = z.strictObject;
 const text = (max = 240) => z.string().max(max).refine(value => Boolean(value.trim()));
@@ -83,7 +84,7 @@ export const vacuumPrimitiveSchema = z.discriminatedUnion('kind', [
     onDiscard: z.discriminatedUnion('type', [object({ type: z.literal('back') }), object({ type: z.literal('dismiss'), scope: z.literal('current-modal') })]) }),
 ]);
 export const vacuumControlSchema = object({
-  id, title, type: z.literal('vacuum-control'), layout: object({ span: z.number().int().min(1).max(4).optional() }), ...visibilityFields,
+  id, title, type: z.literal('vacuum-control'), layout: object({ span: z.number().int().min(1).max(4).optional(), foldSide: foldSideSchema.optional() }), ...visibilityFields,
   props: object({ sourceId: id, primitive: vacuumPrimitiveSchema }),
 });
 export type VacuumDescriptor = z.infer<typeof vacuumDescriptorSchema>;

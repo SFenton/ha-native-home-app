@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, request } from './api';
 import { compileCompositionDocument } from './shared/composition/compiler';
 import { CompositionValidationError } from './shared/composition/json';
+import { normaliseFoldSides } from './shared/composition/fold-sides-normalise';
 import { sameJson } from './sameJson';
 import type { CompositionDocument, CompositionPublication } from './shared/composition/schema';
 import type { HaPublishResult } from './ha-publication';
@@ -89,7 +90,9 @@ export function useCompositionStudio() {
    * Applies an edit as one undo step. With a `group`, every edit in it joins the step the group began (a color dragged in the
    * system picker), however long the drag lasts; any other edit, or leaving the field, ends the group.
    */
-  const apply = useCallback((next: CompositionDocument, group?: string) => {
+  const apply = useCallback((edit: CompositionDocument, group?: string) => {
+    // A side of the hinge lives only on a page's top-level components: whatever the edit nested, moved or copied, it leaves none elsewhere (`sh.fold-sides@1`).
+    const next = normaliseFoldSides(edit);
     if (!current.current || sameJson(next, current.current)) return;
     const path = group ? `group:${group}` : textEditPath(current.current, next), at = Date.now();
     const joins = path !== undefined && typing.current?.path === path && (group !== undefined || at - typing.current.at < UNDO_COALESCE_MS) && past.current.length > 0;
