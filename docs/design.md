@@ -81,7 +81,7 @@ leaves the others as they were. A template used in one place asks nothing. Undo 
 
 **A placed template's form (settings first).** Selecting a place shows its own settings first, as any element's fields, with no heading and each under its label;
 then Width; then one closed row, the template row ("Light Button" over "Template · Used in 12 places"), then Advanced. The row opens in place to a line ("A change
-here asks first."), the template root's fields, and Parameters with Add Parameter…; open or closed is remembered per template for the session, and a template
+here asks first."), the template root's fields, and Each place sets (the list of settings) with Choose Fields…; open or closed is remembered per template for the session, and a template
 with no settings opens it. A setting is the place's own and never asks; a change inside the template row does. A node inside a template, selected on the
 canvas, shows its own fields under the banner "Linked to Light Button".
 
@@ -96,10 +96,24 @@ when there is none). The kinds:
 **Set Per Place.** Under each entity and state field of a template, in Edit, a worded line: "Set Per Place". With no setting of that kind it creates one (named by
 `suggestName`, labelled with the field's label). With one it opens a menu, "Use Light" for each and "New Setting"; Use fills this field from that setting too,
 so one entity fills many fields. Once set the line reads "Set per place as Light." with "Same Everywhere", which takes the field back; the setting goes with its
-last field, and each place's value for it. Setting a field per place is a change to the template, so with two or more places it asks. Other kinds keep Add
-Parameter… in the Parameters list, where each row opens in place to Label, what it fills, and Remove Parameter. "Per place", not "per use".
+last field, and each place's value for it. Setting a field per place is a change to the template, so with two or more places it asks. "Per place", not "per use".
 The two buttons are named with the field after their visible words, "Set Per Place: Entity" and "Same Everywhere: Entity", so the name starts with what a person
 reads (WCAG 2.5.3).
+
+**Any field per place (`sh.component-values@1`).** A place can set any field of the template, not only an entity, a state, text or a symbol. Choose Fields… (Edit,
+inside a template) shows a box on every row of the selected node and a bar pinned to the top of the panel ("Select the fields each place sets." and Done; Escape
+ends it, unless a question or a menu is open and keeps its own Escape). A ticked row is set per place and keeps the line "Set per place as Title."; unticking is
+Same Everywhere. A row that could share an existing setting (same schema, same optionality) opens a menu, "Use Subtitle" for each and "New Setting". Each tick is a
+change to the template, so it asks once for two or more places. The boxes are named "Set Title per place" in a group named "Fields each place sets"; ticking,
+unticking and Reset are spoken in the polite line. A template holds 16 settings and 128 fields set per place. The list reads "Each place sets (n)" with Remove Setting.
+A place shows each such setting as the field's own editor (the color picker, the rule page, the symbol picker), with "Differs from the template." and Reset ("Use the
+template’s Icon color") once it has its own; a place's value never asks, and it can be changed in Use.
+
+The contract: a parameter of kind `value` and a `values` key on a `component-ref` (name to JSON, 16 entries, 8192 canonical bytes each), both behind the new id
+`sh.component-values@1`; a document that uses neither is unchanged and declares no new id. A place with no entry takes the template's value; `null` removes an
+optional field; a value may create a field the body lacks when the object holding it exists. Expansion renames private sources, then applies `args`, then `values`.
+A binding may not fill a node's id, type or child lists, a field of a source, or an item of a list; two bindings on one node may not overlap. The record is
+`SFenton/native-home:.agents/decisions/2026-11-16-studio-template-any-field.md` (PR SFenton/native-home#134, merged; Gate: app_wide=no).
 
 **Repeated pieces.** "Find Repeated Pieces" sits under the templates in the Templates group, with the count once the walk has run. It opens a level of the library
 panel (a phone: Project > Repeated Pieces, a half-height sheet that leaves the page showing). The walk (`src/shared/composition/repeats.ts`) reduces each node to

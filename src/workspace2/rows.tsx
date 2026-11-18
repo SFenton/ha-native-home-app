@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { CompositionDocument } from '../shared/composition/schema';
 import { Disclosure } from './Disclosure';
@@ -12,24 +12,12 @@ import { SegmentRow } from './SegmentRow';
 import { domainSummary } from './editors/action';
 import { useWorkspaceData } from './pickers/WorkspaceData';
 import { slotControl } from './expr/slots';
+import { schemaAt } from './schemaAt';
 
 export { RowsProvider, useRows, type RowsContext } from './rowsContext';
 export { Disclosure } from './Disclosure';
 
-/** The schema that governs the value at `path`, following union variants by what the value is. */
-export function schemaAt(document: CompositionDocument, path: EditorPath): SchemaField {
-  let schema: SchemaField = compositionEditorSchema;
-  path.forEach((key, depth) => {
-    const here = valueAt(document, path.slice(0, depth)) as Json;
-    const picked = selectedVariant(schema, here);
-    if (typeof key === 'number') schema = Array.isArray(picked.items) ? picked.items[key] ?? {} : picked.items ?? {};
-    else {
-      const next: SchemaField | boolean | undefined = picked.properties?.[key] ?? picked.additionalProperties;
-      schema = typeof next === 'object' ? next : {};
-    }
-  });
-  return schema;
-}
+export { schemaAt };
 
 /** The words for the variants a type picker offers. */
 export const variantWords: Record<string, string> = {
@@ -39,6 +27,33 @@ export const variantWords: Record<string, string> = {
   full: 'Full', fitted: 'Fitted', all: 'All of', any: 'Any of', not: 'Not', state: 'An entity is', numeric: 'A number', viewer: 'The person using the app', 'viewer-person': 'The person is',
   literal: 'Fixed value', read: 'From an entity', control: 'From this control',
 };
+
+/** What {@link ObjectRows} needs to let a template's rows be chosen: which rows can be set, and the box that sets one. */
+export interface ChooseRows {
+  /** Whether the row at `rel` (below the object) can be set per place. */
+  settable: (rel: EditorPath) => boolean;
+  /** The box before a row that can be set. */
+  box: (rel: EditorPath) => ReactNode;
+}
+
+/**
+ * One row while fields are chosen: the box in front, the row itself at half strength and inert (hidden from assistive technology, so the box and its
+ * line say it), and the whole row is the box's target. A row that cannot be set has no box and stays inert.
+ */
+export function ChooseRow({ choose, rel, below, children }: { choose: ChooseRows; rel: EditorPath; below: ReactNode; children: ReactNode }) {
+  const settable = choose.settable(rel);
+  const press = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target instanceof Element && event.target.closest('[data-tick]')) return;
+    event.currentTarget.querySelector<HTMLElement>('[data-tick]')?.click();
+  };
+  return <div className="w2-row" data-choose={settable ? 'settable' : 'inert'} onClick={settable ? press : undefined}>
+    <div className="w2-choose-line">
+      {settable && choose.box(rel)}
+      <div className="w2-choose-body" inert aria-hidden>{children}</div>
+    </div>
+    {below}
+  </div>;
+}
 
 /** One field to show: where it is, what governs it and how it sits among its neighbours. */
 interface Entry { path: EditorPath; rel: EditorPath; schema: SchemaField; required: boolean; present: boolean; value: Json }
@@ -154,7 +169,8 @@ export function useEntityNames(): ReadonlyMap<string, string> {
  * The fields of the object at `path` as rows in four groups: what it shows, how it looks, "Behavior", "Advanced".
  * Labels, groups and order come from the label map; an editable field with no entry lands in Advanced under a mechanical label.
  */
-export function ObjectRows({ path, owner, skip, overrides = {}, extra, groups = groupOrder, below }: { path: EditorPath; owner: string; skip?: (path: EditorPath) => boolean; overrides?: Record<string, RowOverride>; extra?: Partial<Record<FieldGroup, ReactNode>>; groups?: readonly FieldGroup[]; /** A line under a row, from the field's path below the object (a template's "Set Per Place"). */ below?: (rel: EditorPath) => ReactNode }) {
+export function ObjectRows({ path, owner, skip, overrides = {}, extra, groups = groupOrder, below, choose }: { path: EditorPath; owner: string; skip?: (path: EditorPath) => boolean; overrides?: Record<string, RowOverride>; extra?: Partial<Record<FieldGroup, ReactNode>>; groups?: readonly FieldGroup[]; /** A line under a row, from the field's path below the object (a template's "Set Per Place"). */ below?: (rel: EditorPath) => ReactNode;
+  /** While a template's fields are being chosen: a box before each row that can be set, and the row itself inert (templates spec, "any field"). */ choose?: ChooseRows }) {
   const { document, onChange, onError } = useRows();
   const names = useEntityNames();
   const options = fieldOptions(owner, path, skip);
@@ -209,7 +225,9 @@ export function ObjectRows({ path, owner, skip, overrides = {}, extra, groups = 
       if (!rows.length && !extra?.[group]) return null;
       return <section key={group} className="w2-group" data-group={group} aria-label={groupTitles[group] || undefined}>
         {groupTitles[group] && groups.length > 1 && <h3 className="w2-group-title">{groupTitles[group]}</h3>}
-        {rows.filter(item => !duplicate(item)).map(item => <div className="w2-row" key={item.entry.path.join('/')}>{render(item)}{below?.(item.entry.rel)}</div>)}
+        {rows.filter(item => !duplicate(item)).map(item => choose
+          ? <ChooseRow key={item.entry.path.join('/')} choose={choose} rel={item.entry.rel} below={below?.(item.entry.rel)}>{render(item)}</ChooseRow>
+          : <div className="w2-row" key={item.entry.path.join('/')}>{render(item)}{below?.(item.entry.rel)}</div>)}
         {extra?.[group]}
       </section>;
     })}

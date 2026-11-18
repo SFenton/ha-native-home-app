@@ -721,6 +721,22 @@
 .w2-param-open { display: grid; gap: 6px; padding: 0 0 8px; }
 .w2-param-open .w2-caption { margin: 0; }
 .w2-add-templates { display: grid; gap: 4px; }
+
+/* templates, any field: Choose Fields, its bar, the box before a row, the row held inert, and a place's own value */
+.w2-choose-start { display: grid; gap: 4px; margin: 0 0 6px; }
+.w2-choose-start .w2-caption { margin: 0; }
+.w2-choose-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; padding: 8px 10px; background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: 10px; box-shadow: var(--w2-shadow); animation: w2-level-fade .12s linear; }
+.w2-choose-bar p { margin: 0; font-size: 13px; color: var(--w2-ink-card); }
+.w2-row[data-choose] .w2-choose-line { display: flex; align-items: center; gap: 10px; min-height: 48px; }
+.w2-row[data-choose="settable"] { cursor: pointer; border-radius: 8px; }
+.w2-row[data-choose="settable"]:hover { background: var(--w2-hover); }
+.w2-fields { display: contents; }
+.w2-row[data-choose] .w2-choose-body { flex: 1; min-width: 0; opacity: 0.5; pointer-events: none; }
+.w2-row[data-choose="inert"] .w2-choose-body { cursor: default; }
+.w2-tick { flex: none; inline-size: 20px; block-size: 20px; margin: 0; accent-color: var(--w2-primary-fill); cursor: pointer; }
+button.w2-tick, .w2-scope button.w2-tick { appearance: none; padding: 0; min-height: 0; min-width: 0; background: var(--w2-field); border: 2px solid var(--w2-muted); border-radius: 4px; }
+.w2-place-value { display: grid; gap: 2px; }
+@media (pointer: coarse) { .w2-row[data-choose="settable"] .w2-choose-line { min-height: 56px; } .w2-tick, .w2-scope button.w2-tick { inline-size: 24px; block-size: 24px; } }
 @media (pointer: coarse) { .w2-per-place-button { min-height: 44px; min-width: 44px; } .w2-scope .w2-template-row { min-height: 56px; } }
 
 .w2-toast-action { margin-left: 12px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; min-height: 44px; min-width: 44px; cursor: pointer; }

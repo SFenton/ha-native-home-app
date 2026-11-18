@@ -1925,6 +1925,304 @@
       }
     },
     {
+      "file": "reject/pending-component-values-color.json",
+      "outcome": "reject",
+      "note": "A colour is one value setting: one place sets its own ink, the other follows the template's.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-rule.json",
+      "outcome": "reject",
+      "note": "A rule is a value: a place replaces the template's visibleWhen with its own condition.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-null.json",
+      "outcome": "reject",
+      "note": "null removes an optional field in one place: the rule goes, and the other place keeps it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-absent-default.json",
+      "outcome": "reject",
+      "note": "A value may fill a field the template does not hold, when the object that would hold it does: a place that sets nothing leaves the field absent.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-private-source.json",
+      "outcome": "reject",
+      "note": "A source key inside a value that names one of the template's own sources means this place's copy: note-a~state, as in the body.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-two-fields.json",
+      "outcome": "reject",
+      "note": "One value fills two fields of two nodes, so one choice cannot drift between them.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-with-args.json",
+      "outcome": "reject",
+      "note": "A string setting and a value setting side by side: args hold the string, values the JSON.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-component-values-at-limit.json",
+      "outcome": "reject",
+      "note": "The limits themselves: 16 entries in values, and one value of exactly 8,192 bytes of canonical JSON.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/component-values-overlap.json",
+      "outcome": "reject",
+      "note": "Two bindings of one node may not overlap when either is a value: props/ink and props/ink/red.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/componentLibrary/0/bindings/1/field"
+      }
+    },
+    {
+      "file": "reject/component-values-overlap-string-under-value.json",
+      "outcome": "reject",
+      "note": "A string binding under a value binding overlaps it too: props/value as a value and the literal inside it (props/value/value) as a text setting.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_value",
+        "pointer": "/document/componentLibrary/0/bindings/1/field"
+      }
+    },
+    {
+      "file": "reject/component-values-unknown-key.json",
+      "outcome": "reject",
+      "note": "A use gives a value to a parameter the entry does not declare.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/values/colour"
+      }
+    },
+    {
+      "file": "reject/component-values-for-text-param.json",
+      "outcome": "reject",
+      "note": "values holds value parameters only: a text parameter takes its string in args.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/values/words"
+      }
+    },
+    {
+      "file": "reject/component-values-args-for-value-param.json",
+      "outcome": "reject",
+      "note": "A value parameter has no argument: an args entry for it is refused.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_combination",
+        "pointer": "/document/pages/2/components/0/args/ink"
+      }
+    },
+    {
+      "file": "reject/component-values-too-many.json",
+      "outcome": "reject",
+      "note": "A use holds at most 16 values.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/values"
+      }
+    },
+    {
+      "file": "reject/component-values-too-large.json",
+      "outcome": "reject",
+      "note": "One value is at most 8,192 bytes of canonical JSON.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "limit_exceeded",
+        "pointer": "/document/pages/2/components/0/values/words_0"
+      }
+    },
+    {
+      "file": "reject/component-values-null-on-required.json",
+      "outcome": "reject",
+      "note": "null removes a field, so it is valid only where the field is optional: props.style is required.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "missing_required",
+        "pointer": "/document/pages/2/components/0/values/style"
+      }
+    },
+    {
+      "file": "reject/component-values-wrong-shape.json",
+      "outcome": "reject",
+      "note": "A value is checked as the field it fills: a colour of no known kind is refused at values/ink.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/values/ink"
+      }
+    },
+    {
+      "file": "reject/component-values-holder-missing.json",
+      "outcome": "reject",
+      "note": "A value may fill an absent field only when the object that would hold it exists.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "invalid_reference",
+        "pointer": "/document/componentLibrary/0/bindings/0/field"
+      }
+    },
+    {
+      "file": "reject/component-values-holder-list.json",
+      "outcome": "reject",
+      "note": "A value never fills an item of a list: items are positional, so a place could not create or remove one.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/componentLibrary/0/bindings/0/field"
+      }
+    },
+    {
+      "file": "reject/component-values-binding-id.json",
+      "outcome": "reject",
+      "note": "A value never fills a node's id: the expansion owns it.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/6",
+        "capability": "sh.component-values@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "binding_type",
+        "pointer": "/document/componentLibrary/0/bindings/0/field"
+      }
+    },
+    {
+      "file": "reject/component-values-capability-missing.json",
+      "outcome": "reject",
+      "note": "A document whose parameter has the kind value must list sh.component-values@1.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/13",
+        "capability": "sh.text-style@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/component-values-key-capability-missing.json",
+      "outcome": "reject",
+      "note": "A use that holds a values key must list sh.component-values@1, even with no entry.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/13",
+        "capability": "sh.text-style@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
       "file": "accept/component-example-humidifier-sheet.json",
       "outcome": "accept",
       "note": "Humidifier sheet (research 5.1): a tab body of room-device controls, one source parameter and one tab-state parameter; two sheets keep two tab selections."

@@ -1,5 +1,5 @@
 import { boundControlShows } from './editors/boundControl';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { buildDocumentIndex, type IndexEntry, type SelectionKey } from '../preview2/model';
 import { Menu } from '@base-ui/react/menu';
 import { ChangeListIconItem } from './ListIconPicker';
@@ -7,7 +7,7 @@ import { ChevronRight, EyeOff, MoreHorizontal, X } from 'lucide-react';
 import type { ComponentEntry, CompositionDocument, CompositionNode } from '../shared/composition/schema';
 import { valueAt, type EditorPath } from '../composition-editor';
 import { GlyphByName } from '../preview2/nodes/shared';
-import { gatherFixed, ObjectRows, RowsProvider, useRows } from './rows';
+import { ChooseRow, gatherFixed, ObjectRows, RowsProvider, useRows } from './rows';
 import AdvancedFold from './AdvancedFold';
 import { fixedLine } from './labels';
 import { PushStack, Tag, usePush } from './kit';
@@ -21,7 +21,9 @@ import { typeName } from './util';
 import ComponentParams, { TemplateParameters, TemplateSettings } from './ComponentParams';
 import TemplateFold from './TemplateFold';
 import PerPlaceLine from './PerPlaceLine';
-import { perPlaceTarget } from './params';
+import { rowTarget } from './params';
+import { ChooseBar, ChooseFieldsButton, useChooseRows } from './ChooseFields';
+import { setChoosing, useChoosing } from './chooseStore';
 import LinkedLine from './LinkedLine';
 import { bodyIdOf, componentUses } from '../shared/composition/components';
 import type { Workspace2 } from './useWorkspace2';
@@ -88,6 +90,8 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
   const { document } = useRows();
   const node = valueAt(document, path) as { id: string } | undefined;
   const overrides = useDeepRows(path);
+  const choosing = useChoosing() === template?.component.id && template?.edit === true;
+  const choose = useChooseRows(document, template?.component, node as CompositionNode | undefined, template?.ws.linked.say, template?.ws.linked.question !== undefined);
   if (!node) return null;
   // A bound control hides the fields its kind does not use: the compiler rejects them.
   const nodeType = String((node as { type?: string }).type);
@@ -99,36 +103,46 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
   const drawn = (at: EditorPath) => { const rel = at.slice(path.length).join('.'); return (nodeType === 'local-tabs' && (rel === 'tabs' || rel === 'blocks' || rel === 'props.pinned' || rel.startsWith('props.tabBar'))) || (nodeType === 'overlay' && rel.startsWith('props.anchors')) || (nodeType === 'state-tile' && (rel === 'props.progress' || rel === 'props.discs' || rel === 'layout.span' || rel.startsWith('props.swipe'))) || ((nodeType === 'light-group-tile' || nodeType === 'room-overview-tile') && rel.startsWith('props.words')) || (nodeType === 'light-group-tile' && rel.startsWith('props.swipe')) || (nodeType === 'tile-grid' && rel.startsWith('props.groups')) || (nodeType === 'status-pill' && rel === 'props.tone') || (isMap && (rel === 'props.primitive.controls' || rel === 'props.primitive.locate')) || (nodeType === 'bound-control' && (rel === 'props.options' || rel === 'props.optionsFrom' || rel.startsWith('props.optionsFrom.'))); };
   const hidden = (at: EditorPath) => notChildren(at) || drawn(at) || !boundControlShows(document, path, at) || (at.at(-1) === 'whenUnknown' && !('visibleWhen' in node && node.visibleWhen))
     || (placePath !== undefined && at.length > path.length && at[path.length] === 'layout');
-  // A field of a template that can be a setting carries the "Set Per Place" line (Edit only).
-  const perPlace = template?.edit ? (rel: EditorPath) => {
+  // A row of a template that is set per place carries its line, and an entity or state row that is not carries "Set Per Place" (Edit); in Use the line is a caption.
+  const perPlace = template ? (rel: EditorPath) => {
     const found = valueAt(document, path) as CompositionNode | undefined;
-    return found && found.type !== 'component-ref' && perPlaceTarget(document, template.component, found, rel.join('/')) ? <PerPlaceLine document={document} component={template.component} node={found} field={rel.join('/')}/> : null;
+    return found && found.type !== 'component-ref' && rowTarget(document, template.component, found, rel.join('/')) ? <PerPlaceLine document={document} component={template.component} node={found} field={rel.join('/')} readOnly={!template.edit} choosing={choosing}/> : null;
   } : undefined;
-  const fields = <>
-    <ObjectRows path={path} owner={nodeType} skip={hidden} overrides={overrides} below={perPlace} groups={nodeType === 'state-tile' ? ['what', 'look', 'states', 'behaviour'] : isList(nodeType) || nodeType === 'repeat' ? ['what', 'look', 'behaviour', 'states'] : ['what', 'look', 'behaviour']}
-      extra={nodeType === 'state-tile' ? { what: <><ProgressRow path={path}/><ButtonsGroup path={path}/></>, look: <WidthRow path={path}/>, states: <StatesGroup path={path}/>, behaviour: <><StateTapRow path={path}/><SwipeRow path={path}/></> } : nodeType === 'light-group-tile' ? { behaviour: <SwipeRow path={path}/>, what: <StateWordsFold path={path}/> } : nodeType === 'room-overview-tile' ? { what: <StateWordsFold path={path}/> } : nodeType === 'tile-grid' ? { look: <GroupsRow path={path}/> } : nodeType === 'status-pill' ? { what: <ToneField path={path}/> } : nodeType === 'bound-control' && (node as { props?: { kind?: string } }).props?.kind === 'choice' ? { what: <ChoicesGroup path={path}/> } : nodeType === 'local-tabs' ? { what: <><TabsList path={path}/><TabBarGroup path={path}/></> } : nodeType === 'overlay' ? { what: <OverlayPosition path={path}/> } : isList(nodeType) ? { states: <><ShowStateRow path={path}/><FixedTextsNote path={path}/></> } : nodeType === 'repeat' ? { states: <ShowStateRow path={path}/> } : undefined}/>
+  // A group the inspector draws itself stands for one field: it carries the same line, and the same box while fields are chosen.
+  const own = (field: string, group: ReactNode): ReactNode => {
+    const rel = field.split('/');
+    return choosing ? <ChooseRow key={field} choose={choose} rel={rel} below={perPlace?.(rel)}>{group}</ChooseRow> : <>{group}{perPlace?.(rel)}</>;
+  };
+  const rows = <>
+    <ObjectRows path={path} owner={nodeType} skip={hidden} overrides={overrides} below={perPlace} choose={choosing ? choose : undefined} groups={nodeType === 'state-tile' ? ['what', 'look', 'states', 'behaviour'] : isList(nodeType) || nodeType === 'repeat' ? ['what', 'look', 'behaviour', 'states'] : ['what', 'look', 'behaviour']}
+      extra={nodeType === 'state-tile' ? { what: <>{own('props/progress', <ProgressRow path={path}/>)}{own('props/discs', <ButtonsGroup path={path}/>)}</>, look: own('layout/span', <WidthRow path={path}/>), states: <StatesGroup path={path}/>, behaviour: <><StateTapRow path={path}/>{own('props/swipe', <SwipeRow path={path}/>)}</> } : nodeType === 'light-group-tile' ? { behaviour: own('props/swipe', <SwipeRow path={path}/>), what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'room-overview-tile' ? { what: own('props/words', <StateWordsFold path={path}/>) } : nodeType === 'tile-grid' ? { look: own('props/groups', <GroupsRow path={path}/>) } : nodeType === 'status-pill' ? { what: own('props/tone', <ToneField path={path}/>) } : nodeType === 'bound-control' && (node as { props?: { kind?: string } }).props?.kind === 'choice' ? { what: own('props/options', <ChoicesGroup path={path}/>) } : nodeType === 'local-tabs' ? { what: <><TabsList path={path}/>{own('props/tabBar', <TabBarGroup path={path}/>)}</> } : nodeType === 'overlay' ? { what: <OverlayPosition path={path}/> } : isList(nodeType) ? { states: <><ShowStateRow path={path}/><FixedTextsNote path={path}/></> } : nodeType === 'repeat' ? { states: <ShowStateRow path={path}/> } : undefined}/>
     {isMap && <><MapOrientation path={path}/><MapButtons path={path}/></>}
     <ChildPosition path={path}/>
   </>;
+  // While fields are chosen the boxes form one group, named for what they do.
+  const grouped = (content: ReactNode) => choosing ? <div role="group" aria-label="Fields each place sets" className="w2-fields">{content}</div> : content;
+  const fields = grouped(rows);
   const width = placePath && <ObjectRows path={placePath} owner="component-ref" skip={at => at.length > placePath.length && at[placePath.length] !== 'layout'} groups={['look']}/>;
   const advanced = <AdvancedFold type={nodeType} id={node.id} idPath={[...path, 'id'].join('/')} fixed={fixedLine(gatherFixed(document, path), nodeType === 'state-tile' ? 'the motion between states, the 1 second minimum for an in-progress look, haptics and what VoiceOver announces' : undefined)}>
-    <ObjectRows path={path} owner={nodeType} skip={child => hidden(child) || child.at(-1) === 'id'} overrides={overrides} groups={['advanced']}/>
+    {grouped(<ObjectRows path={path} owner={nodeType} skip={child => hidden(child) || child.at(-1) === 'id'} overrides={overrides} choose={choosing ? choose : undefined} below={perPlace} groups={['advanced']}/>)}
   </AdvancedFold>;
   // The root of a place (templates spec 3a-B): the place's own settings first, then its Width, then one closed row that holds the template's fields.
   if (template?.root && placePath) {
     const settings = Boolean(template.component.params?.length);
     return <>
+      {choosing && <ChooseBar component={template.component}/>}
       {settings && <TemplateSettings ws={template.ws} document={document} component={template.component} refPath={placePath} onError={template.onError}/>}
       {width}
       <TemplateFold id={template.component.id} name={template.component.name} places={componentUses(document, template.component.id).length} hasSettings={settings}>
         <LinkedLine document={document} entry={template.entry} session={template.ws.linked.session} compact/>
+        {template.edit && <ChooseFieldsButton document={document} component={template.component} node={node as CompositionNode} path={path}/>}
         {fields}
         {template.edit && <TemplateParameters ws={template.ws} document={document} component={template.component} entry={template.entry} onError={template.onError}/>}
       </TemplateFold>
       {advanced}
     </>;
   }
-  return <>{fields}{width}{advanced}</>;
+  return <>{choosing && template && <ChooseBar component={template.component}/>}{fields}{width}{advanced}</>;
 }
 
 /** What a node of a template needs to draw its fields as the template's: the template, the node's index entry, and whether this is a place's root. */
@@ -211,6 +225,10 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
   }, [ws.checks]);
   const ctx = useMemo(() => document ? { document, onChange: ws.studio.apply, onError, problems, onSelect: (key: string) => ws.select(key as never) } : undefined, [document, ws.studio.apply, ws.select, onError, problems]);
   const stateApi = useMemo(() => ({ preview: ws.statePreview, set: ws.setStatePreview }), [ws.statePreview, ws.setStatePreview]);
+  // Choosing a template's fields ends when anything else is selected, or in Use (templates spec, "any field": Moving).
+  const choosingId = useChoosing();
+  const selectedTemplate = target?.kind === 'node' ? index?.get(target.key)?.component : undefined;
+  useEffect(() => { if (choosingId !== undefined && (ws.mode !== 'edit' || selectedTemplate !== choosingId)) setChoosing(undefined); }, [choosingId, ws.mode, selectedTemplate]);
   if (!document || !ctx || !target || !index) return null;
   const surfaceTitle = (key?: string) => { const [kind, ...id] = (key ?? '').split(':'); return (kind === 'page' ? document.pages : document.modals).find(item => item.id === id.join(':'))?.title ?? ''; };
   let header: ReactNode, body: ReactNode, title = '';

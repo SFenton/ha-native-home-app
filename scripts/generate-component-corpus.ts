@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { decodeCompositionPublication } from '../server/composition';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { COMPONENT_ENTRY_LIMITS } from '../src/shared/composition/schema';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import { placeCase, shippedCapabilities, shippedIssue } from './corpus-handshake';
 
@@ -21,6 +22,7 @@ const root = path.resolve(import.meta.dirname, '../contract/corpus');
 const base: J = JSON.parse(readFileSync(path.join(root, 'accept/fixture-composition-first-slice.json'), 'utf8'));
 const PAGE = 2;
 const PREFIX = 'component-';
+const COMPONENT_VALUE_BYTES = COMPONENT_ENTRY_LIMITS.valueBytes;
 const CAPABILITY = 'sh.component-ref@1';
 
 // MARK: Builders
@@ -462,6 +464,110 @@ reject('sources-over-document-limit', 'Every use adds its sources to the documen
   library: [entry('lamp-row', 'Lamp Row', text('cmp-state'), { sources: Array.from({ length: 8 }, (_, index) => haSource(`state-${index}`, 'light.demo_lamp')) })],
   components: Array.from({ length: 100 }, (_, index) => ref(`lamp-${index}`, 'lamp-row')), modal: Array.from({ length: 26 }, (_, index) => ref(`lamp-m${index}`, 'lamp-row')),
 });
+
+// MARK: Values (`sh.component-values@1`, pending)
+// A `value` parameter takes any JSON in a use's `values`, not a string in `args`. Every case below declares the pending id, so the shipped list refuses it
+// first (`contract/corpus/README.md`, "Pending cases"). Every colour, entity id and name is a placeholder.
+const VALUES = 'sh.component-values@1';
+const rgb = (red: number, green: number, blue: number): J => ({ type: 'solid-rgb', red, green, blue });
+const inkText = (id: string, ink?: J, extra: J = {}): J => node(id, 'text', { props: { value: lit('Guests are staying over'), style: 'body', unavailableText: 'None', ...(ink ? { ink } : {}) }, ...extra });
+const valueParam = (name: string, label = name): J => ({ name, kind: 'value', label });
+const valueEntry = (body: J, params: J[], bindings: J[], rest: J = {}): J => entry('guest-note', 'Guest Note', body, { params, bindings, ...rest });
+const inkEntry = (): J => valueEntry(inkText('cmp-note', rgb(10, 20, 30)), [valueParam('ink', 'Ink')], [{ param: 'ink', nodeId: 'cmp-note', field: 'props/ink' }]);
+const shownEntry = (): J => valueEntry(inkText('cmp-note', undefined, { visibleWhen: isOn }), [valueParam('shown', 'Shown')], [{ param: 'shown', nodeId: 'cmp-note', field: 'visibleWhen' }]);
+const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
+/** A literal text whose canonical JSON is exactly `bytes` long (`{"type":"literal","value":"xxx"}`). */
+const literalOf = (bytes: number): J => { const empty = lit(''); return lit('x'.repeat(bytes - bytesOf(empty))); };
+const values = (name: string, note: string, more: Partial<Case>) => accept(`values-${name}`, note, { needs: [VALUES], ...more });
+const refuses = (name: string, note: string, more: Partial<Case>) => reject(`values-${name}`, note, { needs: [VALUES], ...more });
+
+values('color', 'A colour is one value setting: one place sets its own ink, the other follows the template\'s.', {
+  library: [inkEntry()],
+  components: [ref('note-a', 'guest-note', { values: { ink: rgb(200, 10, 10) } }), ref('note-b', 'guest-note')],
+});
+values('rule', 'A rule is a value: a place replaces the template\'s visibleWhen with its own condition.', {
+  library: [shownEntry()],
+  components: [ref('note-a', 'guest-note', { values: { shown: { type: 'state', sourceId: 'source-entity', path: ['state'], in: ['off'] } } }), ref('note-b', 'guest-note')],
+});
+values('null', 'null removes an optional field in one place: the rule goes, and the other place keeps it.', {
+  library: [shownEntry()], components: [ref('note-a', 'guest-note', { values: { shown: null } }), ref('note-b', 'guest-note')],
+});
+values('absent-default', 'A value may fill a field the template does not hold, when the object that would hold it does: a place that sets nothing leaves the field absent.', {
+  library: [valueEntry(inkText('cmp-note'), [valueParam('lines', 'Lines')], [{ param: 'lines', nodeId: 'cmp-note', field: 'props/lines' }])],
+  components: [ref('note-a', 'guest-note', { values: { lines: 2 } }), ref('note-b', 'guest-note')],
+});
+values('private-source', 'A source key inside a value that names one of the template\'s own sources means this place\'s copy: note-a~state, as in the body.', {
+  library: [valueEntry(readText('cmp-state', 'state', { visibleWhen: { type: 'state', sourceId: 'state', path: ['state'], in: ['on'] } }),
+    [valueParam('shown', 'Shown')], [{ param: 'shown', nodeId: 'cmp-state', field: 'visibleWhen' }], { sources: [haSource('state', 'light.demo_lamp')] })],
+  components: [ref('note-a', 'guest-note', { values: { shown: { type: 'state', sourceId: 'state', path: ['state'], in: ['off'] } } }), ref('note-b', 'guest-note')],
+});
+values('two-fields', 'One value fills two fields of two nodes, so one choice cannot drift between them.', {
+  library: [valueEntry(section('cmp-section', [inkText('cmp-one', rgb(10, 20, 30)), inkText('cmp-two', rgb(10, 20, 30))]), [valueParam('ink', 'Ink')],
+    [{ param: 'ink', nodeId: 'cmp-one', field: 'props/ink' }, { param: 'ink', nodeId: 'cmp-two', field: 'props/ink' }])],
+  components: [ref('note-a', 'guest-note', { values: { ink: rgb(200, 10, 10) } })],
+});
+values('with-args', 'A string setting and a value setting side by side: args hold the string, values the JSON.', {
+  library: [valueEntry(inkText('cmp-note', rgb(10, 20, 30)), [{ name: 'words', kind: 'text', label: 'Words' }, valueParam('ink', 'Ink')],
+    [{ param: 'words', nodeId: 'cmp-note', field: 'title' }, { param: 'ink', nodeId: 'cmp-note', field: 'props/ink' }])],
+  components: [ref('note-a', 'guest-note', { args: { words: 'Back Door' }, values: { ink: rgb(200, 10, 10) } })],
+});
+const manyValueNodes = Array.from({ length: 16 }, (_, index) => inkText(`cmp-note-${index}`));
+const atLimit = (): J => valueEntry(section('cmp-section', manyValueNodes), manyValueNodes.map((_, index) => valueParam(`words_${index}`)),
+  manyValueNodes.map((_, index) => ({ param: `words_${index}`, nodeId: `cmp-note-${index}`, field: 'props/value' })));
+values('at-limit', 'The limits themselves: 16 entries in values, and one value of exactly 8,192 bytes of canonical JSON.', {
+  library: [atLimit()],
+  components: [ref('note-a', 'guest-note', { values: Object.fromEntries(manyValueNodes.map((_, index) => [`words_${index}`, index === 0 ? literalOf(COMPONENT_VALUE_BYTES) : lit(`Note ${index}`)])) })],
+});
+
+refuses('overlap', 'Two bindings of one node may not overlap when either is a value: props/ink and props/ink/red.', {
+  library: [valueEntry(inkText('cmp-note', rgb(10, 20, 30)), [valueParam('ink'), valueParam('red')],
+    [{ param: 'ink', nodeId: 'cmp-note', field: 'props/ink' }, { param: 'red', nodeId: 'cmp-note', field: 'props/ink/red' }])],
+});
+refuses('overlap-string-under-value', 'A string binding under a value binding overlaps it too: props/value as a value and the literal inside it (props/value/value) as a text setting.', {
+  library: [valueEntry(inkText('cmp-note'), [valueParam('words'), { name: 'text', kind: 'text' }],
+    [{ param: 'words', nodeId: 'cmp-note', field: 'props/value' }, { param: 'text', nodeId: 'cmp-note', field: 'props/value/value' }])],
+});
+refuses('unknown-key', 'A use gives a value to a parameter the entry does not declare.', {
+  library: [inkEntry()], components: [ref('note-a', 'guest-note', { values: { colour: rgb(1, 2, 3) } })],
+});
+refuses('for-text-param', 'values holds value parameters only: a text parameter takes its string in args.', {
+  library: [valueEntry(inkText('cmp-note'), [{ name: 'words', kind: 'text' }], [{ param: 'words', nodeId: 'cmp-note', field: 'title' }])],
+  components: [ref('note-a', 'guest-note', { args: { words: 'Back Door' }, values: { words: 'Back Door' } })],
+});
+refuses('args-for-value-param', 'A value parameter has no argument: an args entry for it is refused.', {
+  library: [inkEntry()], components: [ref('note-a', 'guest-note', { args: { ink: 'red' } })],
+});
+refuses('too-many', 'A use holds at most 16 values.', {
+  library: [atLimit()], components: [ref('note-a', 'guest-note', { values: { ...Object.fromEntries(manyValueNodes.map((_, index) => [`words_${index}`, lit('x')])), extra: lit('x') } })],
+});
+refuses('too-large', 'One value is at most 8,192 bytes of canonical JSON.', {
+  library: [atLimit()], components: [ref('note-a', 'guest-note', { values: { words_0: literalOf(COMPONENT_VALUE_BYTES + 1) } })],
+});
+refuses('null-on-required', 'null removes a field, so it is valid only where the field is optional: props.style is required.', {
+  library: [valueEntry(inkText('cmp-note'), [valueParam('style')], [{ param: 'style', nodeId: 'cmp-note', field: 'props/style' }])],
+  components: [ref('note-a', 'guest-note', { values: { style: null } })],
+});
+refuses('wrong-shape', 'A value is checked as the field it fills: a colour of no known kind is refused at values/ink.', {
+  library: [inkEntry()], components: [ref('note-a', 'guest-note', { values: { ink: { type: 'no-such-colour' } } })],
+});
+refuses('holder-missing', 'A value may fill an absent field only when the object that would hold it exists.', {
+  library: [valueEntry(inkText('cmp-note'), [valueParam('ink')], [{ param: 'ink', nodeId: 'cmp-note', field: 'props/nowhere/ink' }])],
+});
+refuses('holder-list', 'A value never fills an item of a list: items are positional, so a place could not create or remove one.', {
+  library: [valueEntry(inkText('cmp-note', undefined, { visibleWhen: isOn }), [valueParam('first', 'First')], [{ param: 'first', nodeId: 'cmp-note', field: 'visibleWhen/in/0' }])],
+});
+refuses('binding-id', 'A value never fills a node\'s id: the expansion owns it.', {
+  library: [valueEntry(inkText('cmp-note'), [valueParam('name')], [{ param: 'name', nodeId: 'cmp-note', field: 'id' }])],
+});
+reject('values-capability-missing', 'A document whose parameter has the kind value must list sh.component-values@1.', {
+  library: [inkEntry()], components: [ref('note-a', 'guest-note')],
+  tweak: envelope => { envelope.capabilities = envelope.capabilities.filter((name: string) => name !== VALUES); },
+});
+reject('values-key-capability-missing', 'A use that holds a values key must list sh.component-values@1, even with no entry.', {
+  library: [inkEntry()], components: [ref('note-a', 'guest-note', { values: {} })],
+  tweak: envelope => { envelope.capabilities = envelope.capabilities.filter((name: string) => name !== VALUES); },
+});
+
 
 // MARK: Examples
 // The four examples of the templates research note (build/research/component-templates.md 5.1), compiled. Every entity id is a placeholder.

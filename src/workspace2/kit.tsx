@@ -119,7 +119,7 @@ export function Modal({ open, onOpenChange, title, children, footer, size = 'm',
     <Dialog.Portal>
       <Dialog.Backdrop className="w2-backdrop"/>
       <Dialog.Viewport className="w2-dialog-viewport">
-        <Dialog.Popup className={`w2-scope w2-dialog w2-dialog-${size}`} initialFocus={initialFocus}>
+        <Dialog.Popup className={`w2-scope w2-dialog w2-dialog-${size}`} data-modal initialFocus={initialFocus}>
           <header className="w2-dialog-head">
             <Dialog.Title>{title}</Dialog.Title>
             {dismissable && <Dialog.Close className="w2-icon-button" aria-label="Close"><X size={18} aria-hidden/></Dialog.Close>}

@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 import { boundControlActions, boundControlProps, kindDependentActions, kindDependentProps } from './bound-control';
 import { settingsDomain, settingsDestination, settingsItem, settingsFixedItems, type SettingsKind } from './settings';
 import { climateCapabilities, climateCapability, validateClimateControl, validateClimateInputs, type ClimateProps } from './climate';
-import { bodyCount, bodyHeight, checkedBody, COMPONENT_LIMITS, COMPONENT_REF_CAPABILITY, derivedId, expandDocument, fieldKind, findNode, findNodePath, ownedSources, readField,
+import { bodyCount, bodyHeight, checkedBody, COMPONENT_LIMITS, COMPONENT_REF_CAPABILITY, COMPONENT_VALUES_CAPABILITY, derivedId, fieldsOverlap, expandDocument, fieldKind, findNode, findNodePath, ownedSources, readField,
   type DocumentSource } from './components';
 import { baseTextStyles, compositionChildren, compositionDocumentSchema, type CompositionAction, type CompositionDocument, type CompositionGroups,
   type CompositionActionSlot, type CompositionNode, type ComponentEntry, type ComponentRefNode, type CompositionRead, type CompositionValue, type RepeatNode } from './schema';
@@ -354,6 +354,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   // Saved components (`sh.component-ref@1`): the key's presence is enough to need the capability, since an older app refuses the unknown key either way.
   const library = new Map<string, ComponentEntry>();
   if (document.componentLibrary !== undefined) require('component-ref');
+  // A `value` parameter needs `sh.component-values@1`, a new id: an app that shipped `sh.component-ref@1` refuses a `values` key it does not know.
+  if (document.componentLibrary?.some(entry => entry.params?.some(param => param.kind === 'value'))) capabilities.add(COMPONENT_VALUES_CAPABILITY);
   document.componentLibrary?.forEach((entry, index) => {
     register('component', entry.id, `/document/componentLibrary/${index}/id`);
     // A component that owns a Data Flow (`sh.repeat@1`): an entry with only entity sources decodes without the id.
@@ -600,8 +602,20 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     const keys = Object.keys(given);
     if (keys.length > COMPONENT_LIMITS.params) add('limit_exceeded', `${path}/args`);
     for (const key of keys) if (!params.has(key)) add('unknown_field', pointer(`${path}/args`, key));
+    // `values` (`sh.component-values@1`): one JSON value for each `value` parameter, none for another kind, at most 16 and 8,192 bytes each.
+    const valueKeys = Object.keys(ref.values ?? {});
+    if (ref.values !== undefined) require('component-values');
+    if (valueKeys.length > COMPONENT_LIMITS.values) add('limit_exceeded', `${path}/values`);
+    for (const key of valueKeys) {
+      const at = pointer(`${path}/values`, key);
+      if (!params.has(key)) add('unknown_field', at);
+      else if (params.get(key)!.kind !== 'value') add('invalid_combination', at);
+      else if (new TextEncoder().encode(canonicalOfBounded(ref.values![key])).byteLength > COMPONENT_LIMITS.valueBytes) add('limit_exceeded', at);
+    }
     for (const param of params.values()) {
       const at = pointer(`${path}/args`, param.name), value = given[param.name];
+      // A `value` parameter has no argument: its value, when this use sets one, is in `values`.
+      if (param.kind === 'value') { if (value !== undefined) add('invalid_combination', at); continue; }
       if (value === undefined) { add('missing_required', at); continue; }
       if (param.kind === 'text') continue;
       if (param.kind === 'symbol') { if (value.length > 80) add('invalid_value', at); continue; }
@@ -614,7 +628,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       if (document.dataSources.length + expandedSources + owned.length > 1000) add('limit_exceeded', `${path}/componentId`);
       expandedSources += owned.length;
     }
-    if (keys.length && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });
+    if ((keys.length || valueKeys.length) && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });
   }
   /**
    * A library entry's parameters, private sources and bindings: names are unique, a binding names a parameter and either a node of the body or a source
@@ -633,8 +647,24 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       const target = binding.nodeId !== undefined ? findNode(entry.node, binding.nodeId) : ownedSources(entry).find(source => source.id === binding.sourceId);
       const targetAt = binding.nodeId !== undefined ? `${at}/nodeId` : `${at}/sourceId`;
       if (!target) { add('invalid_reference', targetAt); return; }
-      if (readField(target, binding.field) === undefined) { add('invalid_reference', `${at}/field`); return; }
-      if (param && fieldKind(target, binding.field) !== param.kind) add('binding_type', `${at}/field`);
+      if (param?.kind === 'value') {
+        // A `value` fills any field of a body node, present or not, as long as the object that holds it is there. Not a node's id, type or child lists,
+        // which the expansion owns, and not a field of a source, which only an entity id may fill.
+        const steps = binding.field.split('/').filter(Boolean);
+        if (binding.nodeId === undefined || !steps.length || ['id', 'type', 'children', 'tabs', 'blocks'].includes(steps[0])) { add('binding_type', `${at}/field`); return; }
+        const holder = readField(target, steps.slice(0, -1).join('/'));
+        if (holder === null || typeof holder !== 'object') { add('invalid_reference', `${at}/field`); return; }
+        // A list holds its items by position, which a place cannot create or remove: a value never fills an item of a list.
+        if (Array.isArray(holder)) { add('binding_type', `${at}/field`); return; }
+        // One field path, or one under another, is bound twice when either binding is a `value`: the second is refused.
+        // The same field twice is `invalid_combination`, as for any binding, below.
+        if (entry.bindings!.slice(0, index).some(other => other.nodeId === binding.nodeId && other.field !== binding.field && fieldsOverlap(other.field, binding.field))) add('invalid_value', `${at}/field`);
+      } else {
+        if (readField(target, binding.field) === undefined) { add('invalid_reference', `${at}/field`); return; }
+        if (param && fieldKind(target, binding.field) !== param.kind) add('binding_type', `${at}/field`);
+        if (entry.bindings!.slice(0, index).some(other => other.nodeId !== undefined && other.nodeId === binding.nodeId && other.field !== binding.field && fieldsOverlap(other.field, binding.field)
+          && entry.params?.find(item => item.name === other.param)?.kind === 'value')) add('invalid_value', `${at}/field`);
+      }
       const key = `${binding.nodeId !== undefined ? 'node' : 'source'}\0${binding.nodeId ?? binding.sourceId}\0${binding.field}`;
       if (bound.has(key)) add('invalid_combination', `${at}/field`);
       bound.add(key);
@@ -1866,13 +1896,14 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     catch (error) { if (error instanceof CompositionValidationError) found = error.issues; else throw error; }
     const known = new Set(issues.map(issue => `${issue.code}\0${issue.pointer}`));
     for (const { ref, entry, path } of argUses) {
+      const valued = new Set((entry.params ?? []).filter(param => param.kind === 'value').map(param => param.name));
       for (const binding of entry.bindings ?? []) {
         const inside = binding.nodeId === undefined ? undefined : findNodePath(entry.node, binding.nodeId);
-        if (!inside || ref.args?.[binding.param] === undefined) continue;
+        if (!inside || (valued.has(binding.param) ? ref.values?.[binding.param] : ref.args?.[binding.param]) === undefined) continue;
         const field = path + [...inside, ...binding.field.split('/').filter(Boolean)].map(step => `/${step}`).join('');
         for (const issue of found) {
           if (issue.pointer !== field && !issue.pointer.startsWith(`${field}/`)) continue;
-          const at = pointer(`${path}/args`, binding.param);
+          const at = pointer(`${path}/${valued.has(binding.param) ? 'values' : 'args'}`, binding.param);
           if (known.has(`${issue.code}\0${at}`)) continue;
           known.add(`${issue.code}\0${at}`);
           add(issue.code, at, issue.capability);

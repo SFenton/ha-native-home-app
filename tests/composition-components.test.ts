@@ -403,7 +403,7 @@ describe('labels, origin and limits (D4, D5)', () => {
   const library = (value: J) => first(fixture([], [value]));
 
   it('exports the raised limits', () => {
-    expect(COMPONENT_LIMITS).toEqual({ entries: 100, params: 16, bindings: 128, sources: 8, flows: 8 });
+    expect(COMPONENT_LIMITS).toEqual({ entries: 100, params: 16, bindings: 128, sources: 8, flows: 8, values: 16, valueBytes: 8192 });
   });
 
   it('accepts a label and an origin and reads no meaning from them', () => {
@@ -568,12 +568,37 @@ describe('template-owned sources (D2)', () => {
   });
 });
 
+describe('the handshake for sh.component-values@1', () => {
+  const corpus = (name: string) => readFileSync(`contract/corpus/${name}`);
+  const pending: string[] = JSON.parse(corpus('capabilities.pending.json').toString('utf8'));
+  const cases = (JSON.parse(corpus('index.json').toString('utf8')) as { cases: { file: string; outcome: string; pending?: boolean; issue?: { code: string }; studioIssue?: { code: string } }[] }).cases
+    .filter(item => /component-values-/.test(item.file));
+
+  it('is pending, so every case is held back by the shipped list and the Studio gives its own answer', () => {
+    expect(pending).toContain('sh.component-values@1');
+    expect(cases.length).toBeGreaterThanOrEqual(20);
+    expect(cases.every(item => item.outcome === 'reject' && item.pending && item.issue?.code === 'unsupported_capability')).toBe(true);
+    expect(cases.filter(item => !item.studioIssue).map(item => item.file.replace(/^.*component-values-|\.json$/g, '')).sort())
+      .toEqual(['absent-default', 'at-limit', 'color', 'null', 'private-source', 'rule', 'two-fields', 'with-args']);
+  });
+
+  it('names the Studio\'s first issue for each refusal', () => {
+    const issue = (name: string) => cases.find(item => item.file.endsWith(`component-values-${name}.json`))?.studioIssue?.code;
+    expect(['overlap', 'overlap-string-under-value'].map(issue)).toEqual(['invalid_value', 'invalid_value']);
+    expect(['unknown-key'].map(issue)).toEqual(['unknown_field']);
+    expect(['for-text-param', 'args-for-value-param'].map(issue)).toEqual(['invalid_combination', 'invalid_combination']);
+    expect(['too-many', 'too-large'].map(issue)).toEqual(['limit_exceeded', 'limit_exceeded']);
+    expect(issue('null-on-required')).toBe('missing_required');
+    expect(['capability-missing', 'key-capability-missing'].map(issue)).toEqual(['capability_manifest_mismatch', 'capability_manifest_mismatch']);
+  });
+});
+
 describe('the handshake for sh.component-ref@1', () => {
   const corpus = (name: string) => readFileSync(`contract/corpus/${name}`);
   const shipped: string[] = JSON.parse(corpus('capabilities.json').toString('utf8'));
   const pending: string[] = JSON.parse(corpus('capabilities.pending.json').toString('utf8'));
   const cases = (JSON.parse(corpus('index.json').toString('utf8')) as { cases: { file: string; outcome: string; pending?: boolean; issue?: { code: string }; studioIssue?: unknown }[] }).cases
-    .filter(item => /\/(pending-)?component-/.test(item.file));
+    .filter(item => /\/(pending-)?component-/.test(item.file) && !/component-values-/.test(item.file));
 
   it('lists the capability as shipped and not as pending', () => {
     expect(pending).not.toContain('sh.component-ref@1');

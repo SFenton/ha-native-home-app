@@ -202,18 +202,17 @@ test('the level, the checkboxes and the foot are named for assistive technology,
   await expect(proposal(page).getByRole('textbox', { name: 'Name' })).toBeVisible();
 });
 
-test('Add Parameter… on a template\'s field opens its form', async ({ page, request }) => {
+test('Choose Fields… on a template\'s field opens the bar and a box on every row', async ({ page, request }) => {
   await seed(request, lamps.document);
   await openWorkspace(page);
   await previewRoot(page).getByText('Demo Lamps', { exact: true }).first().click();
   await expect(panel(page).getByRole('heading', { name: 'Lamp Pair', exact: true })).toBeVisible();
   if (isPhone(page)) await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
-  // A template with no parameters has its row open already.
+  // A template with no settings has its row open already.
   const templateRow = panel(page).getByRole('button', { name: /^Lamp Pair, template, used in 2 places$/ });
   if ((await templateRow.getAttribute('aria-expanded')) !== 'true') await templateRow.click();
-  const parameters = panel(page).getByTestId('component-parameters');
-  await parameters.getByRole('button', { name: 'Add Parameter…' }).click();
-  await expect(parameters.getByLabel('Field')).toBeVisible();
-  await expect(parameters.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
-  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-add-parameter`);
+  await panel(page).getByRole('button', { name: 'Choose Fields…' }).click();
+  await expect(panel(page).getByTestId('choose-bar')).toBeVisible();
+  await expect(panel(page).getByRole('checkbox', { name: 'Set Title per place' })).toBeVisible();
+  await snap(page, `${isPhone(page) ? 'phone' : 'desktop'}-choose-fields`);
 });

@@ -9,6 +9,7 @@ Full
 Lamp Row
 Template · Used in 2 places
 A change here asks first.
+Choose Fields…
 Title
 Header
 Footer
@@ -22,10 +23,9 @@ Show icons
 Behavior
 Only show when
 Always
-Parameters (1)
+Each place sets (1)
 Entity
-Entity
-Add Parameter…
+Entity · Entity of Demo First
 Advanced
 ID
 Spacing
@@ -39,7 +39,7 @@ Close
 Settings
 Lamp Row, template, used in 2 places
 Only show when: Always.
-Parameters
+Each place sets
 demo-body
 Copy ID
 Add Presented by

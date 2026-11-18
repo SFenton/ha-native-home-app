@@ -136,3 +136,17 @@ describe('every compiler error names its target, its field and what to change, a
     expect(calls).toEqual(['select node:x', 'panel tabs', 'dialog data', 'select page:p']);
   });
 });
+
+describe('the lines for value settings (sh.component-values@1)', () => {
+  it('says what to do when an app does not read value settings', () => {
+    const issue: CompositionIssue = { code: 'unsupported_capability', pointer: '/document/pages/0/components/0', capability: 'sh.component-values@1' };
+    expect(sentenceFor(home, issue).sentence).toContain('Settings for colors, rules and numbers need a newer app than this one runs. Make them the same everywhere, or wait for the app to update.');
+  });
+
+  it('says a value is too large for one place, and keeps the list wording for any other limit', () => {
+    const large: CompositionIssue = { code: 'limit_exceeded', pointer: '/document/pages/0/components/0/values/ink' };
+    expect(sentenceFor(home, large).sentence).toContain('This value is too large for one place. Shorten it.');
+    const other: CompositionIssue = { code: 'limit_exceeded', pointer: '/document/pages/0/components/0/children' };
+    expect(sentenceFor(home, other).sentence).not.toContain('too large for one place');
+  });
+});

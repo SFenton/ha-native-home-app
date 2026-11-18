@@ -1,5 +1,5 @@
 import { childLists, fieldKind, readField, type NodePath } from './components';
-import type { ComponentParamKind, CompositionDocument, CompositionNode } from './schema';
+import type { ComponentStringKind, CompositionDocument, CompositionNode } from './schema';
 
 /**
  * Repeated pieces (templates spec 5, "Find repeated pieces"): the pure walk that finds shapes the document draws more than once, and the
@@ -142,7 +142,7 @@ export interface RepeatField { index: number; field: string; nodeType: string }
 /** Fields that change together across the places, and can be one parameter. */
 export interface RepeatGroup {
   id: string;
-  kind: ComponentParamKind;
+  kind: ComponentStringKind;
   fields: RepeatField[];
   /** The value in each place, in the order of the class's places. */
   values: string[];
