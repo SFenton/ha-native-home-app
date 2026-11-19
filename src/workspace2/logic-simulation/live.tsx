@@ -26,7 +26,7 @@ export function sharedFlowRequests(program: SimulationProgram): readonly { reado
   }
   return [...grouped.values()];
 }
-/** Keep mounted while switching modes: undefined inputs cancel the shared debounce and invalidate in-flight answers. */
+/** Undefined inputs cancel the shared debounce and invalidate in-flight answers before retirement is acknowledged. */
 export function SimulationFlowBridge({ id, ids, inputs, enabled, onRun, onDisabled }: {
   id: string; ids: readonly string[]; inputs: PipelineInputs; enabled: boolean;
   onRun: (ids: readonly string[], state: FlowState) => void;

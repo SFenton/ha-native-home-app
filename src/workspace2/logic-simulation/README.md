@@ -94,7 +94,9 @@ releasing listeners and disposes itself once drained. This is necessary because
 the unchanged `data/liveRun.ts` hook has no unmount cleanup. `active={false}`
 can still pause a retained host, but callers no longer need a special closing
 render. Tests cover pending/in-flight removal, identity changes, refreshed
-restoration, direct unmount and Strict Mode handoffs. The browser harness now
+restoration, direct unmount, inactive-to-active transfers and Strict Mode handoffs.
+Inactive owners release their request leases after cancellation rather than
+blocking another canvas that uses the same shared store. The browser harness now
 closes directly. Reopening or changing document/canvas identity starts Live
 with no pins.
 

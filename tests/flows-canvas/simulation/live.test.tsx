@@ -144,4 +144,18 @@ describe('S-live shared owner and request path', () => {
     await act(async () => resolvers[1](Response.json({ response: { fresh: true }, at: '2026-11-18T16:00:01Z' })));
     expect(observed.at(-1)?.run.answer?.response).toEqual({ fresh: true });
   });
+  it('lets an active canvas refresh after an inactive owner releases the same store', async () => {
+    const requests = sharedFlowRequests(fixture.program), onRun = vi.fn();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {}));
+    const canvases = (first: boolean, second: boolean) => <>
+      <SimulationFlowBridges requests={requests} enabled={first} onRun={onRun} />
+      <SimulationFlowBridges requests={requests} enabled={second} onRun={onRun} />
+    </>;
+    await render(canvases(true, false)); await act(() => vi.advanceTimersByTimeAsync(599));
+    await render(canvases(false, true)); await act(() => vi.advanceTimersByTimeAsync(599));
+    expect(fetch).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(1)); expect(fetch).toHaveBeenCalledTimes(1);
+    await render(canvases(false, false)); await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

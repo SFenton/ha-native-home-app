@@ -41,7 +41,8 @@ function renderOwners() {
   // One headless retire list serializes same-store handoffs, including a direct host replacement.
   root ??= createRoot(document.createElement('div'));
   const currentRoot = root;
-  const requests = [...owners].flatMap(([owner, { requests, ...props }]) => requests.map(request => ({ ...request, ...props, owner })));
+  const requests = [...owners].flatMap(([owner, { requests, ...props }]) =>
+    props.enabled ? requests.map(request => ({ ...request, ...props, owner })) : []);
   root.render(<RetireList requests={requests} closing={!owners.size} onDrained={() => {
     queueMicrotask(() => {
       if (!owners.size && root === currentRoot) { root = undefined; currentRoot.unmount(); }

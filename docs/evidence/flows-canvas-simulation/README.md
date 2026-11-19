@@ -41,7 +41,7 @@ as a flaky CI assertion.
 
 ## Recorded checks and artifacts
 
-`npm test -- --maxWorkers=2`: 269 files, 12,191 passed and one existing skip.
+`npm test -- --maxWorkers=2`: 269 files, 12,192 passed and one existing skip.
 `npm run build`: passed. Focused Playwright: 16 passed across desktop
 (1440 x 900; design scene 1440 x 1100) and phone (390 x 844, 2x capture).
 The permanent corpus comparison and observer invariants remain in those tests.
@@ -76,7 +76,7 @@ hooks, shared live-run hook, canvas, document contract or network API.
 | Finding | Regression evidence |
 | --- | --- |
 | Import resumed Live | Import/delete retain the active captured scenario, pins and mode, even when the saved row is removed. Desktop/phone intercepted traffic covers replacement and unchanged round trips. Only an explicit Live action resumes reads. |
-| Disappearing bridges skipped cancellation | The host's headless two-phase retire list commits old identities disabled before dropping them or enabling a same-store successor. Unit tests cover pending removal, in-flight removal/late-answer rejection, restored refreshes, direct host unmount and Strict Mode handoffs with both unchanged and renamed store IDs. The shared hook is untouched. |
+| Disappearing bridges skipped cancellation | The host's headless two-phase retire list commits old identities disabled before dropping them or enabling a same-store successor. Unit tests cover pending removal, in-flight removal/late-answer rejection, restored refreshes, direct host unmount, inactive-to-active canvas transfers and Strict Mode handoffs with both unchanged and renamed store IDs. The shared hook is untouched. |
 | Failed import hid storage errors | UI saved-list state commits only after persistence succeeds. Denied/quota browser tests compare the visible names with the unchanged stored bytes and retain the attempted import with its warning. |
 | Bounded evidence falsely appeared complete | Real 60-item pipeline runs keep actual counts/results identical while bounded step/iteration copies set the report flag. Browser captures show the trace-wide warning and actual count 60: [desktop](desktop-truncated-trace.png), [phone](phone-truncated-trace.png). |
 | Text contrast below AA | Scoped text corrections cover mixed Live backgrounds, selected purple rows and result badges. The rendered contrast audit below checks every visible text/input pair in each exercised surface and state, in both appearances. No global or canvas colours changed. |
