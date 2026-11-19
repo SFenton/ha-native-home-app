@@ -1,12 +1,13 @@
 {
   "name": "native-home-studio",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "private": true,
   "type": "module",
   "description": "A Home Assistant app for designing and publishing native server-driven experiences.",
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "tsc --noEmit && vite build",
+    "generate:checker": "node scripts/generate-expression-checker.mjs",
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",

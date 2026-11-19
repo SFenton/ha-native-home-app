@@ -14,7 +14,7 @@ import { deviceControlModel, isRoomDeviceSource, validateDeviceControl, validate
 import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroom';
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
-import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
+import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type BudgetAccountingObserver, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
 import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesStateFills } from './state-styles';
 import { identifierSchema } from '../validation';
 import { APP_STATE_CAPABILITY } from './app-state';
@@ -34,6 +34,7 @@ import { PIPELINE_LIMITS, pipelineSourceSchema, type PipelineSource } from './pi
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
+import { emitSchemaAccounting, expandSchemaIssues, isAccountingObserverFailure, observeSchemaRefusal, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
 
@@ -61,20 +62,27 @@ export function compositionDependencyIssues(dependencies: readonly { from: strin
 }
 
 /** A source needs its binding envelope as well as the pipeline's local requirements. */
-export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1): ReturnType<typeof checkPipelineSource> {
-  const facts = checkPipelineSource(source, at);
+export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1, accountingObserver?: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> {
+  const facts = accountingObserver ? checkObservedPipelineSource(source, at, accountingObserver) : checkPipelineSource(source, at);
   if (ordinal > PIPELINE_LIMITS.pipelines) facts.issues.push({ code: 'limit_exceeded', pointer: at });
   return { ...facts, capabilities: [...new Set(['sh.bindings@1', ...facts.capabilities])].sort() };
 }
 
+function checkObservedPipelineSource(source: PipelineSource, at: string, observer: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> {
+  try { return checkPipelineSource(source, at, observer); }
+  catch (error) { rethrowAccountingObserverFailure(error); }
+}
+
 /** Fragment checking permits external reads; a consuming document additionally resolves those reads. */
-export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources'): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
+export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources', accountingObserver?: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
   const facts = sources.map((source, index): ReturnType<typeof checkPipelineSource> => {
-    try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1); }
+    let parsed: PipelineSource;
+    try { parsed = parseCompositionShape(pipelineSourceSchema, source, accountingObserver, `${at}/${index}`); }
     catch (error) {
-      if (!(error instanceof CompositionValidationError)) throw error;
+      if (!(error instanceof CompositionValidationError) || isAccountingObserverFailure(error)) throw error;
       return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), entities: [], reads: [], dependencies: [], capabilities: [] };
     }
+    return checkCompositionPipelineSource(parsed, `${at}/${index}`, index + 1, accountingObserver);
   });
   const dependencies = facts.flatMap(fact => fact.dependencies);
   const issues = [...facts.flatMap(fact => fact.issues), ...compositionDependencyIssues(dependencies)];
@@ -204,7 +212,7 @@ function usesRgba(value: unknown): boolean {
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-function at(input: unknown, path: PropertyKey[]): unknown {
+function at(input: unknown, path: readonly PropertyKey[]): unknown {
   for (const key of path) {
     if (input === null || typeof input !== 'object' || !Object.hasOwn(input, key)) return undefined;
     input = Reflect.get(input, key);
@@ -213,21 +221,30 @@ function at(input: unknown, path: PropertyKey[]): unknown {
 }
 
 /** Converts Zod failures to value-free diagnostics, preserving explicit unsupported capabilities. */
-export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown): T {
-  const parsed = schema.safeParse(input);
+export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown, accountingObserver?: BudgetAccountingObserver, accountingAt = ''): T {
+  const parsed = accountingObserver ? withSchemaAccounting(() => {
+    const result = schema.safeParse(input);
+    // Zod finalizes size-limit issues lazily, without re-running schema checks.
+    if (!result.success) void result.error.issues;
+    return result;
+  }) : schema.safeParse(input);
   if (parsed.success) return parsed.data;
   const issues: CompositionIssue[] = [];
   /**
    * A plain union reports one failure at its own path. The app names the exact field of the branch the value's `type` selects,
    * so descend into the branch that matched the discriminator, whose first failure is not about `type` itself.
    */
-  const expand = (list: readonly z.core.$ZodIssue[]): z.core.$ZodIssue[] => list.flatMap(issue => {
-    if (issue.code !== 'invalid_union' || !('errors' in issue) || !Array.isArray(issue.errors)) return [issue];
-    const branches = (issue.errors as z.core.$ZodIssue[][]).filter(branch => branch.length && !branch.some(inner => inner.path.at(-1) === 'type' && inner.path.length === 1));
-    if (branches.length !== 1) return [issue];
-    return expand(branches[0].map(inner => ({ ...inner, path: [...issue.path, ...inner.path] }) as z.core.$ZodIssue));
-  });
-  for (const issue of expand(parsed.error.issues)) {
+  const expandedIssues = expandSchemaIssues(parsed.error.issues);
+  if (accountingObserver) {
+    const emitted = new Set<object>();
+    const observed = new Map<string, 'complete' | 'partial'>();
+    const read = (path: readonly PropertyKey[]) => at(input, path);
+    for (const issue of expandedIssues) {
+      emitSchemaAccounting(issue, accountingObserver, accountingAt, emitted);
+      observeSchemaRefusal(schema, input, read, issue, accountingObserver, accountingAt, observed);
+    }
+  }
+  for (const issue of expandedIssues) {
     const path = issue.path;
     let capability: string | undefined;
     let unsupportedPath: PropertyKey[] = path;
@@ -283,7 +300,15 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 
 /** Pure first-slice compiler. No requests, actions, asset-byte checks, or native fidelity claims. */
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
-export interface CompileOptions { tileInkDefault?: boolean }
+export interface CompileOptions {
+  tileInkDefault?: boolean;
+  /**
+   * Synchronous snapshots from existing checks, plus one observation-only Checker per structurally limit-refused owning schema root.
+   * Refusal-only facts are discarded; untraversable roots emit partial schema-limit snapshots instead.
+   * Observer exceptions propagate unchanged (including CompositionValidationError), never as document diagnostics.
+   */
+  accountingObserver?: BudgetAccountingObserver;
+}
 /** Native diagnostics keep their public authored pointers and the compiler's corresponding expansion landings. */
 export class CompositionExpansionError extends CompositionValidationError {
   readonly expandedIssues: readonly CompositionIssue[];
@@ -305,6 +330,7 @@ function compileRecording(input: unknown, options: CompileOptions, references?: 
   if (references && record(input)) referenceCache.set(input, references);
   try { return compileCompositionDocumentWithOrigins(input, options, references).compiled; }
   catch (error) {
+    if (isAccountingObserverFailure(error)) throw error;
     if (references && error instanceof CompositionValidationError) references.issues = error.issues;
     throw error;
   }
@@ -315,10 +341,10 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
 } {
   assertCompositionBounds(input);
   let expansion: ReturnType<typeof expandBounded>;
-  try { expansion = expandBounded(input); }
+  try { expansion = expandBounded(input, options.accountingObserver, '/document'); }
   catch (error) {
     // Like every other compile issue, a logic issue reads from the document's root.
-    if (error instanceof CompositionValidationError) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
+    if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
     throw error;
   }
   if (expansion.document === input) {
@@ -332,7 +358,7 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
     const compiled = compilePlain(expansion.document, options, false, references);
     return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   } catch (error) {
-    if (error instanceof CompositionValidationError) throw new CompositionExpansionError(
+    if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionExpansionError(
       remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings),
       error.issues, expansion.document, expansion.origins,
     );
@@ -402,6 +428,7 @@ export interface CompiledComposition {
   expanded: CompositionDocument;
 }
 function compilePlain(input: unknown, options: CompileOptions, bounded = false, references?: CompositionDependencies): { document: CompositionDocument; capabilities: string[]; badged?: true } {
+  const accountingObserver = options.accountingObserver;
   if (!bounded) assertCompositionBounds(input);
   // Show at Most and Spoken As are the draft's: they are worked out into plain operands first, so capabilities and every other check read what a publication holds.
   // An issue inside a worked-out badge is reported at the setting that asked for it. `badged` tells the caller the document to hand back is the one authored.
@@ -409,16 +436,16 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   if (settings.document !== input) {
     try { return { ...compilePlain(settings.document, options, true, references), badged: true }; }
     catch (error) {
-      if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapBadgeIssues(error.issues, settings.badges, input));
+      if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionValidationError(remapBadgeIssues(error.issues, settings.badges, input));
       throw error;
     }
   }
   if (record(input) && input.schemaVersion !== undefined && input.schemaVersion !== '2.0') reject('unsupported_schema', '/document/schemaVersion');
   if (new TextEncoder().encode(canonicalOfBounded(input)).byteLength > MAX_COMPOSITION_BYTES) reject('limit_exceeded', '/document');
   let document: CompositionDocument;
-  try { document = parseCompositionShape(compositionDocumentSchema, input); }
+  try { document = parseCompositionShape(compositionDocumentSchema, input, accountingObserver, '/document'); }
   catch (error) {
-    if (!(error instanceof CompositionValidationError)) throw error;
+    if (!(error instanceof CompositionValidationError) || isAccountingObserverFailure(error)) throw error;
     throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
   }
   const issues: CompositionIssue[] = [];
@@ -479,7 +506,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (route.visibleWhen) {
         require('visible-when');
         // The catalog is built without entity state, so only a viewer-only rule is checked; it holds no source references.
-        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`).issues);
+        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`, false, undefined, accountingObserver).issues);
         else add('invalid_combination', `/document/extensions/routes/${index}/visibleWhen`);
       }
       refs.push({ kind: 'page', id: route.pageId, path: `/document/extensions/routes/${index}/pageId` });
@@ -567,7 +594,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   /** The records the walk is inside while it draws the template of a `repeat` (`sh.repeat@1`); `item` and `index` mean something only there. */
   let repeatScope: ItemScope | undefined;
   function useCall(call: CallService, path: string, control: boolean) {
-    absorb(checkCallService(call, path, control, repeatScope), 'call');
+    absorb(checkCallService(call, path, control, repeatScope, undefined, accountingObserver), 'call');
     const target = call.target?.entity_id;
     if (target?.type === 'literal') {
       for (const id of Array.isArray(target.value) ? target.value : [target.value]) if (typeof id === 'string') collected.entity(id, `${path}/target/entity_id`);
@@ -620,8 +647,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     if (!rule) return;
     require('enabled-when'); usePredicate(rule.condition, `${path}/enabledWhen/condition`);
   }
-  function useOperand(operand: Operand, path: string) { absorb(checkOperand(operand, path, false, false, repeatScope)); }
-  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path, false, repeatScope)); }
+  function useOperand(operand: Operand, path: string) { absorb(checkOperand(operand, path, false, false, repeatScope, accountingObserver)); }
+  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path, false, repeatScope, accountingObserver)); }
   /** A node's or tab's `visibleWhen`; its policy means nothing without one. */
   function visibility(item: Visibility, path: string) {
     if (item.visibleWhen === undefined) { if (item.whenUnknown !== undefined) add('invalid_combination', `${path}/whenUnknown`); return; }
@@ -816,7 +843,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       expandedSources += owned.length;
       if (references) expandSources(ref, entry).forEach((source, index) => {
         const at = `${path}/sources/${index}`;
-        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1' ? checkPipelineSource(source, at).entities : []);
+        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1'
+          ? (accountingObserver ? checkObservedPipelineSource(source, at, accountingObserver) : checkPipelineSource(source, at)).entities : []);
       });
     }
     if ((keys.length || valueKeys.length) && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });
@@ -1145,13 +1173,13 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (stopper.limit?.min) dialNumber(stopper.limit.min, `${at}/limit/min`);
       if (stopper.limit?.max) dialNumber(stopper.limit.max, `${at}/limit/max`);
       if (stopper.action) {
-        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope);
+        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope, undefined, accountingObserver);
         require('call-service'); absorb(facts);
         if (!facts.usesControl) add('invalid_combination', `${at}/action`);
       }
     });
     if (item.action) {
-      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids);
+      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids, accountingObserver);
       require('call-service'); absorb(facts);
       if (!facts.usesControl) add('invalid_combination', `${p}/action`);
     }
@@ -1263,7 +1291,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (kind !== undefined && kind !== 'number') add('binding_type', `${at}/value`);
     }
     if (found.action) {
-      const facts = checkCallService(found.action, `${at}/action`, true);
+      const facts = checkCallService(found.action, `${at}/action`, true, undefined, undefined, accountingObserver);
       require('call-service'); absorb(facts);
       if (!facts.usesControl) add('invalid_combination', `${at}/action`);
       if (found.action.confirmation?.type === 'additional') add('invalid_combination', `${at}/action/confirmation`);
@@ -1921,7 +1949,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     require('bindings');
     register('source', source.id, `${p}/id`);
     if (source.kind === 'model' && source.model === 'pipeline@1') {
-      const found = checkCompositionPipelineSource(source, p, ++pipelines);
+      const found = checkCompositionPipelineSource(source, p, ++pipelines, accountingObserver);
       collected.define(source, p, undefined, found.entities);
       issues.push(...found.issues);
       for (const name of found.capabilities) capabilities.add(name);

@@ -2,6 +2,7 @@ import { z } from 'zod/v4';
 import { identifierSchema } from '../../validation';
 import { shapeSchema, type Shape } from './shape';
 import { compareOperations, mathArity, mathOperations, operandBase, parameterName, predicateBase, type Operand, type Predicate } from '../expression';
+import { attachSchemaAccounting, beginSchemaAccounting } from '../studio-logic/accounting';
 
 /**
  * The `sh.pipeline@1` contract: a Data Flow as a document data source (`kind: 'model'`, `model: 'pipeline@1'`).
@@ -163,7 +164,14 @@ export const pipelineInputsSchema = object({
   title: text(240),
   parameters: z.array(object({ name: parameterName, type: z.enum(parameterTypes), value: operand })).max(PIPELINE_LIMITS.parameters),
   request: requestSchema,
-  steps: z.array(stepSchema).max(PIPELINE_LIMITS.steps),
+  steps: z.array(stepSchema).max(PIPELINE_LIMITS.steps, { error: issue => {
+    const accounting = beginSchemaAccounting();
+    if (accounting && Array.isArray(issue.input)) {
+      accounting.observer({ type: 'steps', scopeId: 'steps:', pointer: '/steps', count: issue.input.length, limit: PIPELINE_LIMITS.steps });
+      attachSchemaAccounting(issue, accounting, 1);
+    }
+    return undefined;
+  } }),
   output: outputSchema,
   /** The authored shape of the final value. The compiler proves the steps produce it; nodes read against it. */
   schema: shapeSchema,
