@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { checkCallService, checkOperand, checkPredicate, compareOperations, dateOperations, mathOperations, operandBase, predicateBase, type CallService, type Operand, type Predicate } from '../../../src/shared/composition/expression';
+import { describe, expect, it, vi } from 'vitest';
+import { checkCallService, checkOperand, checkPredicate, compareOperations, dateOperations, mathOperations, operandBase, predicateBase, type BudgetAccountingEvent, type CallService, type Operand, type Predicate } from '../../../src/shared/composition/expression';
 import { flowExtrasSteps, pipelineSourceSchema, stepOperations } from '../../../src/shared/composition/pipeline/schema';
 import { blockCatalog, budgetMeter, catalogAvailability, checkGraphPipeline, lift, lower, measureBudget, portType, portsCompatible, projectGraph, validateGraph, type GraphBudget, type LogicAnchor, type LogicGraph } from '../../../src/shared/composition/graph';
 import type { Json } from '../../../src/shared/types';
 import { predicateBudgetFixtures } from './fixtures';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
+import * as compiler from '../../../src/shared/composition/compiler';
+import { CompositionValidationError } from '../../../src/shared/composition/json';
+import { compileGraphValue } from '../../../src/shared/composition/graph/compile';
+import { budgetFromCompilation } from '../../../src/shared/composition/graph/budgets';
 import { copy, record, replaceAt } from '../../../src/shared/composition/graph/json';
-import { nativeContext, symbol } from './fixtures/native';
+import { corpusDocument, nativeContext, symbol } from './fixtures/native';
 
 const anchor: LogicAnchor = { kind: 'logic', id: 'test', field: '/body' };
 const nativeRequirements = (ast: Json, context: ReturnType<typeof nativeContext>) => compileCompositionDocument(replaceAt(copy(context.document), context.pointer, ast)).capabilities;
@@ -29,6 +33,99 @@ const flow = (steps = 1, entities = 1) => ({
   },
 });
 function allowed(ast: Json, kind: 'operand' | 'condition' | 'flow') { return lower(lift(ast, { kind, anchor }).graph).ok; }
+
+describe('C-meter observes the existing compiler pass', () => {
+  function summary(events: readonly BudgetAccountingEvent[], document = false) {
+    const scopes = new Map<string, { kind: string; pointer: string; nodes: number; depth: number; nodeLimit: number | null; depthLimit: number | null }>();
+    for (const event of events) {
+      if (event.type === 'scope') scopes.set(event.scopeId, {
+        kind: event.kind === 'predicate' || event.kind === 'flow-condition' ? 'predicate' : 'expression',
+        pointer: document ? event.pointer.replace(/^\/document(?=\/|$)/, '') : event.pointer,
+        nodes: 0, depth: 0, nodeLimit: event.nodeLimit, depthLimit: event.depthLimit,
+      });
+      if (event.type === 'node') {
+        const scope = scopes.get(event.scopeId);
+        if (!scope) throw new Error('Missing direct Checker scope.');
+        scope.nodes = event.attemptedNodes; scope.depth = event.maxDepth;
+      }
+    }
+    return [...scopes.values()];
+  }
+  function meterSummary(budget: GraphBudget) {
+    return budget.scopes.map(({ kind, pointer, nodes, depth, nodeLimit, depthLimit }) => ({ kind, pointer, nodes, depth, nodeLimit, depthLimit }));
+  }
+  it.each([
+    'count-operand-doors-line', 'count-operand-numeric-tests', 'grammar-call-service-operands',
+    'pipeline-choose-in-step', 'pipeline-parameters',
+  ])('matches native Checker counters for corpus %s with one compile and identical output', file => {
+    const document = corpusDocument(`accept/${file}.json`), events: BudgetAccountingEvent[] = [];
+    compileCompositionDocument(document, { accountingObserver: event => { events.push(event); } });
+    const plain = compileGraphValue(document, { kind: 'document' });
+    const native = vi.spyOn(compiler, 'compileCompositionDocumentWithOrigins');
+    try {
+      const { accounting, ...observed } = compileGraphValue(document, { kind: 'document', accounting: true });
+      expect(observed).toStrictEqual(plain);
+      expect(accounting?.length).toBeGreaterThan(0);
+      const budget = budgetFromCompilation(document, anchor, { ...observed, accounting }, { kind: 'document' });
+      expect(meterSummary(budget)).toStrictEqual(summary(events, true));
+      expect(budget.compilerIssues).toStrictEqual(plain.issues);
+      expect(native).toHaveBeenCalledOnce();
+    } finally { native.mockRestore(); }
+  });
+  const rule: Operand = {
+    type: 'choose', cases: Array.from({ length: 17 }, () => ({ when: { type: 'viewer', isAdmin: true }, then: scalar() })), otherwise: scalar(),
+  };
+  const call: CallService = {
+    type: 'call-service', domain: 'light', service: 'turn_on',
+    data: { type: 'object', fields: { payload: { type: 'list', items: Array.from({ length: 63 }, () => scalar()) } } },
+    target: { entity_id: { type: 'list', items: Array.from({ length: 60 }, () => scalar()) } },
+    confirmation: { type: 'additional', style: 'alert', title: 'Confirm', confirmLabel: 'Run', cancelLabel: 'Cancel', destructive: false, when: { type: 'compare', op: 'eq', left: scalar(), right: scalar() } },
+  };
+  it.each(['17-case rule', 'shared-call 129'] as const)('matches direct Checker events, counts and refusal for %s', name => {
+    const events: BudgetAccountingEvent[] = [], observe = (event: BudgetAccountingEvent) => { events.push(event); };
+    const ast = name === '17-case rule' ? rule : call, kind = name === '17-case rule' ? 'operand' : 'call';
+    const facts = name === '17-case rule' ? checkOperand(rule, '', false, false, undefined, observe) : checkCallService(call, '', false, undefined, undefined, observe);
+    const compiled = compileGraphValue(ast, { kind, accounting: true });
+    expect(compiled.accounting).toStrictEqual(events);
+    expect(compiled.issues).toStrictEqual(facts.issues);
+    const budget = budgetFromCompilation(ast, anchor, compiled, { kind });
+    expect(meterSummary(budget)).toStrictEqual(summary(events));
+    expect(budget.accepted).toBe(false);
+    expect(budget.meters).toContainEqual(expect.objectContaining(name === '17-case rule'
+      ? { kind: 'Rule cases', used: 17, limit: 16, exceeded: true }
+      : { kind: 'Expression nodes', used: 129, limit: 128, exceeded: true }));
+  });
+  it('retains the complete shared call counter when editing only its data field', () => {
+    const context = nativeContext('action'), document = replaceAt(copy(context.document), context.pointer, call);
+    const compiled = compileGraphValue(call.data!, { kind: 'operand', context: { document, pointer: `${context.pointer}/data` }, accounting: true });
+    const budget = budgetFromCompilation(call.data!, anchor, compiled);
+    expect(budget).toMatchObject({ accepted: false, nodes: 129 });
+    expect(budget.scopes.find(scope => scope.kind === 'expression')).toMatchObject({ nodes: 129, nodeLimit: 128 });
+  });
+  it('rebases flow-input snapshots to the same field pointers as its diagnostics', () => {
+    const source = pipelineSourceSchema.parse(flow());
+    const compiled = compileGraphValue(source.inputs, { kind: 'flow-inputs', sourceId: source.id, accounting: true });
+    const budget = budgetFromCompilation(source.inputs, anchor, compiled);
+    expect(budget.meters).toContainEqual(expect.objectContaining({ kind: 'Flow steps', pointer: '/steps', used: 1, limit: 32 }));
+    expect(budget.scopes.every(scope => !scope.pointer.startsWith('/inputs/'))).toBe(true);
+  });
+  it('shows only the enforcing partial size snapshot for an untraversable malformed rule', () => {
+    const document = corpusDocument('accept/count-operand-doors-line.json');
+    if (!record(document)) throw new Error('Expected corpus document.');
+    document.logicLibrary = [{ id: 'malformed', name: 'Malformed', kind: 'operand', params: [], body: {
+      ...rule, cases: Array.from({ length: 17 }, () => ({ when: { type: 'viewer', isAdmin: true }, then: null })),
+    } }];
+    const events: BudgetAccountingEvent[] = [];
+    expect(() => compileCompositionDocument(document, { accountingObserver: event => { events.push(event); } })).toThrow(CompositionValidationError);
+    const compiled = compileGraphValue(document, { kind: 'document', accounting: true });
+    expect(events).toEqual([{ type: 'schema-limit', pointer: '/document/logicLibrary/0/body/cases', count: 17, limit: 16, direction: 'maximum', partial: true }]);
+    expect(compiled.accounting).toEqual([{ ...events[0], pointer: '/logicLibrary/0/body/cases' }]);
+    expect(budgetFromCompilation(document, anchor, compiled)).toMatchObject({
+      accepted: false, nodes: null, depth: null, scopes: [],
+      meters: [{ kind: 'Partial maximum size', used: 17, limit: 16, exceeded: true, visible: true }],
+    });
+  });
+});
 
 describe('G-catalog exhaustive named grammar traces', () => {
   const keys = new Set(blockCatalog.map(entry => entry.key));

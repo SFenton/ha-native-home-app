@@ -23,6 +23,9 @@ export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: consume the shared read-on
 export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOptions = {}): GraphBudget {
   return budgetFromCompilation(ast, anchor, compileGraphValue(ast, options), options);
 }
+export function partialBudgetLimit(meter: BudgetMeter): 'minimum' | 'maximum' | undefined {
+  return meter.kind === 'Partial minimum size' ? 'minimum' : meter.kind === 'Partial maximum size' ? 'maximum' : undefined;
+}
 export function budgetFromCompilation(ast: Json, anchor: LogicAnchor, compiled: AccountingCompilation, options: BudgetOptions = {}): GraphBudget {
   if (compiled.accounting !== undefined) return budgetFromAccounting(anchor, compiled, compiled.accounting);
   const compilerIssues = compiled.issues;
@@ -73,14 +76,15 @@ export function budgetFromCompilation(ast: Json, anchor: LogicAnchor, compiled: 
 
 /** Reduces checker snapshots, not the AST. Acceptance and failures remain the single compilation's result. */
 export function budgetFromAccounting(anchor: LogicAnchor, compiled: FragmentCompilation, events: readonly BudgetAccountingEvent[]): GraphBudget {
-  const scopes = new Map<string, GraphBudget['scopes'][number]>();
-  const entries = new Map<string, string[]>();
+  const scopes = new Map<string, {
+    id: string; kind: 'expression' | 'predicate'; pointer: string; nodeLimit: number | null; depthLimit: number | null;
+    nodes: number; depth: number; entries: string[]; nodeAccounting: 'compiler';
+  }>();
   const resets: NonNullable<GraphBudget['counterResets']>[number][] = [];
   const structural: BudgetMeter[] = [];
   for (const event of events) {
     if (event.type === 'scope') {
       const visits: string[] = [];
-      entries.set(event.scopeId, visits);
       scopes.set(event.scopeId, {
         id: event.scopeId, kind: event.kind === 'predicate' || event.kind === 'flow-condition' ? 'predicate' : 'expression',
         pointer: event.pointer, nodeLimit: event.nodeLimit, depthLimit: event.depthLimit, nodes: 0, depth: 0,
@@ -89,8 +93,9 @@ export function budgetFromAccounting(anchor: LogicAnchor, compiled: FragmentComp
     } else if (event.type === 'node') {
       const scope = scopes.get(event.scopeId);
       if (!scope) throw new Error(`Accounting node has no checker scope: ${event.scopeId}`);
-      entries.get(event.scopeId)!.push(event.pointer);
-      scopes.set(event.scopeId, { ...scope, nodes: event.attemptedNodes, depth: event.maxDepth });
+      scope.entries.push(event.pointer);
+      scope.nodes = event.attemptedNodes;
+      scope.depth = event.maxDepth;
     } else if (event.type === 'condition-budget') resets.push({
       pointer: event.pointer, scopeId: event.scopeId,
       kind: event.action === 'restore' ? 'restore' : /\/of\/\d+\/test$/.test(event.pointer) ? 'count'
@@ -98,6 +103,10 @@ export function budgetFromAccounting(anchor: LogicAnchor, compiled: FragmentComp
     });
     else if (event.type === 'rule-cases') structural.push(budgetMeter('Rule cases', event.count, event.limit, event.pointer));
     else if (event.type === 'steps') structural.push(budgetMeter('Flow steps', event.count, event.limit, event.pointer));
+    else if (event.type === 'schema-limit') structural.push({
+      kind: `Partial ${event.direction} size`, pointer: event.pointer, used: event.count, limit: event.limit,
+      ratio: null, visible: true, exceeded: true,
+    });
   }
   const scopeList = [...scopes.values()];
   const expression = scopeList.filter(scope => scope.kind === 'expression');

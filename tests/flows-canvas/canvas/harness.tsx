@@ -2,14 +2,11 @@ import { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { lift, type CanvasSnapshot } from '../../../src/shared/composition/graph';
 import { supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
-import FlowCanvas, { arrangeCanvas, CanvasDialog } from '../../../src/workspace2/canvas/FlowCanvas';
-import Inspector from '../../../src/workspace2/canvas/Inspector';
+import FlowCanvas, { arrangeCanvas } from '../../../src/workspace2/canvas/FlowCanvas';
 import { useStudioTheme } from '../../../src/workspace2/useStudioTheme';
-import { canvasTheme } from '../../../src/workspace2/canvas/theme';
 import { deriveTheme } from '../../../src/workspace2/theme';
-import { anchor, choose, observedFixture } from './fixtures';
+import { anchor, choose, refusedChoose } from './fixtures';
 import { blockCatalog } from '../../../src/shared/composition/graph/catalog';
-import type { CSSProperties } from 'react';
 import type { Json } from '../../../src/shared/types';
 import type { CanvasHostWithObservations } from '../../../src/workspace2/canvas/observations';
 import { observationFixture } from './observation-fixture';
@@ -36,6 +33,7 @@ const ast: Json = fixture === 'large' ? largeGraphFlow()
   : fixture === 'summary' ? { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['home'] }, { type: 'not', of: { type: 'state', sourceId: 'light', path: ['state'], in: ['off'] } }] }
   : fixture === 'warm' || fixture === 'observations' ? warm
   : fixture === 'meter' ? choose
+  : fixture === 'meter-refusal' ? refusedChoose
   : { type: 'math', op: 'add', args: [{ type: 'literal', value: 21 }, { type: 'literal', value: 3 }] };
 function Harness() {
   const followed = useStudioTheme(true);
@@ -75,14 +73,7 @@ function Harness() {
       save: async () => ({ status: 'saved', snapshot }),
     };
   }, []);
-  const meterInspector = <Inspector graph={graph} node={graph.nodes.find(node => node.catalogKey === 'operand.literal.number') ?? graph.nodes[0]} host={host} budgets={[...(fixture === 'meter' ? [observedFixture(choose, 'operand')] : [])]} outputNames={['Subtitle']} send={() => {}} close={() => setClosed(true)} locate={() => {}} move={() => {}} remove={() => {}} onLocate={() => {}}/>;
   if (closed) return <p>Canvas closed. Draft writes: {writes}</p>;
-  if (fixture === 'meter') return <div className="w2-canvas" style={{ ...theme.variables, ...canvasTheme(theme), colorScheme: theme.dark ? 'dark' : 'light' } as CSSProperties}>
-    <header className="w2-canvas-header"><div><h1>Subtitle · Compiler accounting fixture</h1><small>52 steps from one real checker pass. No simulation.</small></div></header>
-    <div className="w2-canvas-work"><main className="w2-canvas-main"><div className="w2-canvas-viewport"><div className="w2-canvas-connections"><h2>Fixture, not production accounting</h2><p>The inspector renders accounting captured from the compiler observer. Production stays unavailable until #28 is integrated; this fixture does not inject counters into FlowCanvas.</p><p>One If / Otherwise, 16 comparisons in All Of, and literal branches. Accepted by the compiler.</p></div></div></main>
-      {window.matchMedia('(max-width: 599px)').matches ? <CanvasDialog title="Block inspector" sheet theme={theme} close={() => setClosed(true)}>{meterInspector}</CanvasDialog> : meterInspector}
-    </div>
-  </div>;
   return <>{lookup && <output hidden aria-label="Large canvas lookup performance" data-milliseconds={lookup.milliseconds} data-ports={lookup.ports} data-nodes={graph.nodes.length}/>}
     <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'large' ? 'Large graph: 2,341 blocks' : fixture === 'summary' ? 'Hallway Light' : fixture === 'observations' ? 'Too Warm Warning (observation fixture)' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={[fixture === 'summary' ? 'Visible When' : 'Subtitle']} onClose={() => setClosed(true)}/></>;
 }

@@ -15,6 +15,7 @@ export interface LowerOptions {
   readonly library?: readonly LogicEntry[];
   readonly itemScope?: ItemScope;
   readonly index?: GraphRevisionIndex;
+  readonly accounting?: boolean;
 }
 const jsonArray = (value: GraphJSON): value is readonly GraphJSON[] => Array.isArray(value);
 /** Lossless buffer projection only. This does not authorize Apply, Save or publication. */
@@ -95,10 +96,11 @@ export function lowerValidated(validated: GraphValidation, options: LowerOptions
     }
   });
   if (errors.length) return { ok: false, original: graph.original, errors, budgets: [] };
-  const documents = new Map([...contextDocuments].map(([key, document]) => [key, compileGraphValue(document, { kind: 'document' })]));
+  const documents = new Map([...contextDocuments].map(([key, document]) => [key, compileGraphValue(document, { kind: 'document', accounting: options.accounting })]));
   const compileOptions: FragmentOptions[] = graph.roots.map((root, index) => ({
     kind: root.destination.kind === 'flow' && record(values[index]) && values[index].model !== 'pipeline@1' ? 'flow-inputs' as const : root.destination.kind,
     context: root.destination.context, library: options.library, itemScope: options.itemScope, allowControl: root.destination.allowControl,
+    accounting: options.accounting,
     sourceId: root.destination.sourceId ?? (root.anchor.kind === 'flow' ? root.anchor.id : undefined),
   }));
   const compilations = graph.roots.map((root, index) => {

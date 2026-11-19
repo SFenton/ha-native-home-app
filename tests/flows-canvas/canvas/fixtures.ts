@@ -9,6 +9,7 @@ export const anchor = { kind: 'logic', id: 'canvas-test', field: '/body' } as co
 export const number = (value = 1): Operand => ({ type: 'literal', value });
 export const comparisons: Predicate = { type: 'all', of: Array.from({ length: 16 }, () => ({ type: 'compare', op: 'eq', left: number(), right: number() })) };
 export const choose: Operand = { type: 'choose', cases: [{ when: comparisons, then: number() }], otherwise: number() };
+export const refusedChoose: Operand = { type: 'choose', cases: Array.from({ length: 17 }, () => ({ when: { type: 'viewer' as const, isAdmin: true }, then: number() })), otherwise: number() };
 export const count: Operand = { type: 'count', of: [{ test: comparisons }] };
 export function observedFixture(ast: Operand | Predicate | CallService, kind: 'operand' | 'condition' | 'call', at = '') {
   const accounting: BudgetAccountingEvent[] = [], observe = (event: BudgetAccountingEvent) => accounting.push(event);

@@ -128,7 +128,8 @@ reported separately from compiler samples; browser mount/edit measurements
 include them end to end. Stage medians, index cost and separate million-read
 construction-seal/trusted-handoff profiles are printed in local and hosted logs.
 Before/after corpus hashes were captured at the pre-optimization head and cover
-ordered diagnostics and every output field, including source maps and budgets.
+ordered diagnostics and every unobserved output field, including source maps and
+budgets. Those golden fixtures and the permanent #24 differential remain unchanged.
 
 ## Optional observation input
 
@@ -184,14 +185,21 @@ until a compatible shared display contract is available. No simulation files
 were edited and no adapter test is claimed. The `observations` harness fixture
 remains scripted display data, not simulation/runtime evidence.
 
-## Accounting dependency (pending)
+## Compiler accounting
 
-`AccountingCompilation` extends main's unchanged `FragmentCompilation` with an
-optional `accounting` array of `BudgetAccountingEvent`.
-`budgetFromCompilation` accepts either shape and reduces those snapshots when
-present; it never replays the checker or derives parallel AST counters.
+Main's #28 observer forwarding is merged. `FlowCanvas` requests
+`lower(graph, { accounting: true })`; the existing single `compileGraphValue`
+captures `BudgetAccountingEvent` snapshots in `FragmentCompilation.accounting`.
+The observer is forwarded through document, fragment, expansion, schema and flow
+entry points, including refusals. `budgetFromCompilation` only reduces those
+events: no second compile, AST walk or independently maintained counting rules.
+Unobserved graph callers retain their original result shape; explicitly request
+`accounting: true` when calling `lower`, `compileGraphValue` or `measureBudget`
+outside the canvas. An unobserved compilation remains a supported input, with
+unavailable counters rather than estimates.
 `LimitsMeter` consumes only the resulting `GraphBudget`. Compact figures appear
-strictly **above** 75%, in the inspector's **Fits in the phone app** section.
+strictly **above** 75%, or for a refused partial size, in the inspector's
+**Fits in the phone app** section.
 Each field has one thin bar with plain-word steps/deep text, using its most
 constrained compiler counter rather than adding different scopes together.
 All scopes, pointers, resets, runtime limits, capabilities and unavailability
@@ -200,15 +208,22 @@ Null limits stay uncapped. Counts/depths include the first refused entry, not un
 Compiler acceptance and ordered diagnostics remain authoritative, including
 both CHK-nested-choose-budget outcomes.
 
-**Production observer forwarding is not connected yet.** W2-D owns the native
-compiler entry points. Until that dependency merges and `graph/compile.ts`
-captures/forwards its exact observer option in the single compile, production
-expression, predicate and flow counts remain explicitly **unavailable**.
-Expansion duplication/generated-flow totals also remain unavailable.
+Refusals show the enforcing count and limit, including 17 of 16 rule cases and
+129 of 128 shared call entries. An untraversable malformed value shows the
+compiler's size and minimum/maximum, explicitly marked **partial**, with no
+invented node/depth totals or percentage (including zero limits).
+Contextual snapshots use field-relative pointers,
+but retain the complete enclosing shared counter when editing only part of it.
+Expansion duplication/generated-flow totals and unobserved structural limits
+remain unavailable; compiler counters are not presented as those quantities.
 
-The test-only meter fixture calls the existing real checker observer and passes
-its snapshots through the same budget adapter. Its threshold screenshot is
-explicitly labelled as a fixture, not evidence that production counters work.
+The browser meter fixtures now mount the actual `FlowCanvas` in both accepted
+and refused states; no test-only budget injection remains. Unit tests compare
+the meter with native Checker snapshots on five corpus documents, the 17-case
+refusal, shared-call 129 and a malformed partial case. The unchanged compiler
+gate now measures the observed canvas path, with 30 warmups and 31 samples.
+An additional 51 alternating observed/unobserved lowering pairs after 30 paired
+warmups report net accounting cost, including capture and meter reduction.
 
 ## Isolated acceptance harness
 

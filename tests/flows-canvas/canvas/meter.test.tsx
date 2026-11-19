@@ -6,7 +6,7 @@ import LimitsMeter from '../../../src/workspace2/canvas/LimitsMeter';
 import type { CallService, Operand, Predicate } from '../../../src/shared/composition/expression';
 import { predicateBudgetFixtures } from '../graph/fixtures';
 import { copy } from '../../../src/shared/composition/graph/json';
-import { anchor, choose, count, flowFixture, number, observedFixture } from './fixtures';
+import { anchor, choose, count, flowFixture, number, observedFixture, refusedChoose } from './fixtures';
 import { budgetFromCompilation, measureBudget } from '../../../src/shared/composition/graph';
 import { compileGraphValue, type FragmentCompilation } from '../../../src/shared/composition/graph/compile';
 
@@ -77,11 +77,37 @@ describe('C-meter uses real checker accounting, not canvas AST counts', () => {
       expect(initial).toMatchObject({ used: 35, limit: null, ratio: null, visible: false, exceeded: false });
     }
   });
-  it('keeps production accounting explicitly unavailable until observer integration', () => {
-    render(<LimitsMeter budgets={[measureBudget(choose, anchor, { kind: 'operand' })]}/>);
+  it('shows real production accounting from the existing compile', () => {
+    render(<LimitsMeter budgets={[measureBudget(choose, anchor, { kind: 'operand', accounting: true })]}/>);
     fireEvent.click(screen.getByText('Details'));
-    expect(screen.getByText(/Accounting unavailable pending observer/)).toBeTruthy();
-    expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.queryByText(/No compiler accounting was captured/)).toBeNull();
+    expect(screen.getByRole('meter').getAttribute('value')).toBe('0.8125');
+    expect(screen.getByLabelText('Limits for Result').textContent).toContain('52 of 64 steps');
+  });
+  it('shows the exceeded limit from a refused 17-case rule', () => {
+    const budget = measureBudget(refusedChoose, anchor, { kind: 'operand', accounting: true });
+    expect(budget.accepted).toBe(false);
+    render(<LimitsMeter budgets={[budget]}/>);
+    expect(screen.getByLabelText('Limits above 75 percent').textContent).toContain('17 of 16 choices');
+    fireEvent.click(screen.getByText('Details'));
+    expect(screen.getByText('Compiler refused this output.')).toBeTruthy();
+    expect(screen.getAllByText(/17 of 16 choices/)).toHaveLength(2);
+  });
+  it.each([
+    ['minimum', 0, 1], ['maximum', 17, 16], ['minimum', 0, 0], ['maximum', 1, 0],
+  ] as const)('shows a partial %s size %i at limit %i without fabricated totals or percentages', (direction, count, limit) => {
+    const compiled = compileGraphValue(choose, { kind: 'operand' });
+    const budget = budgetFromCompilation(choose, anchor, { ...compiled,
+      issues: [{ code: 'limit_exceeded', pointer: '/cases' }],
+      accounting: [{ type: 'schema-limit', pointer: '/cases', count, limit, direction, partial: true }],
+    });
+    expect(budget).toMatchObject({ nodes: null, depth: null, scopes: [], accepted: false });
+    expect(budget.meters[0]).toMatchObject({ ratio: null, exceeded: true });
+    render(<LimitsMeter budgets={[budget]}/>);
+    expect(screen.getByLabelText('Limits above 75 percent').textContent).toContain(`Size ${count}; ${direction} ${limit} (partial)`);
+    expect(screen.getByRole('meter').getAttribute('value')).toBe('1');
+    fireEvent.click(screen.getByText('Details'));
+    expect(screen.getByText(new RegExp(`Partial accounting: size ${count}; ${direction} ${limit}`))).toBeTruthy();
   });
   it('accepts an unobserved main compilation without replaying its checker or estimating counters', () => {
     const check = vi.spyOn(expression, 'checkOperand');

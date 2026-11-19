@@ -23,6 +23,58 @@ npx vitest run tests/flows-canvas/graph/canvas-performance.test.ts \
   --maxWorkers=2 --reporter=verbose --silent=false
 ```
 
+## Single-pass compiler accounting
+
+Merged main at `897268f` (#28). The production `FlowCanvas` now opts into the
+existing compiler pass's accounting observer; snapshots travel through
+`graph/compile.ts` and `FragmentCompilation` to the budget reducer. There is no
+second compile or counting walk. Unobserved public callers remain compatible.
+Five corpus documents match native Checker counts exactly; focused tests also
+cover the 17-case refusal, shared-call 129, partial malformed input, flow-input
+pointer rebasing and a shared call counter enclosing the edited field.
+
+The refreshed [desktop meter](desktop-meter.png) and
+[phone meter](phone-meter.png) now come from the actual canvas, not an injected
+budget fixture. The [desktop refusal](desktop-meter-refusal.png) and
+[phone refusal](phone-meter-refusal.png) show the compiler's 17-of-16 choice limit.
+Partial refusals display their actual size and minimum/maximum, marked partial;
+their missing traversal totals are never invented.
+
+The unchanged 50 ms performance assertion now exercises the observed path on
+the same 2,341-node / 32-step edited fixture, with fresh indexes, 30 instrumented
+warmups, 31 samples and exactly one native checker call per sample. A separate
+paired measurement includes capture and reduction in the observed lower cost.
+Hosted targets remain <=35 ms compiler and <=2,500 ms mount per device; the
+orchestrator owns hosted verification after the push.
+
+Local accounting acceptance:
+
+- Unrestricted `npm test`: **280 files / 14,414 passed**, one pre-existing skip.
+  The observed compiler median was **19.59 ms**: validate **12.21 ms**, lower
+  **6.54 ms**, adapter **3.74 ms** (included in lower). Fresh indexes **1.36 ms**.
+  This leaves **30.41 ms** under the unchanged 50 ms gate locally.
+- Final isolated gate: **16.48 ms** total; validate **9.56 ms**, lower **6.80 ms**,
+  adapter **3.69 ms**, indexes **1.05 ms**. Stage medians are independent.
+- Isolated matched accounting profile: observed lower **6.31 ms**, unobserved
+  lower **7.44 ms**, paired net cost **-1.61 ms**, over 51 alternating pairs after 30
+  paired warmups. This includes snapshot capture and meter reduction, not just
+  callback dispatch. The observed reducer replaces the unobserved fallback's
+  scope-location AST walk, so net cost is not isolated observer-callback cost.
+- A prior concurrent full-suite/build run failed at **51.10 ms**. The unchanged
+  code passed at 28.11 ms with no concurrent build/browser work of ours, and the
+  final suite passed at 19.59 ms; that
+  failure is not counted as a pass or an exact causal measurement of Mac load.
+- All **28 standard-config browser cases passed**. Desktop mount/focus/edit:
+  **1,084.81 / 90.81 / 157.72 ms**; phone **1,117.43 / 135.64 / 189.66 ms**.
+  Both are below the local mount target; neither is hosted CI evidence.
+  Mount port reads remain **99 / 96**, with **zero** edit geometry reads.
+- Partial guard tests include zero limits and exclusive-boundary refusals:
+  these show the authoritative refused size, not a fabricated percentage.
+- Production build/typecheck passed. The original corpus golden file and
+  permanent #24 differential were not changed and pass.
+
+## Earlier construction evidence
+
 Construction-time immutability correction (supersedes repeated deep freezing):
 
 - The `2f6be72` hosted compiler gate failed at **70.80 ms**: validate **48.82 ms**,
@@ -144,7 +196,7 @@ figures and actual run-not-skipped log evidence belong to
 [PR #29's verification record](https://github.com/SFenton/ha-native-home-app/pull/29):
 local figures do not prove the hosted runner meets the unchanged gate.
 
-Every corpus case and both the original and edited large fixture match
+Every unobserved corpus case and both the original and edited large fixture match
 pre-optimization golden ordered-tree hashes captured at `196cac8`.
 The hashes cover ordered diagnostic codes/paths/messages and every lowering
 output field; repeated whole-document anchor strings are hashed without
@@ -200,6 +252,8 @@ The compound summary follows panel 3 of 15-editor, **not superseded panel 2**.
 | **Phone, custom HA inspector sheet** ![Custom summary sheet](phone-custom-summary.png) | ![Summary reference, panel 3](../../design/flows/15-editor.png) |
 | **Desktop, above-threshold inspector meter** ![Inspector meter](desktop-meter.png) | ![Inspector meter reference](../../design/flows/12-canvas.png) |
 | **Phone, above-threshold inspector meter** ![Inspector sheet meter](phone-meter.png) | ![Inspector meter reference](../../design/flows/12-canvas.png) |
+| **Desktop, refused 17-case rule** ![Refused inspector meter](desktop-meter-refusal.png) | ![Inspector meter reference](../../design/flows/12-canvas.png) |
+| **Phone, refused 17-case rule** ![Refused inspector sheet meter](phone-meter-refusal.png) | ![Inspector meter reference](../../design/flows/12-canvas.png) |
 | **Too Warm Warning: Average, Is Above, All Of, If / Otherwise** ![Too Warm scene](desktop-too-warm-warning.png) | ![Too Warm Warning reference](../../design/flows/12-canvas.png) |
 | **Too Warm Warning: phone selection lens** ![Too Warm phone scene](phone-too-warm-warning.png) | ![Too Warm Warning reference](../../design/flows/12-canvas.png) |
 | **Desktop, light observations** ![Light observations](desktop-light-observations.png) | ![Simulation observation reference](../../design/flows/13-sim.png) |
@@ -248,16 +302,13 @@ The local readonly contract remains
 connected-source or configured-literal fallback exists. Focus restoration and
 the single-compile path are preserved when only observations change.
 
-**Still pending: #28 is open.** No excluded compiler/pipeline files were edited.
-Production expression, predicate and flow accounting remain unavailable inside
-the meter's collapsed Details until the observer-forwarding PR merges and
-`graph/compile.ts` captures its exact observer option from the single compile.
-Expansion duplication/generated-flow totals also remain unavailable.
-The typed reducer and UI never estimate counters or replay the checker.
-`AccountingCompilation` locally extends main's unchanged compilation interface
-with optional snapshots; `graph/compile.ts` is byte-identical to current main.
-The missing-property runtime regression asserts unavailable counters and exactly
-one native checker invocation.
+**#28 is merged and connected.** No W2-D compiler/pipeline files were edited.
+Production expression, predicate and flow counters now come from the single
+native compile. Full refusals show the exceeded limit; partial schema guards
+show size and limit without invented traversal totals. Expansion duplication
+and generated-flow totals remain unavailable. Unobserved callers remain valid,
+and their missing-property regression still asserts unavailable counters and
+exactly one native checker invocation.
 
 Focused tests retain exact thresholds: expression 48/49, shared call 96/97,
 predicate 24/25, expression-depth 6/7, predicate-depth 4/5, choices 12/13 and

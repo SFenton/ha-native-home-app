@@ -161,12 +161,25 @@ test('C-themes: light, dark, custom HA tokens and narrow palette/canvas/summary 
     await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-summary.png`, fullPage: true });
   }
 });
-test('C-meter: above-threshold screenshot is derived from the checker fixture, never estimated', async ({ page }, testInfo) => {
+test('C-meter: production canvas shows counters from its single compiler pass', async ({ page }, testInfo) => {
   await page.goto(`${harness}?fixture=meter`);
+  await activate(page, page.getByRole('button', { name: 'Close block palette' }));
+  await selectBlock(page, 'Select Number 4'); await page.keyboard.press('Enter');
+  await nodeControl(page, 'Inspect Number'); await page.keyboard.press('Enter');
   await expect(page.getByLabel('Limits above 75 percent')).toContainText('52 of 64 steps');
   await expect(page.getByRole('meter', { name: 'Subtitle fit', exact: true })).toHaveAttribute('value', '0.8125');
   await expect(page.getByText('Details', { exact: true }).locator('..')).not.toHaveAttribute('open', '');
   await page.screenshot({ path: `${evidence}/${testInfo.project.name}-meter.png`, fullPage: true });
+});
+test('C-meter refusal: production canvas shows the actual exceeded rule-case limit', async ({ page }, testInfo) => {
+  await page.goto(`${harness}?fixture=meter-refusal`);
+  await activate(page, page.getByRole('button', { name: 'Close block palette' }));
+  await expect(page.getByRole('button', { name: 'Apply to draft', exact: true })).toBeDisabled();
+  await activate(page, page.getByRole('button', { name: 'Inspector', exact: true }));
+  await expect(page.getByLabel('Limits above 75 percent')).toContainText('17 of 16 choices');
+  await expect(page.getByRole('meter', { name: 'Subtitle fit', exact: true })).toHaveAttribute('value', '1');
+  await page.getByLabel('Fits in the phone app', { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${evidence}/${testInfo.project.name}-meter-refusal.png`, fullPage: true });
 });
 test('C-fidelity: Too Warm Warning recipe, compact chrome, outline wires and keyboard help', async ({ page }, testInfo) => {
   if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 1920, height: 1120 });

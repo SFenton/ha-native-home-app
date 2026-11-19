@@ -86,7 +86,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const models = useMemo(() => presentBlocks(graph, index, names, host.data.sources, previousModels.current), [graph, index, names, host.data.sources]);
   const layoutKey = useMemo(() => blockLayoutKey(graph, models), [graph, models]);
   useLayoutEffect(() => { navigationOrder.current = ordered; previousModels.current = models; }, [ordered, models]);
-  const result = useMemo(() => lower(graph, { targetCapabilities: host.targetCapabilities, index: index.revision }), [graph, index, host.targetCapabilities]);
+  const result = useMemo(() => lower(graph, { targetCapabilities: host.targetCapabilities, index: index.revision, accounting: true }), [graph, index, host.targetCapabilities]);
   const detached = useMemo(() => detachedNodes(graph, index), [graph, index]);
   const dirty = graph !== baseline.current;
   const focus = useCallback((target: CanvasFocus) => {

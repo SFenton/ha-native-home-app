@@ -26,17 +26,18 @@ it('C-meter preserves one compilation and <=50ms median validate plus lower for 
   });
   let recording = false;
   try {
-    for (let i = 0; i < warmups; i++) lowerValidated(validateForLowering(edited, prepareGraphRevision(edited)));
+    for (let i = 0; i < warmups; i++) lowerValidated(validateForLowering(edited, prepareGraphRevision(edited)), { accounting: true });
     check.mockClear(); observeAdapter.mockClear();
     recording = true;
     for (let i = 0; i < measured; i++) {
       const start = performance.now();
       const index = prepareGraphRevision(edited), indexed = performance.now();
       const validated = validateForLowering(edited, index), middle = performance.now();
-      const diagnostics = validated.diagnostics, result = lowerValidated(validated);
+      const diagnostics = validated.diagnostics, result = lowerValidated(validated, { accounting: true });
       samples.push(performance.now() - start);
       indexTimes.push(indexed - start); validationTimes.push(middle - start); lowerTimes.push(performance.now() - middle);
       expect(diagnostics.filter(issue => issue.severity === 'error')).toEqual([]); expect(result.ok).toBe(true);
+      expect(result.budgets[0]).toMatchObject({ accounting: 'partial', nodes: expect.any(Number) });
     }
     expect(check).toHaveBeenCalledTimes(measured);
   } finally { check.mockRestore(); observeAdapter.mockRestore(); }
@@ -48,6 +49,22 @@ it('C-meter preserves one compilation and <=50ms median validate plus lower for 
   process.stdout.write(`Canvas indexes: ${median(indexTimes)} ms, included in validate and total; prepared once per measured revision.\n`);
   process.stdout.write(`Canvas construction: initial ${construction.toFixed(2)} ms; edited revision ${editConstruction.toFixed(2)} ms; separate from compiler samples and included in browser mount/edit.\n`);
   expect(samples[middle]).toBeLessThanOrEqual(50);
+  const validated = validateForLowering(edited), plain: number[] = [], observed: number[] = [], differences: number[] = [];
+  for (let i = 0; i < 30; i++) for (const accounting of [false, true]) lowerValidated(validated, { accounting });
+  for (let i = 0; i < 51; i++) {
+    let unobservedTime = 0, observedTime = 0;
+    for (const accounting of i % 2 ? [true, false] : [false, true]) {
+      const start = performance.now();
+      const result = lowerValidated(validated, { accounting });
+      const elapsed = performance.now() - start;
+      expect(result.ok).toBe(true);
+      if (accounting) { observedTime = elapsed; observed.push(elapsed); }
+      else { unobservedTime = elapsed; plain.push(elapsed); }
+    }
+    differences.push(observedTime - unobservedTime);
+  }
+  const costMedian = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)].toFixed(2);
+  process.stdout.write(`Canvas accounting: observed lower ${costMedian(observed)} ms; unobserved lower ${costMedian(plain)} ms; paired overhead ${costMedian(differences)} ms; 51 alternating pairs after 30 paired warmups, same immutable fixture; capture and meter reduction included.\n`);
   const token = validateForLowering(edited);
   for (let i = 0; i < 10_000; i++) readGraphValidation(token);
   const start = performance.now();
