@@ -1,6 +1,6 @@
 import { catalogByKey } from './catalog';
 import { atPointer, copy, copyShape, fingerprint, replaceAt } from './json';
-import { expressionPort, inputType, portsCompatible } from './ports';
+import { expressionPort, expressionScope, inputType, portsCompatible, scopesCompatible } from './ports';
 import { describeGrammar, type FragmentKind } from './grammar';
 import type { Json } from '../../types';
 import type { GraphDiagnostic, GraphEdge, GraphNode, LogicGraph } from './types';
@@ -56,7 +56,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     const owner = scope?.ownerNodeId ? nodes.get(scope.ownerNodeId) : undefined;
     const params = owner?.payload.kind === 'flow-inputs' ? new Map(owner.payload.value.parameters.map(parameter => [parameter.name, parameter.type])) : new Map();
     return current !== undefined && (node.payload.kind === 'operand' || node.payload.kind === 'condition')
-      ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(scope?.itemShape ? { item: copyShape(scope.itemShape) } : {}) }, output.scopeId) : output;
+      ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(scope?.itemShape ? { item: copyShape(scope.itemShape) } : {}) }, expressionScope(current, node.scopeId, graph.scopes)) : output;
   };
   if (scopes.size !== graph.scopes.length) report('duplicate_id', 'Scope IDs must be unique.');
   for (const scope of graph.scopes) {
@@ -93,9 +93,11 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
       && original !== undefined && fromOriginal !== undefined
       && current !== undefined && fingerprint(current) === fingerprint(fromOriginal);
     const actual = actualOutput(from) ?? output.type;
-    const match = portsCompatible(actual, inputType(to, edge.binding, input.type));
-    if (!match.compatible && !unchanged) report(actual.scopeId && actual.scopeId !== input.type.scopeId ? 'scope_mismatch' : 'binding_type', match.reason!, to.id, input.id);
-    if (output.type.scopeId && output.type.scopeId !== input.type.scopeId) report('scope_mismatch', 'Item-scoped values cannot leave their scope.', to.id, input.id);
+    const destinationScopeId = ['document', 'flow', 'flow-inputs', 'logic-entry'].includes(to.payload.kind) ? input.type.scopeId ?? to.scopeId : to.scopeId;
+    const expected = inputType({ ...to, scopeId: destinationScopeId }, edge.binding, input.type);
+    const sameScope = scopesCompatible(actual, expected, graph.scopes);
+    const match = portsCompatible(actual, expected, graph.scopes);
+    if (!match.compatible && (!unchanged || !sameScope)) report(sameScope ? 'binding_type' : 'scope_mismatch', match.reason!, to.id, input.id);
   }
   for (const node of graph.nodes) {
     if (!scopes.has(node.scopeId)) report('invalid_reference', 'Block scope is missing.', node.id);

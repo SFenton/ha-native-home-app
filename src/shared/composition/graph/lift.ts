@@ -5,10 +5,10 @@ import { z } from 'zod/v4';
 import { requestShape } from '../pipeline/sources';
 import { elementOf, type Shape } from '../pipeline/shape';
 import { newFacts, typeSteps, type TypeScope } from '../pipeline/typing';
-import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
+import { describeGrammar, inferFragment, type FragmentKind } from './grammar';
 import { atPointer, copy, copyShape, fingerprint, record, segments, withoutCanvasMetadata } from './json';
 import { autoLayout } from './layout';
-import { expressionPort, inputType, outputPort, portType } from './ports';
+import { expressionPort, expressionScope, inputType, outputPort, portType } from './ports';
 import { graphSourceSchema, typingSteps } from './capabilities';
 import type { GraphDiagnostic, GraphEdge, GraphNode, GraphScope, GraphSourceLocation, LiftResult, LogicAnchor, LogicGraph, OpaqueRegion, PortType, StudioCanvasMetadata } from './types';
 
@@ -66,15 +66,7 @@ export function lift(ast: Json, options: LiftOptions = {}): LiftResult {
       ensureScope({ id: scopeId, kind: 'flow', parentId: inherited, ownerNodeId: id });
     }
     const payload = description.payload.kind === 'opaque' ? { ...description.payload, pointer: at } : description.payload;
-    const depends = (candidate: Json, names: readonly string[]): boolean => record(candidate) && (names.includes(String(candidate.type))
-      || expressionChildren(candidate, 'operand').some(child => depends(child.value, names)));
-    let portScope: string | undefined;
-    if (depends(value, ['item', 'index', 'hole'])) portScope = scopeId;
-    else if (depends(value, ['param'])) {
-      let owner = scopes.find(scope => scope.id === scopeId);
-      while (owner && owner.kind !== 'flow') owner = scopes.find(scope => scope.id === owner?.parentId);
-      portScope = owner?.id ?? scopeId;
-    }
+    const portScope = expressionScope(value, scopeId, scopes);
     let type = expressionPort(value, hint === 'condition' || payload.kind === 'condition' || payload.kind === 'logic-ref' && payload.representation === 'condition', typing, portScope);
     if (!['operand', 'condition', 'logic-ref', 'hole'].includes(payload.kind)) type = portType({ kind: 'object', fields: {} }, 'stream');
     if (hint === 'source-selection' || payload.kind === 'source-selection') type = { ...portType({ kind: 'string' }, 'source-selection', portScope), valueType: 'entity' };
@@ -113,7 +105,7 @@ export function lift(ast: Json, options: LiftOptions = {}): LiftResult {
       }
       const inner = visit(child.value, child.kind, childAt, childScope, childTyping);
       const actual = inner.outputs[0].type;
-      const input = { id: child.binding, label: child.binding, type: inputType(node, child.binding, actual), required: true, binding: child.binding };
+      const input = { id: child.binding, label: child.binding, type: inputType({ ...node, scopeId: inner.scopeId }, child.binding, actual), required: true, binding: child.binding };
       node = { ...node, inputs: [...node.inputs, input] };
       edges.push({ id: `edge-${edges.length + 1}`, kind: actual.representation, from: { nodeId: inner.id, portId: 'value' }, to: { nodeId: id, portId: input.id }, binding: child.binding });
       sourceMap.push({ pointer: childAt, nodeId: id, portId: input.id, anchor });

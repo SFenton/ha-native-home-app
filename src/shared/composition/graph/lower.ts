@@ -58,7 +58,7 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
   try { ({ ast, sourceMap } = projectGraph(graph)); assertCompositionBounds(ast); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
-    return { ok: false, original: graph.original, errors: error.issues.map(issue => diagnostic(issue, graph.roots[0])), budgets: [] };
+    return { ok: false, original: graph.original, errors: [...errors, ...error.issues.map(issue => diagnostic(issue, graph.roots[0]))], budgets: [] };
   }
   const values = graph.roots.length === 1 ? [ast] : Array.isArray(ast) ? ast : [ast];
   const budgets: GraphBudget[] = [];

@@ -10,6 +10,9 @@ actions, or UI dependencies.
   Payloads contain grammar-checked skeletons; each ordered input binding replaces
   its skeleton child. Template references remain references. Opaque blocks retain
   exact JSON and cannot be edited.
+  Input constraints come from grammar positions and destination lexical scopes,
+  not the previous child's enum/refinements. Item values stay in their step;
+  flow parameters remain available in descendant scopes of their own flow.
 - `lower(graph, {library, targetCapabilities, itemScope})` validates before
   returning atomic replacements. Failures retain `original`; they never return
   a partially modified document. Complete documents use the existing compiler.

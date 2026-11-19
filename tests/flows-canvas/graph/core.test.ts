@@ -253,6 +253,23 @@ describe('typed connections, structural refusals and fan-out', () => {
     expect(portsCompatible(portType({ kind: 'number' }, 'operand', 'item-a'), portType({ kind: 'number' }, 'operand', 'item-b')).compatible).toBe(false);
   });
   const base = () => lift({ type: 'math', op: 'add', args: [scalar(1), scalar(2)] }, { kind: 'operand' }).graph;
+  it('allows ordinary Choose value edits without retaining the previous literal enum', () => {
+    const ast: Operand = { type: 'choose', cases: [{ when: state(), then: { type: 'literal', value: 'Hot' } }], otherwise: { type: 'literal', value: 'Cold' } };
+    const graph = lift(ast, { kind: 'operand' }).graph;
+    const edited: LogicGraph = { ...graph, nodes: graph.nodes.map(node => node.payload.kind === 'operand' && node.payload.value.type === 'literal' && node.payload.value.value === 'Hot'
+      ? { ...node, payload: { kind: 'operand', value: { type: 'literal', value: 'Warm' } } } : node) };
+    expect(lower(edited)).toMatchObject({ ok: true, ast: { ...ast, cases: [{ ...ast.cases[0], then: { type: 'literal', value: 'Warm' } }] } });
+  });
+  it('allows same-step item rewiring but rejects a different step scope', () => {
+    const source = pipelineSourceSchema.parse(flow());
+    source.inputs.steps.unshift(...[0, 1].map(i => ({ id: `filter-${i}`, op: 'filter' as const, where: { type: 'compare' as const, op: 'eq' as const, left: { type: 'item' as const, path: ['state'] }, right: { type: 'literal' as const, value: 'on' } } })));
+    const graph = lift(source, { kind: 'flow' }).graph;
+    const item = graph.nodes.find(node => node.origins[0] === '/inputs/steps/0/where/left')!;
+    const wire = (step: number): LogicGraph => ({ ...graph, edges: graph.edges.map(edge => graph.nodes.find(node => node.id === edge.to.nodeId)?.origins[0] === `/inputs/steps/${step}/where` && edge.binding === '/right'
+      ? { ...edge, from: { nodeId: item.id, portId: 'value' } } : edge) });
+    expect(lower(wire(0))).toMatchObject({ ok: true });
+    expect(lower(wire(1))).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'scope_mismatch' })]) });
+  });
   it('refuses occupied inputs, disconnections, cycles and wrong edge binding without mutating the original', () => {
     const graph = base(), edge = graph.edges[0];
     expect(validateGraph({ ...graph, edges: [...graph.edges, { ...edge, id: 'extra' }] }).some(error => error.code === 'occupied_input')).toBe(true);
