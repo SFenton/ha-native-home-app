@@ -4,7 +4,7 @@ import {
   ANY, BOOLEAN, INTEGER, NEVER, NUMBER, STRING, elementOf, fieldOf, hasObject, kindsOf, merge, objectOf, orNull, shapeAt, text, withField, withoutNull,
   type Member, type Shape,
 } from './shape';
-import { MAX_RULE_CASES } from '../expression';
+import { BudgetAccountingScope, MAX_RULE_CASES, type BudgetAccountingObserver } from '../expression';
 import { mathArity, PIPELINE_LIMITS, type PipelineOperand, type PipelineStep, type ReadKind, type Where } from './schema';
 import { flowExtrasDateStyles } from '../expression';
 
@@ -80,10 +80,18 @@ const holeName = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
 const entityIdFormat = text('entity-id');
 
 /** Types one operand. Issues, reads and parameter references go to `facts`; the result is `any` where the operand is wrong. */
-export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: string, facts: TypeFacts, budget: NodeBudget = { nodes: PIPELINE_LIMITS.operandNodes }, depth = 1): Shape {
-  if (depth > PIPELINE_LIMITS.operandDepth || budget.nodes <= 0) { report(facts, 'limit_exceeded', at); return ANY; }
+export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: string, facts: TypeFacts, budget: NodeBudget = { nodes: PIPELINE_LIMITS.operandNodes }, depth = 1, observer?: BudgetAccountingObserver): Shape {
+  const accounting = observer ? new BudgetAccountingScope(observer, 'flow-operand', at, budget.nodes, PIPELINE_LIMITS.operandDepth) : undefined;
+  return walkOperand(operand, scope, at, facts, budget, depth, accounting);
+}
+function walkOperand(operand: PipelineOperand, scope: TypeScope, at: string, facts: TypeFacts, budget: NodeBudget, depth: number, accounting?: BudgetAccountingScope): Shape {
+  if (depth > PIPELINE_LIMITS.operandDepth || budget.nodes <= 0) {
+    accounting?.enter(at, depth, false, budget.nodes);
+    report(facts, 'limit_exceeded', at); return ANY;
+  }
   budget.nodes -= 1;
-  const sub = (child: PipelineOperand, ...parts: (string | number)[]) => typeOperand(child, scope, parts.reduce<string>(join, at), facts, budget, depth + 1);
+  accounting?.enter(at, depth, true, budget.nodes);
+  const sub = (child: PipelineOperand, ...parts: (string | number)[]) => walkOperand(child, scope, parts.reduce<string>(join, at), facts, budget, depth + 1, accounting);
   switch (operand.type) {
     case 'literal': {
       const value = operand.value;
@@ -208,11 +216,12 @@ export function typeOperand(operand: PipelineOperand, scope: TypeScope, at: stri
     case 'control': case 'raw-state': case 'last-changed': case 'list-count': case 'list-includes': case 'count': report(facts, 'invalid_combination', at); return ANY;
     case 'choose': {
       facts.usesRules = true;
+      accounting?.observer({ type: 'rule-cases', pointer: join(at, 'cases'), count: operand.cases.length, limit: MAX_RULE_CASES });
       if (!operand.cases.length || operand.cases.length > MAX_RULE_CASES) report(facts, 'limit_exceeded', join(at, 'cases'));
       let result = sub(operand.otherwise, 'otherwise');
       const branches: [Shape, string][] = [];
       operand.cases.forEach((entry, index) => {
-        typeWhere(entry.when, scope, join(join(join(at, 'cases'), index), 'when'), facts);
+        typeWhere(entry.when, scope, join(join(join(at, 'cases'), index), 'when'), facts, undefined, 1, accounting?.observer);
         branches.push([sub(entry.then, 'cases', index, 'then'), join(join(join(at, 'cases'), index), 'then')]);
       });
       // The branches give one kind: a branch with no kind in common with the first reports at itself.
@@ -249,19 +258,27 @@ export function checkSegments(path: readonly string[], at: string, facts: TypeFa
 // MARK: Conditions
 
 /** Types a condition. Operands inside it are checked against `scope`. */
-export function typeWhere(where: Where, scope: TypeScope, at: string, facts: TypeFacts, counter = { nodes: PIPELINE_LIMITS.whereNodes }, depth = 1): void {
-  if (counter.nodes <= 0 || depth > 6) { report(facts, 'limit_exceeded', at); return; }
+export function typeWhere(where: Where, scope: TypeScope, at: string, facts: TypeFacts, counter = { nodes: PIPELINE_LIMITS.whereNodes }, depth = 1, observer?: BudgetAccountingObserver): void {
+  const accounting = observer ? new BudgetAccountingScope(observer, 'flow-condition', at, counter.nodes, 6) : undefined;
+  walkWhere(where, scope, at, facts, counter, depth, accounting);
+}
+function walkWhere(where: Where, scope: TypeScope, at: string, facts: TypeFacts, counter: NodeBudget, depth: number, accounting?: BudgetAccountingScope): void {
+  if (counter.nodes <= 0 || depth > 6) {
+    accounting?.enter(at, depth, false, counter.nodes);
+    report(facts, 'limit_exceeded', at); return;
+  }
   counter.nodes -= 1;
-  const operand = (value: PipelineOperand, ...parts: string[]) => typeOperand(value, scope, parts.reduce(join, at), facts);
+  accounting?.enter(at, depth, true, counter.nodes);
+  const operand = (value: PipelineOperand, ...parts: string[]) => typeOperand(value, scope, parts.reduce(join, at), facts, undefined, 1, accounting?.observer);
   switch (where.type) {
-    case 'all': case 'any': where.of.forEach((part, index) => typeWhere(part, scope, join(join(at, 'of'), index), facts, counter, depth + 1)); return;
-    case 'not': typeWhere(where.of, scope, join(at, 'of'), facts, counter, depth + 1); return;
+    case 'all': case 'any': where.of.forEach((part, index) => walkWhere(part, scope, join(join(at, 'of'), index), facts, counter, depth + 1, accounting)); return;
+    case 'not': walkWhere(where.of, scope, join(at, 'of'), facts, counter, depth + 1, accounting); return;
     // The document leaves read a source or the signed-in person by name; a flow reads through a parameter's `read` and `viewer` instead.
     case 'state': case 'numeric': case 'viewer': case 'viewer-person': report(facts, 'invalid_combination', at); return;
     case 'exists': operand(where.value, 'value'); return;
     case 'in': {
       const subject = operand(where.value, 'value');
-      where.in.forEach((option, index) => { if (!comparable(subject, typeOperand(option, scope, join(join(at, 'in'), index), facts))) report(facts, 'binding_type', join(join(at, 'in'), index)); });
+      where.in.forEach((option, index) => { if (!comparable(subject, typeOperand(option, scope, join(join(at, 'in'), index), facts, undefined, 1, accounting?.observer))) report(facts, 'binding_type', join(join(at, 'in'), index)); });
       return;
     }
     case 'compare': {
@@ -285,7 +302,7 @@ const stepScope = (base: Omit<TypeScope, 'item'>, item?: Shape): TypeScope => ({
  * The shape a step gives when it receives `input`. A step that cannot apply to the shape reports `binding_type` at its `op`; a name that does not
  * exist reports `invalid_reference` at the name; the result is then `any`, so one mistake reports once.
  */
-export function typeStep(step: PipelineStep, input: Shape, params: TypeScope['params'], at: string, facts: TypeFacts): Shape {
+export function typeStep(step: PipelineStep, input: Shape, params: TypeScope['params'], at: string, facts: TypeFacts, observer?: BudgetAccountingObserver): Shape {
   const base = { params, allowRead: false, allowViewer: false };
   const list = (): Shape | undefined => {
     const element = elementOf(input);
@@ -293,7 +310,7 @@ export function typeStep(step: PipelineStep, input: Shape, params: TypeScope['pa
     return element;
   };
   const operand = (value: PipelineOperand, item: Shape | undefined, ...parts: (string | number)[]) =>
-    typeOperand(value, stepScope(base, item), parts.reduce<string>(join, at), facts);
+    typeOperand(value, stepScope(base, item), parts.reduce<string>(join, at), facts, undefined, 1, observer);
   switch (step.op) {
     case 'get': {
       if (!hasObject(input)) { report(facts, 'binding_type', join(at, 'op')); return ANY; }
@@ -318,7 +335,7 @@ export function typeStep(step: PipelineStep, input: Shape, params: TypeScope['pa
     }
     case 'filter': {
       const element = list();
-      typeWhere(step.where, stepScope(base, element ?? ANY), join(at, 'where'), facts);
+      typeWhere(step.where, stepScope(base, element ?? ANY), join(at, 'where'), facts, undefined, 1, observer);
       return element ? input : ANY;
     }
     case 'sort': {
@@ -423,11 +440,12 @@ export function typeStep(step: PipelineStep, input: Shape, params: TypeScope['pa
   }
 }
 /** The shape after every step, with each step's shape on the way (what the Studio's outline shows at "After Step 3"). */
-export function typeSteps(steps: readonly PipelineStep[], input: Shape, params: TypeScope['params'], at: string, facts: TypeFacts): Shape[] {
+export function typeSteps(steps: readonly PipelineStep[], input: Shape, params: TypeScope['params'], at: string, facts: TypeFacts, observer?: BudgetAccountingObserver): Shape[] {
+  observer?.({ type: 'steps', scopeId: `steps:${at}`, pointer: join(at, 'steps'), count: steps.length, limit: PIPELINE_LIMITS.steps });
   const shapes: Shape[] = [];
   let current = input;
   steps.forEach((step, index) => {
-    current = typeStep(step, current, params, join(join(at, 'steps'), index), facts);
+    current = typeStep(step, current, params, join(join(at, 'steps'), index), facts, observer);
     shapes.push(current);
   });
   return shapes;
