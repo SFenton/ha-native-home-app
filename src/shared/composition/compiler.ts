@@ -247,7 +247,7 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown, a
     const read = (path: readonly PropertyKey[]) => at(input, path);
     for (const issue of expandedIssues) {
       emitSchemaAccounting(issue, accountingObserver, accountingAt, emitted);
-      observeSchemaRefusal(read, issue, accountingObserver, accountingAt, observed);
+      observeSchemaRefusal(schema, input, read, issue, accountingObserver, accountingAt, observed);
     }
   }
   for (const issue of expandedIssues) {
@@ -309,7 +309,7 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 export interface CompileOptions {
   tileInkDefault?: boolean;
   /**
-   * Synchronous snapshots from existing checks, plus one observation-only Checker per structurally limit-refused root.
+   * Synchronous snapshots from existing checks, plus one observation-only Checker per structurally limit-refused owning schema root.
    * Refusal-only facts are discarded; untraversable roots emit partial schema-limit snapshots instead.
    * Observer exceptions propagate unchanged (including CompositionValidationError), never as document diagnostics.
    */
@@ -434,6 +434,7 @@ export interface CompiledComposition {
   expanded: CompositionDocument;
 }
 function compilePlain(input: unknown, options: CompileOptions, bounded = false, references?: CompositionDependencies): { document: CompositionDocument; capabilities: string[]; badged?: true } {
+  const accountingObserver = options.accountingObserver;
   if (!bounded) assertCompositionBounds(input);
   // Show at Most and Spoken As are the draft's: they are worked out into plain operands first, so capabilities and every other check read what a publication holds.
   // An issue inside a worked-out badge is reported at the setting that asked for it. `badged` tells the caller the document to hand back is the one authored.
@@ -448,7 +449,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   if (record(input) && input.schemaVersion !== undefined && input.schemaVersion !== '2.0') reject('unsupported_schema', '/document/schemaVersion');
   if (new TextEncoder().encode(canonicalOfBounded(input)).byteLength > MAX_COMPOSITION_BYTES) reject('limit_exceeded', '/document');
   let document: CompositionDocument;
-  try { document = parseCompositionShape(compositionDocumentSchema, input, options.accountingObserver, '/document'); }
+  try { document = parseCompositionShape(compositionDocumentSchema, input, accountingObserver, '/document'); }
   catch (error) {
     if (!(error instanceof CompositionValidationError) || isAccountingObserverFailure(error)) throw error;
     throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
@@ -511,7 +512,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (route.visibleWhen) {
         require('visible-when');
         // The catalog is built without entity state, so only a viewer-only rule is checked; it holds no source references.
-        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`, false, undefined, options.accountingObserver).issues);
+        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`, false, undefined, accountingObserver).issues);
         else add('invalid_combination', `/document/extensions/routes/${index}/visibleWhen`);
       }
       refs.push({ kind: 'page', id: route.pageId, path: `/document/extensions/routes/${index}/pageId` });
@@ -599,7 +600,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   /** The records the walk is inside while it draws the template of a `repeat` (`sh.repeat@1`); `item` and `index` mean something only there. */
   let repeatScope: ItemScope | undefined;
   function useCall(call: CallService, path: string, control: boolean) {
-    absorb(checkCallService(call, path, control, repeatScope, undefined, options.accountingObserver), 'call');
+    absorb(checkCallService(call, path, control, repeatScope, undefined, accountingObserver), 'call');
     const target = call.target?.entity_id;
     if (target?.type === 'literal') {
       for (const id of Array.isArray(target.value) ? target.value : [target.value]) if (typeof id === 'string') collected.entity(id, `${path}/target/entity_id`);
@@ -652,8 +653,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     if (!rule) return;
     require('enabled-when'); usePredicate(rule.condition, `${path}/enabledWhen/condition`);
   }
-  function useOperand(operand: Operand, path: string) { absorb(checkOperand(operand, path, false, false, repeatScope, options.accountingObserver)); }
-  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path, false, repeatScope, options.accountingObserver)); }
+  function useOperand(operand: Operand, path: string) { absorb(checkOperand(operand, path, false, false, repeatScope, accountingObserver)); }
+  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path, false, repeatScope, accountingObserver)); }
   /** A node's or tab's `visibleWhen`; its policy means nothing without one. */
   function visibility(item: Visibility, path: string) {
     if (item.visibleWhen === undefined) { if (item.whenUnknown !== undefined) add('invalid_combination', `${path}/whenUnknown`); return; }
@@ -849,7 +850,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (references) expandSources(ref, entry).forEach((source, index) => {
         const at = `${path}/sources/${index}`;
         collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1'
-          ? (options.accountingObserver ? checkObservedPipelineSource(source, at, options.accountingObserver) : checkPipelineSource(source, at)).entities : []);
+          ? (accountingObserver ? checkObservedPipelineSource(source, at, accountingObserver) : checkPipelineSource(source, at)).entities : []);
       });
     }
     if ((keys.length || valueKeys.length) && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });
@@ -1178,13 +1179,13 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (stopper.limit?.min) dialNumber(stopper.limit.min, `${at}/limit/min`);
       if (stopper.limit?.max) dialNumber(stopper.limit.max, `${at}/limit/max`);
       if (stopper.action) {
-        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope, undefined, options.accountingObserver);
+        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope, undefined, accountingObserver);
         require('call-service'); absorb(facts);
         if (!facts.usesControl) add('invalid_combination', `${at}/action`);
       }
     });
     if (item.action) {
-      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids, options.accountingObserver);
+      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids, accountingObserver);
       require('call-service'); absorb(facts);
       if (!facts.usesControl) add('invalid_combination', `${p}/action`);
     }
@@ -1296,7 +1297,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (kind !== undefined && kind !== 'number') add('binding_type', `${at}/value`);
     }
     if (found.action) {
-      const facts = checkCallService(found.action, `${at}/action`, true, undefined, undefined, options.accountingObserver);
+      const facts = checkCallService(found.action, `${at}/action`, true, undefined, undefined, accountingObserver);
       require('call-service'); absorb(facts);
       if (!facts.usesControl) add('invalid_combination', `${at}/action`);
       if (found.action.confirmation?.type === 'additional') add('invalid_combination', `${at}/action/confirmation`);
@@ -1954,7 +1955,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     require('bindings');
     register('source', source.id, `${p}/id`);
     if (source.kind === 'model' && source.model === 'pipeline@1') {
-      const found = checkCompositionPipelineSource(source, p, ++pipelines, options.accountingObserver);
+      const found = checkCompositionPipelineSource(source, p, ++pipelines, accountingObserver);
       collected.define(source, p, undefined, found.entities);
       issues.push(...found.issues);
       for (const name of found.capabilities) capabilities.add(name);

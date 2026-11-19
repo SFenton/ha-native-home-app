@@ -7,6 +7,7 @@ import * as expression from '../../../src/shared/composition/expression';
 import type { BudgetAccountingEvent, BudgetAccountingObserver, CallService, Operand, Predicate } from '../../../src/shared/composition/expression';
 import { checkPipelineSource } from '../../../src/shared/composition/pipeline/compile';
 import type { PipelineSource } from '../../../src/shared/composition/pipeline/schema';
+import type { Shape } from '../../../src/shared/composition/pipeline/shape';
 import { newFacts, typeSteps } from '../../../src/shared/composition/pipeline/typing';
 import { createCompositionDocument } from '../../../src/shared/composition/workspace';
 import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from '../../../src/shared/composition/schema';
@@ -186,6 +187,67 @@ describe('structurally refused rules use one observation-only Checker', () => {
       when: { type: 'viewer', isAdmin: true }, then: literal(),
     })), otherwise,
   });
+  const format = (value: Operand): Operand => ({ type: 'format', pattern: '{value}', args: { value } });
+  it.each([
+    ['wrapped rule', format(rule(literal())), 91],
+    ['refused rule nested inside another refused rule', rule(rule(literal())), 174],
+    ['two sibling refusals under one root', { type: 'list', items: [rule(literal()), rule(format(literal()))] }, 175],
+  ] satisfies [string, Operand, number][])('retains the owning budget for %s at every document/flow boundary', (_name, value, count) => {
+    const source = flow();
+    source.inputs.steps = [{ id: 'map', op: 'map', fields: { value } }];
+    const input = document(text(value)), pipeline = { ...document(), dataSources: [source] };
+    const entries: [string, (observer?: BudgetAccountingObserver) => unknown][] = [
+      ['/document/pages/0/components/0/props/value/value', observer => refusal(() => compileCompositionDocument(input, { accountingObserver: observer }))],
+      ['/document/pages/0/components/0/props/value/value', observer => refusal(() => compileCompositionDocumentWithOrigins(input, { accountingObserver: observer }))],
+      ['/document/dataSources/0/inputs/steps/0/fields/value', observer => refusal(() => compileCompositionDocument(pipeline, { accountingObserver: observer }))],
+      ['/document/dataSources/0/inputs/steps/0/fields/value', observer => refusal(() => compileCompositionDocumentWithOrigins(pipeline, { accountingObserver: observer }))],
+      ['/sources/0/inputs/steps/0/fields/value', observer => checkCompositionPipelineBundle([source], '/sources', observer)],
+    ];
+    for (const [pointer, invoke] of entries) {
+      const direct = recording(), observed = recording();
+      expression.checkOperand(value, pointer, true, false, 'lenient', direct.observer);
+      expect(direct.events).toHaveLength(count);
+      const spy = vi.spyOn(expression, 'checkOperand'), plain = invoke();
+      expect(spy).not.toHaveBeenCalled();
+      expect(invoke(observed.observer)).toStrictEqual(plain);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(observed.events).toStrictEqual(direct.events);
+      spy.mockRestore();
+    }
+  });
+
+  it.each([false, true])('retains shared-call ownership and already-charged nodes (spent=%s)', spent => {
+    const action: CallService = {
+      type: 'call-service', domain: 'light', service: 'turn_on',
+      data: { type: 'object', fields: { payload: spent ? { type: 'list', items: Array.from({ length: 60 }, () => literal()) } : rule(literal()) } },
+      target: { entity_id: spent ? rule(literal('light.demo')) : literal('light.demo') },
+      confirmation: { type: 'additional', style: 'alert', title: 'Confirm', confirmLabel: 'Run', cancelLabel: 'Cancel', destructive: false, when: { type: 'viewer', isAdmin: true } },
+    };
+    const input = document({ id: 'run', title: 'Run', type: 'primary-button', layout: { span: 1 }, props: {}, action });
+    const direct = recording();
+    expression.checkCallService(action, '/document/pages/0/components/0/action', true, 'lenient', 'any', direct.observer);
+    expect(direct.events).toHaveLength(spent ? 156 : 96);
+    for (const compile of [compileCompositionDocument, compileCompositionDocumentWithOrigins]) {
+      const spy = vi.spyOn(expression, 'checkCallService'), observed = recording(), plain = refusal(() => compile(input));
+      expect(spy).not.toHaveBeenCalled();
+      expect(refusal(() => compile(input, { accountingObserver: observed.observer }))).toStrictEqual(plain);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(observed.events).toStrictEqual(direct.events);
+      expect(observed.events).toContainEqual(expect.objectContaining({ type: 'scope', nodeLimit: 128, pointer: '/document/pages/0/components/0/action' }));
+      spy.mockRestore();
+    }
+  });
+
+  it('keeps the predicate root and its uncapped initial condition scope for a nested refusal', () => {
+    const value: Predicate = { type: 'exists', value: format(rule(literal())) }, direct = recording(), observed = recording();
+    expression.checkPredicate(value, '/document/pages/0/components/0/visibleWhen', false, 'lenient', direct.observer);
+    const input = document(text(undefined, value)), plain = refusal(() => compileCompositionDocument(input));
+    const spy = vi.spyOn(expression, 'checkPredicate');
+    expect(refusal(() => compileCompositionDocument(input, { accountingObserver: observed.observer }))).toStrictEqual(plain);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(observed.events).toStrictEqual(direct.events);
+  });
+
   it.each([
     ['literal', literal(0), 90],
     ['format', { type: 'format', pattern: '{value}', args: { value: literal(0) } }, 91],
@@ -297,13 +359,16 @@ describe('expression limit guard sweep', () => {
   });
   const operandCases: [string, Operand][] = [
     ['source path minimum', read([])], ['source path maximum', read(Array(9).fill('state'))],
-    ['source segment length', read(['x'.repeat(161)])],
+    ['source segment length', read(['x'.repeat(161)])], ['source UTF-8 byte limit', read(['\u00e9'.repeat(81)])],
+    ['source identifier minimum', { type: 'raw-state', sourceId: '' }],
     ['source identifier size', { type: 'raw-state', sourceId: 'a'.repeat(81) }],
     ['format pattern length', { type: 'format', pattern: 'x'.repeat(2001), args: {} }],
+    ['format nonblank pattern', { type: 'format', pattern: '', args: {} }],
     ['format maximum precision minimum', format(-1)], ['format maximum precision maximum', format(7)],
     ['format minimum precision minimum', format(6, -1)], ['format minimum precision maximum', format(6, 7)],
     ['format arguments', { type: 'format', pattern: 'Text', args: fields(17) }],
     ['format argument name', { type: 'format', pattern: 'Text', args: { ['a'.repeat(33)]: literal() } }],
+    ['format argument name minimum', { type: 'format', pattern: 'Text', args: { '': literal() } }],
     ['count minimum', count(0)], ['count maximum', count(33)],
     ...[0, 33].map((length): [string, Operand] => [`count viewer cardinality ${length}`, {
       type: 'count', of: [{ test: { type: 'viewer', isAdmin: true }, viewer: { personEntityIds: Array(length).fill('person.example') } }],
@@ -317,6 +382,7 @@ describe('expression limit guard sweep', () => {
     ['math structural argument maximum', { type: 'math', op: 'add', args: Array.from({ length: 9 }, () => literal()) }],
     ['object fields', { type: 'object', fields: fields(65) }],
     ['object field name', { type: 'object', fields: { ['a'.repeat(65)]: literal() } }],
+    ['object field name minimum', { type: 'object', fields: { '': literal() } }],
     ['list items', { type: 'list', items: Array.from({ length: 65 }, () => literal()) }],
     ['item path', { type: 'item', path: Array(9).fill('field') }],
     ['item path segment length', { type: 'item', path: ['x'.repeat(65)] }],
@@ -353,6 +419,9 @@ describe('expression limit guard sweep', () => {
     ['state option length', { type: 'state', sourceId: 'source', path: ['state'], in: ['x'.repeat(161)] }],
     ['viewer id length', { type: 'viewer', userIds: ['x'.repeat(161)] }],
     ['viewer-person id length', { type: 'viewer-person', in: ['x'.repeat(161)] }],
+    ['state option minimum', { type: 'state', sourceId: 'source', path: ['state'], in: [''] }],
+    ['viewer id minimum', { type: 'viewer', userIds: [''] }],
+    ['viewer-person id minimum', { type: 'viewer-person', in: [''] }],
     ...[0, 17].flatMap((length): [string, Predicate][] => [
       ['all children ' + length, { type: 'all', of: Array.from({ length }, () => compare()) }],
       ['any children ' + length, { type: 'any', of: Array.from({ length }, () => compare()) }],
@@ -385,6 +454,7 @@ describe('call and pipeline limit guard sweep', () => {
     ...[0, 33].map((length): [string, (value: CallService) => void] =>
       [`exempt user cardinality ${length}`, value => { confirmation(value).exemptUserIds = Array(length).fill('user'); }]),
     ['exempt user length', value => { confirmation(value).exemptUserIds = ['x'.repeat(161)]; }],
+    ['exempt user minimum', value => { confirmation(value).exemptUserIds = ['']; }],
     ['optimistic count', value => { value.optimistic = Array.from({ length: 17 }, () => ({ sourceId: 'source', value: 'on', revertAfterSeconds: 1, failsOnTimeout: false })); }],
     ...[0, 161].map((length): [string, (value: CallService) => void] =>
       [`optimistic text ${length}`, value => { value.optimistic = [{ sourceId: 'source', value: 'x'.repeat(length), revertAfterSeconds: 1, failsOnTimeout: false }]; }]),
@@ -404,6 +474,10 @@ describe('call and pipeline limit guard sweep', () => {
 
   const entity = () => ({ type: 'literal' as const, value: 'sensor.example' });
   const pipelineLimits: [string, string, (source: PipelineSource) => void][] = [
+    ...[0, 81].flatMap((length): [string, string, (source: PipelineSource) => void][] => [
+      [`source id length ${length}`, '/id', source => { source.id = 'a'.repeat(length); }],
+      [`step id length ${length}`, '/inputs/steps/0/id', source => { source.inputs.steps[0].id = 'a'.repeat(length); }],
+    ]),
     ...[0, 241].map((length): [string, string, (source: PipelineSource) => void] =>
       [`title length ${length}`, '/inputs/title', source => { source.inputs.title = 'x'.repeat(length); }]),
     ['parameters', '/inputs/parameters', source => { source.inputs.parameters = Array.from({ length: 9 }, (_, index) => ({ name: `p${index}`, type: 'number', value: literal() })); }],
@@ -478,6 +552,45 @@ describe('call and pipeline limit guard sweep', () => {
     const direct = recording(), value = flow();
     expect(checkCompositionPipelineSource(value, '/flow', 129, direct.observer)).toStrictEqual(checkCompositionPipelineSource(value, '/flow', 129));
     expect(direct.events.length).toBeGreaterThan(0);
+  });
+});
+
+describe('inherited pipeline shape limits', () => {
+  const shapeLimits: [string, Shape, string, { count: number; limit: number; direction: 'minimum' | 'maximum' }?][] = [
+    ...[0, 161].map((length): [string, Shape, string, { count: number; limit: number; direction: 'minimum' | 'maximum' }] =>
+      [`field name ${length}`, { kind: 'object', fields: { ['a'.repeat(length)]: { shape: { kind: 'number' } } } }, `/fields/${'a'.repeat(length)}`,
+        { count: length, limit: length ? 160 : 1, direction: length ? 'maximum' : 'minimum' }]),
+    ...[0, 9].map((length): [string, Shape, string, { count: number; limit: number; direction: 'minimum' | 'maximum' }] =>
+      [`enum size ${length}`, { kind: 'string', enum: Array(length).fill('value') }, '/enum',
+        { count: length, limit: length ? 8 : 1, direction: length ? 'maximum' : 'minimum' }]),
+    ['enum value length', { kind: 'string', enum: ['a'.repeat(65)] }, '/enum/0', { count: 65, limit: 64, direction: 'maximum' }],
+    ...[1, 7].map((length): [string, Shape, string, { count: number; limit: number; direction: 'minimum' | 'maximum' }] =>
+      [`union members ${length}`, { kind: 'union', of: Array.from({ length }, () => ({ kind: 'number' })) }, '/of',
+        { count: length, limit: length === 1 ? 2 : 6, direction: length === 1 ? 'minimum' : 'maximum' }]),
+    ['object field cardinality', { kind: 'object', fields: Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`f${index}`, { shape: { kind: 'number' } }])) }, '/fields'],
+    ['shape depth', Array.from({ length: 6 }).reduce<Shape>(of => ({ kind: 'array', of }), { kind: 'number' }), '/of'.repeat(6)],
+  ];
+  it.each(shapeLimits.flatMap(([name, shape, suffix, snapshot]) => (['request', 'output'] as const).map(location => ({ location, name, shape, suffix, snapshot }))))('$location $name preserves all entry-point diagnostics and emits accounting', ({ location, name, shape, suffix, snapshot }) => {
+    const source = flow();
+    source.inputs.parameters = [];
+    source.inputs.steps = [];
+    const at = location === 'request' ? '/inputs/request/responseShape' : '/inputs/schema';
+    if (location === 'request') source.inputs.request = { type: 'entity-attribute', entityId: { type: 'literal', value: 'sensor.example' }, path: ['values'], responseShape: shape };
+    else source.inputs.schema = shape;
+    const input = { ...document(), dataSources: [source] };
+    const entries: [string, (observer?: BudgetAccountingObserver) => unknown][] = [
+      ['/document/dataSources/0', observer => refusal(() => compileCompositionDocument(input, { accountingObserver: observer }))],
+      ['/document/dataSources/0', observer => refusal(() => compileCompositionDocumentWithOrigins(input, { accountingObserver: observer }))],
+      ['/sources/0', observer => checkCompositionPipelineBundle([source], '/sources', observer)],
+    ];
+    for (const [prefix, invoke] of entries) {
+      const observed = recording(), plain = invoke();
+      expect(invoke(observed.observer)).toStrictEqual(plain);
+      if (snapshot) expect(observed.events).toEqual([{ type: 'schema-limit', pointer: `${prefix}${at}${suffix}`, ...snapshot, partial: true }]);
+      else expect(observed.events.length).toBeGreaterThan(0);
+      const issues = Array.isArray(plain) ? plain : checkCompositionPipelineBundle([source], '/sources').issues;
+      expect(issues).toContainEqual(expect.objectContaining({ pointer: `${prefix}${at}${suffix}`, ...(name.startsWith('field name') ? { code: 'invalid_value' } : {}) }));
+    }
   });
 });
 

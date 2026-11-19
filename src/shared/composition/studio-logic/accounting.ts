@@ -1,6 +1,6 @@
 import { z } from 'zod/v4';
 import {
-  callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase,
+  callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, operandSchema, predicateBase, predicateSchema,
   type BudgetAccountingEvent, type BudgetAccountingObserver, type CallService, type Operand, type Predicate,
 } from '../expression';
 import { pointer } from '../json';
@@ -76,30 +76,49 @@ export function emitSchemaAccounting(
 }
 
 type RefusedKind = 'operand' | 'predicate' | 'call';
-let grammarKinds: Map<string, Set<RefusedKind>> | undefined;
-function refusedKind(value: object): RefusedKind | undefined {
-  const type: unknown = Reflect.get(value, 'type');
-  if (typeof type !== 'string') return undefined;
-  if (!grammarKinds) {
-    grammarKinds = new Map();
-    for (const [kind, schema] of [['operand', operandBase], ['predicate', predicateBase], ['call', callServiceSchema]] as const) {
-      const concrete = schema instanceof z.ZodLazy ? schema.unwrap() : schema;
-      const variants = concrete instanceof z.ZodDiscriminatedUnion ? concrete.options : [concrete];
-      for (const variant of variants) {
-        if (!(variant instanceof z.ZodObject)) continue;
-        const discriminator: unknown = variant.shape.type;
-        const types = discriminator instanceof z.ZodLiteral ? discriminator.values : discriminator instanceof z.ZodEnum ? discriminator.options : [];
-        for (const type of types) if (typeof type === 'string') {
-          const held = grammarKinds.get(type) ?? new Set<RefusedKind>();
-          held.add(kind); grammarKinds.set(type, held);
-        }
-      }
-    }
+interface SchemaRoot { readonly kind: RefusedKind; readonly value: unknown; readonly depth: number }
+function schemaVariantMatches(schema: z.core.$ZodType, value: unknown): boolean {
+  if (schema instanceof z.ZodLazy) return schemaVariantMatches(schema.unwrap(), value);
+  if (schema instanceof z.ZodUnion) return schema.options.some(option => schemaVariantMatches(option, value));
+  if (!(schema instanceof z.ZodObject) || value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  return ['type', 'kind', 'op', 'model'].every(key => {
+    const tag = schema.shape[key];
+    return !(tag instanceof z.ZodLiteral || tag instanceof z.ZodEnum) || tag.safeParse(Reflect.get(value, key)).success;
+  });
+}
+function schemaRoot(
+  schema: z.core.$ZodType, value: unknown, path: readonly PropertyKey[], depth = 0, seen = new Set<z.core.$ZodType>(),
+): SchemaRoot | undefined {
+  if (seen.has(schema)) return undefined;
+  const kind = schema === callServiceSchema ? 'call'
+    : schema === operandBase || schema === operandSchema ? 'operand'
+    : schema === predicateBase || schema === predicateSchema ? 'predicate' : undefined;
+  if (kind) return schemaVariantMatches(schema, value) ? { kind, value, depth } : undefined;
+  const next = new Set(seen).add(schema);
+  if (schema instanceof z.ZodLazy || schema instanceof z.ZodOptional || schema instanceof z.ZodNullable
+    || schema instanceof z.ZodDefault || schema instanceof z.ZodCatch || schema instanceof z.ZodReadonly || schema instanceof z.ZodNonOptional) {
+    return schemaRoot(schema.unwrap(), value, path, depth, next);
   }
-  const kinds = grammarKinds.get(type);
-  if (kinds?.size === 1) return [...kinds][0];
-  if (type === 'viewer') return Object.hasOwn(value, 'field') ? 'operand' : 'predicate';
-  return undefined;
+  if (schema instanceof z.ZodPipe) return schemaRoot(schema.in, value, path, depth, next);
+  if (schema instanceof z.ZodUnion) {
+    for (const option of schema.options) {
+      const found = schemaRoot(option, value, path, depth, next);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (schema instanceof z.ZodObject) {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    if (!schemaVariantMatches(schema, value)) return undefined;
+    // Both call data and pipeline request data have this shared operand structure without the outer lazy schema.
+    if (schema.shape.type instanceof z.ZodLiteral && schema.shape.type.values.has('object')
+      && schema.shape.fields instanceof z.ZodRecord && schema.shape.fields.valueType === operandBase) return { kind: 'operand', value, depth };
+    const key = path[depth], child: z.core.$ZodType | undefined = schema.shape[String(key)];
+    return child ? schemaRoot(child, Reflect.get(value, key), path, depth + 1) : undefined;
+  }
+  if (depth >= path.length || value === null || typeof value !== 'object') return undefined;
+  const child = schema instanceof z.ZodArray ? schema.element : schema instanceof z.ZodRecord ? schema.valueType : undefined;
+  return child ? schemaRoot(child, Reflect.get(value, path[depth]), path, depth + 1) : undefined;
 }
 const pathPointer = (path: readonly PropertyKey[]) => path.reduce<string>((base, part) => pointer(base, String(part)), '');
 type GuardSnapshot = Extract<BudgetAccountingEvent, { type: 'schema-limit' }>;
@@ -125,21 +144,27 @@ function guardSize(issue: z.core.$ZodIssue, value: unknown): GuardSize | undefin
 
 /** Only called after a structural size/range refusal, and only with an attached observer. */
 export function observeSchemaRefusal(
-  read: (path: readonly PropertyKey[]) => unknown, issue: z.core.$ZodIssue, observer: BudgetAccountingObserver, base: string, observed: Map<string, 'complete' | 'partial'>,
+  schema: z.ZodType, input: unknown, read: (path: readonly PropertyKey[]) => unknown, issue: z.core.$ZodIssue,
+  observer: BudgetAccountingObserver, base: string, observed: Map<string, 'complete' | 'partial'>,
 ): void {
   const params: unknown = Reflect.get(issue, 'params');
   if (params !== null && typeof params === 'object' && schemaIssues?.has(params)) return;
+  if (issue.code === 'invalid_key') {
+    for (const inner of issue.issues) {
+      const guard = guardSize(inner, issue.path.at(-1));
+      if (guard) reportAccounting(observer, { type: 'schema-limit', pointer: `${base}${pathPointer(issue.path)}`, ...guard, partial: true });
+    }
+    return;
+  }
   const own = pathPointer(issue.path), value = read(issue.path);
   const guard = guardSize(issue, value);
   if (!guard) return;
   const partial: GuardSnapshot = {
     type: 'schema-limit', pointer: `${base}${own}`, ...guard, partial: true,
   };
-  for (let depth = issue.path.length; depth >= 0; depth--) {
-    const path = issue.path.slice(0, depth), at = pathPointer(path), candidate = read(path);
-    if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
-    const kind = refusedKind(candidate);
-    if (!kind) continue;
+  const root = schemaRoot(schema, input, issue.path);
+  if (root) {
+    const at = pathPointer(issue.path.slice(0, root.depth)), { kind, value: candidate } = root;
     if (observed.has(at)) {
       if (observed.get(at) === 'partial') reportAccounting(observer, partial);
       return;

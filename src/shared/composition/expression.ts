@@ -619,20 +619,29 @@ const isIdentifier = (value: unknown) => typeof value === 'string' ? value.lengt
 /** Checks one operand the way the app's parser does. `allowControl` is true only inside a control's own call. */
 export function checkOperand(value: Operand, pointer: string, allowControl = false, flow = false, scope?: ItemScope, observer?: BudgetAccountingObserver): ExpressionFacts {
   const checker = new Checker(allowControl, flow, scope);
-  if (observer) return observing(checker, observer, () => { checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker; });
+  if (observer) return observedOperand(checker, value, pointer, observer);
   checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker;
+}
+function observedOperand(checker: Checker, value: Operand, pointer: string, observer: BudgetAccountingObserver) {
+  return observing(checker, observer, () => { checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker; });
 }
 /** Checks one predicate. */
 export function checkPredicate(value: Predicate, pointer: string, flow = false, scope?: ItemScope, observer?: BudgetAccountingObserver): ExpressionFacts {
   const checker = new Checker(false, flow, scope);
-  if (observer) return observing(checker, observer, () => { checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker; });
+  if (observer) return observedPredicate(checker, value, pointer, flow, observer);
   checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker;
+}
+function observedPredicate(checker: Checker, value: Predicate, pointer: string, flow: boolean, observer: BudgetAccountingObserver) {
+  return observing(checker, observer, () => { checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker; });
 }
 /** Checks one `call-service` action. */
 export function checkCallService(value: CallService, pointer: string, allowControl: boolean, scope?: ItemScope, controlStoppers?: readonly string[] | 'any', observer?: BudgetAccountingObserver): ExpressionFacts {
   const checker = new Checker(allowControl, false, scope, controlStoppers);
-  if (observer) return observing(checker, observer, () => { checker.call(value, pointer); return checker; });
+  if (observer) return observedCall(checker, value, pointer, observer);
   checker.call(value, pointer); return checker;
+}
+function observedCall(checker: Checker, value: CallService, pointer: string, observer: BudgetAccountingObserver) {
+  return observing(checker, observer, () => { checker.call(value, pointer); return checker; });
 }
 
 // MARK: Schemas with the parser's checks attached
