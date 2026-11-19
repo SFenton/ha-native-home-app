@@ -1,6 +1,7 @@
-import type { GraphEdge, GraphNode, LogicGraph } from '../../shared/composition/graph';
+import { prepareGraphRevision, type GraphEdge, type GraphNode, type GraphRevisionIndex, type LogicGraph } from '../../shared/composition/graph';
 
 export interface CanvasGraphIndex {
+  readonly revision: GraphRevisionIndex;
   readonly nodes: ReadonlyMap<string, GraphNode>;
   readonly ordinals: ReadonlyMap<string, number>;
   readonly roots: ReadonlySet<string>;
@@ -10,9 +11,9 @@ export interface CanvasGraphIndex {
   readonly source: (nodeId: string, portId: string) => GraphNode | undefined;
 }
 export function indexGraph(graph: LogicGraph): CanvasGraphIndex {
-  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
-  const incoming = new Map<string, GraphEdge[]>(), outgoing = new Map<string, GraphEdge[]>();
-  const inputs = new Map<string, Map<string, GraphEdge[]>>(), outputs = new Map<string, Map<string, GraphEdge[]>>();
+  const revision = prepareGraphRevision(graph);
+  const nodes = revision.nodes, incoming = revision.incomingNodes, outgoing = new Map<string, GraphEdge[]>();
+  const outputs = new Map<string, Map<string, GraphEdge[]>>();
   const empty: readonly GraphEdge[] = [];
   const add = (byNode: Map<string, GraphEdge[]>, byPort: Map<string, Map<string, GraphEdge[]>>, endpoint: GraphEdge['to'], edge: GraphEdge) => {
     let node = byNode.get(endpoint.nodeId), ports = byPort.get(endpoint.nodeId);
@@ -23,12 +24,11 @@ export function indexGraph(graph: LogicGraph): CanvasGraphIndex {
     node.push(edge); port.push(edge);
   };
   for (const edge of graph.edges) {
-    add(incoming, inputs, edge.to, edge);
     add(outgoing, outputs, edge.from, edge);
   }
-  const edges: CanvasGraphIndex['edges'] = (nodeId, portId, direction) => (direction === 'input' ? inputs : outputs).get(nodeId)?.get(portId) ?? empty;
+  const edges: CanvasGraphIndex['edges'] = (nodeId, portId, direction) => direction === 'input' ? revision.incoming(nodeId, portId) : outputs.get(nodeId)?.get(portId) ?? empty;
   return {
-    nodes, incoming, outgoing, edges,
+    revision, nodes, incoming, outgoing, edges,
     ordinals: new Map(graph.nodes.map((node, index) => [node.id, index + 1])),
     roots: new Set(graph.roots.map(root => root.nodeId)),
     source: (nodeId, portId) => {

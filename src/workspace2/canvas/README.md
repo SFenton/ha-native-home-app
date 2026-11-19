@@ -68,8 +68,13 @@ icons; the existing theme and graph helpers supply tokens, shapes and LAN-safe
 license/notices changed. SVG wires are decorative; native HTML controls and the
 outline provide the full editing interface.
 
-Node, edge and incoming-port indexes are built once per immutable graph
-revision. Stable per-block presentation models and actions let literal-only
+Node, edge, incoming-port, binding and wide-port indexes are built once per
+immutable graph revision with `prepareGraphRevision(graph)`. Canvas lookup,
+validation and projection share that opaque revision index; only read-only
+map views and frozen edge arrays are exposed. A mismatched revision, spread,
+prototype impostor or proxy is rejected by an O(1) private-brand/exact-graph
+WeakSet check, without comparing or hashing graph contents.
+Stable per-block presentation models and actions let literal-only
 edits render only the affected blocks/ports; unchanged geometry does not remeasure
 wires. Topology, position and displayed-label changes invalidate geometry.
 Memoized wires also skip payload-only renders. Focusing a port updates the
@@ -78,14 +83,21 @@ input before the snapshot, rather than the previously selected block.
 Palette type hints and accessible names use the graph-core output descriptor,
 including numeric date differences/progress, rather than a second type map.
 
-The performance-only core handoff is `validateForLowering(graph)` followed by
-`lowerValidated(validation)`. The frozen, nominal token holds the exact immutable
-revision and its ordered diagnostics in private fields. Lowering checks its runtime
-class/private brand; spread copies, wrappers, proxies and replaced diagnostics
-cannot bypass validation. No registry or cross-call cache is used.
+The performance-only core handoff is `validateForLowering(graph, index?)` followed
+by `lowerValidated(validation)`. The frozen, nominal token holds the exact
+immutable revision, shared index and ordered diagnostics in a private WeakMap
+keyed on that graph object. Lowering checks its runtime class/private brand and
+per-token WeakMap in O(1); spread copies, wrappers, proxies and replaced diagnostics
+cannot bypass validation. There is no module-level registry.
 Calling `lower(graph)` directly still
-validates and takes the same refusal path. All core indexes are call-local;
-there is no cross-call cache. The performance guard retains its 50 ms median.
+validates and takes the same refusal path; `lower(graph, { index })` also validates,
+but reuses the already prepared exact-revision indexes. Indexes are call-local or
+owned by one immutable editor revision, with no cross-call cache or mutable module
+state. The performance guard retains its 50 ms median. It uses the unchanged
+2,341-node edited fixture for 30 instrumented warmups and 31 measured runs, includes
+fresh index preparation in every validation/total sample, and asserts one native
+compile per measured run. Stage medians, index cost and a separate million-read
+trusted-handoff profile are printed in local and hosted logs.
 Before/after corpus hashes were captured at the pre-optimization head and cover
 ordered diagnostics and every output field, including source maps and budgets.
 

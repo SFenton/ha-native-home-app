@@ -25,7 +25,7 @@ npx vitest run tests/flows-canvas/graph/canvas-performance.test.ts \
 
 Final local results for this revision:
 
-- Full suite: **273 files, 14,126 passing tests**, one pre-existing skip.
+- Full suite: **273 files, 14,127 passing tests**, one pre-existing skip.
 - Production build and TypeScript: **passed**.
 - Canvas-focused units: **176 passed**.
 - Isolated Playwright: **24 passed**, twelve desktop and twelve phone.
@@ -33,21 +33,26 @@ Final local results for this revision:
   4822/data overrides. The harness HTML swap is test-owned; no shell/server or
   workflow change is needed.
 - **2,341 nodes / 32 steps:** validate plus already-validated lower median
-  **23.88 ms**, minimum 21.20, maximum 43.99; 15 samples after five warmups.
-  Stage medians: **validate 13.14 ms; lower 10.92 ms; adapter 3.82 ms**.
+  **19.12 ms**, minimum 17.87, maximum 34.19; 31 samples after 30 instrumented warmups.
+  Stage medians: **validate 11.87 ms; lower 7.13 ms; adapter 3.48 ms**.
   Lower includes the adapter; medians are independent and are not additive.
   Exactly one native source compile is asserted per sample, with the original
   **<=50 ms** gate unchanged.
+  An isolated rerun measured **15.47 ms** (14.70-29.18), with stages
+  **9.18 / 6.30 / 3.17 ms**. Index construction is included, not moved outside
+  the timed validation/total. The identical immutable fixture is used every run;
+  warmups include the adapter/native-checker spies, and their records are cleared
+  before collecting the 31 measured samples.
 
 The review baseline was **11,570 ms lookup**, **42,810 ms Chromium mount** and a
 focus timeout. The new standard-config browser measurements are:
 
 | 2,341-node fixture | Desktop | Phone | Asserted budget |
 | --- | ---: | ---: | ---: |
-| Mount, navigation through two painted frames | 2,273.04 ms | 2,287.45 ms | <5,000 ms |
-| Build index and resolve every incoming port | 2.30 ms | 2.60 ms | <50 ms |
-| Select a Number and focus its output | 437.06 ms | 470.45 ms | <1,000 ms |
-| Submit a valid literal edit through two painted frames | 603.25 ms | 532.50 ms | <1,500 ms |
+| Mount, navigation through two painted frames | 2,323.59 ms | 2,253.05 ms | <5,000 ms |
+| Build index and resolve every incoming port | 3.20 ms | 4.30 ms | <50 ms |
+| Select a Number and focus its output | 444.61 ms | 452.92 ms | <1,000 ms |
+| Submit a valid literal edit through two painted frames | 595.30 ms | 567.48 ms | <1,500 ms |
 
 Raw browser measurements are in [desktop](desktop-large-performance.json) and
 [phone](phone-large-performance.json), and attached to the browser test report.
@@ -62,6 +67,21 @@ The round-two hosted baseline at `57919bd` was 1,574.51 ms desktop edit and
 1,620.72 ms phone edit, failing the unchanged 1,500 ms gate. Its accepted mount
 times were 3,103.63 / 3,296.00 ms and focus was 691.03 / 775.40 ms.
 Current-head hosted timings and complete CI status are recorded in the PR body.
+The completed `613f824` hosted browser shards passed all 24 canvas cases:
+desktop mount/focus/edit **3,038.33 / 682.70 / 885.28 ms**, phone
+**2,878.46 / 648.64 / 814.83 ms**, with zero edit geometry reads.
+Its compiler gate failed at **50.314 ms**; it is not presented as green CI.
+
+The validator body did not change between `57919bd` and `613f824`; only the
+opaque handoff wrapper changed. Local profiling found the trusted read to be
+nanoseconds, not the hosted validation increase of 8.37 ms. No historical hosted
+CPU profile exists to attribute that increase more precisely. Warmed CPU profiles
+identified JSON bounds walks, grammar descriptors, original/binding lookup,
+projection allocation and garbage collection as the real compiler work.
+The headroom revision shares indexes through validation and lowering, avoids
+eager diagnostic-origin maps and single-port sets, uses authoritative expression
+descriptors directly for math/item nodes, reuses binding maps for unbound equality,
+and replaces projection entry/map/fromEntries chains with ordered loops.
 
 Local validate-plus-lower was 31.76 ms in the independent review and 29.18 ms
 in the preceding observation revision. The hosted pre-fix baseline at
@@ -79,8 +99,10 @@ test remains unchanged and passes. Direct unvalidated `lower` still rejects
 invalid graphs; the explicit handoff is separately compared with it.
 The token now uses frozen instances with runtime-checked private fields, not
 copyable public trusted data. Spread copies, re-wrapped graphs, swapped
-diagnostics, prototype impostors and proxies are rejected without a token cache.
-All core indexes are per call, with no cross-call caches or mutable module state.
+diagnostics, prototype impostors and proxies are rejected. The exact graph keys a
+private per-token WeakMap; trusted reads do not compare or hash graph contents.
+Core indexes are per call or immutable editor revision and shared with projection,
+with no cross-call caches or mutable module state.
 
 The dedicated configuration defaults to 4822 and honors the port/data overrides.
 It has no HA/persistence backend or credentials. The standard configuration uses
