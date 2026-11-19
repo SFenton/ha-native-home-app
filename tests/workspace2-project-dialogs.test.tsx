@@ -50,21 +50,18 @@ describe('Data', () => {
     expect(within(models).getAllByText(/^Used by \d+$/).length).toBeGreaterThan(10);
   });
 
-  it('searches by name or id, and "Remove Unused" drops only the sources nothing reads', () => {
-    let last = sample('unused');
-    render(<Dialog dialog="data" document={sample('unused')} seen={next => { last = next; }}/>);
+  it('searches editable model sources by name or id without a manual cleanup action', () => {
+    render(<Dialog dialog="data" document={sample('unused')}/>);
     fireEvent.change(screen.getByPlaceholderText('Search data'), { target: { value: 'lonely' } });
     expect(screen.getAllByRole('button', { name: /lonely-weather/ })).toHaveLength(1);
     fireEvent.change(screen.getByPlaceholderText('Search data'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Unused' }));
-    expect(last.dataSources.some(source => source.id === 'lonely-weather')).toBe(false);
-    expect(last.dataSources.length).toBe(base.dataSources.length);
+    expect(screen.queryByRole('button', { name: 'Remove Unused' })).toBeNull();
     expect(removeUnusedSources(base).dataSources.length).toBe(base.dataSources.length);
   });
 
-  it('disables "Remove Unused" when everything is read, and says so when there is no data', () => {
+  it('has no cleanup action, and says so when there is no data', () => {
     const { unmount } = render(<Dialog dialog="data"/>);
-    expect((screen.getByRole('button', { name: 'Remove Unused' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Remove Unused' })).toBeNull();
     unmount();
     render(<Dialog dialog="data" document={{ ...base, dataSources: [] }}/>);
     expect(screen.getByText('No data yet.')).toBeTruthy();

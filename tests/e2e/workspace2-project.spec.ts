@@ -152,9 +152,10 @@ test('Data counts what reads each source, Local State adds a state, and the rows
   } else {
     // A wide window opens Project > Data as the library's Data tab; a source row opens its fields in the inspector.
     const panel = page.getByTestId('data-panel');
+    await panel.getByRole('button', { name: /^Models, \d+$/ }).click();
     await expect(panel.getByText(/^Used by \d+$/).first()).toBeVisible();
-    await page.getByPlaceholder('Find data').fill('weather');
-    const rows = panel.getByRole('region', { name: 'Models' }).getByRole('button');
+    await page.getByPlaceholder('Find an entity, device or area').fill('weather');
+    const rows = panel.getByRole('region', { name: 'Models' }).getByRole('button', { name: /, source, / });
     await expect(rows).toHaveCount(1);
     await snap(page, `${size}-data`);
     await rows.first().click();

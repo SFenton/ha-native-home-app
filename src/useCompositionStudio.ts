@@ -3,6 +3,7 @@ import { ApiError, request } from './api';
 import { compileCompositionDocument } from './shared/composition/compiler';
 import { CompositionValidationError } from './shared/composition/json';
 import { normaliseFoldSides } from './shared/composition/fold-sides-normalise';
+import { pruneEntitySources } from './workspace2/dialogs/sources';
 import { sameJson } from './sameJson';
 import type { CompositionDocument, CompositionPublication } from './shared/composition/schema';
 import type { HaPublishResult } from './ha-publication';
@@ -54,6 +55,7 @@ export function useCompositionStudio() {
   /** The text field the last edit typed into, and when; a further keystroke in it joins that undo step. */
   const typing = useRef<{ path: string; at: number } | undefined>(undefined);
   const future = useRef<CompositionDocument[]>([]);
+  const lastApplied = useRef<{ input: CompositionDocument; output: CompositionDocument } | undefined>(undefined);
   const [busy, setBusy] = useState(false), locked = useRef(false);
   /** Settles when the operation holding the lock ends, so a caller can wait its turn instead of failing. */
   const idle = useRef<Promise<void>>(Promise.resolve()), release = useRef<() => void>(() => {});
@@ -92,12 +94,13 @@ export function useCompositionStudio() {
    */
   const apply = useCallback((edit: CompositionDocument, group?: string) => {
     // A side of the hinge lives only on a page's top-level components: whatever the edit nested, moved or copied, it leaves none elsewhere (`sh.fold-sides@1`).
-    const next = normaliseFoldSides(edit);
+    const next = pruneEntitySources(normaliseFoldSides(edit));
     if (!current.current || sameJson(next, current.current)) return;
     const path = group ? `group:${group}` : textEditPath(current.current, next), at = Date.now();
     const joins = path !== undefined && typing.current?.path === path && (group !== undefined || at - typing.current.at < UNDO_COALESCE_MS) && past.current.length > 0;
     if (!joins) past.current = [...past.current.slice(-(UNDO_DEPTH - 1)), current.current];
     future.current = []; typing.current = path === undefined ? undefined : { path, at };
+    lastApplied.current = { input: edit, output: next };
     current.current = next; setDocument(next); setStatus('');
   }, []);
   const persist = useCallback(async (expected: number) => {
@@ -184,7 +187,7 @@ export function useCompositionStudio() {
   /** Takes back the edit that produced `applied`, leaving nothing to redo, when it is still the newest edit; false when it is not. */
   const revert = (applied: CompositionDocument) => {
     const before = past.current[past.current.length - 1];
-    if (current.current !== applied || !before) return false;
+    if (lastApplied.current?.input !== applied || current.current !== lastApplied.current.output || !before) return false;
     past.current.pop(); typing.current = undefined; current.current = before; setDocument(before);
     return true;
   };

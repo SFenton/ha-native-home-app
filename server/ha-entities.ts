@@ -1,4 +1,5 @@
 import { HttpError } from './store';
+import { HubRequestError, type LiveEntityHub } from './ha-live';
 
 /**
  * What the Studio's style editor reads from Home Assistant: the entity list, a domain's states with their translated names, the
@@ -6,7 +7,7 @@ import { HttpError } from './store';
  */
 
 /** One entity as the picker lists it. */
-export interface PickerEntity { entityId: string; name: string; state: string; deviceClass?: string }
+export interface PickerEntity { entityId: string; name: string; state: string; unit?: string; deviceClass?: string }
 
 /** A state Home Assistant offers for an entity, with the name it shows people. */
 export interface EntityState { state: string; name?: string }
@@ -46,10 +47,37 @@ export async function listEntities(reads: HaReads, domain?: string): Promise<Pic
       entityId: item.entity_id,
       name: typeof attributes.friendly_name === 'string' ? attributes.friendly_name : item.entity_id,
       state: item.state,
+      ...(typeof attributes.unit_of_measurement === 'string' ? { unit: attributes.unit_of_measurement } : {}),
       ...(typeof attributes.device_class === 'string' ? { deviceClass: attributes.device_class } : {}),
     });
   }
   return found.sort((a, b) => a.name.localeCompare(b.name) || a.entityId.localeCompare(b.entityId));
+}
+
+/** Only names and entity membership leave the registries; device identifiers and registry metadata stay on the server. */
+export async function listEntityAreas(hub: Pick<LiveEntityHub, 'request'> | undefined, credentials: readonly string[] = []) {
+  if (!hub) throw new HttpError(503, 'Home Assistant is not configured');
+  let raw: unknown[];
+  try {
+    raw = await Promise.all(['area', 'device', 'entity'].map(kind => hub.request({ type: `config/${kind}_registry/list` }, 8000)));
+  } catch (error) {
+    if (error instanceof HubRequestError) throw new HttpError(502, 'Home Assistant areas could not be read');
+    throw error;
+  }
+  if (!raw.every(Array.isArray)) throw new HttpError(502, 'Home Assistant returned unreadable areas');
+  const [areaRows, deviceRows, entityRows] = raw as unknown[][];
+  const safe = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 255 && !credentials.some(secret => secret && value.includes(secret));
+  const areas = areaRows.filter(isRecord).flatMap(row => safe(row.area_id) && safe(row.name) ? [{ id: row.area_id, name: row.name }] : []);
+  const areaIds = new Set(areas.map(area => area.id));
+  const devices = new Map(deviceRows.filter(isRecord).flatMap(row => safe(row.id) ? [[row.id, row] as const] : []));
+  const entities = entityRows.filter(isRecord).flatMap(row => {
+    if (!safe(row.entity_id) || !entityPattern.test(row.entity_id)) return [];
+    const device = typeof row.device_id === 'string' ? devices.get(row.device_id) : undefined;
+    const area = typeof row.area_id === 'string' ? row.area_id : device?.area_id;
+    const deviceName = device?.name_by_user ?? device?.name;
+    return [{ entityId: row.entity_id, ...(typeof area === 'string' && areaIds.has(area) ? { areaId: area } : {}), ...(safe(deviceName) ? { device: deviceName } : {}) }];
+  });
+  return { areas, entities };
 }
 
 /**

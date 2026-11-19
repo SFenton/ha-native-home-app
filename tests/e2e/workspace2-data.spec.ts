@@ -30,28 +30,32 @@ async function openData(page: Page) {
     await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Data$/ }).click();
     return page.locator('.w2-data');
   }
-  await openLibrary(page, 'Data');
-  return page.getByTestId('data-panel');
+  await openLibrary(page, 'Flows');
+  const panel = page.getByTestId('flows-panel');
+  const group = panel.getByRole('button', { name: /^Flows, \d+$/ });
+  if (await group.getAttribute('aria-expanded') === 'false') await group.click();
+  return panel;
 }
 const inspector = (page: Page) => isPhone(page) ? page.locator('.w2-project-sheet') : page.getByLabel('Properties');
 
 test.describe('the Data rail item and panel', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'A phone has no rail; Project > Data is below');
-  test('the rail has Data as its seventh item, named "Data"', async ({ page }) => {
+  test('the rail has Flows before Data as its eighth item', async ({ page }) => {
     await openWorkspace(page);
     const buttons = page.getByTestId('library-rail').getByRole('button');
-    await expect(buttons).toHaveCount(7);
+    await expect(buttons).toHaveCount(8);
+    await expect(buttons.nth(6)).toHaveText('Flows');
     await expect(buttons.last()).toHaveText('Data');
     await expect(railButton(page, 'Data')).toBeVisible();
   });
   test('the panel lists Data Flows with "Used by n", counts what is there, and Find data filters', async ({ page }) => {
     const panel = await openData(page);
-    await expect(panel.getByText(/^1 data flow · \d+ sources$/)).toBeVisible();
-    await expect(panel.getByRole('heading', { name: 'Data Flows' })).toBeVisible();
+    await expect(panel.getByText(/1 flow · \d+ fields with logic$/)).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Flows, 1' })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Overdue Chores, data flow, used by 1, live' })).toBeVisible();
-    await panel.getByRole('searchbox', { name: 'Find data' }).fill('zzz');
+    await panel.getByRole('searchbox', { name: 'Find a flow' }).fill('zzz');
     await expect(panel.getByRole('button', { name: /Overdue Chores/ })).toHaveCount(0);
-    await panel.getByRole('searchbox', { name: 'Find data' }).fill('chores');
+    await panel.getByRole('searchbox', { name: 'Find a flow' }).fill('chores');
     await expect(panel.getByRole('button', { name: /Overdue Chores/ })).toBeVisible();
     await snap(page, `${prefix(page)}-data-panel`);
   });
@@ -69,8 +73,11 @@ test.describe('the Data rail item and panel', () => {
     await snap(page, `${prefix(page)}-data-flow`);
   });
   test('a source row (an entity, an app topic or a model) opens its fields in the inspector, and a second click closes it', async ({ page }) => {
-    const panel = await openData(page);
-    const row = panel.getByRole('region', { name: 'Models' }).getByRole('button').first();
+    await openWorkspace(page);
+    await openLibrary(page, 'Data');
+    const panel = page.getByTestId('data-panel');
+    await panel.getByRole('button', { name: /^Models, \d+$/ }).click();
+    const row = panel.getByRole('region', { name: 'Models' }).getByRole('button', { name: /, source, / }).first();
     await expect(row).toHaveAttribute('aria-label', /, source, (used by \d+|not used)$/);
     await row.click();
     const props = inspector(page);
@@ -89,7 +96,7 @@ test.describe('the flow editor', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'The phone path is below');
   test('+ Data Flow offers the five choices; a group of entities has no Refresh and no Run', async ({ page }) => {
     const panel = await openData(page);
-    await panel.getByRole('button', { name: 'Data Flow', exact: true }).click();
+    await panel.getByRole('button', { name: 'New Flow', exact: true }).click();
     const menu = page.getByRole('menu', { name: 'Get data from' });
     await expect(menu.getByRole('menuitem')).toHaveText([/A Service/, /An Entity's Attribute/, /A Live List/, /A Group of Entities/, /Nothing/]);
     await menu.getByRole('menuitem', { name: /A Group of Entities/ }).click();
@@ -103,7 +110,7 @@ test.describe('the flow editor', () => {
   });
   test('Nothing has one Value row and says it is worked out on the phone', async ({ page }) => {
     const panel = await openData(page);
-    await panel.getByRole('button', { name: 'Data Flow', exact: true }).click();
+    await panel.getByRole('button', { name: 'New Flow', exact: true }).click();
     await page.getByRole('menuitem', { name: /Nothing/ }).click();
     const props = page.getByLabel('Properties');
     await expect(props.getByTestId('run-bar')).toContainText('Worked out on the phone. Nothing to run.');

@@ -16,6 +16,22 @@
 .w2-scope .w2-data-add { min-height: 36px; border-radius: 18px; gap: 6px; }
 .w2-data-foot .w2-caption { flex-basis: 100%; margin: 0; }
 .w2-data-sources { max-height: 320px; overflow: auto; }
+.w2-group-preview { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 400; }
+.w2-data-group .w2-tree-group-button > span:not(.w2-group-preview) { flex-shrink: 0; }
+.w2-flow-rowtext { display: flex; flex-direction: column; flex: 1; min-width: 0; padding-block: 6px; }
+.w2-flow-name { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
+.w2-flow-name .w2-data-tag { flex: none; padding-inline: 5px; font-size: 10px; }
+.w2-flow-rowtext small { color: var(--w2-muted); font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w2-flow-glyph { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--w2-field); color: var(--w2-link); }
+.w2-flow-glyph[data-kind=boolean] { color: var(--w2-ok-text, var(--w2-ink-card)); background: color-mix(in srgb, var(--w2-ok) 16%, var(--w2-card)); }
+.w2-flow-glyph[data-kind=words] { color: var(--w2-warn-text, var(--w2-ink-card)); background: color-mix(in srgb, var(--w2-warn) 16%, var(--w2-card)); }
+.w2-flows-panel .w2-data-plain > .w2-data-row { flex: 1; min-width: 0; }
+.w2-data-segment { display: flex; margin: 4px 12px 8px; }
+.w2-data-segment button { flex: 1; min-width: 0; white-space: nowrap; }
+.w2-ha-entity { padding: 6px 8px; }
+.w2-ha-entity-head { display: flex; gap: 8px; align-items: baseline; }
+.w2-ha-state { flex: none; max-width: 45%; overflow-wrap: anywhere; font-weight: 500; }
+.w2-ha-readers { display: block; color: var(--w2-muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* The outline: a tree of 28 px rows */
 .w2-outline { padding: 0 4px; }

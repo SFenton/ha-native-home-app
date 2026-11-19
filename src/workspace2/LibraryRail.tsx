@@ -1,4 +1,4 @@
-import { AppWindow, Database, Dock, Layers, PanelBottom, LayoutGrid, SlidersHorizontal } from 'lucide-react';
+import { AppWindow, Database, Dock, Layers, PanelBottom, LayoutGrid, SlidersHorizontal, Workflow } from 'lucide-react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { categories, type Category } from './layout';
 
@@ -10,11 +10,12 @@ export const categoryInfo: Record<Category, { label: string; icon: (size: number
   modals: { label: 'Modals', icon: size => <AppWindow size={size} aria-hidden/> },
   components: { label: 'Components', icon: size => <LayoutGrid size={size} aria-hidden/> },
   controls: { label: 'Controls', icon: size => <SlidersHorizontal size={size} aria-hidden/> },
+  flows: { label: 'Flows', icon: size => <Workflow size={size} aria-hidden/> },
   data: { label: 'Data', icon: size => <Database size={size} aria-hidden/> },
 };
 
 /**
- * The library rail: seven category buttons on the leading edge. The button whose panel is open is pressed; pressing it closes the
+ * The library rail's category buttons on the leading edge. The button whose panel is open is pressed; pressing it closes the
  * panel, pressing another switches category. Arrow keys move between the buttons (one tab stop, as a toolbar does).
  */
 export default function LibraryRail({ category, open, onPress, inert }: { category: Category; open: boolean; onPress: (category: Category) => void; /** The flyout covers the rail; nothing under it takes focus. */ inert?: boolean }) {

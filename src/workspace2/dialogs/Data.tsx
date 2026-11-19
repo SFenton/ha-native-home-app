@@ -11,7 +11,7 @@ import { addEntry, canAddEntry, entryOf, kindWord, libraryOf, useCounts } from '
 import { setHeldLogicScope } from '../data/logic/logicScope';
 import { logicWords } from '../data/logic/logicWords';
 import type { Workspace2 } from '../useWorkspace2';
-import { modelChoices, removeUnusedSources, sourceName, sourceUses, type Source } from './sources';
+import { modelChoices, sourceName, sourceUses, type Source } from './sources';
 
 /** One source's fields, found by its id so an edit that reorders the list cannot point at another source. */
 export function SourceFields({ id }: { id: string }) {
@@ -52,7 +52,6 @@ export default function Data({ ws }: { ws?: Workspace2 }) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const rows = document.dataSources.map(source => ({ source, name: sourceName(source, names) }))
     .filter(({ source, name }) => words.every(word => `${name} ${source.id}`.toLowerCase().includes(word)));
-  const unused = document.dataSources.filter(source => !uses.get(source.id)).length;
   const flows = flowSources(document).filter(source => words.every(word => `${source.inputs.title} ${source.id}`.toLowerCase().includes(word)));
   const add = (kind: RequestKind) => {
     const made = newFlow(document, kind, { entityId: entities.find(row => row.domain === (kind === 'group' ? 'light' : kind === 'attribute' ? 'sensor' : 'todo'))?.entityId });
@@ -94,7 +93,6 @@ export default function Data({ ws }: { ws?: Workspace2 }) {
       {ws && <button type="button" disabled={!canAddFlow(document)} onClick={() => push?.push({ title: 'Get Data From', body: <ul className="w2-list">{requestKinds.map(kind => <li key={kind}><button type="button" className="w2-list-row" onClick={() => { push?.pop(); add(kind); }}>{requestWords[kind].title}<span className="w2-page-via">{requestWords[kind].note}</span></button></li>)}</ul> })}>Data Flow</button>}
       {ws && <button type="button" disabled={!canAddEntry(document)} onClick={() => push?.push({ title: logicWords.addTemplate, body: <ul className="w2-list"><li><button type="button" className="w2-list-row" onClick={() => { push?.pop(); addLogic('value'); }}>{logicWords.addValue}</button></li><li><button type="button" className="w2-list-row" onClick={() => { push?.pop(); addLogic('condition'); }}>{logicWords.addCondition}</button></li></ul> })}>{logicWords.addTemplate}</button>}
       <button type="button" onClick={() => push?.push({ title: 'Add Source', body: <AddSource/> })}>Add Source</button>
-      <button type="button" disabled={unused === 0} onClick={() => onChange(removeUnusedSources(document))}>Remove Unused</button>
     </div>
   </div>;
 }

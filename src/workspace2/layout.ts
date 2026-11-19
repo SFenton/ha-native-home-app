@@ -6,9 +6,9 @@
 /** `phone` has no rail (sheets and bars); `flyout` slides the library over the rail; `docked` keeps it beside the rail. */
 export type Tier = 'phone' | 'flyout' | 'docked';
 /** The category buttons of the library rail, top to bottom. */
-export type Category = 'tabs' | 'pages' | 'sheets' | 'modals' | 'components' | 'controls' | 'data';
-/** The seven categories in rail order: lib3's six, then Data (studio-ux2, L-tax and L-data). */
-export const categories: readonly Category[] = ['tabs', 'pages', 'sheets', 'modals', 'components', 'controls', 'data'];
+export type Category = 'tabs' | 'pages' | 'sheets' | 'modals' | 'components' | 'controls' | 'flows' | 'data';
+/** The library categories in rail order. */
+export const categories: readonly Category[] = ['tabs', 'pages', 'sheets', 'modals', 'components', 'controls', 'flows', 'data'];
 /** The categories that list the app's surfaces as a tree; the others are palettes. */
 export type TreeCategory = 'tabs' | 'pages' | 'sheets' | 'modals';
 /** Whether a category lists surfaces. */

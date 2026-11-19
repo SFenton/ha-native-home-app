@@ -26,6 +26,8 @@ export interface FakeHaOptions {
   serviceResponse?: (command: Record<string, unknown>) => unknown;
   /** Entities the live stream and `GET /api/states` report, by id. */
   entities?: Record<string, { state: string; attributes?: Record<string, unknown> }>;
+  /** Read-only registry replies, including extra metadata to exercise safe projection. */
+  registries?: { area: unknown; device: unknown; entity: unknown };
 }
 
 /** Minimal Home Assistant: the `fenton_home` UI publication websocket commands, with an ordered call log. */
@@ -108,7 +110,10 @@ export async function fakeHomeAssistant(options: FakeHaOptions) {
       log.push(`ws ${name}`);
       if (options.unknownCommand) { fail(id, 'unknown_command', 'Unknown command.'); return; }
       if (options.denyCommands) { fail(id, 'unauthorized', 'Unauthorized'); return; }
-      if (message.type === 'fenton_home/house_config') {
+      const registry = /^config\/(area|device|entity)_registry\/list$/.exec(String(message.type))?.[1] as 'area' | 'device' | 'entity' | undefined;
+      if (registry && options.registries) {
+        send({ id, type: 'result', success: true, result: options.registries[registry] });
+      } else if (message.type === 'fenton_home/house_config') {
         const sections = Object.fromEntries(['home', 'security', 'climate', 'customLights', 'food', 'chores', 'household', 'media', 'roomDevices', 'sprinklers',
           'vacation', 'vacuums', 'bedroom', 'rooms'].map(key => [key, {}]));
         send({ id, type: 'result', success: true, result: { schema: 2, hash: 'a'.repeat(64), config: { ...sections, ...options.houseConfig } } });

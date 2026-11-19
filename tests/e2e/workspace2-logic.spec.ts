@@ -34,8 +34,11 @@ async function openData(page: Page) {
     await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Data$/ }).click();
     return page.locator('.w2-data');
   }
-  await openLibrary(page, 'Data');
-  return page.getByTestId('data-panel');
+  await openLibrary(page, 'Flows');
+  const panel = page.getByTestId('flows-panel');
+  const group = panel.getByRole('button', { name: /^Templates, \d+$/ });
+  if (await group.getAttribute('aria-expanded') === 'false') await group.click();
+  return panel;
 }
 /** A tile's Subtitle value, opened in its editor. */
 async function openSubtitle(page: Page, tile: string): Promise<Locator> {
@@ -51,9 +54,9 @@ for (const scheme of ['light', 'dark'] as const) {
     test('the Data panel lists the three templates, and a template opens with its settings, body and uses', async ({ page }) => {
       const panel = await openData(page);
       const group = panel.getByTestId('logic-group');
-      await expect(group.getByRole('heading', { name: 'Logic Templates' })).toBeVisible();
-      await expect(group.getByRole('button', { name: /^Count or All/ })).toContainText('Value · Used by 3');
-      await expect(group.getByRole('button', { name: /^Night Hours/ })).toContainText('Condition · Used by 3');
+      await expect(group.getByRole('heading', { name: isPhone(page) ? 'Logic Templates' : /^Templates,/ })).toBeVisible();
+      await expect(group.getByRole('button', { name: /^Count or All/ })).toContainText(`${isPhone(page) ? 'Value' : 'Words'} · Used by 3`);
+      await expect(group.getByRole('button', { name: /^Night Hours/ })).toContainText(`${isPhone(page) ? 'Condition' : 'Yes or No'} · Used by 3`);
       await snap(page, `${prefix(page)}-${scheme}-logic-group`);
       await group.getByRole('button', { name: /^Count or All/ }).click();
       const editor = page.getByTestId('logic-editor');

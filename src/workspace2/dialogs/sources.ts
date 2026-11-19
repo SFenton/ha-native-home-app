@@ -36,18 +36,45 @@ export function sourceName(source: Source, entityNames?: ReadonlyMap<string, str
   return detail ? `${model} · ${detail}` : model;
 }
 
-/** How many places read each source: every string in the document, outside a source's own `id`, that is one source's id. */
+/** Source references and typed Source settings count; entity ids, labels and service targets do not. */
 export function sourceUses(document: CompositionDocument): Map<string, number> {
   const uses = new Map<string, number>(document.dataSources.map(source => [source.id, 0]));
-  const walk = (value: unknown, own?: boolean) => {
-    if (typeof value === 'string') { if (uses.has(value)) uses.set(value, uses.get(value)! + 1); return; }
-    if (Array.isArray(value)) { for (const item of value) walk(item); return; }
-    if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) { if (own && key === 'id') continue; walk(child); }
+  const add = (value: unknown, local: ReadonlySet<string>) => {
+    if (typeof value === 'string' && !local.has(value) && uses.has(value)) uses.set(value, uses.get(value)! + 1);
   };
-  const { dataSources, ...rest } = document;
-  walk(rest);
-  for (const source of dataSources) walk(source, true);
+  const walk = (value: unknown, local: ReadonlySet<string>) => {
+    if (Array.isArray(value)) { for (const item of value) walk(item, local); return; }
+    if (!value || typeof value !== 'object') return;
+    const row = value as Record<string, unknown>;
+    const entry = row.type === 'logic-ref' ? document.logicLibrary?.find(item => item.id === row.logicId)
+      : row.type === 'component-ref' ? document.componentLibrary?.find(item => item.id === row.componentId) : undefined;
+    if (row.args && typeof row.args === 'object') {
+      for (const param of entry?.params ?? []) if (param.kind === 'source-id') add((row.args as Record<string, unknown>)[param.name], local);
+    }
+    if (row.kind === 'source-id') add(row.sample, local);
+    for (const [key, child] of Object.entries(row)) {
+      if (/^(sourceId|providerId)$|SourceId$/.test(key)) add(child, local);
+      else if (/SourceIds$/.test(key) && Array.isArray(child)) child.forEach(item => add(item, local));
+      walk(child, local);
+    }
+  };
+  const { componentLibrary, ...rest } = document;
+  walk(rest, new Set());
+  for (const entry of componentLibrary ?? []) {
+    walk(entry, new Set([...(entry.sources ?? []), ...(entry.flows ?? [])].map(source => source.id)));
+  }
   return uses;
+}
+
+/** Entity sources are Studio-managed. Pruning and the edit that orphaned them share one history entry. Models stay editable. */
+export function pruneEntitySources(document: CompositionDocument): CompositionDocument {
+  let next = document;
+  for (;;) {
+    const uses = sourceUses(next);
+    const dataSources = next.dataSources.filter(source => source.kind !== 'ha-entity' || (uses.get(source.id) ?? 0) > 0);
+    if (dataSources.length === next.dataSources.length) return next;
+    next = { ...next, dataSources };
+  }
 }
 
 /** The document without the sources nothing reads. */

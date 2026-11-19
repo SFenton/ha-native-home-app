@@ -6,6 +6,7 @@ import { buildAllowedHosts, isAllowedHostHeader } from './allowed-hosts';
 import { isLoopbackHost, localDevelopment, type ServerConfig } from './config';
 import { HomeAssistantClient, PICTURE_ENTITY } from './ha';
 import { openLiveSession, pictureWanted, wantedEntities } from './ha-live';
+import { listEntityAreas } from './ha-entities';
 import { draftTodoIds } from './native-home';
 import { registerFlowRun } from './flow-run';
 import { HttpError, StudioStore } from './store';
@@ -214,6 +215,9 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   app.get('/native/api/ha/entities', async (req, res) => {
     const { domain } = z.strictObject({ domain: z.string().regex(/^[a-z][a-z0-9_]*$/).optional() }).parse(req.query);
     res.json(await ha.entities.list(domain));
+  });
+  app.get('/native/api/ha/areas', async (_req, res) => {
+    res.json(await listEntityAreas(ha.live, [config.haToken ?? '', config.supervisorToken ?? '', config.authToken ?? '']));
   });
   app.get('/native/api/ha/entity-states', async (req, res) => {
     res.json(await ha.entities.states(z.strictObject({ entityId: z.string().max(160) }).parse(req.query).entityId));
