@@ -18,7 +18,7 @@ import { logicWords } from './logicWords';
  * checkbox (ticked: each use sets it). Saving is one step in the page's draft: the field then holds a use of the new template with its own values filled in, so
  * the page draws what it drew. Not offered inside a logic template's own editor.
  */
-export default function SaveAsLogic({ draft, path, kind, onSaved }: { draft: Draft; path: EditorPath; kind: 'value' | 'condition'; onSaved?: () => void }) {
+export default function SaveAsLogic({ draft, path, kind, onSaved }: { draft: Draft; path: EditorPath; kind: 'value' | 'condition' | 'operand'; onSaved?: () => void }) {
   const scope = useLogicScope();
   const [open, setOpen] = useState(false);
   if (scope) return null;
@@ -28,17 +28,17 @@ export default function SaveAsLogic({ draft, path, kind, onSaved }: { draft: Dra
   </div>;
 }
 
-function SaveDialog({ draft, path, kind, onClose, onSaved }: { draft: Draft; path: EditorPath; kind: 'value' | 'condition'; onClose: () => void; onSaved?: () => void }) {
+function SaveDialog({ draft, path, kind, onClose, onSaved }: { draft: Draft; path: EditorPath; kind: 'value' | 'condition' | 'operand'; onClose: () => void; onSaved?: () => void }) {
   const document = useDraftDocument(draft), ctx = useNameContext(document);
   const slot = valueAt(document, path) as { type: string } & Record<string, unknown> | undefined;
-  const body = kind === 'value' ? (slot ? slotOperand(slot) : undefined) : slot as Predicate | undefined;
+  const body = kind === 'value' ? (slot ? slotOperand(slot) : undefined) : slot as Operand | Predicate | undefined;
   const rows = useMemo(() => extractRows(body, id => { const entity = entityOfSource(ctx, id); return entity ? ctx.entityName?.(entity) ?? entity : id; }, id => ctx.entityName?.(id) ?? id), [body, ctx]);
-  const [name, setName] = useState(() => freshName(document, kind === 'value' ? 'New Value' : 'New Condition'));
+  const [name, setName] = useState(() => freshName(document, kind === 'condition' ? 'New Condition' : 'New Value'));
   const [ticked, setTicked] = useState(() => new Set(rows.filter(row => row.kind === 'entity' || row.kind === 'person').map(row => row.key)));
   const first = useRef<HTMLInputElement>(null);
   const save = () => {
     if (!body || !name.trim()) return;
-    const made = entryFromLogic(document, kind, name.trim(), body, rows.filter(row => ticked.has(row.key)));
+    const made = entryFromLogic(document, kind === 'condition' ? 'condition' : 'value', name.trim(), body, rows.filter(row => ticked.has(row.key)));
     const use = makeUse(made.entry, made.args);
     const next = addMadeEntry(document, made.entry);
     draft.set(replaceAt(next, path, kind === 'value' ? operandSlot(use as unknown as Operand, slot) : use));

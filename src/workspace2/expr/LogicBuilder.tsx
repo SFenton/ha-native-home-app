@@ -15,6 +15,8 @@ import { useDraftEnvironment, useNameContext } from './useExpr';
 import LogicTemplateButton from '../data/logic/LogicTemplateButton';
 import { useRule } from './useRule';
 import { groupCount, groupSentence, groupTitle, words, type Place } from './words';
+import { LogicField } from '../logic-fields/Field';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 /** Which row is open in the builder: one at a time (D5). */
 const OpenRow = createContext<{ open: string | undefined; setOpen: (key: string | undefined) => void }>({ open: undefined, setOpen: () => {} });
@@ -121,5 +123,7 @@ function GroupPage({ props, at }: { props: BuilderProps; at: readonly number[] }
 /** The Logic editor (spec "The condition editor: Logic"): groups of conditions, two levels in place and a third on a pushed page. */
 export default function LogicBuilder(props: Omit<BuilderProps, 'inlineDepth'> & { inlineDepth?: number }) {
   const [open, setOpen] = useState<string | undefined>();
+  const canvas = useLogicFields();
+  if (canvas) return <LogicField draft={props.draft} path={props.path} kind="condition" label={props.place === 'filter' ? 'Keep items when' : 'When'}/>;
   return <OpenRow.Provider value={{ open, setOpen }}><div className="w2-expr-logic" data-testid="logic-builder"><GroupView props={{ inlineDepth: 2, ...props }} at={[]} level={1}/></div></OpenRow.Provider>;
 }

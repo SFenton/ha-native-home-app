@@ -17,6 +17,8 @@ import { words } from './words';
 import SaveAsLogic from '../data/logic/SaveLogicDialog';
 import { SelectMenu } from '../SelectMenu';
 import { useLogicScope } from '../data/logic/logicScope';
+import { LogicField } from '../logic-fields/Field';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 type Slot = { type: string } & Record<string, unknown>;
 /** The words a Fixed field shows for a slot: its own text, or the text of a literal operand; nothing for logic that is not a plain value (a use, a rule, a read). */
@@ -48,6 +50,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   draft: Draft; path: EditorPath; kind: Kind; modes: readonly ValueMode[]; look?: LookKind; label: string; initialMode?: ValueMode; maxLength?: number;
 }) {
   const document = useDraftDocument(draft);
+  const canvas = useLogicFields();
   const logicScope = useLogicScope();
   const slot = valueAt(document, path) as Slot | undefined;
   const key = path.join('/'), memo = memoOf(draft, key);
@@ -55,6 +58,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   const [mode, setModeState] = useState<ValueMode>(() => memo.mode ?? (derived === 'custom' ? 'fixed' : derived));
   const entered = useRef(false);
   const setMode = (next: ValueMode) => {
+    if (canvas && next === 'rules') { canvas.open({ draft, path, kind: 'slot', label }); return; }
     const current = draft.get(), now = valueAt(current, path) as Slot, was = memo.mode ?? mode;
     // What the mode on show holds now goes into memory.
     if (was === 'fixed') memo.fixed = fixedOf(now, kind);
@@ -85,6 +89,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   };
   const inputs = mode === 'rules' ? (rulesOf(slot, kind)?.cases ?? []).flatMap(entry => inputsOf(entry.when)) : kind === 'text' && slot ? (() => { const operand = slotOperand(slot); return operand ? operandInputs(operand) : []; })() : mode === 'entity' && slot && 'value' in slot ? operandInputs(slot.value as Operand) : [];
   const unique = [...new Map(inputs.map(input => [`${input.sourceId}|${input.path.join('/')}`, input])).values()];
+  if (canvas && derived !== 'fixed') return <LogicField draft={draft} path={path} kind="slot" label={label}/>;
   return <div className="w2-editor-section w2-expr-editor" data-testid="value-editor" data-mode={mode}>
     {kind === 'text' && <SaveAsLogic draft={draft} path={path} kind="value" onSaved={() => { memo.mode = 'entity'; setModeState('entity'); }}/>}
     {modes.length > 1 && <Segmented label={`${label} value`} value={mode} options={modes.map(item => ({ value: item, label: modeWords[item] }))} onChange={setMode}/>}

@@ -12,6 +12,8 @@ import { useNameContext } from './useExpr';
 import { useRule } from './useRule';
 import SaveAsLogic from '../data/logic/SaveLogicDialog';
 import { policyChoices, words, type Place } from './words';
+import { LogicField } from '../logic-fields/Field';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 type Mode = 'simple' | 'logic';
 /** A person's choice of Logic for a simple condition is kept for that field while the page is open; it is not written to the document. */
@@ -48,6 +50,11 @@ export default function ConditionEditor({ draft, path, place, scope = 'document'
   const setMode = (next: Mode) => { choose(next); memory.set(draft, (memory.get(draft) ?? new Map()).set(key, next)); };
   const reason = useId();
   const parentPolicy = policy ? ((valueAt(document, path.slice(0, -1)) as Record<string, unknown> | undefined)?.[policyKey] as WhenUnknown | undefined) : undefined;
+  const canvas = useLogicFields();
+  if (canvas) return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">
+    <LogicField draft={draft} path={path} kind="condition" label={place === 'filter' ? 'Keep items when' : 'When'}/>
+    {policy && <PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/>}
+  </div>;
   return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">
     {rule && <SaveAsLogic draft={draft} path={path} kind="condition"/>}
     <Segmented label="Condition view" value={mode} options={[{ value: 'simple', label: words.simple, dimmed: !fit.fits }, { value: 'logic', label: words.logic }]} onChange={setMode} describedBy={reason}/>

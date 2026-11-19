@@ -64,6 +64,8 @@ export function useCompositionStudio() {
   const whenIdle = useCallback(async () => { while (locked.current) await idle.current; }, []);
   const latestDocument = useCallback(() => current.current, []);
   const [error, setError] = useState(''), [status, setStatus] = useState(''), [conflict, setConflict] = useState(false);
+  const saveFailure = useRef<unknown>(undefined);
+  const latestSaveFailure = useCallback(() => saveFailure.current, []);
   const [publishedRevision, setPublishedRevision] = useState<number>();
   const [homeAssistant, setHomeAssistant] = useState<HaPublishResult>();
   const [houseImport, setHouseImport] = useState<HouseImportReport>();
@@ -112,7 +114,11 @@ export function useCompositionStudio() {
     return next;
   }, []);
   const save = useCallback(async (publish: boolean | 'home-assistant' = false, keepLocal = false) => {
-    if (locked.current || !metadata.current || !current.current) return false;
+    saveFailure.current = undefined;
+    if (locked.current || !metadata.current || !current.current) {
+      saveFailure.current = new Error('Wait for the current operation and load the workspace before saving.');
+      return false;
+    }
     acquire(); setBusy(true); setError(''); setStatus('');
     try {
       let expected = metadata.current.revision;
@@ -129,7 +135,7 @@ export function useCompositionStudio() {
         setStatus(`Published revision ${published.revision}.`);
       } else setStatus(`Saved draft revision ${next.revision}`);
       return true;
-    } catch (reason) { report(reason); return false; }
+    } catch (reason) { saveFailure.current = reason; report(reason); return false; }
     finally { free(); setBusy(false); }
   }, [persist, report, acquire, free]);
   /** Adds the layout parts missing from the saved draft from the live house config, then reloads the draft. */
@@ -210,6 +216,6 @@ export function useCompositionStudio() {
   return {
     document, envelope, publishedRevision, homeAssistant, houseImport, importHouse, backup, refreshBackup, startFromPublished, restorePreviousDraft, setStatus, busy, error, status, conflict, dirty,
     canUndo: past.current.length > 0, canRedo: future.current.length > 0,
-    apply, save, reload, undo, redo, revert, setError, report, whenIdle, latestDocument, isSaved,
+    apply, save, reload, undo, redo, revert, setError, report, whenIdle, latestDocument, latestSaveFailure, isSaved,
   };
 }

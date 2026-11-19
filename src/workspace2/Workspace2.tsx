@@ -1,7 +1,7 @@
 import { fetchPicture } from '../preview2/map-picture';
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
-import { useRecords } from './data/useRecords';
+import { useWorkspaceRecords } from './logic-fields/live';
 import { INK_DEFAULT_CAPABILITY } from '../shared/composition/compiler';
 import { defaultPreviewInk, PreviewInkContext } from '../preview2/ink';
 import Preview2, { previewWindows, type PreviewWindow } from './preview';
@@ -45,6 +45,7 @@ import { SelectMenusContext } from './SelectMenu';
 import { ToastHost } from './toasts';
 import type { DialogKey } from './projectDialogs';
 import './workspace2.css';
+import { LogicFieldsProvider, WhenCanvasClosed } from './logic-fields/LogicFields';
 
 const SNAP_PEEK = '88px', SNAP_HALF = 0.5, SNAP_FULL = 1;
 const snapPoints = [SNAP_PEEK, SNAP_HALF, SNAP_FULL];
@@ -148,7 +149,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
     window={window_} textScale={textScales[textStep]} appearance={appearance === 'follow' ? undefined : appearance} bezel={!narrow} live={ws.houseStates.live} overlay={ws.houseStates.overlay}
     onOverlayChange={ws.houseStates.setOverlay} onSimulatedCall={ws.simulated} revealKey={ws.revealKey} repeatMark={ws.repeats.mark} bottomInset={bottomInset} alert={ws.alertPreview}
     statePreview={ws.statePreview && ws.selection === `node:${ws.statePreview.nodeId}` ? ws.statePreview : undefined}
-    mapPicture={ws.houseStates.streaming ? fetchPicture : undefined} records={useRecords}/>}</PreviewGuard> : undefined,
+    mapPicture={ws.houseStates.streaming ? fetchPicture : undefined} records={useWorkspaceRecords}/>}</PreviewGuard> : undefined,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [ws.previewDocument, ws.lastGoodDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.live, ws.houseStates.streaming, ws.houseStates.overlay, window_, narrow, ws.revealKey, ws.repeats.mark, bottomInset, ws.alertPreview, ws.statePreview, textStep, appearance, ws.setSurface, ws.select, ws.openTemplate, ws.houseStates.setOverlay, ws.simulated]);
   const underPreview = railUnderPreview(narrow, window_);
@@ -162,6 +163,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
     <SimulatorWindowContext.Provider value={simulator}>
     <ToastHost>
       <WorkspaceDataProvider document={document} house={ws.houseStates.house} live={ws.houseStates.live} environment={ws.houseStates.environment} overlay={ws.houseStates.overlay} tried={ws.tried} onCreatePage={onCreatePage ?? newPageFlow} onCreateSheet={onCreateSheet ?? newSheetFlow}>
+      <LogicFieldsProvider ws={ws} theme={theme}>
       <AddHost ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <DragLayer ws={ws} narrow={narrow} stage={stageElement} onError={showError}>
       <TopBar ws={ws} narrow={narrow} window={window_} onWindow={setWindow} pagesOpen={pagesOpen} onPagesOpen={setPagesOpen} projectOpen={projectOpen} onProjectOpen={setProjectOpen}
@@ -201,11 +203,12 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
         </Drawer.Popup></Drawer.Viewport></Drawer.Portal>
       </Drawer.Root>}
       {document && <PublishDialog ws={ws}/>}
-      {document && <ConflictDialog ws={ws}/>}
+      {document && <WhenCanvasClosed><ConflictDialog ws={ws}/></WhenCanvasClosed>}
       <OpenFromPublished ws={ws} active={active}/>
       {document && <LinkedHost ws={ws}/>}
       </DragLayer>
       </AddHost>
+      </LogicFieldsProvider>
       </WorkspaceDataProvider>
     </ToastHost>
     </SimulatorWindowContext.Provider>

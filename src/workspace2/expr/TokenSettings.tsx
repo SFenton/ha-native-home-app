@@ -13,6 +13,18 @@ import { useNameContext } from './useExpr';
 import LogicUseSettings from '../data/logic/LogicUse';
 import { isUse, workedOut } from '../data/logic/logicModel';
 import { words } from './words';
+import { useLogicFields } from '../logic-fields/LogicFields';
+import { DraftField } from '../logic-fields/AddressedField';
+import type { EditorPath } from '../../composition-editor';
+
+function tokenPath(value: unknown, operand: Operand, path: EditorPath): EditorPath | undefined {
+  if (value === operand) return path;
+  if (!value || typeof value !== 'object') return undefined;
+  for (const [key, child] of Object.entries(value)) {
+    const found = tokenPath(child, operand, [...path, key]);
+    if (found) return found;
+  }
+}
 
 /** The capital letters a text value can have: as written, then each case the contract has. */
 const textCaseChoices = [{ value: 'as-written', label: words.textCaseChoices['as-written'] }, ...[...textCases].reverse().map(item => ({ value: item, label: words.textCaseChoices[item] }))];
@@ -20,14 +32,18 @@ const textCaseChoices = [{ value: 'as-written', label: words.textCaseChoices['as
 /** What a token opened offers (spec "The token line"): its value, how a number is written, wording for 0 and 1, and Remove Value. */
 export default function TokenSettings({ draft, address, index, onWording, onClose, inline }: { draft: Draft; address: LineAddress; index: number; onWording?: (parts: Part[], index: number) => void; onClose?: () => void; /** Drawn in the editor's own page, not on a page of its own: a use that is unlinked or removed leaves the editor open, for Done. */ inline?: boolean }) {
   const document = useDraftDocument(draft), ctx = useNameContext(document), push = usePush();
+  const canvas = useLogicFields();
   const operand = lineOperand(valueAt(document, address.path), address.wrap);
   const parts = operand ? parseLine(operand) : undefined;
   const tokenIndexes = (parts ?? []).flatMap((part, at) => 'token' in part ? [at] : []);
   const at = tokenIndexes[index], part = at === undefined ? undefined : parts![at];
   if (!parts || !part || !('token' in part)) return <p className="w2-caption">{words.customValue}</p>;
   const { token } = part;
+  const storedPath = tokenPath(valueAt(document, address.path), token.operand, address.path);
+  const canvasField = canvas ? <DraftField draft={draft} path={storedPath ?? address.path} kind={storedPath || address.wrap === 'operand' ? 'operand' : 'slot'} label={words.value}/> : undefined;
   const asUse: unknown = token.operand;
   if (isUse(asUse)) {
+    if (canvasField) return canvasField;
     const leaveUse = () => { onClose?.(); if (!onClose) push?.pop(); };
     const afterChange = () => { if (!inline) leaveUse(); };
     return <LogicUseSettings draft={draft} use={asUse} kind="value" removeLabel={words.removeValue} onLeave={leaveUse}
@@ -47,6 +63,7 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
   const leave = () => { onClose?.(); if (!onClose) push?.pop(); };
   return <div className="w2-token-settings" data-testid="token-settings">
     <p className="w2-expr-tokenname"><strong>{operandName(token.operand, ctx)}</strong></p>
+    {canvasField}
     <ValuePickerRow draft={draft} label={words.value} title={words.value} stacked={false} primary={operandName(token.operand, ctx)}
       onPick={picked => { draft.set(picked.document); set(parts.map((item, i) => i === at ? { token: newToken(picked.operand) } : item)); }}/>
     {token.operand.type === 'read' && <div className="w2-row-segment"><span className="w2-row-label">Show as</span>
