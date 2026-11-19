@@ -1,7 +1,7 @@
 # Flows canvas graph core
 
-Pure projection APIs for `docs/flows-canvas.md` in PR #21, reviewed at
-`fce634d`, with the orchestrator's round-2
+Pure projection APIs for `docs/flows-canvas.md`, merged in PR #21 at
+`40d4041`, with the orchestrator's round-2
 compiler-only accounting addendum. There are no stores, network calls, device
 actions, or UI dependencies.
 
@@ -49,6 +49,9 @@ actions, or UI dependencies.
 
 After rebasing onto merged PR #20, `GraphPipeline*` and graph schemas are aliases
 of the real shared pipeline exports. There is no temporary average/min bridge.
+Text slots use the shared `textValue` export, including its unavailable policy
+and generic 2000-character envelope; whole-document compilation enforces the
+specific consuming field's limits. There is no local text-keep schema.
 Average and text keep remain gated on target capabilities, and parity tests run
 the real shared average evaluator unconditionally. A-number-state remains
 disabled with its specific prerequisite and compiler pointer; no cast or

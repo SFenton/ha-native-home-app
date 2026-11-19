@@ -52,6 +52,30 @@ describe('G-catalog exhaustive named grammar traces', () => {
   });
 });
 
+describe.each(['read', 'expr'] as const)('shared %s text slots', type => {
+  const slot = (whenUnavailable: string, fallback = 'No answer'): Json => type === 'read'
+    ? { type, from: { type: 'source', sourceId: 'light', path: ['state'] }, as: 'number', missing: 'unavailable', fallback, whenUnavailable }
+    : { type, value: scalar(), fallback, whenUnavailable };
+  it.each(['fallback', 'keep'])('retains the native %s policy and requires the actual target capability', policy => {
+    const ast = slot(policy), graph = lift(ast, { kind: 'slot', anchor }).graph;
+    expect(measureBudget(ast, anchor, { kind: 'slot' }).accepted).toBe(true);
+    expect(lower(graph, { targetCapabilities: ['sh.operands@1', 'sh.rules@1'] })).toMatchObject({
+      ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'unsupported_capability', capability: 'sh.text-keep@1' })]),
+    });
+    expect(lower(graph, { targetCapabilities: ['sh.operands@1', 'sh.rules@1', 'sh.text-keep@1'] })).toMatchObject({ ok: true, ast });
+  });
+  it.each([
+    ['unknown policy', 'later', 'No answer', '/whenUnavailable'],
+    ['oversized fallback', 'keep', 'x'.repeat(2001), '/fallback'],
+  ])('refuses %s through the shared schema without changing the original', (_name, policy, fallback, pointer) => {
+    const ast = slot(policy, fallback), graph = lift(ast, { kind: 'slot', anchor }).graph;
+    expect(lower(graph)).toMatchObject({ ok: false, original: ast });
+    const budget = measureBudget(ast, anchor, { kind: 'slot' });
+    expect(budget.accepted).toBe(false);
+    expect(budget.compilerIssues[0].pointer).toBe(pointer);
+  });
+});
+
 describe('G-limits exact existing boundaries', () => {
   const comparisons = (count: number): Predicate => count === 1 ? { type: 'compare', op: 'eq', left: scalar(), right: scalar() }
     : count <= 17 ? { type: 'all', of: Array.from({ length: count - 1 }, () => comparisons(1)) }

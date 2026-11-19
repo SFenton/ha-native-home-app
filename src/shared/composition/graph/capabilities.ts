@@ -2,6 +2,7 @@ import { parseCompositionShape } from '../compiler';
 import { CompositionValidationError } from '../json';
 import { checkPipelineSource, FLOW_AVERAGE_CAPABILITY, type PipelineFacts } from '../pipeline/compile';
 import { pipelineInputsSchema, pipelineSourceSchema, stepSchema } from '../pipeline/schema';
+import { textValue } from '../slots';
 import type { GraphPipelineSource } from './types';
 
 export const AVERAGE_CAPABILITY = FLOW_AVERAGE_CAPABILITY;
@@ -9,6 +10,7 @@ export const TEXT_KEEP_CAPABILITY = 'sh.text-keep@1';
 export const graphStepSchema = stepSchema;
 export const graphInputsSchema = pipelineInputsSchema;
 export const graphSourceSchema = pipelineSourceSchema;
+export const graphTextSlotSchema = textValue(2000, true);
 
 export function checkGraphPipeline(source: GraphPipelineSource, at: string): PipelineFacts {
   try { return checkPipelineSource(parseCompositionShape(pipelineSourceSchema, source), at); }

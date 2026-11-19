@@ -5,7 +5,7 @@ import { callServiceSchema, checkCallService, checkOperand, checkPredicate, oper
 import { assertCompositionBounds, CompositionValidationError, pointer, type CompositionIssue } from '../json';
 import { expandLogic, type LogicEntry } from '../logic-library';
 import { conditional } from '../slots';
-import { AVERAGE_CAPABILITY, checkGraphPipeline, graphInputsSchema, graphSourceSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
+import { AVERAGE_CAPABILITY, checkGraphPipeline, graphInputsSchema, graphSourceSchema, graphTextSlotSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record, replaceAt, withoutCanvasMetadata } from './json';
 import { expressionPort, portsCompatible } from './ports';
@@ -69,6 +69,7 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
     const report = (issue: CompositionIssue) => errors.push(diagnostic(issue, root, sourceMap));
     const check = (candidate: Json, kind: FragmentKind, at = '', itemScope = options.itemScope): void => {
       if (kind === 'slot' && record(candidate) && candidate.type === 'conditional') parseCompositionShape(conditional(z.json()), candidate);
+      if (kind === 'slot' && record(candidate) && (candidate.type === 'read' || candidate.type === 'expr')) parseCompositionShape(graphTextSlotSchema, candidate);
       if (kind === 'operand') {
         const facts = checkOperand(parseCompositionShape(operandBase, candidate), at, root.destination.allowControl, false, itemScope);
         facts.issues.forEach(report); facts.needs.forEach(name => capabilities.add(`sh.${name}@1`));

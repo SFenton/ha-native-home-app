@@ -5,8 +5,7 @@ import { logicEntrySchema, logicHoleSchema, logicRefSchema } from '../logic-libr
 import { outputSchema, pipelineInputsSchema, pipelineSourceSchema, requestSchema, stepSchema } from '../pipeline/schema';
 import type { GraphPayload } from './types';
 import { atPointer, copy, join, record, replaceAt } from './json';
-import { graphInputsSchema, graphSourceSchema, graphStepSchema } from './capabilities';
-import { read } from '../slots';
+import { graphInputsSchema, graphSourceSchema, graphStepSchema, graphTextSlotSchema } from './capabilities';
 import { identifierSchema } from '../../validation';
 
 export type FragmentKind = 'operand' | 'condition' | 'call' | 'source-selection' | 'flow' | 'flow-inputs' | 'request' | 'step' | 'output' | 'logic-entry' | 'slot' | 'document' | 'auto';
@@ -16,9 +15,10 @@ const operandNames = new Set(['literal', 'read', 'control', 'viewer', 'format', 
 const predicateNames = new Set(['state', 'numeric', 'viewer', 'viewer-person', 'all', 'any', 'not', 'compare', 'in', 'exists']);
 const literal: Operand = { type: 'literal', value: 0 };
 const condition = { type: 'compare' as const, op: 'eq' as const, left: literal, right: literal };
+const [, readTextSlot, expressionTextSlot] = graphTextSlotSchema.options;
 const slotSchema = z.discriminatedUnion('type', [
-  read.extend({ fallback: z.string().optional(), whenUnavailable: z.enum(['fallback', 'keep']).optional() }),
-  z.strictObject({ type: z.literal('expr'), value: operandBase, fallback: z.string().optional(), whenUnavailable: z.enum(['fallback', 'keep']).optional() }),
+  readTextSlot,
+  expressionTextSlot,
   z.strictObject({ type: z.literal('bound-symbol'), value: operandBase, fallback: z.json() }),
   z.strictObject({ type: z.literal('conditional'), cases: z.array(z.strictObject({ when: predicateBase, then: z.json() })), otherwise: z.json() }),
 ]);

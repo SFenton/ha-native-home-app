@@ -8,7 +8,7 @@ import { PIPELINE_BUDGET } from '../pipeline/evaluate';
 import { PIPELINE_LIMITS } from '../pipeline/schema';
 import { newFacts, typeOperand, typeWhere } from '../pipeline/typing';
 import { conditional } from '../slots';
-import { checkGraphPipeline, graphInputsSchema, graphSourceSchema } from './capabilities';
+import { checkGraphPipeline, graphInputsSchema, graphSourceSchema, graphTextSlotSchema } from './capabilities';
 import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
 import { record, withoutCanvasMetadata } from './json';
 import type { BudgetMeter, GraphBudget, LogicAnchor } from './types';
@@ -68,6 +68,7 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
     const kind = inferFragment(value, hint);
     try {
       if (validate && kind === 'slot' && record(value) && value.type === 'conditional') parseCompositionShape(conditional(z.json()), value);
+      if (validate && kind === 'slot' && record(value) && (value.type === 'read' || value.type === 'expr')) parseCompositionShape(graphTextSlotSchema, value);
       if (kind === 'operand' || kind === 'condition') {
         if (flow) { flowScopes(value, kind, at); return; }
         unknownScope(at, MAX_EXPRESSION_NODES);
