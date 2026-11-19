@@ -7,10 +7,13 @@ describe('C-themes wire/glyph and focus contrast', () => {
     ['light', {}],
     ['dark', { '--primary-background-color': '#111111', '--card-background-color': '#202020', '--primary-text-color': '#eeeeee' }],
     ['custom HA', { '--primary-color': '#9b7ac4', '--primary-background-color': '#f3edf7', '--card-background-color': '#fbf8ff', '--primary-text-color': '#312043', '--secondary-text-color': '#72577e' }],
-  ])('%s keeps labels >=4.5 and focus >=3 against card and canvas', (_, values) => {
+  ])('%s keeps labels >=4.5 and focus >=3, including field, hover and selected surfaces', (_, values) => {
     const theme = deriveTheme(values, false), wires = canvasTheme(theme);
     for (const [name, value] of Object.entries(wires)) for (const ground of ['--w2-bg', '--w2-card']) {
       expect(contrast(parseColor(value)!, parseColor(theme.variables[ground])!)).toBeGreaterThanOrEqual(name.includes('focus') ? 3 : 4.5);
+    }
+    for (const surface of ['--w2-field', '--w2-hover', '--w2-selected']) {
+      expect(contrast(parseColor(wires['--w2-canvas-focus'])!, parseColor(theme.variables[surface])!)).toBeGreaterThanOrEqual(3);
     }
   });
 });

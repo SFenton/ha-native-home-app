@@ -7,7 +7,8 @@ import type { CallService, Operand, Predicate } from '../../../src/shared/compos
 import { predicateBudgetFixtures } from '../graph/fixtures';
 import { copy } from '../../../src/shared/composition/graph/json';
 import { anchor, choose, count, flowFixture, number, observedFixture } from './fixtures';
-import { measureBudget } from '../../../src/shared/composition/graph';
+import { budgetFromCompilation, measureBudget } from '../../../src/shared/composition/graph';
+import { compileGraphValue, type FragmentCompilation } from '../../../src/shared/composition/graph/compile';
 
 afterEach(cleanup);
 const list = (nodes: number): Operand => ({ type: 'list', items: Array.from({ length: nodes - 1 }, () => number()) });
@@ -81,6 +82,17 @@ describe('C-meter uses real checker accounting, not canvas AST counts', () => {
     fireEvent.click(screen.getByText('Details'));
     expect(screen.getByText(/Accounting unavailable pending observer/)).toBeTruthy();
     expect(screen.queryByRole('meter')).toBeNull();
+  });
+  it('accepts an unobserved main compilation without replaying its checker or estimating counters', () => {
+    const check = vi.spyOn(expression, 'checkOperand');
+    try {
+      const compiled: FragmentCompilation = compileGraphValue(choose, { kind: 'operand' });
+      expect(compiled).not.toHaveProperty('accounting');
+      expect(budgetFromCompilation(choose, anchor, compiled, { kind: 'operand' })).toMatchObject({
+        accounting: 'unavailable', nodes: null, depth: null, steps: null, meters: [], compilerIssues: compiled.issues,
+      });
+      expect(check).toHaveBeenCalledOnce();
+    } finally { check.mockRestore(); }
   });
   it.each(['/visibleWhen', '/look/cases/0/when', '/activeWhen', '/filledWhen', '/errorWhen'])('meter matches compiler: CHK early refusal in %s', pointer => {
     const base = observedFixture(copy(predicateBudgetFixtures.base) as Predicate, 'condition', pointer);

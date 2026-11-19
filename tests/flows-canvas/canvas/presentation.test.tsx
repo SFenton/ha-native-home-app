@@ -5,9 +5,14 @@ import { lift } from '../../../src/shared/composition/graph';
 import { supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
 import { blockCatalog } from '../../../src/shared/composition/graph/catalog';
 import Palette from '../../../src/workspace2/canvas/Palette';
-import { blockName, blockResult, blockSeed, fixedAverage, nodeDetail, portLabel } from '../../../src/workspace2/canvas/blocks';
+import { blockName, blockResult, blockSeed, fixedAverage, nodeDetail, nodeName, portLabel } from '../../../src/workspace2/canvas/blocks';
 import Inspector from '../../../src/workspace2/canvas/Inspector';
-import type { CanvasHost } from '../../../src/shared/composition/graph';
+import type { CanvasHost, LogicGraph, PortType } from '../../../src/shared/composition/graph';
+import { edit, initialEditState } from '../../../src/workspace2/canvas/edit';
+import { indexGraph } from '../../../src/workspace2/canvas/graph-index';
+import { blockLayoutKey, presentBlocks } from '../../../src/workspace2/canvas/presentation';
+import { branchLabel } from '../../../src/workspace2/canvas/inspector-copy';
+import PortGlyph, { listItemKind } from '../../../src/workspace2/canvas/PortGlyph';
 import { anchor, number } from './fixtures';
 
 afterEach(cleanup);
@@ -61,4 +66,43 @@ it.each([1, 3])('draws the selected compound graph with its actual %i branches, 
   for (let n = 0; n < count; n++) expect(within(map).getByText(`Lamp ${n + 1} is on`)).toBeTruthy();
   expect(within(map).getByText('Visible When')).toBeTruthy();
   expect(screen.getByText(`All of ${count} checks must match. ${count} of ${count} connected.`)).toBeTruthy();
+});
+function presentation(graph: LogicGraph, previous?: ReturnType<typeof presentBlocks>) {
+  const index = indexGraph(graph), names = new Map(graph.nodes.map(node => [node.id, nodeName(node, graph, index)]));
+  return presentBlocks(graph, index, names, [], previous);
+}
+it('retains every unaffected block presentation and the layout key on a literal value edit', () => {
+  const graph = lift({ type: 'math', op: 'add', args: [number(21), number(3)] }, { kind: 'operand', anchor }).graph;
+  const literal = graph.nodes[1], before = presentation(graph);
+  const revised = edit(initialEditState(graph), { type: 'update', nodeId: literal.id, value: number(25) }).graph;
+  const after = presentation(revised, before);
+  for (const node of graph.nodes) {
+    if (node.id === literal.id) expect(after.get(node.id)).not.toBe(before.get(node.id));
+    else expect(after.get(node.id)).toBe(before.get(node.id));
+  }
+  expect(blockLayoutKey(revised, after)).toBe(blockLayoutKey(graph, before));
+});
+it('refreshes dependent labels when an edited count stops being a fixed Average', () => {
+  const graph = lift({ type: 'math', op: 'divide', args: [{ type: 'math', op: 'add', args: [number(), number()] }, number(2)] }, { kind: 'operand', anchor }).graph;
+  const before = presentation(graph), index = indexGraph(graph), divisor = index.source(graph.nodes[0].id, '/args/1')!;
+  const revised = edit(initialEditState(graph), { type: 'update', nodeId: divisor.id, value: number(3) }).graph, after = presentation(revised, before);
+  expect(before.get(graph.nodes[0].id)?.name).toBe('Average');
+  expect(after.get(graph.nodes[0].id)?.name).toBe('Divide');
+  expect(after.get(graph.nodes[0].id)).not.toBe(before.get(graph.nodes[0].id));
+});
+it('labels Not without reversing or hiding the configured negative predicate', () => {
+  const graph = lift({ type: 'not', of: { type: 'viewer', isAdmin: false } }, { kind: 'condition', anchor }).graph;
+  expect(branchLabel(graph.nodes[0], graph, indexGraph(graph), [])).toBe('Not → Viewer is not an administrator');
+});
+it.each([
+  [{ kind: 'number' }, 'number', 'hash'],
+  [{ kind: 'string' }, 'text', 'type'],
+  [{ kind: 'object', fields: {} }, 'record', 'braces'],
+  [{ kind: 'union', of: [{ kind: 'number' }, { kind: 'null' }] }, 'number', 'hash'],
+  [{ kind: 'union', of: [{ kind: 'number' }, { kind: 'string' }] }, 'unknown', 'circle-help'],
+  [{ kind: 'any' }, 'unknown', 'circle-help'],
+] satisfies [PortType['shape'], string, string][])('uses the declared list item glyph for %j', (item, kind, icon) => {
+  const { container } = render(<PortGlyph kind="list" itemKind={listItemKind({ kind: 'array', of: item })}/>);
+  expect(container.querySelector('[data-item-kind]')?.getAttribute('data-item-kind')).toBe(kind);
+  expect(container.querySelector(`svg.lucide-${icon}`)).not.toBeNull();
 });

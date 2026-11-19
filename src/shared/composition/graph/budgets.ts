@@ -14,12 +14,16 @@ export interface BudgetOptions extends FragmentOptions {
   /** Retained for call-site compatibility; requirements are never seeded from caller guesses. */
   readonly capabilities?: readonly string[];
 }
+export interface AccountingCompilation extends FragmentCompilation {
+  /** Optional native snapshots; an unobserved compilation remains a valid input. */
+  readonly accounting?: readonly BudgetAccountingEvent[];
+}
 export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: consume the shared read-only expression/call and flow accounting observer for totals, depths, counter scopes/resets, structural limits and expansion provenance; preserve CHK-nested-choose-budget unchanged.';
 
 export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOptions = {}): GraphBudget {
   return budgetFromCompilation(ast, anchor, compileGraphValue(ast, options), options);
 }
-export function budgetFromCompilation(ast: Json, anchor: LogicAnchor, compiled: FragmentCompilation, options: BudgetOptions = {}): GraphBudget {
+export function budgetFromCompilation(ast: Json, anchor: LogicAnchor, compiled: AccountingCompilation, options: BudgetOptions = {}): GraphBudget {
   if (compiled.accounting !== undefined) return budgetFromAccounting(anchor, compiled, compiled.accounting);
   const compilerIssues = compiled.issues;
   const scopes: GraphBudget['scopes'][number][] = [];

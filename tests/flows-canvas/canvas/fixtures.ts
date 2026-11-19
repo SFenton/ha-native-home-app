@@ -1,5 +1,5 @@
 import { checkCallService, checkOperand, checkPredicate, type BudgetAccountingEvent, type CallService, type Operand, type Predicate } from '../../../src/shared/composition/expression';
-import { budgetFromCompilation } from '../../../src/shared/composition/graph/budgets';
+import { budgetFromCompilation, type AccountingCompilation } from '../../../src/shared/composition/graph/budgets';
 import type { FragmentCompilation } from '../../../src/shared/composition/graph/compile';
 import { newFacts, typeSteps, typeWhere } from '../../../src/shared/composition/pipeline/typing';
 import type { PipelineStep } from '../../../src/shared/composition/pipeline/schema';
@@ -24,6 +24,6 @@ export function flowFixture(steps?: PipelineStep[]) {
   return fixtureBudget({}, facts.issues, accounting);
 }
 function fixtureBudget(ast: Json, issues: FragmentCompilation['issues'], accounting: BudgetAccountingEvent[]) {
-  const compiled: FragmentCompilation = { expanded: ast, origins: [], issues, capabilities: [], dependencies: [], accounting };
+  const compiled: AccountingCompilation = { expanded: ast, origins: [], issues, capabilities: [], dependencies: [], accounting };
   return budgetFromCompilation(ast, anchor, compiled);
 }

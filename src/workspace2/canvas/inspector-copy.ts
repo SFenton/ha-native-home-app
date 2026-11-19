@@ -14,7 +14,7 @@ export function branchLabel(node: GraphNode, graph: LogicGraph, index: CanvasGra
   if (value) {
     if (value.type === 'not') {
       const source = index.source(node.id, '/of');
-      return source ? `Not (${branchLabel(source, graph, index, sources, new Set([...ancestors, node.id]))})` : 'Not (unconnected check)';
+      return source ? `Not → ${branchLabel(source, graph, index, sources, new Set([...ancestors, node.id]))}` : 'Not → unconnected check';
     }
     if (value.type === 'compare') return `${term('/left')} ${comparisons[String(value.op)] ?? value.op} ${term('/right')}`;
     if (value.type === 'viewer' && typeof value.isAdmin === 'boolean') return `Viewer ${value.isAdmin ? 'is' : 'is not'} an administrator`;

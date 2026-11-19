@@ -85,6 +85,9 @@
 .w2-canvas-port-glyph[data-port-kind=entity], .w2-canvas-port-glyph[data-port-kind=list], .w2-canvas-port-glyph[data-port-kind=record] { border-color: transparent; }
 .w2-canvas-port-glyph svg { flex: none; width: 10px; height: 10px; stroke-width: 2; }
 .w2-canvas-port-glyph[data-port-kind=list] svg, .w2-canvas-port-glyph[data-port-kind=record] svg, .w2-canvas-port-glyph[data-port-kind=entity] svg { width: 15px; height: 15px; }
+.w2-canvas-port-glyph[data-port-kind=list] { position: relative; }
+.w2-canvas-port-glyph[data-port-kind=list]::before { content: ''; position: absolute; inset-inline-end: 100%; top: calc(50% - 2.5px); width: 7px; height: 5px; border-block: 1px solid var(--w2-wire); }
+.w2-canvas-port[data-direction=output] .w2-canvas-port-glyph[data-port-kind=list]::before { inset-inline-end: auto; inset-inline-start: 100%; }
 .w2-canvas-port[data-direction=input] .w2-canvas-port-glyph { margin-inline-start: -18px; }
 .w2-canvas-port[data-direction=output] .w2-canvas-port-glyph { order: 4; margin-inline-end: -18px; }
 .w2-canvas-port-value { min-width: 21px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--w2-wire) 8%, transparent); color: var(--w2-wire); font-size: 10px; font-weight: 500; }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { lift, type CanvasSnapshot } from '../../../src/shared/composition/graph';
+import { supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
 import FlowCanvas, { arrangeCanvas, CanvasDialog } from '../../../src/workspace2/canvas/FlowCanvas';
 import Inspector from '../../../src/workspace2/canvas/Inspector';
 import { useStudioTheme } from '../../../src/workspace2/useStudioTheme';
@@ -32,7 +33,7 @@ const warmPositions: Readonly<Record<string, { x: number; y: number }>> = {
   '/cases/0/then': { x: 944, y: 500 }, '/otherwise': { x: 944, y: 620 },
 };
 const ast: Json = fixture === 'large' ? largeGraphFlow()
-  : fixture === 'summary' ? { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['home'] }, { type: 'not', of: { type: 'viewer', isAdmin: false } }] }
+  : fixture === 'summary' ? { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['home'] }, { type: 'not', of: { type: 'state', sourceId: 'light', path: ['state'], in: ['off'] } }] }
   : fixture === 'warm' || fixture === 'observations' ? warm
   : fixture === 'meter' ? choose
   : { type: 'math', op: 'add', args: [{ type: 'literal', value: 21 }, { type: 'literal', value: 3 }] };
@@ -64,7 +65,7 @@ function Harness() {
     let snapshot: CanvasSnapshot = { document: ast, revision: '1' };
     return {
       snapshot: () => snapshot, open: () => {}, openOutput: () => {}, compareConflict: () => {}, uses: () => [], preview: () => {},
-      data: { sources: [{ id: 'light', name: 'Hallway Light' }] }, targetCapabilities: [...new Set(blockCatalog.flatMap(entry => entry.capabilities)), 'sh.operands@1', 'sh.conditions@1'],
+      data: { sources: [{ id: 'light', name: 'Hallway Light' }] }, targetCapabilities: [...new Set([...supportedCompositionCapabilities, ...blockCatalog.flatMap(entry => entry.capabilities)])],
       ...(fixture === 'observations' ? { observations: observationFixture(graph) } : {}),
       apply: async transaction => {
         if (params.get('conflict')) return { status: 'conflict', remote: { document: ast, revision: 'remote-2' } };

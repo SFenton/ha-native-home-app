@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleCheck, CircleHelp, ChevronRight, Ellipsis, GitBranch, List, Maximize, Minus, Plus, Redo2, SlidersHorizontal, Undo2, WandSparkles, X } from 'lucide-react';
 import { autoLayout, lower, type BlockCatalogEntry, type GraphBudget, type GraphEdge, type GraphNode, type LogicGraph } from '../../shared/composition/graph';
@@ -14,9 +14,14 @@ import './canvas.css';
 import { describeObservation, type CanvasHostWithObservations } from './observations';
 import { indexGraph } from './graph-index';
 import CanvasBlock, { type BlockActions } from './CanvasBlock';
+import { blockLayoutKey, presentBlocks, type BlockPresentation } from './presentation';
 
 const focusKey = (focus: CanvasFocus) => JSON.stringify(focus);
 const editable = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
+interface WirePath { readonly id: string; readonly path: string; readonly kind: string; readonly from: GraphEdge['from'] }
+const CanvasWires = memo(function CanvasWires({ paths, width, height, observations }: { paths: readonly WirePath[]; width: number; height: number; observations: CanvasHostWithObservations['observations'] }) {
+  return <li className="w2-canvas-wires" aria-hidden><svg width={width} height={height}>{paths.map(wire => <path key={wire.id} data-observation-state={observations?.[wire.from.nodeId]?.outputs?.[wire.from.portId]?.state} d={wire.path} className={`w2-canvas-wire w2-canvas-wire-${wire.kind}`}/>)}</svg></li>;
+});
 export function arrangeCanvas(graph: LogicGraph): LogicGraph {
   const arranged = autoLayout(graph, true), columns = new Map<number, number>(), positions = new Map<string, { x: number; y: number }>();
   for (const node of orderedNodes(arranged)) {
@@ -61,7 +66,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     return () => query.removeEventListener('change', update);
   }, []);
   const [zoom, setZoom] = useState(1), [moving, setMoving] = useState<{ nodeId: string; x: number; y: number }>();
-  const [wirePaths, setWirePaths] = useState<readonly { id: string; path: string; kind: string; from: GraphEdge['from'] }[]>([]);
+  const [wirePaths, setWirePaths] = useState<readonly WirePath[]>([]);
   const [initialSnapshot] = useState(() => host.snapshot());
   const snapshot = useRef(initialSnapshot), baseline = useRef(initialGraph), refs = useRef(new Map<string, HTMLButtonElement>());
   const viewport = useRef<HTMLDivElement>(null), board = useRef<HTMLUListElement>(null), addButton = useRef<HTMLButtonElement>(null), navigation = useRef<HTMLDivElement>(null);
@@ -74,6 +79,10 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const labelOf = (id: string, node?: GraphNode) => portLabel(id, node, graph, index);
   const selected = state.focus ? index.nodes.get(state.focus.nodeId) : undefined;
   const ordered = useMemo(() => orderedNodes(graph, index), [graph, index]);
+  const navigationOrder = useRef(ordered), previousModels = useRef<ReadonlyMap<string, BlockPresentation>>(undefined);
+  const models = useMemo(() => presentBlocks(graph, index, names, host.data.sources, previousModels.current), [graph, index, names, host.data.sources]);
+  const layoutKey = useMemo(() => blockLayoutKey(graph, models), [graph, models]);
+  useLayoutEffect(() => { navigationOrder.current = ordered; previousModels.current = models; }, [ordered, models]);
   const result = useMemo(() => lower(graph, { targetCapabilities: host.targetCapabilities }), [graph, host.targetCapabilities]);
   const detached = useMemo(() => detachedNodes(graph, index), [graph, index]);
   const dirty = graph !== baseline.current;
@@ -82,10 +91,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     if (target.portId !== undefined) setEntered(target.nodeId);
     restore.current = true;
   }, []);
-  const send = useCallback((command: EditCommand) => {
+  const send = useCallback((command: EditCommand, origin?: CanvasFocus) => {
     setMessage('');
     restore.current = true;
-    setState(held => edit(held, command));
+    setState(held => edit(origin ? { ...held, focus: origin } : held, command));
+    if (origin?.portId) setEntered(origin.nodeId);
     if (command.type === 'add' || command.type === 'combine') setPanel(null);
   }, []);
   const locate = useCallback((id: string) => { setEntered(undefined); focus({ nodeId: id }); setPanel(null); }, [focus]);
@@ -98,6 +108,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   }, [state, view, entered, panel, connection, deleting, leaving, phone]);
   const positions = graph.nodes.map(node => node.id === moving?.nodeId ? { x: moving.x, y: moving.y } : node.position ?? { x: 24, y: 24 });
   const width = Math.max(900, ...positions.map(position => position.x + 300)), height = Math.max(600, ...graph.nodes.map((node, index) => positions[index].y + 140 + (node.inputs.length + node.outputs.length) * 44));
+  // Payload-only revisions retain both the block models and measured wire geometry.
   useLayoutEffect(() => {
     if (view !== 'graph' || !board.current) return;
     const measure = () => {
@@ -115,7 +126,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     measure();
     const observer = new ResizeObserver(measure); observer.observe(board.current);
     return () => observer.disconnect();
-  }, [graph, index, moving, view, zoom]);
+  }, [layoutKey, moving, view, zoom, phone, host.observations]);
   const close = () => { onClose(); returnFocus?.focus(); };
   const apply = async () => {
     if (!result.ok || detached.length || busy) return;
@@ -157,11 +168,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       focus(node.inputs[0] ? { nodeId: node.id, portId: node.inputs[0].id, direction: 'input' } : node.outputs[0] ? { nodeId: node.id, portId: node.outputs[0].id, direction: 'output' } : { nodeId: node.id });
     } else if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
-      const index = ordered.findIndex(held => held.id === node.id);
+      const ordered = navigationOrder.current, index = ordered.findIndex(held => held.id === node.id);
       const neighbor = event.key === 'Home' ? ordered[0] : event.key === 'End' ? ordered.at(-1) : ordered[(index + (event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1) + ordered.length) % ordered.length];
       if (neighbor) { setEntered(undefined); focus({ nodeId: neighbor.id }); }
     }
-  }, [moving, ordered, focus, send]);
+  }, [moving, focus, send]);
   const nodeKeys = useCallback((event: KeyboardEvent<HTMLLIElement>, node: GraphNode) => {
     if (editable(event.target)) return;
     if (event.target !== elementFor({ nodeId: node.id }) && ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
@@ -237,11 +248,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           <div className="w2-canvas-scaled" style={view === 'graph' ? { width: width * zoom, height: height * zoom } : undefined}>
             <ul ref={board} className={`w2-canvas-nodes w2-canvas-${view}`} aria-label={view === 'graph' ? 'Flow graph blocks' : 'Flow outline blocks'} aria-describedby="w2-canvas-key-help"
               style={view === 'graph' ? { width, height, transform: `scale(${zoom})` } : undefined}>
-              {view === 'graph' && <li className="w2-canvas-wires" aria-hidden><svg width={width} height={height}>{wirePaths.map(wire => <path key={wire.id} data-observation-state={host.observations?.[wire.from.nodeId]?.outputs?.[wire.from.portId]?.state} d={wire.path} className={`w2-canvas-wire w2-canvas-wire-${wire.kind}`}/>)}</svg></li>}
+              {view === 'graph' && <CanvasWires paths={wirePaths} width={width} height={height} observations={host.observations}/>}
               {ordered.map(node => {
                 const position = node.id === moving?.nodeId ? moving : node.position;
                 const active = selected?.id === node.id;
-                return <CanvasBlock key={node.id} node={node} graph={graph} index={index} names={names} sources={host.data.sources} observation={host.observations?.[node.id]}
+                return <CanvasBlock key={node.id} model={models.get(node.id)!} observation={host.observations?.[node.id]}
                   active={active} controls={entered === node.id} tabStop={active || !selected && ordered[0] === node} positioned={view === 'graph'} x={position?.x ?? 24} y={position?.y ?? 24} actions={actions}/>;
               })}
             </ul>
@@ -249,7 +260,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           {view === 'outline' && <section className="w2-canvas-connections" aria-label="Connections"><h2>Connections</h2><ul aria-label="Wires">{graph.edges.map(edge => {
             const from = index.nodes.get(edge.from.nodeId)!, to = index.nodes.get(edge.to.nodeId)!, type = from.outputs.find(port => port.id === edge.from.portId)?.type.valueType;
             const observation = host.observations?.[from.id]?.outputs?.[edge.from.portId];
-            return <li key={edge.id}><button type="button" aria-label={`${nameOf(from)} Result, ${type}, to ${nameOf(to)} ${labelOf(edge.to.portId, to)}${describeObservation(observation, true)}; disconnect`} onClick={() => send({ type: 'disconnect', edgeId: edge.id })}>{nameOf(from)} → {nameOf(to)} {labelOf(edge.to.portId, to)}{observation?.state === 'cant-tell' && <small>Can't tell</small>} <small>Disconnect</small></button>
+            return <li key={edge.id}><button type="button" aria-label={`${nameOf(from)} Result, ${type}, to ${nameOf(to)} ${labelOf(edge.to.portId, to)}${describeObservation(observation, true)}; disconnect`} onClick={() => send({ type: 'disconnect', edgeId: edge.id }, { ...edge.to, direction: 'input' })}>{nameOf(from)} → {nameOf(to)} {labelOf(edge.to.portId, to)}{observation?.state === 'cant-tell' && <small>Can't tell</small>} <small>Disconnect</small></button>
               <button type="button" onClick={() => locate(from.id)}>Go to source</button><button type="button" onClick={() => locate(to.id)}>Go to destination</button></li>;
           })}</ul></section>}
         </div>

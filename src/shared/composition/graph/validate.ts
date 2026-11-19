@@ -11,15 +11,30 @@ import { newFacts, typeOperand, typeStep, type TypeScope } from '../pipeline/typ
 import { requestSchema } from '../pipeline/schema';
 import { graphInputsSchema, graphStepSchema } from './capabilities';
 
-const validationBrand: unique symbol = Symbol('GraphValidation');
-export interface GraphValidation {
-  readonly [validationBrand]: true;
-  readonly graph: LogicGraph;
-  readonly diagnostics: readonly GraphDiagnostic[];
+class ValidatedGraph {
+  readonly #graph: LogicGraph;
+  readonly #diagnostics: readonly GraphDiagnostic[];
+  constructor(graph: LogicGraph) {
+    this.#graph = graph;
+    this.#diagnostics = Object.freeze(validateGraph(graph).map(diagnostic => Object.freeze(diagnostic)));
+    Object.freeze(this);
+  }
+  get graph(): LogicGraph { return this.#graph; }
+  get diagnostics(): readonly GraphDiagnostic[] { return this.#diagnostics; }
+  static read(candidate: ValidatedGraph): { graph: LogicGraph; diagnostics: readonly GraphDiagnostic[] } {
+    if (!(candidate instanceof ValidatedGraph) || !(#graph in candidate)) throw new TypeError('Expected an authentic graph validation handoff.');
+    return { graph: candidate.#graph, diagnostics: candidate.#diagnostics };
+  }
 }
+Object.freeze(ValidatedGraph.prototype);
+Object.freeze(ValidatedGraph);
+export type GraphValidation = ValidatedGraph;
 /** Explicit handoff for one immutable graph revision; never reuse after mutating it. */
 export function validateForLowering(graph: LogicGraph): GraphValidation {
-  return { [validationBrand]: true, graph, diagnostics: validateGraph(graph) };
+  return new ValidatedGraph(graph);
+}
+export function readGraphValidation(validated: GraphValidation): { graph: LogicGraph; diagnostics: readonly GraphDiagnostic[] } {
+  return ValidatedGraph.read(validated);
 }
 export function validateGraph(graph: LogicGraph, options: { readonly projection?: boolean } = {}): readonly GraphDiagnostic[] {
   try {

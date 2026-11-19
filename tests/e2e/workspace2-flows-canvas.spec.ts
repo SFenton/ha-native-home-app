@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
 import { writeFileSync } from 'node:fs';
+import { contrast, parseColor } from '../../src/workspace2/theme';
 
 const harness = '/tests/flows-canvas/canvas/harness.html';
 const evidence = path.resolve('docs/evidence/w2-c');
@@ -128,6 +129,17 @@ test('C-themes: light, dark, custom HA tokens and narrow palette/canvas/summary 
     await activate(page, palette.getByRole('button', { name: /^Values, \d+ blocks$/ }));
     await activate(page, palette.getByRole('button', { name: /^From Home, \d+ blocks$/ }));
     await activate(page, palette.getByRole('button', { name: /^Compare, \d+ blocks$/ }));
+    const search = palette.getByRole('searchbox', { name: 'Find a block' });
+    await tabTo(page, search);
+    const focusColors = await search.evaluate(element => ({
+      visible: element.matches(':focus-visible'), ring: getComputedStyle(element).outlineColor,
+      field: getComputedStyle(element.closest('.w2-canvas-search')!).backgroundColor,
+      panel: getComputedStyle(element.closest('.w2-canvas-palette')!).backgroundColor,
+    }));
+    expect(focusColors.visible).toBe(true);
+    for (const surface of [focusColors.field, focusColors.panel]) expect(contrast(parseColor(focusColors.ring)!, parseColor(surface)!)).toBeGreaterThanOrEqual(3);
+    await testInfo.attach(`${scheme}-search-focus-contrast`, { body: JSON.stringify(focusColors), contentType: 'application/json' });
+    await palette.locator('.w2-canvas-palette-scroll').evaluate(element => { element.scrollTop = 0; });
     await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-palette.png`, fullPage: true });
     await activate(page, page.getByRole('button', { name: 'Close block palette' }));
     await expect(page.getByRole('list', { name: 'Flow graph blocks' })).toBeVisible();
@@ -139,9 +151,11 @@ test('C-themes: light, dark, custom HA tokens and narrow palette/canvas/summary 
     await expect(page.getByRole('list', { name: 'Flow outline blocks' })).toBeVisible();
     await page.goto(`${harness}?fixture=summary${scheme === 'custom' ? '&theme=custom' : ''}`);
     await activate(page, page.getByRole('button', { name: 'Close block palette' }));
+    await expect(page.getByRole('button', { name: 'No Problems', exact: true })).toBeVisible();
     await selectBlock(page, 'Select All Of 1'); await page.keyboard.press('Enter');
     await nodeControl(page, 'Inspect All Of'); await page.keyboard.press('Enter');
     await expect(page.getByRole('figure', { name: 'All Of, 3 checks' })).toContainText("Viewer's person is home");
+    await expect(page.getByRole('figure', { name: 'All Of, 3 checks' })).toContainText('Not → Hallway Light is off');
     await expect(page.getByRole('figure', { name: 'All Of, 3 checks' }).locator('.w2-canvas-summary-branch')).toHaveCount(3);
     await expect(page.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeVisible();
     await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-summary.png`, fullPage: true });
@@ -224,6 +238,19 @@ for (const view of ['Graph', 'Outline'] as const) test(`C-focus ${view}: undo re
   await page.keyboard.press('ControlOrMeta+z'); await expect(plus).toBeFocused();
   await expect(plus).toHaveAttribute('aria-label', /connected to Number/);
 });
+test('C-focus Outline: wire undo restores Add Value instead of the previously selected Number 3', async ({ page }) => {
+  await page.goto(harness);
+  await activate(page, page.getByRole('button', { name: 'Close block palette' }));
+  await activate(page, page.getByRole('button', { name: 'Outline', exact: true }));
+  await selectBlock(page, 'Select Number 3');
+  await page.getByRole('button', { name: 'Number Result, number, to Add Value; disconnect' }).focus();
+  await page.keyboard.press('Enter');
+  const value = page.getByRole('button', { name: /^Add, Value input/ });
+  await expect(value).toHaveAttribute('aria-label', /required, unconnected/);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(value).toBeFocused();
+  await expect(value).toHaveAttribute('aria-label', /connected to Number/);
+});
 test('C-recipe: keyboard adds and undoes the complete Average Fixed Values graph', async ({ page }) => {
   await page.goto(harness);
   await tabTo(page, page.getByRole('searchbox', { name: 'Find a block' }));
@@ -256,14 +283,26 @@ test('C-large: 2341 blocks mount, resolve ports, focus and edit within interacti
   await expect(page.getByRole('button', { name: /^Number, Result output/ }).first()).toBeFocused();
   await header.click();
   await page.getByRole('spinbutton', { name: 'Value', exact: true }).fill('2');
+  const geometry = await page.evaluateHandle(() => {
+    const reads = { ports: 0, boards: 0 }, original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      if (this.matches('.w2-canvas-port')) reads.ports++;
+      if (this.matches('.w2-canvas-nodes')) reads.boards++;
+      return original.call(this);
+    };
+    return reads;
+  });
   const editStart = performance.now();
   await page.getByRole('button', { name: 'Update value', exact: true }).click(); await paint();
   const edit = performance.now() - editStart;
   await expect(page.getByRole('spinbutton', { name: 'Value', exact: true })).toHaveValue('2');
-  const metrics = { nodes: 2341, steps: 32, mount, lookup, focus, edit, budgets: { mount: 5000, lookup: 50, focus: 1000, edit: 1500 } };
+  await expect(page.getByRole('status').filter({ hasText: 'Number fields updated.' })).toBeVisible();
+  const geometryReads = await geometry.jsonValue(); await geometry.dispose();
+  const metrics = { nodes: 2341, steps: 32, mount, lookup, focus, edit, geometryReads, budgets: { mount: 5000, lookup: 50, focus: 1000, edit: 1500 } };
   console.info(`C-large ${testInfo.project.name}: ${JSON.stringify(metrics)}`);
   writeFileSync(`${evidence}/${testInfo.project.name}-large-performance.json`, JSON.stringify(metrics, null, 2) + '\n');
   await testInfo.attach('large-canvas-performance', { body: JSON.stringify(metrics), contentType: 'application/json' });
   expect(mount).toBeLessThan(5000); expect(lookup).toBeLessThan(50);
   expect(focus).toBeLessThan(1000); expect(edit).toBeLessThan(1500);
+  expect(geometryReads).toEqual({ ports: 0, boards: 0 });
 });

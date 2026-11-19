@@ -46,11 +46,14 @@ Styling uses existing workspace/HA tokens. Distinct Lucide block icons, named
 ports, type-specific socket glyphs/shapes, accessible type descriptions and the
 Outline connection list supplement colored sockets/wires. Numbers use a hash in
 a circle, text a T in a square and conditions a check in a diamond; time, entity,
-list and record sockets also have distinct glyphs. The socket of an unresolved input uses its connected
+list and record sockets also have distinct glyphs. Lists use doubled lines with
+the declared item-type glyph; unknown or mixed items retain a question mark.
+The socket of an unresolved input uses its connected
 source's static port type for color, never a sampled value; compatibility still
 uses the original graph descriptor. Port values come only from optional host
 observations; there is no literal, connected-source or calculated-value fallback.
-Socket contrast retains 4.5:1 and focus retains 3:1 on the tested grounds.
+Socket contrast retains 4.5:1 and focus retains 3:1 on canvas, panel, field,
+hover and selection surfaces in light, dark and custom themes.
 
 The compact bottom bar contains zoom, Tidy Up and a problems disclosure.
 Keyboard instructions remain associated with the graph for assistive technology,
@@ -66,14 +69,21 @@ license/notices changed. SVG wires are decorative; native HTML controls and the
 outline provide the full editing interface.
 
 Node, edge and incoming-port indexes are built once per immutable graph
-revision. Memoized block components preserve interactivity when selection or
-port focus changes; focusing a port also updates the focus saved in undo history.
+revision. Stable per-block presentation models and actions let literal-only
+edits render only the affected blocks/ports; unchanged geometry does not remeasure
+wires. Topology, position and displayed-label changes invalidate geometry.
+Memoized wires also skip payload-only renders. Focusing a port updates the
+focus saved in undo history; disconnecting an Outline wire records its destination
+input before the snapshot, rather than the previously selected block.
 Palette type hints and accessible names use the graph-core output descriptor,
 including numeric date differences/progress, rather than a second type map.
 
 The performance-only core handoff is `validateForLowering(graph)` followed by
-`lowerValidated(validation)`. The branded token holds the exact immutable
-revision and its ordered diagnostics. Calling `lower(graph)` directly still
+`lowerValidated(validation)`. The frozen, nominal token holds the exact immutable
+revision and its ordered diagnostics in private fields. Lowering checks its runtime
+class/private brand; spread copies, wrappers, proxies and replaced diagnostics
+cannot bypass validation. No registry or cross-call cache is used.
+Calling `lower(graph)` directly still
 validates and takes the same refusal path. All core indexes are call-local;
 there is no cross-call cache. The performance guard retains its 50 ms median.
 Before/after corpus hashes were captured at the pre-optimization head and cover
@@ -128,8 +138,9 @@ scripted display snapshot shaped like this API, not simulation/runtime evidence.
 
 ## Accounting dependency (pending)
 
-`FragmentCompilation.accounting` is a typed, optional array of
-`BudgetAccountingEvent`. `budgetFromCompilation` reduces those snapshots when
+`AccountingCompilation` extends main's unchanged `FragmentCompilation` with an
+optional `accounting` array of `BudgetAccountingEvent`.
+`budgetFromCompilation` accepts either shape and reduces those snapshots when
 present; it never replays the checker or derives parallel AST counters.
 `LimitsMeter` consumes only the resulting `GraphBudget`. Compact figures appear
 strictly **above** 75%, in the inspector's **Fits in the phone app** section.

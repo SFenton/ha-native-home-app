@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 import type { Json } from '../../types';
 import { absorbCompositionExpressionCapabilities, checkCompositionPipelineSource, compileCompositionDocumentWithOrigins, compositionCallShape, CompositionExpansionError, compositionDependencyIssues, parseCompositionShape } from '../compiler';
-import { checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type BudgetAccountingEvent, type ItemScope } from '../expression';
+import { checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, type CompositionIssue } from '../json';
 import { expandBounded, type LogicEntry, type LogicOrigin } from '../logic-library';
 import { graphInputsSchema, graphSourceSchema } from './capabilities';
@@ -18,8 +18,6 @@ export interface FragmentOptions {
   readonly library?: readonly LogicEntry[];
 }
 export interface FragmentCompilation {
-  /** Absent until the native entry point forwards the observer; never recovered by replaying a checker. */
-  readonly accounting?: readonly BudgetAccountingEvent[];
   readonly expanded: Json;
   readonly origins: readonly LogicOrigin[];
   readonly capabilities: readonly string[];

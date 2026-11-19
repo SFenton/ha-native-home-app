@@ -13,3 +13,20 @@ it('keeps the explicit validation handoff and direct lower identical, including 
     expect(lowerValidated(validateForLowering(revision))).toEqual(lower(revision));
   }
 });
+it('rejects spread, re-wrapped and diagnostic-swapped validation handoffs at runtime', () => {
+  const graph = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+  const broken = { ...graph, edges: [] }, valid = validateForLowering(graph), invalid = validateForLowering(broken);
+  expect(lower(broken).ok).toBe(false);
+  // @ts-expect-error Spreading the token loses its private runtime state.
+  expect(() => lowerValidated({ ...valid })).toThrow(TypeError);
+  // @ts-expect-error A spread cannot retain the private validation state.
+  expect(() => lowerValidated({ ...valid, graph: broken })).toThrow(TypeError);
+  // @ts-expect-error A new wrapper is not a validated revision, even with the same fields.
+  expect(() => lowerValidated({ graph: { ...graph }, diagnostics: valid.diagnostics })).toThrow(TypeError);
+  // @ts-expect-error Replacing diagnostics does not create a trusted handoff.
+  expect(() => lowerValidated({ ...invalid, diagnostics: [] })).toThrow(TypeError);
+  expect(() => lowerValidated(Object.create(Object.getPrototypeOf(valid)))).toThrow(TypeError);
+  expect(() => lowerValidated(new Proxy(valid, {}))).toThrow(TypeError);
+  expect(Object.isFrozen(invalid.diagnostics)).toBe(true);
+  expect(lowerValidated(invalid)).toEqual(lower(broken));
+});

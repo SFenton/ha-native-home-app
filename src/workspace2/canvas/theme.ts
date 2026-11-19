@@ -14,6 +14,7 @@ export function canvasTheme(theme: DerivedTheme): Record<string, string> {
     result[`--w2-wire-${kind}`] = toCss(color);
   }
   result['--w2-observation-pinned'] = result['--w2-wire-time'];
-  result['--w2-canvas-focus'] = toCss(ensureContrast(ensureContrast(parseColor(theme.selection)!, ground, ink, 3), card, ink, 3));
+  const focusSurfaces = ['--w2-bg', '--w2-card', '--w2-field', '--w2-hover', '--w2-selected'];
+  result['--w2-canvas-focus'] = toCss(focusSurfaces.reduce((color, surface) => ensureContrast(color, parseColor(theme.variables[surface])!, ink, 3.05), parseColor(theme.selection)!));
   return result;
 }
