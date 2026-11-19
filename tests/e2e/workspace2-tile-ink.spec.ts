@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { CompositionStore } from '../../server/composition-store';
+import { INK_DEFAULT_CAPABILITY, legacyManifest } from '../../src/shared/composition/compiler';
 import { addStateTile, duplicateStyle, newStateTile } from '../../src/shared/composition/state-style-library';
 import { builtInStyle } from '../../src/shared/composition/state-styles';
 import { isPhone, openWorkspace, previewRoot, seed, selectTile, snap } from './workspace2-helpers';
@@ -36,6 +40,69 @@ const colorOf = (target: Locator, scheme?: 'light') => target.evaluate((element,
   return color;
 }, scheme);
 const lineColor = (target: Locator) => target.evaluate(element => getComputedStyle(element).color);
+
+for (const legacy of [true, false]) {
+  test(`publish without editing: ${legacy ? 'legacy' : 'newly compiled'} draft previews the published ink`, async ({ page }, testInfo) => {
+    const directory = testInfo.outputPath('studio-data');
+    const initial = await CompositionStore.open(directory);
+    const first = initial.getDraft();
+    const tile = { ...newStateTile('cover.demo_blinds', 'Demo Blinds', 'blind', undefined)!, id: 'ink-default-blinds' };
+    const saved = await initial.save(addStateTile(first.document, first.document.pages[0].id, tile), first.revision);
+    if (legacy) {
+      // Fixture for a draft saved by the compiler before the ink promotion.
+      await writeFile(path.join(directory, 'native-v2/state.json'), JSON.stringify({
+        draft: { ...saved, capabilities: legacyManifest(saved.capabilities) }, publishedRevision: null,
+      }));
+    }
+    const store = await CompositionStore.open(directory);
+    const loaded = store.getDraft();
+    const stateBefore = await readFile(path.join(directory, 'native-v2/state.json'), 'utf8');
+    let saves = 0, publishes = 0;
+    await page.route('**/native/api/draft', async route => {
+      if (route.request().method() !== 'GET') {
+        saves += 1;
+        await route.fulfill({ status: 405, json: { error: 'This regression must publish the untouched saved revision' } });
+        return;
+      }
+      await route.fulfill({ json: store.getDraft() });
+    });
+    await page.route('**/native/api/ha/open-check', route => route.fulfill({ json: { action: 'keep', reason: 'not-connected', draftRevision: loaded.revision } }));
+    await page.route('**/native/api/ha/publication', route => route.fulfill({ json: { epoch: 'test-ink', current: null, history: [], storedAssets: 0 } }));
+    await page.route('**/native/api/ha/publish', async route => {
+      publishes += 1;
+      const { expectedRevision } = route.request().postDataJSON() as { expectedRevision: number };
+      const published = await store.publish(expectedRevision);
+      await route.fulfill({ json: { epoch: 'test-ink', revision: published.revision, envelopeSha256: 'a'.repeat(64) } });
+    });
+    await page.route('**/api/native-home', route => route.fulfill({ json: {
+      mode: 'live', houseConfig: { schema: 2, hash: 'a'.repeat(64), config: {} },
+      states: [{ entityId: 'cover.demo_blinds', name: 'Demo Blinds', state: 'closed', deviceClass: 'blind' }],
+    } }));
+    await openWorkspace(page);
+    const expectedInk = legacy ? 'muted' : 'primary';
+    await expect(previewRoot(page)).toHaveAttribute('data-ink', expectedInk);
+    const glyph = node$(page, tile.id).locator('.sh-tile-glyph').first();
+    await expect(glyph).toHaveCSS('color', legacy ? 'rgb(142, 142, 147)' : 'rgb(255, 255, 255)');
+    expect(await readFile(path.join(directory, 'native-v2/state.json'), 'utf8')).toBe(stateBefore);
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Publish to the App?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    const published = store.getPublished();
+    const publishedInk = published.capabilities.includes(INK_DEFAULT_CAPABILITY) ? 'primary' : 'muted';
+    await expect(previewRoot(page)).toHaveAttribute('data-ink', publishedInk);
+    expect(publishedInk).toBe(expectedInk);
+    expect(published.document).toEqual(loaded.document);
+    expect(published.revision).toBe(loaded.revision);
+    expect(store.getDraft()).toEqual(loaded);
+    expect(saves).toBe(0);
+    expect(publishes).toBe(1);
+    const reopened = await CompositionStore.open(directory);
+    expect(reopened.getDraft()).toEqual(loaded);
+    expect(reopened.getPublished()).toEqual(published);
+  });
+}
 
 test('Icon color: a state tile draws its icon in the color, a Light and a Dark one, and the tile beside it stays grey', async ({ page, request }) => {
   await seed(request, document);
