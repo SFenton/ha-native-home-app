@@ -11,16 +11,18 @@ import firstSlice from './fixtures/composition-first-slice.json';
 
 vi.mock('../src/api', () => ({
   apiUrl: (path: string) => path,
+  fetchHaEntities: async () => [],
+  fetchEntityAreas: async () => ({ areas: [], entities: [] }),
   request: vi.fn(async (path: string) => path.endsWith('/assets') ? [] : { epoch: 'e', current: null, history: [], storedAssets: 0 }),
 }));
 
 afterEach(cleanup);
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
 
 /** Opens every disclosure on screen, and every pushed "Advanced" page, until nothing closed is left. */
 export async function openEverything(root: HTMLElement) {
   for (let round = 0; round < 8; round++) {
-    const closed = [...root.querySelectorAll<HTMLElement>('.w2-disclosure-head[aria-expanded=false]:not(.w2-advanced-row)')];
+    const closed = [...root.querySelectorAll<HTMLElement>('.w2-disclosure-head[aria-expanded=false]:not(.w2-advanced-row), .w2-tree-group-button[aria-expanded=false]')];
     if (!closed.length) break;
     for (const head of closed) await act(async () => { fireEvent.click(head); });
   }
@@ -93,7 +95,7 @@ describe('acceptance 1: no generated fieldset or details list renders in the wor
     expect(found).toEqual([]);
   });
 
-  const dialogs: DialogKey[] = ['rename', 'data', 'local-state', 'links', 'launch', 'live', 'history', 'import', 'activity', 'about', 'help'];
+  const dialogs: DialogKey[] = ['rename', 'data', 'flows', 'local-state', 'links', 'launch', 'live', 'history', 'import', 'activity', 'about', 'help'];
   for (const dialog of dialogs) {
     it(`draws the ${dialog} dialog, and every row it pushes, without a fieldset or details list`, async () => {
       const document = Project.withEverything(homeDomains.document as unknown as CompositionDocument);
@@ -121,11 +123,12 @@ describe('acceptance 1: no generated fieldset or details list renders in the wor
   it('draws a source of every model the Data dialog can add as rows', async () => {
     const base = homeDomains.document as unknown as CompositionDocument;
     const { modelChoices } = await import('../src/workspace2/dialogs/sources');
-    const choices = modelChoices();
+    const choices = modelChoices().filter(choice => choice.model !== 'pipeline@1');
     expect(choices.length).toBeGreaterThan(15);
     const document = { ...base, dataSources: choices.map(choice => choice.make(base)) } as CompositionDocument;
     const ws = Project.workspace(document);
     const { container } = render(<DialogBody dialog="data" ws={ws} close={() => {}} onError={() => {}}/>);
+    await openEverything(container);
     const found: string[] = [];
     for (let at = 0; at < choices.length; at++) {
       await act(async () => { fireEvent.click(container.querySelectorAll<HTMLElement>('[data-pushes]')[at]); });

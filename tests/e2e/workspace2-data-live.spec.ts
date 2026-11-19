@@ -31,7 +31,7 @@ async function openFlow(page: Page): Promise<Locator> {
   await openWorkspace(page);
   if (sheetPath(page)) {
     await page.getByRole('button', { name: 'Project', exact: true }).click();
-    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Data$/ }).click();
+    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Flows$/ }).click();
   } else {
     await openLibrary(page, 'Flows');
     const group = page.getByRole('button', { name: /^Flows, \d+$/ });

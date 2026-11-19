@@ -26,12 +26,12 @@ const full = (page: Page) => isPhone(page) ? page.evaluate(() => window.dispatch
 const saved = async (page: Page): Promise<CompositionDocument> => (await (await page.request.get('/native/api/draft')).json()).document;
 const refs = (document: unknown, id: string) => (JSON.stringify(document).match(new RegExp(`"logicId":"${id}"`, 'g')) ?? []).length;
 
-/** Opens Data: the library's Data item when there is a rail, Project > Data on a phone. */
+/** Opens Flows: its rail item on desktop, Project > Flows on a phone. */
 async function openData(page: Page) {
   await openWorkspace(page);
   if (isPhone(page)) {
     await page.getByRole('button', { name: 'Project', exact: true }).click();
-    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Data$/ }).click();
+    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Flows$/ }).click();
     return page.locator('.w2-data');
   }
   await openLibrary(page, 'Flows');

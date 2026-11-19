@@ -16,7 +16,7 @@
 .w2-scope .w2-data-add { min-height: 36px; border-radius: 18px; gap: 6px; }
 .w2-data-foot .w2-caption { flex-basis: 100%; margin: 0; }
 .w2-data-sources { max-height: 320px; overflow: auto; }
-.w2-group-preview { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 400; }
+.w2-group-preview { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 400; text-align: start; }
 .w2-data-group .w2-tree-group-button > span:not(.w2-group-preview) { flex-shrink: 0; }
 .w2-flow-rowtext { display: flex; flex-direction: column; flex: 1; min-width: 0; padding-block: 6px; }
 .w2-flow-name { display: flex; align-items: baseline; gap: 4px; min-width: 0; }

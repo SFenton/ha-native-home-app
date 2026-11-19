@@ -28,7 +28,7 @@ function EntityRow({ entity, uses }: { entity: HaEntity; uses: readonly string[]
 }
 
 /** Home Assistant is a read-only catalog; App and Models remain authored sources. */
-export default function DataPanel({ ws, library, onError }: { ws: Workspace2; library: Library; onError: (message: string) => void }) {
+export default function DataPanel({ ws, library, onError, onOpenSource }: { ws: Workspace2; library: Library; onError: (message: string) => void; onOpenSource?: (id: string, name: string) => void }) {
   const document = ws.document!, { entities } = useWorkspaceData();
   const [query, setQuery] = useState(''), [everything, setEverything] = useState(false);
   const [catalog, setCatalog] = useState<HaEntity[]>(), [areas, setAreas] = useState<EntityAreas>();
@@ -74,7 +74,7 @@ export default function DataPanel({ ws, library, onError }: { ws: Workspace2; li
     return <LibraryGroup id={`data.${title}`} title={title} names={shown.map(appName)} library={library} reveal={sources.some(source => source.id === ws.flowId) ? ws.flowId : undefined} searching={Boolean(query.trim())}>
       <ul className="w2-data-list">{shown.map(source => {
         const open = ws.flowId === source.id, label = appName(source), count = uses.get(source.id) ?? 0;
-        return <li key={source.id} className="w2-data-plain"><button type="button" className="w2-data-row" aria-current={open || undefined} aria-label={`${label}, source, used by ${count}`} onClick={() => ws.openFlow(open ? undefined : source.id)}>
+        return <li key={source.id} className="w2-data-plain"><button type="button" className="w2-data-row" data-pushes={onOpenSource ? true : undefined} aria-current={open || undefined} aria-label={`${label}, source, used by ${count}`} onClick={() => onOpenSource ? onOpenSource(source.id, label) : ws.openFlow(open ? undefined : source.id)}>
           <span className="w2-data-name">{label}</span><span className="w2-data-used">Used by {count}</span>
         </button></li>;
       })}</ul>
@@ -86,8 +86,9 @@ export default function DataPanel({ ws, library, onError }: { ws: Workspace2; li
       <button type="button" aria-pressed={!everything} onClick={() => setEverything(false)}>In Use · {inUse.length}</button>
       <button type="button" aria-pressed={everything} onClick={() => setEverything(true)}>Everything · {all.length}</button>
     </div>
-    <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Find an entity, device or area" aria-label="Find an entity, device or area" value={query} onChange={event => setQuery(event.target.value)}/></label>
+    <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Find an entity or area" aria-label="Find an entity, device or area" value={query} onChange={event => setQuery(event.target.value)}/></label>
     <div className="w2-lib-scroll">
+      <section aria-label="From Home Assistant">
       {catalogError && <p className="w2-caption" role="status">{catalogError}. Showing entities named by this project.</p>}
       {areaError && <p className="w2-caption" role="status">Areas unavailable: {areaError}. Entities are listed in No Area.</p>}
       {groups.map(([id, group]) => <LibraryGroup key={id} id={`data.area.${id || 'none'}`} title={group.title} names={group.entities.map(entity => friendly(entity.name, entity.entityId))} library={library} searching={Boolean(query.trim())}
@@ -95,19 +96,22 @@ export default function DataPanel({ ws, library, onError }: { ws: Workspace2; li
         <ul className="w2-data-list">{group.entities.map(entity => <EntityRow key={entity.entityId} entity={entity} uses={[...readers.get(entity.entityId) ?? []]}/>)}</ul>
       </LibraryGroup>)}
       {!groups.length && <p className="w2-caption">{query ? 'Nothing matches.' : everything ? 'No Home Assistant entities available.' : 'No entities in use yet.'}</p>}
+      <p className="w2-caption">Listed while a tile or flow reads it. Nothing to add or clean up.</p>
+      </section>
+      <section aria-label="App and model sources">
       {plainGroup('App', models.filter(source => source.kind === 'model' && source.model === 'app-state@1'))}
       {plainGroup('Models', models.filter(source => source.kind === 'model' && source.model !== 'app-state@1'))}
-    </div>
     <footer className="w2-data-foot">
-      <p className="w2-caption">Listed while a tile or flow reads it. Nothing to add or clean up.</p>
       <Menu.Root><Menu.Trigger className="w2-data-add"><Plus size={16} aria-hidden/>Source</Menu.Trigger>
         <Menu.Portal><Menu.Positioner side="top" sideOffset={6} align="start" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu w2-data-sources" aria-label="Add a source">
           {modelChoices().filter(choice => choice.model !== 'pipeline@1').map(choice => <Menu.Item key={choice.model} className="w2-menu-item" onClick={() => {
-            try { const made = choice.make(document); ws.studio.apply({ ...document, dataSources: [...document.dataSources, made] }); ws.openFlow(made.id); }
+            try { const made = choice.make(document); ws.studio.apply({ ...document, dataSources: [...document.dataSources, made] }); if (onOpenSource) onOpenSource(made.id, appName(made)); else ws.openFlow(made.id); }
             catch (error) { onError(error instanceof Error ? error.message : String(error)); }
           }}>{choice.name}</Menu.Item>)}
         </Menu.Popup></Menu.Positioner></Menu.Portal>
       </Menu.Root>
     </footer>
+      </section>
+    </div>
   </div>;
 }

@@ -21,13 +21,13 @@ function withList(): CompositionDocument {
 test.beforeEach(async ({ request }) => { await seed(request, withList()); });
 
 const prefix = (page: Page) => isPhone(page) ? 'phone' : 'desktop';
-/** Opens the Data tab: the library's Data item when there is a rail, Project > Data on a phone. */
+/** Opens Flows: its rail item on desktop, Project > Flows on a phone. */
 const sheetPath = (page: Page) => (page.viewportSize()?.width ?? 1440) < 600;
 async function openData(page: Page) {
   await openWorkspace(page);
   if (sheetPath(page)) {
     await page.getByRole('button', { name: 'Project', exact: true }).click();
-    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Data$/ }).click();
+    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Flows$/ }).click();
     return page.locator('.w2-data');
   }
   await openLibrary(page, 'Flows');
@@ -199,7 +199,7 @@ test.describe('the List', () => {
 
 test.describe('on a phone', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1440) >= 700, 'The phone path');
-  test('Project > Data is a pushed page that lists Data Flows and opens one', async ({ page }) => {
+  test('Project > Flows is a pushed page that lists Data Flows and opens one', async ({ page }) => {
     await openData(page);
     const sheet = page.getByRole('dialog', { name: 'Project' });
     await expect(sheet.getByRole('heading', { name: 'Data Flows' })).toBeVisible();
