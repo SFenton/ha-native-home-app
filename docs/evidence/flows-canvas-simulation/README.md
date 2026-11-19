@@ -42,7 +42,7 @@ as a flaky CI assertion.
 ## Recorded checks and artifacts
 
 `npm test -- --maxWorkers=2`: 270 files, 12,194 passed and one existing skip.
-`npm run build`: passed. Focused Playwright: 24 passed across desktop
+`npm run build`: passed. Focused Playwright: 28 passed across desktop
 (1440 x 900; design scene 1440 x 1100) and phone (390 x 844, 2x capture).
 The permanent corpus comparison and observer invariants remain in those tests.
 `npm run scan:house`: zero findings. Temporary browser servers were stopped.
@@ -96,14 +96,52 @@ window. The mode, active output, unchanged persisted/visible list, retained
 unsaved JSON and visible warning assertions are unchanged. No production code,
 retry, fixed sleep or allowed simulation request was added.
 
-From main `2855842`, the quota case passed **30 desktop + 30 phone repetitions**
-with `--repeat-each=30 --workers=1`, port 4823 and isolated
-`test-results/studio-data/w2-s`. Every attachment was checked for two setup
-reads and an empty simulation window:
-[full measured repetition summary](quota-flake-repeats.json). The four
-denied/quota traffic records above are refreshed and explicitly separate setup
-reads from measured simulation requests. Afterwards the full 24-case browser
-suite, 12,194 unit tests (one existing skip), build and house scan passed.
+From main `2855842`, the original setup-wait fix passed 30 desktop + 30 phone
+repetitions. The final request-accounting correction and its negative controls
+were then repeated at both normal and 4x CPU, as detailed below. All browser
+execution used port 4823 and isolated `test-results/studio-data/w2-s`.
+
+#### Late route-delivery guard and permanent negative control
+
+Review of `f3603e9` found that a copied Node-side route array could still miss
+an import-triggered request delivered during asynchronous attachment work.
+The test now also records every fetch/XHR **synchronously at its start in the
+page**. After the clock advances and pending requests complete, it attaches
+diagnostics, then re-reads the page ledger and the final live route-count delta.
+Both must be zero. No endpoint, including safe flow-run reads, is exempt.
+
+Both storage-failure cases have a permanent negative-control variant. The
+test-only storage wrapper schedules a POST flow-run request 600 ms into the
+actual failed-import handler. The same zero-request guard must reject this
+variant; the control also requires exactly that one injected request.
+No application handler, bridge or request implementation is modified.
+`STUDIO_E2E_CPU_RATE=4` enables Chromium CPU throttling for these cases, so the
+delayed-request regression can be stressed without scratch source mutations.
+
+| CPU rate | Form | Normal imports, zero requests | Delayed mutations rejected |
+| --- | --- | ---: | ---: |
+| 1x | Desktop | 30/30 | 30/30 |
+| 1x | Phone | 30/30 | 30/30 |
+| 4x | Desktop | 30/30 | 30/30 |
+| 4x | Phone | 30/30 | 30/30 |
+
+These are **240 passing cases**, run with `--repeat-each=30 --workers=2`.
+All 240 attachments were checked: two settled setup reads, matching browser/
+route deltas, and zero import requests in all 120 normal runs. All 120 negative
+controls observed exactly one delayed flow-run and required the guard to
+reject it. [Full measured repetition summary](quota-flake-repeats.json);
+example injected traffic on [desktop](desktop-delayed-import-network.json)
+and [phone](phone-delayed-import-network.json). These two negative-control
+records deliberately contain a request; they are detection evidence, not
+claims of network-free simulation.
+
+The four denied/quota records above are refreshed normal runs and continue to
+show zero import requests. The final full suite passed **28/28 browser cases**;
+12,194 unit tests (one existing skip), build and house scan also pass.
+No production code changed. The prior container failure was Ubuntu mirror
+503/resource errors; a retry was requested, but GitHub refused while its
+workflow was still running (HTTP 403). New-head CI is reported in the PR
+handoff rather than being described as green here.
 
 ## Independent-review corrections
 

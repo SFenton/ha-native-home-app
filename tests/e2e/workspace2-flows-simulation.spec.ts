@@ -20,6 +20,43 @@ async function attachNetwork(info: TestInfo, value: unknown) {
   await info.attach('intercepted-network.json', { path, contentType: 'application/json' });
 }
 const output = (page: Page, name: string) => page.getByRole('article', { name: `Output ${name}`, exact: true }).locator('output');
+type NetworkRead = { method: string; url: string };
+declare global {
+  interface Window { __simulationImportTraffic: { requests: NetworkRead[]; pending: number } }
+}
+async function observeImport(page: Page) {
+  await page.evaluate(() => {
+    const traffic = window.__simulationImportTraffic = { requests: [] as NetworkRead[], pending: 0 };
+    const fetch = window.fetch;
+    window.fetch = function (input, init) {
+      traffic.requests.push({
+        method: init?.method ?? (input instanceof Request ? input.method : 'GET'),
+        url: new URL(input instanceof Request ? input.url : String(input), document.baseURI).href,
+      });
+      traffic.pending++;
+      return fetch.call(this, input, init).finally(() => { traffic.pending--; });
+    };
+    const requests = new WeakMap<XMLHttpRequest, NetworkRead>();
+    const open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method: string, url: string | URL, async: boolean = true, username?: string | null, password?: string | null) {
+      requests.set(this, { method, url: new URL(String(url), document.baseURI).href });
+      return open.call(this, method, url, async, username, password);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+      const request = requests.get(this);
+      if (!request) throw new Error('Import audit observed XMLHttpRequest.send without open.');
+      traffic.requests.push(request);
+      traffic.pending++;
+      this.addEventListener('loadend', () => { traffic.pending--; }, { once: true });
+      return send.call(this, body);
+    };
+  });
+}
+async function assertNoImportRequests(page: Page, network: readonly NetworkRead[], initialReads: number) {
+  const requests = await page.evaluate(() => window.__simulationImportTraffic.requests);
+  expect(requests, 'No requests may start during import, including delayed flow-run reads.').toEqual([]);
+  expect(network.length - initialReads, 'The final live route delta must also stay zero.').toBe(0);
+}
 async function open(page: Page) {
   const network: { method: string; url: string }[] = [];
   await page.emulateMedia({ colorScheme: 'light' });
@@ -236,8 +273,14 @@ for (const change of ['active', 'unchanged', 'inactive'] as const) {
     await attachNetwork(info, { change, activeCaptureUnchangedUntilSelection: true, persistedImport: true, simulationFetches: 0, requests: network });
   });
 }
-for (const failure of ['SecurityError', 'QuotaExceededError']) {
-  test(`failed import is transactional and visible: ${failure}`, async ({ page }, info) => {
+for (const failure of ['SecurityError', 'QuotaExceededError']) for (const delayedRequest of [false, true]) {
+  test(`failed import is transactional and visible: ${failure}${delayedRequest ? ' (delayed flow-run negative control)' : ''}`, async ({ page }, info) => {
+    const cpuRate = Number(process.env.STUDIO_E2E_CPU_RATE ?? 1);
+    expect(Number.isFinite(cpuRate) && cpuRate >= 1, 'STUDIO_E2E_CPU_RATE must be a finite number >= 1.').toBe(true);
+    if (cpuRate !== 1) {
+      const session = await page.context().newCDPSession(page);
+      await session.send('Emulation.setCPUThrottlingRate', { rate: cpuRate });
+    }
     const network = await open(page);
     // Loading fixtures remounts the host in Live; settle that refresh before entering simulation.
     const refreshed = page.waitForResponse(response => response.url().endsWith('/native/api/ha/flow-run') && response.request().method() === 'POST');
@@ -256,14 +299,18 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) {
     const exchange = drawer.getByLabel('Scenario exchange JSON', { exact: true });
     const replacement = JSON.stringify({ version: 1, scenarios: [] });
     await exchange.fill(replacement);
-    await page.evaluate(({ failure, key }) => {
+    await page.evaluate(({ failure, key, delayedRequest }) => {
       const set = Storage.prototype.setItem;
       Storage.prototype.setItem = function (name, value) {
-        if (name === key) throw new DOMException('Test storage failure', failure);
+        if (name === key) {
+          if (delayedRequest) setTimeout(() => { void fetch('./native/api/ha/flow-run', { method: 'POST' }); }, 600);
+          throw new DOMException('Test storage failure', failure);
+        }
         return set.call(this, name, value);
       };
-    }, { failure, key: saved.key });
+    }, { failure, key: saved.key, delayedRequest });
     await page.clock.install();
+    await observeImport(page);
     const initialReads = network.length;
     await drawer.getByRole('button', { name: 'Import scenarios (replace browser list)', exact: true }).click();
     const warning = page.getByRole('status').filter({ hasText: 'Import not saved.' });
@@ -274,10 +321,15 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) {
     await expect(page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Simulated', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(output(page, 'Subtitle')).toHaveText('Too Warm');
     await page.clock.runFor(1000);
-    const simulationRequests = network.slice(initialReads);
-    await attachNetwork(info, { failure, initialReads, unchangedPersistedList: true, unsavedImportRetained: true, warning: await warning.textContent(), simulationFetches: simulationRequests.length, simulationRequests, requests: network });
-    expect(simulationRequests).toEqual([]);
-    expect(network.every(request => request.method === 'POST' && request.url.endsWith('/native/api/ha/flow-run'))).toBe(true);
+    await page.waitForFunction(() => window.__simulationImportTraffic.pending === 0);
+    const warningText = await warning.textContent();
+    const simulationRequests = await page.evaluate(() => window.__simulationImportTraffic.requests);
+    await attachNetwork(info, { failure, cpuRate, delayedRequest, initialReads, unchangedPersistedList: true, unsavedImportRetained: true, warning: warningText, simulationFetches: simulationRequests.length, simulationRequests, requests: network });
+    // Re-read both counters after the asynchronous evidence work; no import endpoint is exempt.
+    if (delayedRequest) {
+      expect(simulationRequests).toEqual([{ method: 'POST', url: network[0].url }]);
+      await expect(assertNoImportRequests(page, network, initialReads)).rejects.toThrow('No requests may start during import');
+    } else await assertNoImportRequests(page, network, initialReads);
   });
 }
 test('AA contrast for every rendered simulation text/background pair in both appearances', async ({ page }, info) => {

@@ -1,5 +1,7 @@
 {
   "failure": "QuotaExceededError",
+  "cpuRate": 1,
+  "delayedRequest": false,
   "initialReads": 2,
   "unchangedPersistedList": true,
   "unsavedImportRetained": true,
