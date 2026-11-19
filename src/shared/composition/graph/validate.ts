@@ -25,45 +25,49 @@ const constructionSeal = Symbol('immutable graph data');
 const constructionAuthority = Symbol();
 const isProxy = typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function'
   ? process.getBuiltinModule('node:util').types.isProxy : undefined;
+function plainDataValue(descriptor: PropertyDescriptor | undefined, key: PropertyKey): unknown {
+  if (!descriptor || !('value' in descriptor)) throw new TypeError(`Graph revisions require own data properties; accessor ${String(key)} is not supported.`);
+  const child: unknown = descriptor.value;
+  if (typeof child === 'function') throw new TypeError('Graph revisions require plain data; functions are not supported.');
+  return child;
+}
 class ConstructionSeal {
-  readonly #value: object;
+  readonly #values: WeakSet<object>;
   readonly #batch: Readonly<{ complete: boolean }>;
-  constructor(value: object, batch: Readonly<{ complete: boolean }>, authority: typeof constructionAuthority) {
+  constructor(values: WeakSet<object>, batch: Readonly<{ complete: boolean }>, authority: typeof constructionAuthority) {
     if (authority !== constructionAuthority) throw new TypeError('Graph construction seals are private.');
-    this.#value = value;
+    this.#values = values;
     this.#batch = batch;
     Object.freeze(this);
   }
   static holds(value: object): boolean {
     if (isProxy?.(value)) throw new TypeError('Graph revisions require plain data; Proxy objects are not supported.');
-    const seal: unknown = Object.getOwnPropertyDescriptor(value, constructionSeal)?.value;
-    return seal instanceof ConstructionSeal && #value in seal && seal.#value === value && seal.#batch.complete;
+    const descriptor = Object.getOwnPropertyDescriptor(value, constructionSeal);
+    const seal = descriptor ? plainDataValue(descriptor, constructionSeal) : undefined;
+    return seal instanceof ConstructionSeal && #values in seal && seal.#batch.complete && seal.#values.has(value);
   }
 }
 Object.freeze(ConstructionSeal.prototype);
 Object.freeze(ConstructionSeal);
-function plainData(value: object, pending?: object[]): void {
+function plainData(value: object, pending: object[]): void {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) {
     throw new TypeError('Graph revisions require plain data with Object.prototype, Array.prototype or null.');
   }
   for (const key of Reflect.ownKeys(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !('value' in descriptor)) throw new TypeError(`Graph revisions require own data properties; accessor ${String(key)} is not supported.`);
-    const child: unknown = descriptor.value;
-    if (typeof child === 'function') throw new TypeError('Graph revisions require plain data; functions are not supported.');
-    if (pending && key !== constructionSeal && child !== null && typeof child === 'object') pending.push(child);
+    const child = plainDataValue(Object.getOwnPropertyDescriptor(value, key), key);
+    if (key !== constructionSeal && child !== null && typeof child === 'object') pending.push(child);
   }
 }
 function freezeRevision(graph: LogicGraph): void {
   if (ConstructionSeal.holds(graph)) return;
-  const seen = new Set<object>(), pending: object[] = [graph], batch = { complete: false };
+  const seen = new WeakSet<object>(), pending: object[] = [graph], batch = { complete: false };
+  const seal = new ConstructionSeal(seen, batch, constructionAuthority);
   while (pending.length) {
     const value = pending.pop()!;
     if (ConstructionSeal.holds(value) || seen.has(value)) continue;
     seen.add(value);
-    plainData(value);
-    if (Object.isExtensible(value)) Object.defineProperty(value, constructionSeal, { value: new ConstructionSeal(value, batch, constructionAuthority) });
+    if (Object.isExtensible(value)) Object.defineProperty(value, constructionSeal, { value: seal });
     Object.freeze(value);
     // Freeze first: even an undetectable proxy cannot swap the child values being certified.
     plainData(value, pending);

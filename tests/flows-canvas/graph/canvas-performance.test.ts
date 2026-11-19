@@ -74,4 +74,34 @@ it('C-meter preserves one compilation and <=50ms median validate plus lower for 
   const sealStart = performance.now();
   for (let i = 0; i < 1_000_000; i++) if (constructGraphRevision(edited) !== edited) throw new Error('Wrong constructed revision.');
   process.stdout.write(`Canvas construction check: ${(performance.now() - sealStart).toFixed(2)} ns/call over 1000000 exact-object seal reads after 10000 warmups; no traversal or refreezing.\n`);
+  const sealCosts: number[] = [];
+  let newObjects = 0;
+  for (let i = 0; i < 12; i++) {
+    const fresh = lift(largeGraphFlow(), { kind: 'flow' }).graph;
+    const pending: object[] = [fresh], seen = new Set<object>();
+    let objects = 0;
+    while (pending.length) {
+      const value = pending.pop()!;
+      if (seen.has(value)) continue;
+      seen.add(value);
+      if (Object.isExtensible(value)) objects++;
+      const children: unknown[] = Object.values(value);
+      for (const child of children) if (child !== null && typeof child === 'object') pending.push(child);
+    }
+    if (!objects) throw new Error('Expected fresh graph data for the construction profile.');
+    const start = performance.now();
+    constructGraphRevision(fresh);
+    if (i >= 3) sealCosts.push((performance.now() - start) * 1_000_000 / objects);
+    newObjects = objects;
+  }
+  process.stdout.write(`Canvas new-object seal: ${costMedian(sealCosts)} ns/object; ${newObjects} new objects per unchanged fixture; 9 samples after 3 warmups; lifting/counting excluded.\n`);
+  const containers = new WeakSet<object>([edited, edited.nodes, edited.edges, ...edited.nodes, ...edited.edges]);
+  const traversal = vi.spyOn(Reflect, 'ownKeys');
+  try {
+    const result = lowerValidated(validateForLowering(edited, prepareGraphRevision(edited)), { accounting: true });
+    const walks = traversal.mock.calls.filter(([value]) => containers.has(value)).length;
+    expect(result.ok).toBe(true);
+    expect(walks).toBe(0);
+    process.stdout.write(`Canvas compiler-path construction walks: ${walks}; revision/node/edge containers, separate probe excluded from timings.\n`);
+  } finally { traversal.mockRestore(); }
 }, 30_000);

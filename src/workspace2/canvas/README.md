@@ -103,8 +103,10 @@ cannot bypass validation. There is no module-level registry.
 initial-state and successful-transaction boundaries. Every newly created graph,
 node, array and payload receives a non-enumerable construction seal; already
 sealed objects are reused without traversing or refreezing their children.
-Seals have private runtime fields, an unexported construction authority and exact
-object identity. They become usable only after the complete construction batch
+One proof is shared by a construction batch, with private `WeakSet` membership
+for exact object identity and an unexported construction authority. The traversal's
+visited set doubles as that membership set; it does not allocate/freeze a proof
+object for every node. The proof becomes usable only after the complete batch
 is frozen. Borrowed seals, proxies and fabricated constructors cannot certify
 different data; spreading a graph loses its seal and requires full validation.
 These are immutable construction proofs, not cached diagnostics or compilation.
@@ -124,10 +126,15 @@ Node runtimes exposing `process.getBuiltinModule` also reject proxies using
 `node:util.types.isProxy`, before invoking their reflection traps. This is
 capability-detected without importing a Node module into the browser bundle.
 Browser JavaScript cannot reliably identify every proxy. Construction therefore
-freezes each new parent before re-reading its descriptors/prototype and walking
-its now-stable child values; an undetectable proxy cannot swap in unsealed data
-during freezing. The batch is trusted only after every reachable child passes.
+freezes each new parent before checking its prototype once and enumerating its
+own keys once. The same descriptor check enqueues its now-stable child values;
+there is no separate pre-freeze descriptor/prototype walk. An undetectable proxy
+cannot swap in unsealed data during freezing. The reserved seal descriptor is
+checked before replacement, so its accessor/function values cannot be silently
+normalized into metadata. The batch is trusted only after every child passes.
 Already sealed objects retain their O(1) identity check with no descriptor walk.
+The existing initial-state, recipe and transaction factories seal before exposing
+their revisions; they reuse this proof rather than an unchecked "plain" marker.
 
 Standalone `validateGraph(graph)` remains a non-freezing diagnostic query;
 `prepareGraphRevision`, `validateForLowering` and direct `lower` construct
@@ -144,6 +151,11 @@ compile per measured run. Initial and edited-revision construction costs are
 reported separately from compiler samples; browser mount/edit measurements
 include them end to end. Stage medians, index cost and separate million-read
 construction-seal/trusted-handoff profiles are printed in local and hosted logs.
+An additional profile reports total seal cost per newly sealed data object over
+nine fresh fixtures after three warmups; lifting/counting are outside its timer.
+A separate reflection probe asserts no construction walks over the prepared
+revision/node/edge containers during validate+lower, without instrumenting the
+timed compiler samples.
 Before/after corpus hashes were captured at the pre-optimization head and cover
 ordered diagnostics and every unobserved output field, including source maps and
 budgets. Those golden fixtures and the permanent #24 differential remain unchanged.

@@ -23,7 +23,60 @@ npx vitest run tests/flows-canvas/graph/canvas-performance.test.ts \
   --maxWorkers=2 --reporter=verbose --silent=false
 ```
 
-## Round-four plain-data construction boundary
+## Single-walk batch sealing (latest)
+
+The [hosted `7c39257` compiler job](https://github.com/SFenton/ha-native-home-app/actions/runs/44545047545/job/135633253681)
+failed at **55.13 ms**: validate **33.94**, lower **22.48**, adapter **14.98**,
+indexes **2.67 ms**. Initial construction was **141.87 ms**, outside that timer.
+All stages rose by roughly the same factor versus the accepted `9593927`
+baseline; this does not establish a 19 ms descriptor-check cost.
+
+New data now has one post-freeze prototype/key/descriptor walk, which also
+enqueues children. A batch shares one private proof and `WeakSet`, instead of
+allocating/freezing a proof per object. Existing factory construction boundaries
+mark immutable data before exposure and keep O(1) reuse. No unchecked factory
+marker, module-level mutable registry, cached validation or compilation was added.
+All rejection cases remain; two additional cases prevent accessor/function data
+at the reserved seal key from being overwritten before rejection.
+
+Adjacent isolated runs on **Node 22.23.5**, same Mac, fixture, compiler options,
+warmups and gate:
+
+| Metric | Committed `7c39257` | Correction |
+| --- | ---: | ---: |
+| Total sealing per new data object | 856.02 ns | 603.34 ns |
+| Observed validate+lower median | 16.37 ms | 16.62 ms |
+| Initial / edited construction | 40.76 / 0.83 ms | 31.65 / 0.73 ms |
+| O(1) seal check | 26.65 ns/call | 31.93 ns/call |
+
+Sealing is **29.5% cheaper per new object**; the compiler result is essentially
+flat, not evidence of recovering the hosted target. The construction profile
+includes checks, freezing and proof insertion over **47,543 new objects** per
+fixture, nine samples after three warmups; lifting/counting are excluded.
+The baseline loads only the committed `validate.ts` through a temporary
+load-only Vite plugin; all other source, config and the test are identical.
+The checkout is never switched or modified for comparison.
+
+Compiler sampling remains 31 runs after 30 warmups, fresh indexes, accounting
+enabled, one native compile and the unchanged **50 ms** assertion. The separate
+probe records **zero construction key walks** on revision/node/edge containers
+for **both versions**. Thus repeated full sealing is not inside that timer;
+the hosted excess cannot be assigned quantitatively to it from these runs.
+After-stage medians: validate **10.19**, lower **6.44**, adapter **4.36**,
+indexes **0.89 ms**. Adapter/index costs are included in lower/validate;
+independent medians are not additive. Trusted handoff read: **29.24 ns/call**.
+
+`npm test` on Node 22 passed **280 files / 14,428 tests**, one existing skip;
+the full-suite compiler median was **25.32 ms**. Build/typecheck and all **30**
+standard-config browser cases passed, preserving byte goldens and #24.
+Desktop mount/focus/edit: **1,119.42 / 90.29 / 155.28 ms**; phone:
+**1,080.61 / 130.40 / 185.74 ms**. Raw JSONs are refreshed; screenshot noise
+is not included. Temporary servers stopped; user development data was untouched.
+
+The new hosted **about-36-ms-or-below** target remains to be verified by the
+orchestrator after the push. These local runs are not a hosted performance claim.
+
+## Round-four plain-data construction boundary (prior head `7c39257`)
 
 The accessor probe now fails explicitly at construction, before a trusted
 handoff can be issued. Newly encountered objects must have only own data
@@ -46,8 +99,8 @@ The reviewer's **prior-head `9593927`** hosted result is **36.35 ms** compiler
 median (validate 21.70, lower 14.55, adapter 9.86 ms), accepted by the owner;
 the original 50 ms gate is unchanged. Its desktop/phone mounts were
 **1,918.64 / 1,520.99 ms**, and all twelve checks passed. These are baseline
-figures, not measurements of this correction. New hosted figures remain
-pending the orchestrator's post-push CI report.
+figures, not measurements of this correction. The subsequent `7c39257` compiler
+failure and its follow-up are recorded above.
 
 Local verification of the correction:
 

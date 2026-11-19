@@ -94,6 +94,16 @@ it('constructs already non-extensible input without leaving writable graph field
   expect(Reflect.set(constructed, 'nodes', [])).toBe(false);
   expect(lowerValidated(validateForLowering(constructed)).ok).toBe(true);
 });
+it.each(['accessor', 'function'] as const)('rejects an invalid %s at the reserved seal key before replacing metadata', kind => {
+  const sealed = constructGraphRevision(lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph);
+  const key = Object.getOwnPropertySymbols(sealed)[0];
+  if (!key) throw new Error('Expected a constructed graph.');
+  const graph = lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph;
+  const get = vi.fn(() => Object.getOwnPropertyDescriptor(sealed, key)?.value);
+  Object.defineProperty(graph, key, kind === 'accessor' ? { get, configurable: true } : { value: () => 1, configurable: true });
+  expect(() => validateForLowering(graph)).toThrow(kind === 'accessor' ? /own data properties; accessor/ : /functions are not supported/);
+  expect(get).not.toHaveBeenCalled();
+});
 it.each(['endpoint', 'array index', 'array symbol'] as const)('rejects the review accessor probe at the %s before issuing a trusted handoff', location => {
   const graph = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
   let portId = graph.edges[0].to.portId, currentEdge = graph.edges[0], reads = 0;
