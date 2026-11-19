@@ -57,6 +57,11 @@ export function dataReferences(document: CompositionDocument, value: unknown): {
       const entry = document.componentLibrary?.find(item => item.id === value.componentId);
       if (entry) {
         const ref = value as ComponentRefNode;
+        // The compiler checks declared source arguments even when no binding currently consumes them.
+        for (const param of entry.params ?? []) {
+          const id = ref.args?.[param.name];
+          if (param.kind === 'source-id' && typeof id === 'string') found.push(id);
+        }
         walk(expandRef(ref, entry), args, stack);
         walk(expandSources(ref, entry), args, stack);
       }

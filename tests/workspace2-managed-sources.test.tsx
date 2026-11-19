@@ -109,6 +109,26 @@ describe('Studio-managed entity sources', () => {
     expect(sourceUses(literalTarget).get('legacy-actual')).toBe(0);
   });
 
+  it('retains declared source arguments even without bindings, but not text arguments that happen to name a source', () => {
+    const initial = doc('legacy-actual');
+    const entry: NonNullable<CompositionDocument['componentLibrary']>[number] = {
+      id: 'unbound-component', name: 'Unbound component',
+      node: { id: 'unbound-text', type: 'text', title: 'Caption', layout: { span: 1 }, props: { value: { type: 'literal', value: 'Caption' }, style: 'body', unavailableText: 'Unavailable' } },
+      params: [{ name: 'reader', kind: 'source-id' }, { name: 'caption', kind: 'text' }],
+    };
+    const place = { id: 'unbound-place', type: 'component-ref' as const, componentId: entry.id, layout: { span: 1 as const }, args: { reader: 'legacy-actual', caption: 'legacy-actual' } };
+    const before: CompositionDocument = { ...initial, componentLibrary: [entry], pages: [{ ...initial.pages[0], components: [...initial.pages[0].components, place] }] };
+    const edited = { ...before, pages: [{ ...before.pages[0], components: [place] }] };
+    expect(() => compileCompositionDocument(before)).not.toThrow();
+    expect(sourceUses(edited).get('legacy-actual')).toBe(1);
+    const pruned = pruneEntitySources(before, edited);
+    expect(pruned.dataSources).toEqual(before.dataSources);
+    expect(() => compileCompositionDocument(pruned)).not.toThrow();
+    const textOnly = replaceAt(edited, ['componentLibrary', 0, 'params', 0, 'kind'], 'text');
+    expect(() => compileCompositionDocument(textOnly)).not.toThrow();
+    expect(sourceUses(textOnly).get('legacy-actual')).toBe(0);
+  });
+
   it.each([
     ['navigation visibility', ['navigation', 'tabs', 0, 'visibleWhen']],
     ['chrome', ['navigation', 'chrome', 'groups']],
