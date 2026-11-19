@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.15
+
+- Maintenance and internal changes.
+
 ## 0.3.14
 
 - Maintenance and internal changes.
