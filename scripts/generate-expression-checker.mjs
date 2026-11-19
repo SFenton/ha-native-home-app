@@ -9,8 +9,42 @@ if (!checker) throw new Error('Missing canonical Checker');
 const canonical = source.slice(checker.getStart(parsed), checker.end);
 const selection = 'accountingChecker === this ? checkerAccounting : undefined';
 if (canonical.split(selection).length - 1 !== 6) throw new Error('Review the Checker accounting selections before regenerating');
-const plain = canonical.replace(/^class Checker /, 'const PlainChecker = class Checker ')
-  .replaceAll(selection, 'undefined as typeof checkerAccounting');
+const edits = [];
+function omit(node) { edits.push({ start: node.getFullStart(), end: node.end, text: '' }); }
+function stripAccounting(node) {
+  if (ts.isVariableStatement(node)) {
+    const declarations = node.declarationList.declarations;
+    if (declarations.some(declaration => ts.isIdentifier(declaration.name) && ['accounting', 'outerScope'].includes(declaration.name.text))) {
+      if (declarations.length !== 1) throw new Error('Accounting bindings must remain separate from semantic state');
+      omit(node);
+      return;
+    }
+  }
+  if (ts.isIfStatement(node) && ts.isIdentifier(node.expression) && node.expression.text === 'accounting') {
+    if (node.elseStatement) throw new Error('Review accounting else branches before specialising');
+    omit(node);
+    return;
+  }
+  if (ts.isExpressionStatement(node) && node.expression.getText(parsed).startsWith('accounting?.')) {
+    omit(node);
+    return;
+  }
+  if (ts.isConditionalExpression(node) && ts.isIdentifier(node.condition) && node.condition.text === 'accounting') {
+    edits.push({ start: node.getStart(parsed), end: node.end, text: node.whenFalse.getText(parsed) });
+    return;
+  }
+  ts.forEachChild(node, stripAccounting);
+}
+stripAccounting(checker);
+let plain = canonical;
+for (const edit of edits.sort((a, b) => b.start - a.start)) {
+  const start = edit.start - checker.getStart(parsed), end = edit.end - checker.getStart(parsed);
+  plain = plain.slice(0, start) + edit.text + plain.slice(end);
+}
+if (/\b(accounting|outerScope|accountingChecker|checkerAccounting|BudgetAccountingScope|reportAccounting)\b/.test(plain)) {
+  throw new Error('Unrecognised accounting code remains in the plain visitor');
+}
+plain = plain.replace(/^class Checker /, 'const PlainChecker = class Checker ');
 const begin = '// BEGIN GENERATED PLAIN CHECKER';
 const end = '// END GENERATED PLAIN CHECKER';
 const start = source.indexOf(begin), finish = source.indexOf(end);

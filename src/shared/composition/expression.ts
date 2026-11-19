@@ -619,30 +619,15 @@ const PlainChecker = class Checker implements ExpressionFacts {
   add(code: CompositionIssue['code'], pointer: string) { this.issues.push({ code, pointer }); }
   start(nodes: number, pointer: string) {
     this.budget = nodes;
-    const accounting = undefined as typeof checkerAccounting;
-    if (accounting) {
-      accounting.expression = new BudgetAccountingScope(accounting.observer, 'expression', pointer, nodes, MAX_EXPRESSION_DEPTH);
-      accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, null, null, `predicate:${pointer}:initial`);
-    }
   }
   beginCondition(pointer: string) {
-    const accounting = undefined as typeof checkerAccounting;
-    if (accounting) {
-      const previousScopeId = accounting.predicate!.id;
-      accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH);
-      reportAccounting(accounting.observer, { type: 'condition-budget', action: 'reset', pointer, previousScopeId, scopeId: accounting.predicate.id,
-        previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: MAX_CONDITION_NODES });
-    }
     this.conditionBudget = MAX_CONDITION_NODES;
   }
   private enter(pointer: string, depth: number): boolean {
-    const accounting = undefined as typeof checkerAccounting;
     if (depth > MAX_EXPRESSION_DEPTH || this.budget <= 0) {
-      accounting?.expression!.enter(pointer, depth, false, this.budget);
       this.add('limit_exceeded', pointer); return false;
     }
     this.budget -= 1;
-    accounting?.expression!.enter(pointer, depth, true, this.budget);
     return true;
   }
   operand(value: Operand, pointer: string, depth: number) {
@@ -733,21 +718,14 @@ const PlainChecker = class Checker implements ExpressionFacts {
         if (this.flow) this.add('invalid_combination', pointer);
         if (!value.of.length || value.of.length > MAX_COUNT_ENTRIES) this.add('limit_exceeded', at('of'));
         const outer = this.conditionBudget;
-        const accounting = undefined as typeof checkerAccounting;
-        const outerScope = accounting?.predicate;
         value.of.forEach((entry, index) => {
           // Each test has the condition budget a rule's case has.
-          this.beginCondition(accounting ? at('of', index, 'test') : '');
+          this.beginCondition('');
           this.predicate(entry.test, at('of', index, 'test'), depth + 1, 1);
           entry.viewer?.personEntityIds.forEach((person, slot) => {
             if (!PERSON_ENTITY_ID.test(person)) this.add('invalid_value', at('of', index, 'viewer', 'personEntityIds', slot));
           });
         });
-        if (accounting) {
-          reportAccounting(accounting.observer, { type: 'condition-budget', action: 'restore', pointer, previousScopeId: accounting.predicate!.id,
-            scopeId: outerScope!.id, previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: Number.isFinite(outer) ? outer : null });
-          accounting.predicate = outerScope;
-        }
         this.conditionBudget = outer;
         break;
       }
@@ -809,11 +787,9 @@ const PlainChecker = class Checker implements ExpressionFacts {
         break;
       case 'choose': {
         this.needs.add('rules');
-        const accounting = undefined as typeof checkerAccounting;
-        if (accounting) reportAccounting(accounting.observer, { type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
         if (!value.cases.length || value.cases.length > MAX_RULE_CASES) this.add('limit_exceeded', at('cases'));
         value.cases.forEach((entry, index) => {
-          this.beginCondition(accounting ? at('cases', index, 'when') : '');
+          this.beginCondition('');
           this.predicate(entry.when, at('cases', index, 'when'), depth + 1, 1);
           this.operand(entry.then, at('cases', index, 'then'), depth + 1);
         });
@@ -844,13 +820,10 @@ const PlainChecker = class Checker implements ExpressionFacts {
   }
   predicate(value: Predicate, pointer: string, depth: number, conditionDepth = 1) {
     if (!this.enter(pointer, depth)) return;
-    const accounting = undefined as typeof checkerAccounting;
     if (this.conditionBudget !== Number.POSITIVE_INFINITY && (conditionDepth > MAX_CONDITION_DEPTH || this.conditionBudget <= 0)) {
-      accounting?.predicate!.enter(pointer, conditionDepth, false, this.conditionBudget);
       this.add('limit_exceeded', pointer); return;
     }
     this.conditionBudget -= 1;
-    accounting?.predicate!.enter(pointer, conditionDepth, true, this.conditionBudget);
     switch (value.type) {
       case 'state':
         this.path(value.path, `${pointer}/path`);
