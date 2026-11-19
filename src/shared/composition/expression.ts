@@ -237,6 +237,42 @@ export interface ExpressionFacts {
   needs: Set<string>;
 }
 
+export type BudgetScopeKind = 'expression' | 'predicate' | 'flow-operand' | 'flow-condition';
+/** Synchronous, read-only snapshots of actual checker visits, not a second AST walk. Null limits/remaining mean uncapped. */
+export type BudgetAccountingEvent =
+  | { readonly type: 'scope'; readonly scopeId: string; readonly kind: BudgetScopeKind; readonly pointer: string; readonly nodeLimit: number | null; readonly depthLimit: number | null }
+  // Cumulative scope snapshots: attempts include refused entries; charges exclude them.
+  | { readonly type: 'node'; readonly scopeId: string; readonly pointer: string; readonly depth: number; readonly charged: boolean;
+    readonly nodes: number; readonly attemptedNodes: number; readonly maxDepth: number; readonly maxChargedDepth: number; readonly remaining: number | null }
+  | { readonly type: 'condition-budget'; readonly action: 'reset' | 'restore'; readonly pointer: string;
+    readonly previousScopeId: string; readonly scopeId: string; readonly previousRemaining: number | null; readonly remaining: number | null }
+  | { readonly type: 'rule-cases'; readonly pointer: string; readonly count: number; readonly limit: number }
+  | { readonly type: 'steps'; readonly scopeId: string; readonly pointer: string; readonly count: number; readonly limit: number };
+export type BudgetAccountingObserver = (event: BudgetAccountingEvent) => void;
+
+/** Observer-only state shared by the expression and flow checkers. Never constructed on the unobserved path. */
+export class BudgetAccountingScope {
+  readonly id: string;
+  private nodes = 0;
+  private attemptedNodes = 0;
+  private maxDepth = 0;
+  private maxChargedDepth = 0;
+  constructor(readonly observer: BudgetAccountingObserver, kind: BudgetScopeKind, pointer: string, nodeLimit: number | null, depthLimit: number | null, scopeId = `${kind}:${pointer}`) {
+    this.id = scopeId;
+    observer({ type: 'scope', scopeId: this.id, kind, pointer, nodeLimit, depthLimit });
+  }
+  enter(pointer: string, depth: number, charged: boolean, remaining: number) {
+    this.attemptedNodes += 1;
+    this.maxDepth = Math.max(this.maxDepth, depth);
+    if (charged) { this.nodes += 1; this.maxChargedDepth = Math.max(this.maxChargedDepth, depth); }
+    this.observer({ type: 'node', scopeId: this.id, pointer, depth, charged, nodes: this.nodes, attemptedNodes: this.attemptedNodes,
+      maxDepth: this.maxDepth, maxChargedDepth: this.maxChargedDepth, remaining: Number.isFinite(remaining) ? remaining : null });
+  }
+}
+
+// Only observed checkers get side storage; unobserved instances keep the base layout.
+let checkerAccounting: WeakMap<Checker, { observer: BudgetAccountingObserver; expression?: BudgetAccountingScope; predicate?: BudgetAccountingScope }> | undefined;
+
 /** Walks operands, predicates and calls with the app parser's budget, depth, text and combination rules. */
 class Checker implements ExpressionFacts {
   issues: CompositionIssue[] = [];
@@ -253,13 +289,36 @@ class Checker implements ExpressionFacts {
    * `controlStoppers` is the stopper ids of a dial control's one call (`sh.dial-control@1`): there every `control` names one of them. `'any'` is the
    * schema's own pass, which leaves that to the compiler. Absent, a `control` names none (a bound control, a swipe, or a stopper's own call).
    */
-  constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope, private readonly controlStoppers?: readonly string[] | 'any') {}
+  constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope, private readonly controlStoppers?: readonly string[] | 'any', observer?: BudgetAccountingObserver) {
+    if (observer) (checkerAccounting ??= new WeakMap()).set(this, { observer });
+  }
   add(code: CompositionIssue['code'], pointer: string) { this.issues.push({ code, pointer }); }
-  start(nodes: number) { this.budget = nodes; }
-  beginCondition() { this.conditionBudget = MAX_CONDITION_NODES; }
+  start(nodes: number, pointer: string) {
+    this.budget = nodes;
+    const accounting = checkerAccounting?.get(this);
+    if (accounting) {
+      accounting.expression = new BudgetAccountingScope(accounting.observer, 'expression', pointer, nodes, MAX_EXPRESSION_DEPTH);
+      accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, null, null, `predicate:${pointer}:initial`);
+    }
+  }
+  beginCondition(pointer: string) {
+    const accounting = checkerAccounting?.get(this);
+    if (accounting) {
+      const previousScopeId = accounting.predicate!.id;
+      accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH);
+      accounting.observer({ type: 'condition-budget', action: 'reset', pointer, previousScopeId, scopeId: accounting.predicate.id,
+        previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: MAX_CONDITION_NODES });
+    }
+    this.conditionBudget = MAX_CONDITION_NODES;
+  }
   private enter(pointer: string, depth: number): boolean {
-    if (depth > MAX_EXPRESSION_DEPTH || this.budget <= 0) { this.add('limit_exceeded', pointer); return false; }
+    const accounting = checkerAccounting?.get(this);
+    if (depth > MAX_EXPRESSION_DEPTH || this.budget <= 0) {
+      accounting?.expression!.enter(pointer, depth, false, this.budget);
+      this.add('limit_exceeded', pointer); return false;
+    }
     this.budget -= 1;
+    accounting?.expression!.enter(pointer, depth, true, this.budget);
     return true;
   }
   operand(value: Operand, pointer: string, depth: number) {
@@ -350,14 +409,21 @@ class Checker implements ExpressionFacts {
         if (this.flow) this.add('invalid_combination', pointer);
         if (!value.of.length || value.of.length > MAX_COUNT_ENTRIES) this.add('limit_exceeded', at('of'));
         const outer = this.conditionBudget;
+        const accounting = checkerAccounting?.get(this);
+        const outerScope = accounting?.predicate;
         value.of.forEach((entry, index) => {
           // Each test has the condition budget a rule's case has.
-          this.conditionBudget = MAX_CONDITION_NODES;
+          this.beginCondition(accounting ? at('of', index, 'test') : '');
           this.predicate(entry.test, at('of', index, 'test'), depth + 1, 1);
           entry.viewer?.personEntityIds.forEach((person, slot) => {
             if (!PERSON_ENTITY_ID.test(person)) this.add('invalid_value', at('of', index, 'viewer', 'personEntityIds', slot));
           });
         });
+        if (accounting) {
+          accounting.observer({ type: 'condition-budget', action: 'restore', pointer, previousScopeId: accounting.predicate!.id,
+            scopeId: outerScope!.id, previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: Number.isFinite(outer) ? outer : null });
+          accounting.predicate = outerScope;
+        }
         this.conditionBudget = outer;
         break;
       }
@@ -419,9 +485,11 @@ class Checker implements ExpressionFacts {
         break;
       case 'choose': {
         this.needs.add('rules');
+        const accounting = checkerAccounting?.get(this);
+        accounting?.observer({ type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
         if (!value.cases.length || value.cases.length > MAX_RULE_CASES) this.add('limit_exceeded', at('cases'));
         value.cases.forEach((entry, index) => {
-          this.conditionBudget = MAX_CONDITION_NODES;
+          this.beginCondition(accounting ? at('cases', index, 'when') : '');
           this.predicate(entry.when, at('cases', index, 'when'), depth + 1, 1);
           this.operand(entry.then, at('cases', index, 'then'), depth + 1);
         });
@@ -452,8 +520,13 @@ class Checker implements ExpressionFacts {
   }
   predicate(value: Predicate, pointer: string, depth: number, conditionDepth = 1) {
     if (!this.enter(pointer, depth)) return;
-    if (this.conditionBudget !== Number.POSITIVE_INFINITY && (conditionDepth > MAX_CONDITION_DEPTH || this.conditionBudget <= 0)) { this.add('limit_exceeded', pointer); return; }
+    const accounting = checkerAccounting?.get(this);
+    if (this.conditionBudget !== Number.POSITIVE_INFINITY && (conditionDepth > MAX_CONDITION_DEPTH || this.conditionBudget <= 0)) {
+      accounting?.predicate!.enter(pointer, conditionDepth, false, this.conditionBudget);
+      this.add('limit_exceeded', pointer); return;
+    }
     this.conditionBudget -= 1;
+    accounting?.predicate!.enter(pointer, conditionDepth, true, this.conditionBudget);
     switch (value.type) {
       case 'state':
         this.path(value.path, `${pointer}/path`);
@@ -494,7 +567,7 @@ class Checker implements ExpressionFacts {
     }
   }
   call(value: CallService, pointer: string) {
-    this.start(MAX_CALL_NODES);
+    this.start(MAX_CALL_NODES, pointer);
     if (value.data) this.operand(value.data, `${pointer}/data`, 1);
     const target = Object.entries(value.target ?? {}).sort(([a], [b]) => a < b ? -1 : 1);
     if (value.target && !target.length) this.add('invalid_value', `${pointer}/target`);
@@ -510,8 +583,9 @@ class Checker implements ExpressionFacts {
     if (value.confirmation?.type === 'additional' && !value.confirmation.cancelLabel) this.add('invalid_value', `${pointer}/confirmation/cancelLabel`);
     if (value.confirmation?.type === 'additional' && value.confirmation.when) {
       this.needs.add('confirm-when');
-      this.beginCondition();
-      this.predicate(value.confirmation.when, `${pointer}/confirmation/when`, 1);
+      const at = `${pointer}/confirmation/when`;
+      this.beginCondition(at);
+      this.predicate(value.confirmation.when, at, 1);
     }
   }
 }
@@ -534,16 +608,16 @@ const isIdentifier = (value: unknown) => typeof value === 'string' ? value.lengt
   : Array.isArray(value) && value.length > 0 && value.every(item => typeof item === 'string' && item.length > 0);
 
 /** Checks one operand the way the app's parser does. `allowControl` is true only inside a control's own call. */
-export function checkOperand(value: Operand, pointer: string, allowControl = false, flow = false, scope?: ItemScope): ExpressionFacts {
-  const checker = new Checker(allowControl, flow, scope); checker.start(MAX_EXPRESSION_NODES); checker.operand(value, pointer, 1); return checker;
+export function checkOperand(value: Operand, pointer: string, allowControl = false, flow = false, scope?: ItemScope, observer?: BudgetAccountingObserver): ExpressionFacts {
+  const checker = new Checker(allowControl, flow, scope, undefined, observer); checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker;
 }
 /** Checks one predicate. */
-export function checkPredicate(value: Predicate, pointer: string, flow = false, scope?: ItemScope): ExpressionFacts {
-  const checker = new Checker(false, flow, scope); checker.start(MAX_EXPRESSION_NODES); if (flow) checker.beginCondition(); checker.predicate(value, pointer, 1); return checker;
+export function checkPredicate(value: Predicate, pointer: string, flow = false, scope?: ItemScope, observer?: BudgetAccountingObserver): ExpressionFacts {
+  const checker = new Checker(false, flow, scope, undefined, observer); checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker;
 }
 /** Checks one `call-service` action. */
-export function checkCallService(value: CallService, pointer: string, allowControl: boolean, scope?: ItemScope, controlStoppers?: readonly string[] | 'any'): ExpressionFacts {
-  const checker = new Checker(allowControl, false, scope, controlStoppers); checker.call(value, pointer); return checker;
+export function checkCallService(value: CallService, pointer: string, allowControl: boolean, scope?: ItemScope, controlStoppers?: readonly string[] | 'any', observer?: BudgetAccountingObserver): ExpressionFacts {
+  const checker = new Checker(allowControl, false, scope, controlStoppers, observer); checker.call(value, pointer); return checker;
 }
 
 // MARK: Schemas with the parser's checks attached
