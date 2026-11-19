@@ -470,14 +470,20 @@ export function resolveSymbol(slot: SymbolLook | Conditional<SymbolLook> | Bound
   return { status: 'value', look: drawn ? { ...slot.fallback, name } : slot.fallback };
 }
 
-/** A text slot: a literal, a read or an `expr`, each with an optional fallback for when the value is unavailable. */
-export type TextSlot = { type: 'literal'; value: string } | ({ type: 'read' } & Extract<Operand, { type: 'read' }> & { fallback?: string })
-  | { type: 'expr'; value: Operand; fallback?: string };
+/** A text slot with optional unavailable text and a policy to retain the last answered text (`sh.text-keep@1`). */
+export type TextSlot = { type: 'literal'; value: string }
+  | (Extract<Operand, { type: 'read' }> | { type: 'expr'; value: Operand }) & { fallback?: string; whenUnavailable?: 'fallback' | 'keep' };
+/** Applies a text slot's retention and fallback to an already evaluated result. `previous` is answered text for keep, last shown text for loading. */
+export function resolveTextResult(slot: TextSlot, result: ReadResult, previous?: string): ReadResult {
+  if (result.status === 'loading') return previous === undefined ? result : value(previous);
+  if (result.status !== 'unavailable' || slot.type === 'literal') return result;
+  if (slot.whenUnavailable === 'keep' && previous !== undefined) return value(previous);
+  return slot.fallback === undefined ? result : value(slot.fallback);
+}
 /** What a text slot gives: its value, "not yet" (`loading`: the slot keeps what it showed) or, with no fallback, `unavailable`. */
-export function resolveText(slot: TextSlot, env: Environment): ReadResult {
+export function resolveText(slot: TextSlot, env: Environment, previous?: string): ReadResult {
   const result = evaluateOperand(slot.type === 'expr' ? slot.value : slot as Operand, env);
-  const fallback = slot.type === 'literal' ? undefined : slot.fallback;
-  return result.status === 'unavailable' && fallback !== undefined ? value(fallback) : result;
+  return resolveTextResult(slot, result, previous);
 }
 
 /** A badge as an evaluator reads it: none, or a value and, from `sh.badge-spoken@1`, the words VoiceOver says for it. */

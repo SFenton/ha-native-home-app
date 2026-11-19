@@ -180,6 +180,22 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
       const items = list(value); each(items);
       return extreme(step.op, items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter)));
     }
+    case 'average': {
+      const items = list(value); each(items);
+      const numbers = items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter))
+        .filter((part): part is number => typeof part === 'number' && Number.isFinite(part));
+      if (!numbers.length) return null;
+      const total = numbers.reduce((sum, part) => sum + part, 0);
+      let mean = total / numbers.length;
+      if (!Number.isFinite(total)) {
+        const scale = numbers.reduce((largest, part) => Math.max(largest, Math.abs(part)), 0);
+        const scaled = numbers.reduce((sum, part) => sum + part / scale, 0);
+        const restored = scaled * scale;
+        // The scaled mean is in [-1, 1], so rescaling cannot overflow. Restore first when cancellation permits it.
+        mean = Number.isFinite(restored) ? restored / numbers.length : (scaled / numbers.length) * scale;
+      }
+      return mean === 0 ? 0 : mean;
+    }
     case 'running-sum': {
       const items = list(value); each(items);
       // The native scan (`WeatherPrecipitationTimeline.points`, `WeatherPrecipitationTimeline.swift:14-19`): a total that has gone unknown stays unknown when

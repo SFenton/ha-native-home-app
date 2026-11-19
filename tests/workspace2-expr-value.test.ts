@@ -33,15 +33,15 @@ describe('Rules', () => {
   });
 
   it('a look writes conditional, text writes expr holding choose', () => {
-    const look = toSlot('rules', { rules: { cases: [{ when, then: orange }], otherwise: orange } }, 'color');
+    const look = toSlot('rules', { rules: { cases: [{ when, then: orange }], otherwise: orange } }, 'color', undefined);
     expect(look).toEqual({ type: 'conditional', cases: [{ when, then: orange }], otherwise: orange });
-    const text = toSlot('rules', { rules: { cases: [{ when, then: lit('a') }], otherwise: lit('b') } }, 'text');
+    const text = toSlot('rules', { rules: { cases: [{ when, then: lit('a') }], otherwise: lit('b') } }, 'text', undefined);
     expect(text).toEqual({ type: 'expr', value: { type: 'choose', cases: [{ when, then: lit('a') }], otherwise: lit('b') } });
   });
 
   it('keeps a rule that has no condition yet in the slot, so Done can wait for it', () => {
     const rules: RulesDraft<unknown> = { cases: [{ when: undefined, then: orange }], otherwise: orange };
-    const slot = toSlot('rules', { rules: rules as RulesDraft<never> }, 'color') as unknown as { cases: unknown[] };
+    const slot = toSlot('rules', { rules: rules as RulesDraft<never> }, 'color', undefined) as unknown as { cases: unknown[] };
     expect(slot.cases).toHaveLength(1);
     expect(rulesOf(slot as never, 'color')!.cases[0].when).toBeUndefined();
     expect(rulesProblem(rulesOf(slot as never, 'color')!, 'color')).toBe('Rule 1 needs a condition.');
@@ -55,9 +55,9 @@ describe('Rules', () => {
   });
 
   it('From Entity on a color keeps the fixed value as the fallback', () => {
-    const slot = toSlot('entity', { entity: read, fixed: orange }, 'color');
+    const slot = toSlot('entity', { entity: read, fixed: orange }, 'color', undefined);
     expect(slot).toEqual({ type: 'bound-color', value: read, fallback: orange });
-    expect(toSlot('entity', { entity: read, fixed: { type: 'sf-symbol', name: 'bolt' } }, 'icon')).toMatchObject({ type: 'bound-symbol' });
+    expect(toSlot('entity', { entity: read, fixed: { type: 'sf-symbol', name: 'bolt' } }, 'icon', undefined)).toMatchObject({ type: 'bound-symbol' });
   });
 
   it('reports mixed kinds at the second rule', () => {

@@ -83,11 +83,11 @@ export function mixedKinds(rules: RulesDraft<Operand>): { at: number | 'otherwis
 }
 
 /** The slot a mode writes. `fixed` is a look object or an operand; `rules` builds the `conditional` or the `choose`. */
-export function toSlot(mode: Exclude<Mode, 'custom'>, content: { fixed?: Operand | Json; entity?: Operand; rules?: RulesDraft<Operand | Json> }, kind: Kind): Slot {
+export function toSlot(mode: Exclude<Mode, 'custom'>, content: { fixed?: Operand | Json; entity?: Operand; rules?: RulesDraft<Operand | Json> }, kind: Kind, previous: unknown): Slot {
   if (mode === 'rules') {
     const rules = content.rules!;
     const cases = rules.cases.map(entry => (entry.when ? { when: entry.when, then: entry.then } : { then: entry.then }) as { when: Predicate; then: typeof entry.then });
-    if (kind === 'text') return { type: 'expr', value: { type: 'choose', cases: cases as { when: Predicate; then: Operand }[], otherwise: rules.otherwise as Operand } };
+    if (kind === 'text') return operandSlot({ type: 'choose', cases: cases as { when: Predicate; then: Operand }[], otherwise: rules.otherwise as Operand }, previous);
     return { type: 'conditional', cases, otherwise: rules.otherwise };
   }
   if (kind !== 'text') {
@@ -95,7 +95,7 @@ export function toSlot(mode: Exclude<Mode, 'custom'>, content: { fixed?: Operand
     return content.fixed as Slot;
   }
   const operand = (mode === 'entity' ? content.entity : content.fixed) as Operand;
-  return operandSlot(operand);
+  return operandSlot(operand, previous);
 }
 
 /** Which rule gives the value now: the first that holds, "Waiting" when a text rule above it cannot be told, or Otherwise. */

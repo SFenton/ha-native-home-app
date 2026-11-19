@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { isPhone, openWorkspace, previewRoot, seed, selectTile, snap } from './workspace2-helpers';
+import type { CompositionDocument } from '../../src/shared/composition/schema';
+import { buildDocumentIndex } from '../../src/preview2/model';
+import { replaceAt } from '../../src/composition-editor';
 
-const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: { navigation: Record<string, unknown> } };
+const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 /** The fixture opened on its Climate tab, where a navigation tile holds a text slot. */
 const climate = { ...fixture.document, navigation: { ...fixture.document.navigation, initialTabId: 'hc-tab-climate', initialPageId: 'page-climate' } };
 test.beforeEach(async ({ request }) => { await seed(request); });
@@ -221,6 +224,115 @@ test('Tokens: Insert a Value opens the picker, a token opens its settings, and D
     await undoButton(page).click();
     await expect(panel.getByRole('button', { name: 'Subtitle value: Fixed' })).toBeVisible();
   }
+});
+
+test('While unavailable preserves Keep last and fallback through text and token edits', async ({ page, request }) => {
+  const { panel, line } = await openSubtitleLine(page, request);
+  await panel.getByRole('button', { name: 'Insert a Value' }).click();
+  await page.getByRole('option', { name: /Lights On/ }).click();
+  const fallback = panel.getByRole('textbox', { name: 'If unavailable', exact: true });
+  await fallback.fill('No reading');
+  const policy = panel.getByRole('combobox', { name: 'While unavailable' });
+  await expect(policy).toHaveText('Show fallback');
+  await policy.click();
+  await page.getByRole('option', { name: 'Keep last', exact: true }).click();
+  await expect(panel.getByText('Keep last needs a newer app. Until the first answer, the fallback is shown.')).toBeVisible();
+  await line.click();
+  await line.press('End');
+  await page.keyboard.type(' now');
+  await expect(fallback).toHaveValue('No reading');
+  await expect(policy).toHaveText('Keep last');
+  const showAs = panel.getByRole('combobox', { name: 'Show as', exact: true });
+  const changeTo = (await showAs.textContent())?.includes('Number') ? 'Text' : 'Number';
+  await showAs.click();
+  await page.getByRole('option', { name: changeTo, exact: true }).click();
+  await expect(fallback).toHaveValue('No reading');
+  await expect(policy).toHaveText('Keep last');
+  await expect(done(page)).toBeEnabled();
+  await done(page).click();
+  await panel.getByRole('button', { name: /^Subtitle:/ }).click();
+  await expect(panel.getByRole('textbox', { name: 'If unavailable', exact: true })).toHaveValue('No reading');
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await panel.getByRole('combobox', { name: 'While unavailable' }).click();
+  await page.getByRole('option', { name: 'Show fallback', exact: true }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Show fallback');
+  await done(page).click();
+});
+
+test('While unavailable works in Rules and survives rule edits, mode changes and template save', async ({ page, request }) => {
+  const { panel, line } = await openSubtitleLine(page, request);
+  await panel.getByRole('button', { name: 'Insert a Value' }).click();
+  await page.getByRole('option', { name: /Lights On/ }).click();
+  await panel.getByRole('combobox', { name: 'Show as', exact: true }).click();
+  await page.getByRole('option', { name: 'Text', exact: true }).click();
+  await panel.getByRole('radio', { name: 'Rules', exact: true }).click();
+  const fallback = panel.getByRole('textbox', { name: 'If unavailable', exact: true });
+  const policy = panel.getByRole('combobox', { name: 'While unavailable' });
+  await expect(policy).toHaveText('Show fallback');
+  await fallback.fill('No reading');
+  await policy.click();
+  await page.getByRole('option', { name: 'Keep last', exact: true }).click();
+  await panel.getByRole('button', { name: /^Rule 1 of 1: if no condition yet/ }).click();
+  await panel.getByRole('button', { name: 'Entity', exact: true }).click();
+  await page.getByRole('option', { name: /Guest Mode/ }).first().click();
+  const then = panel.getByRole('textbox', { name: 'Subtitle, Rule 1', exact: true });
+  await then.click();
+  await then.press('End');
+  await page.keyboard.type(' guests');
+  await panel.getByRole('button', { name: 'Subtitle', exact: true }).first().click();
+  await panel.getByRole('radio', { name: 'Rules', exact: true }).click();
+  await panel.getByRole('button', { name: 'More for Rule 1', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
+  await expect(panel.getByRole('button', { name: /^Rule 2 of 2: if/ })).toBeVisible();
+  await expect(policy).toHaveText('Keep last');
+  await expect(fallback).toHaveValue('No reading');
+  await panel.getByRole('radio', { name: 'From Entity', exact: true }).click();
+  await expect(line.locator('.w2-token')).toHaveCount(1);
+  await expect(policy).toHaveText('Keep last');
+  await panel.getByRole('radio', { name: 'Rules', exact: true }).click();
+  await expect(policy).toHaveText('Keep last');
+  await panel.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Save as Logic Template…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Save as Logic Template', exact: true });
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Retained Reading');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(policy).toHaveText('Keep last');
+  await expect(fallback).toHaveValue('No reading');
+  await expect(line.locator('.w2-token')).toContainText('Retained Reading');
+  await expect(done(page)).toBeEnabled();
+  await done(page).click();
+  await panel.getByRole('button', { name: /^Subtitle:/ }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await expect(panel.getByRole('textbox', { name: 'If unavailable', exact: true })).toHaveValue('No reading');
+  await done(page).click();
+});
+
+test('While unavailable survives Rules to Fixed, apply, and inline editing', async ({ page, request }) => {
+  const tile = [...buildDocumentIndex(climate).entries.values()].find(entry => entry.node?.title === 'Room Thermostats');
+  expect(tile).toBeDefined();
+  const document = replaceAt(climate, [...tile!.path, 'props', 'subtitle'], {
+    type: 'expr', value: { type: 'choose', cases: [{ when: { type: 'viewer', isAdmin: true }, then: { type: 'literal', value: 'Administrator' } }],
+      otherwise: { type: 'literal', value: 'Guest' } },
+    fallback: 'No reading', whenUnavailable: 'keep',
+  });
+  await seed(request, document);
+  await stubHouse(page);
+  await openWorkspace(page);
+  const panel = await selectTile(page, 'Room Thermostats');
+  await full(page);
+  await panel.getByRole('button', { name: /^Subtitle: 1 rule/ }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await panel.getByRole('radio', { name: 'Fixed', exact: true }).click();
+  await done(page).click();
+  const inline = panel.getByRole('textbox', { name: 'Subtitle', exact: true });
+  await expect(inline).toHaveValue('Guest');
+  await inline.fill('Guest updated inline');
+  await panel.getByRole('button', { name: 'Subtitle value: Fixed', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: /From Entity/ }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await expect(panel.getByRole('textbox', { name: 'If unavailable', exact: true })).toHaveValue('No reading');
+  await expect(panel.getByRole('textbox', { name: 'Subtitle', exact: true })).toHaveText('Guest updated inline');
+  await done(page).click();
 });
 
 test('Try Values: an override changes the result line and tags it Test, Reset to Live undoes it, and closing the page clears it', async ({ page }) => {

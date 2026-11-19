@@ -1066,6 +1066,22 @@ Swift evaluator is later work and must pass `contract/corpus/pipelines`.
   below 1e15), a tie rounds away from zero, and dates are whole calendar days on the viewer's clock.
 
 
+### Keeping unavailable text (`sh.text-keep@1`, pending)
+
+A text slot's `read` or `expr` may carry `whenUnavailable: "fallback" | "keep"`. Omitted or `"fallback"` keeps today's behavior: an unavailable value draws the slot's `fallback`, or its usual empty/unknown text when none is authored. `"keep"` retains the last answered text while unavailable. Before any answer it still draws the fallback (or the usual empty/unknown text); drawing fallback does not count as an answer. Loading continues to retain the last shown text for both policies. An empty answered string is still an answer.
+
+Writing either policy declares pending `sh.text-keep@1`; omission declares nothing new. Unknown policies are refused (`unknown_variant` at `whenUnavailable`), and a publication that uses the field without declaring the capability is refused (`capability_manifest_mismatch` at `/capabilities`). Literals do not take the field. The shared schema, evaluator and Studio preview use the same policy.
+
+The shared text inspector places **While unavailable: Show fallback / Keep last** next to Fallback for every `read` or `expr` slot, including Rules and expressions the token line cannot show, and marks Keep last as needing a newer app. These are slot settings, not options on a Logic Template's operand body. Text edits (both inside the editor and inline after applying Fixed mode), rule edits, mode changes and saving a Logic Template preserve both slot-level settings; they never become fields of a nested operand or template body. When edited content becomes literal-only, an `expr` around that literal retains the settings without adding invalid fields to a literal slot. `scripts/asks-corpus.ts` generates the `text-keep-*` accept/refusal cases through `generate-expression-corpus.ts`.
+
+### Average flow step (`sh.flow-average@1`, pending)
+
+`{ "id": "mean", "op": "average", "value": <operand> }` reduces a list to the mean of its finite numeric parts. Like `min` and `max`, it requires a numeric-compatible operand (`binding_type` for typed text) and gives a number or null. Null and non-number parts, including numeric text, are skipped; no numeric parts or an empty list gives null. The answer is not rounded and prints with the Data Flow number rules above. Cost is `1 + item count + operand nodes per item`, as for `sum`.
+
+The mean of finite parts stays finite, including repeated positive or negative `Number.MAX_VALUE` parts and mixed signs whose intermediate total overflows. Ordinary finite totals still use sum-then-divide, preserving their existing floating-point result and printed text. If the total overflows, sum the parts scaled by their greatest absolute value; restore that sum before dividing when it is finite, otherwise divide the scaled sum before restoring it. The scaled mean is in `[-1, 1]`, so restoring it cannot overflow. Zero is normalized to positive zero.
+
+The Data Flow editor offers **Average** alongside Lowest and Highest, marked **Needs a newer app**. The publication declares the pending `sh.flow-average@1`; the shipped app refuses it until native support ships. `scripts/wgflow-corpus.ts` generates the `flow-average-*` publication and pipeline-evaluation cases.
+
 ### Expressions, rules and app state
 
 One operand grammar and one condition grammar (`src/shared/composition/expression.ts`) serve four consumers: a Data Flow's operands and `where`, a
@@ -1102,7 +1118,7 @@ node's `visibleWhen` and other predicates, rule-based values and authored string
 - **Data Flow additions.** Two request kinds: `entities` (1 to 64 literal entity ids and up to 8 named attributes; rows are
   `{ entityId, state, ...attributes }`; no `refresh`, the flow runs when an observed entity changes) and `none` (no data; `value` is an operand over
   the parameters, the viewer and the clock). A document holds up to 128 flows.
-- **Pending.** `sh.surface-orientation@1` and `sh.surface-controls@1` (see [vacuum-map-ctl](#map-orientation-and-corner-buttons-lane-vacuum-map-ctl)), the four style ids `sh.text-style@1`, `sh.stack@1`, `sh.symbol-part@1` and `sh.choice-icons@1` (see [WG-S1](#style-parts-text-style-stack-symbol-and-choice-icons-lane-wg-s1)), the two ids `sh.repeat@1` and `sh.flow-extras@1` (see [WG-S2](#repeat-and-the-extra-flow-steps-lane-wg-s2)), the two data ids `sh.chart@1` and `sh.linear-gauge@1` (see [WG-S3](#data-parts-chart-and-linear-gauge-lane-wg-s3)), and `sh.fold-sides@1` (see [fold sides](#sections-on-the-two-sides-of-the-fold-shfold-sides1-lane-l3-of-studio-duo-sim)), are in `contract/corpus/capabilities.pending.json`; every other id above is promoted: it shipped with the app (native-ingest L1a, L1b and c1a42b32), so it is in `capabilities.json`. An id is
+- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.flow-average@1`, `sh.fold-sides@1`, `sh.shell-profile@1`, `sh.text-keep@1` and `sh.tile-ink-default@1` remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09` are shipped in `capabilities.json` (verified against native-home main and that release tag). An id is
   mutable until a publication that uses it has been served, so changes fold into `@1`; after that, a change of meaning is `@2` beside `@1`.
 
 ### Generic parts (lane TC3)
@@ -1215,9 +1231,7 @@ are optional: a document that uses neither needs nothing new.
   space. Empty parts stay, as in `title` (`a  b` is `A  B`, `_x` is ` X`), and empty text is empty; a number or a boolean prints as `scalarText` prints it. So the
   vacuum's "Wheel stuck" reads "Wheel Stuck", where `title` would give "Wheel stuck". Swift reads it over `unicodeScalars`, never `capitalized` or
   `Character.uppercased()`, so a non-ASCII first letter is left alone on both sides (`élan vital` is `élan Vital`).
-  **Id: new, `sh.text-case-words@1`**, not T1's `sh.pipeline-operands@1`. The contract allows either (T1's id is still pending, so it is mutable), but that id
-  also gates the flow operands (`item`, `param`, `clock`, `date`) and the date styles, which native has not listed; folding `words` in would make the vacuum wait for all
-  of them. `title` keeps its id and `words` has its own, so a document that uses only `words` declares only `sh.text-case-words@1`, and one that uses both declares both.
+  **Id: `sh.text-case-words@1`**, not T1's `sh.pipeline-operands@1`. Both ids are shipped. `title` keeps its id and `words` has its own, so a document that uses only `words` declares only `sh.text-case-words@1`, and one that uses both declares both.
   A flow that uses `words` needs the same id.
 - **TC4c, `solid-appearance { light, dark }`.** A colour for each appearance: `{ "type": "solid-appearance", "light": <solid-rgb>, "dark": <solid-rgb> }`, both
   members the document's own `solid-rgb` object (`red`, `green`, `blue`, whole numbers 0 to 255), both required, no other key. The device draws `light` in Light
@@ -1263,7 +1277,7 @@ in one lane. `sh.state-style-fills@1` has shipped, so `fillInk` cannot fold into
 
 #### The tile contract ids and the ink gate (lanes TC6, TC7 and integ11)
 
-`sh.tile-swipe@1`, `sh.state-words@1`, `sh.grid-state-groups@1` and `sh.tile-ink-default@1` are pending capabilities (`src/shared/composition/pending.ts`, `contract/corpus/capabilities.pending.json`).
+`sh.tile-swipe@1`, `sh.state-words@1` and `sh.grid-state-groups@1` shipped at `ios/v2611.18.09`. `sh.tile-ink-default@1` remains pending (`src/shared/composition/pending.ts`, `contract/corpus/capabilities.pending.json`).
 The first three are declared only by a document that uses their field. `sh.tile-ink-default@1` has no field, so the compiler once declared it for every document, and the native app does not list it yet:
 a publication that declares an id the app does not know is refused by every phone. It is therefore held behind one gate.
 
@@ -1282,7 +1296,7 @@ read 20 before integ11; no recorded corpus case used the token, so no evaluation
 
 #### Map orientation and corner buttons (lane vacuum-map-ctl)
 
-Two optional additions for any surface that draws a picture, a vacuum's map today and an image or camera surface later. Two pending ids, so native takes them one at a time: **`sh.surface-orientation@1`** and **`sh.surface-controls@1`**. Both are shared schemas (`surface-controls.ts`, `slots.ts`), not part of `vacuum.ts`. Design: `build/design/vacuum-map-ctl.md`.
+Two optional additions for any surface that draws a picture, a vacuum's map today and an image or camera surface later. Two shipped ids: **`sh.surface-orientation@1`** and **`sh.surface-controls@1`**. Both are shared schemas (`surface-controls.ts`, `slots.ts`), not part of `vacuum.ts`. Design: `build/design/vacuum-map-ctl.md`.
 
 - **`orientation` (the vacuum descriptor, beside `mapRotationDegrees`).** `{ "flipHorizontal": bool, "flipVertical": bool }`, both required when the object is present. Both on is "invert". Rotation first, then the flip, in screen space. It lives on the source, the one piece every map, area editor and report of that vacuum reads, so it is set once and never copied per map. Absent, or both false, draws the map as before. Writing the object at all declares `sh.surface-orientation@1`; the Studio removes it when both flips go off.
 - **`controls` (the `map` primitive, optional).** Up to four groups, one per corner (`top-leading`, `top-trailing`, `bottom-leading`, `bottom-trailing`; leading and trailing, so a right-to-left language swaps sides). A group is `{ corner, axis: "row" | "column", buttons }` with 1 to 8 buttons. A row reads leading to trailing, a column top to bottom; the first button is the leading or top one. Declares `sh.surface-controls@1`.
@@ -1296,7 +1310,7 @@ Two optional additions for any surface that draws a picture, a vacuum's map toda
 
 #### Style parts: text style, stack, symbol and choice icons (lane WG-S1)
 
-Four pending ids, all generic and none named for a card: **`sh.text-style@1`**, **`sh.stack@1`**, **`sh.symbol-part@1`** and **`sh.choice-icons@1`**. They let a card or a sheet be built from
+Four shipped ids, all generic and none named for a card: **`sh.text-style@1`**, **`sh.stack@1`**, **`sh.symbol-part@1`** and **`sh.choice-icons@1`**. They let a card or a sheet be built from
 parts that read as the app's own text, rows, columns and symbols, with no shipped card, kit or default. They are the first of the weather-gen parts (`build/research/weather-gen.md`, 3.3); the chart, gauge, dial,
 arc, repeat and backdrop parts are later lanes. A document that uses none of the new fields compiles byte for byte as before (`tests/wgstyle.test.ts`). Demo ids only: `weather.demo_home`, `sun.demo_sun`.
 
@@ -1341,7 +1355,7 @@ arc, repeat and backdrop parts are later lanes. A document that uses none of the
 
 #### Repeat and the extra flow steps (lane WG-S2)
 
-Two pending ids, both generic and none named for a card: **`sh.repeat@1`** and **`sh.flow-extras@1`**. They give the style parts a data path: a flow can give a list of records, a node can draw one
+Two shipped ids, both generic and none named for a card: **`sh.repeat@1`** and **`sh.flow-extras@1`**. They give the style parts a data path: a flow can give a list of records, a node can draw one
 template for each record, and a flow can compute what a graph, a gauge or a rail needs (the smallest and largest of a list, a running total, a list-wide value written onto each item, the hour and weekday of a date, and how far
 the clock is between two moments). A document that uses none of the new fields declares neither id and compiles byte for byte as before (checked over the 1007 documents of the earlier corpus and fixtures: their compile results are identical). Demo ids only: `weather.demo_home`, `sensor.demo_case`. The spec is `build/research/weather-gen.md`, 3.3 and 3.4.
 
@@ -1381,7 +1395,7 @@ the clock is between two moments). A document that uses none of the new fields d
 
 #### Data parts: chart and linear gauge (lane WG-S3)
 
-Two pending ids, both generic and neither named for a card: **`sh.chart@1`** (the `chart` node) and **`sh.linear-gauge@1`** (the `linear-gauge` node). They draw a series and a reading the document supplies, so a
+Two shipped ids, both generic and neither named for a card: **`sh.chart@1`** (the `chart` node) and **`sh.linear-gauge@1`** (the `linear-gauge` node). They draw a series and a reading the document supplies, so a
 card or a sheet can show a bar chart, a line, an area or a rail built from generic parts (`build/research/weather-gen.md`, 3.3; the dial, arc, repeat and backdrop are later lanes). A document that uses neither
 node declares neither id and compiles byte for byte as before (`tests/wgchart.test.ts`). Colours are inks (WG-S1): a `solid-rgb`, an `rgba` or a light and dark pair, so a chart that holds one declares `sh.text-style@1` (or `sh.solid-appearance@1` for a pair) too.
 
@@ -1416,7 +1430,7 @@ node declares neither id and compiles byte for byte as before (`tests/wgchart.te
   - **label thinning**: capacity is `floor(plot / (widest + 6))`, cadence `ceil(count / capacity)`, indices every cadence-th from 0: `:59-68` (24 labels of 32 in 153 give every 6th, in 326 every 3rd; none give 1; no width shows a quarter) and the exact gap.
   - **rails**: a value is a share of the track, held between 0 and 100 (not a number is 0); the marker is `max(0, min(width - size, width x share - size / 2))`; the span is held inside the track and not drawn when empty; a right-to-left layout mirrors; the week rail's start 25, size 50 and marker 50 and the hero rail's 75 are
     computed from the forecast numbers with the grammar's own `math` operands in `gauge-rail-*` cases, including the flat range (0 below, 100 above, 50 on).
-- **Corpus.** 145 publication cases written by `scripts/wgchart-corpus.ts` (`chart-` 91, `linear-gauge-` 54; 38 compile as `reject/pending-*`, the rest are refused) and 116 evaluation cases. Every refusal records its first issue by hand in `expect { code, pointer }`, and the generator fails when the compiler disagrees.
+- **Corpus.** 145 publication cases written by `scripts/wgchart-corpus.ts` (`chart-` 91, `linear-gauge-` 54; 38 compile as `accept/*`, the rest are refused) and 116 evaluation cases. Every refusal records its first issue by hand in `expect { code, pointer }`, and the generator fails when the compiler disagrees.
   Subject kinds `chart` (an `op`: `domain`, `two-step`, `share`, `labels`, `indices`, `levels`, `bars`, `points`, `spoken`) and `gauge` are answered in `tests/expression-corpus.test.ts`.
 - **Preview.** A chart is SVG: bars in their columns with the corner radius, a line through the middle of equal slots that breaks at an unknown value, an area as the line closed on the base, dots, grid lines, the axis labels beside the plot and the thinned labels under it, measured from the drawn
   labels. A gauge is a track with an absolutely placed span (a CSS gradient of the stops) and marker, gliding unless Reduce Motion is on. Colours go through the ink slot (`rgb()`, `rgb(r g b / a)`, `light-dark()`).
@@ -1458,7 +1472,7 @@ timeout, a byte cap, a magic-byte type check, at most 8 in flight and `no-store`
 
 ### Gauge parts: dial and arc track (lane WG-S4)
 
-Two pending ids, both generic and neither named for a card: **`sh.dial@1`** (the `dial` node) and **`sh.arc-track@1`** (the `arc-track` node). They draw a reading the document supplies, so a card or a sheet can show a circular gauge with a needle or a lit tick, or an arc with a marker that
+Two shipped ids, both generic and neither named for a card: **`sh.dial@1`** (the `dial` node) and **`sh.arc-track@1`** (the `arc-track` node). They draw a reading the document supplies, so a card or a sheet can show a circular gauge with a needle or a lit tick, or an arc with a marker that
 moves, built from generic parts (`build/research/weather-gen.md`, 3.1 and 3.3). They are not in `capabilities.json` until the app ships them. A document that uses neither node declares neither id and compiles byte for byte as before (`tests/wgdial.test.ts`).
 Colours are inks (WG-S1): a `solid-rgb`, an `rgba` or a light and dark pair, so a part that holds an `rgba` declares `sh.text-style@1` (or `sh.solid-appearance@1` for a pair) too. The value of each is a number operand: from 0 to 1, or from 0 to 100 by `scale`; no value hides the pointer or the marker.
 A flow's date `progress` (WG-S2) is a number between 0 and 1 and so composes with `arc-track` as it is, once that branch is merged.
@@ -1483,7 +1497,7 @@ A flow's date `progress` (WG-S2) is a number between 0 and 1 and so composes wit
   the compass (`UKWeatherCompassView`, `:306-440`: 48 ticks, the north one a flag, four letters, the needle `:310-340`), the bearing arithmetic (`WeatherPresentation.swift:13-22`, tested at `WeatherPresentationTests.swift:85-93`: `normalizeBearingDegrees`, `shortestBearingDelta`) and the daylight arc (`UKWeatherSunArcView`, `:536-590`, and `sunArcMarker`, `WeatherPresentation.swift:267-270`, tested at
   `WeatherPresentationTests.swift:148-153`). The arithmetic is `dial-math.ts` and `arc-track-math.ts`, which the preview draws with and the app's views must agree with.
   - **Native note for the pair gate.** The app's barometer centres its dial at 0.56 of its height with a radius of half its width, so its upper ticks reach above its own box (for a box 140 wide, the top tick runs from y 1.4 to -8.4). A `UIView` draws only inside its bounds, so the app probably clips them. The preview draws the whole dial (an SVG with visible overflow); whether the app's clip is wanted is for the pair gate to say.
-- **Corpus.** 106 publication cases written by `scripts/wgdial-corpus.ts` (79 `dial-` and 27 `arc-track-` ones, 28 of them `pending-*` that compile and the rest refused) and 80 evaluation cases. Every refusal records its first issue by hand in `expect { code, pointer }`, and the generator fails when the compiler disagrees. Subject kinds `dial` and `arc` (an `op` of `layout` with a `pick` of the parts it pins,
+- **Corpus.** 106 publication cases written by `scripts/wgdial-corpus.ts` (79 `dial-` and 27 `arc-track-` ones, 28 accepts and the rest refused) and 80 evaluation cases. Every refusal records its first issue by hand in `expect { code, pointer }`, and the generator fails when the compiler disagrees. Subject kinds `dial` and `arc` (an `op` of `layout` with a `pick` of the parts it pins,
   `share`, `normalize`, `delta`, `next`, `progress` or `point`) are answered by `tests/dial-corpus.ts`.
 - **Preview.** SVG in points, from the measured width: the ticks as one path, the lit tick, the needle as a group turned by CSS (a 0.3 second glide, none under Reduce Motion), the letters as SVG text, the flag, the centre text as aria-hidden text over the centre; the arc as a curve, a horizon and a circle. All colours go through the ink slot.
 - **Editors.** Add offers **Dial** and **Arc** in Content, each as the smallest useful part in neutral greys (a 25-tick dial over 250 degrees with a lit tick at half; a dashed arc with a marker at half). The inspector is the schema's: Sweep, Value scale, Pointer (Kind, Value, ends, width, color), Ticks, Letters, Flag, Text in the middle, Text place (Text centre down the height, Then down by; `sh.dial-text-place@1`), Size, Accessibility; Curve, Box, Progress, Line, Dashes, Horizon, Marker.
@@ -1546,7 +1560,7 @@ Two pending ids. **`sh.dial-control@1`** is the `dial-control` node and the `sto
 
 ### Counting many entities (`sh.count@1`, lane SC1)
 
-One pending id for one operand. A document that has no `count` declares nothing new and compiles byte for byte as before (`tests/count-operand.test.ts`). Native mirror lane: NC1.
+One shipped id for one operand. A document that has no `count` declares nothing new and compiles byte for byte as before (`tests/count-operand.test.ts`). Native mirror lane: NC1.
 
 **Why.** A count written with `math add` over `choose` costs about four nodes an entity and is written again at every use, so four or more entities pass the 64-node limit of an expression. `count` costs one node plus its tests, whatever
 the number of entities, and a use of it is evaluated once.
@@ -1570,9 +1584,8 @@ the number of entities, and a use of it is evaluated once.
   The viewer's own person entity is `viewer.personEntityId`, the same field the `viewer` operand reads.
 - **Grammar boundary.** A `count` standing where a `compare` argument stands is a number (`above`, `below`, `eq` against a number; against text it is `binding_type`). It adds with `math add`, so an app icon's number is `math add` of counts, one for each kind of thing.
   The name is also the shell's profile `count` node (`sh.profile-count@1`): a record with `of` is the operand (a stray `id` on it is `unknown_field`), a record with an `id` and no `of` is the unsupported node. Corpus `count-operand-profile-node-is-not-the-operand` and `count-operand-stray-id` pin both.
-- **Corpus.** `scripts/count-corpus.ts` writes the `count-operand-` publication cases (`pending-count-operand-*` compile; `count-operand-*` are refused, each with its hand-written first issue) and the `count-operand-` evaluation cases (subjects `operand` and `condition`),
-  through `generate-expression-corpus.ts`. Evaluation env keys are the existing `reads` (`<source>/state` or `<source>/attributes/<name>`), `raw`, `changed`, `viewer` and `flow`, and `viewerPerson` (what the host's `viewerPersonState` gives; absent means none). Native mirror: `sh.count@1` joins `ServerUIIngestedCapabilities`, `capabilities.json` is regenerated and
-  `sh.count@1` is dropped from `capabilities.pending.json`, the generators are rerun, and `ServerUIOperand` decodes `count` with `ServerUIPredicate` for each test, strictly (unknown fields refused), and evaluates as above.
+- **Corpus.** `scripts/count-corpus.ts` writes the `count-operand-` publication cases (compiled cases in `accept/`; refusals in `reject/`, each with its hand-written first issue) and the `count-operand-` evaluation cases (subjects `operand` and `condition`),
+  through `generate-expression-corpus.ts`. Evaluation env keys are the existing `reads` (`<source>/state` or `<source>/attributes/<name>`), `raw`, `changed`, `viewer` and `flow`, and `viewerPerson` (what the host's `viewerPersonState` gives; absent means none). Native mirror: `sh.count@1` is in `ServerUIIngestedCapabilities` and `capabilities.json`; `ServerUIOperand` decodes `count` with `ServerUIPredicate` for each test, strictly (unknown fields refused), and evaluates as above.
 
 ### Linked components (`sh.component-ref@1`, lane L-linked)
 

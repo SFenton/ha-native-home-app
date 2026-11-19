@@ -146,7 +146,7 @@ describe('compiling', () => {
     for (const id of ['sh.entity-time@1', 'sh.countdown@1', 'sh.duration-format@1', 'sh.math-truncate@1']) {
       expect(compile({ type: 'math', op: 'round', args: [lit(1.5)] }).capabilities).not.toContain(id);
       expect(compile({ type: 'clock', part: 'now' }).capabilities).not.toContain(id);
-      expect(pendingCompositionCapabilities).toContain(id);
+      expect(pendingCompositionCapabilities).not.toContain(id);
     }
   });
   it('puts the last change on an entity source only', () => {

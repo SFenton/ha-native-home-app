@@ -50,7 +50,7 @@ export default function RulesList({ draft, path, kind, look, label }: { draft: D
   const list = useRef<HTMLOListElement>(null);
   if (!rules) return null;
   const count = rules.cases.length, status = ruleStatus(rules, env, kind);
-  const write = (next: RulesDraft<Operand | Json>, typing?: string) => draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: next }, kind) as unknown as Json), typing);
+  const write = (next: RulesDraft<Operand | Json>, typing?: string) => draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: next }, kind, valueAt(draft.get(), path)) as unknown as Json), typing);
   const open = (index: number | 'otherwise') => push?.push({ title: index === 'otherwise' ? words.otherwise : `Rule ${index + 1}`, body: <RulePage draft={draft} path={path} kind={kind} look={look} index={index} label={label}/> });
   const move = (from: number, to: number) => {
     if (to < 0 || to >= count || to === from) return;

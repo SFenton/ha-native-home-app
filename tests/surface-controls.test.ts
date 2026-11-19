@@ -35,10 +35,10 @@ const issues = (document: ReturnType<typeof mapDocument>): string[] => {
   }
 };
 
-describe('the pending ids', () => {
-  it('lists both new ids as pending', () => {
-    expect(pendingCompositionCapabilities).toContain('sh.surface-orientation@1');
-    expect(pendingCompositionCapabilities).toContain('sh.surface-controls@1');
+describe('the shipped ids', () => {
+  it('no longer lists either id as pending', () => {
+    expect(pendingCompositionCapabilities).not.toContain('sh.surface-orientation@1');
+    expect(pendingCompositionCapabilities).not.toContain('sh.surface-controls@1');
   });
   it('declares nothing new for a map without them', () => {
     const capabilities = compile(mapDocument(undefined, true)).capabilities;

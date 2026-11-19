@@ -85,6 +85,11 @@ export const supportedCompositionCapabilities: readonly string[] = [
   'sh.list-read@1', 'sh.raw-state@1', 'sh.state-style-fills@1',
   'sh.bound-options-read@1', 'sh.tile-disc-rules@1', 'sh.grid-min-columns@1', 'sh.bound-row-parts@1', 'sh.check-face@1',
   'sh.pipeline@1', 'sh.pipeline-operands@1', 'sh.list-parts@1', 'sh.text-case-words@1', 'sh.solid-appearance@1', 'sh.tile-ink@1',
+  // Shipped at native-home ios/v2611.18.09.
+  'sh.arc-track@1', 'sh.chart@1', 'sh.choice-icons@1', 'sh.count@1', 'sh.countdown@1', 'sh.dial@1',
+  'sh.duration-format@1', 'sh.entity-time@1', 'sh.flow-extras@1', 'sh.grid-state-groups@1', 'sh.linear-gauge@1',
+  'sh.math-truncate@1', 'sh.repeat@1', 'sh.stack@1', 'sh.state-words@1', 'sh.surface-controls@1',
+  'sh.surface-orientation@1', 'sh.symbol-part@1', 'sh.text-style@1', 'sh.tile-swipe@1',
   ...pendingCompositionCapabilities,
 ];
 /** A Home Assistant entity id: `domain.object`. */
@@ -506,6 +511,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       return;
     }
     if ('fallback' in value && value.fallback !== undefined) require('rules');
+    if ('whenUnavailable' in value && value.whenUnavailable !== undefined) require('text-keep');
     if (value.type === 'expr') {
       // A string made by an operand: text, a number or a boolean, never a structure. The operand's own reads are checked with the other expression refs.
       if (expected !== 'string') add('binding_type', `${path}/type`);

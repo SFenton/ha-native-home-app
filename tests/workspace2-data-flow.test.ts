@@ -72,7 +72,7 @@ describe('stepsThatFit', () => {
   const shape = (id: string, kind: RequestKind) => flowShapes(flowById(newFlow(base, kind).document, 'flow-1')!.inputs).request;
   it('offers a list of items the item steps', () => {
     const list = flowShapes(flowById(newFlow(base, 'live-list').document, 'flow-1')!.inputs).after[0];
-    expect(stepsThatFit(list)).toEqual(['filter', 'sort', 'limit', 'map', 'group', 'count', 'sum', 'first', 'unique', 'default', 'min', 'max', 'running-sum', 'annotate']);
+    expect(stepsThatFit(list)).toEqual(['filter', 'sort', 'limit', 'map', 'group', 'count', 'sum', 'first', 'unique', 'default', 'min', 'max', 'average', 'running-sum', 'annotate']);
   });
   it('offers a group of entries Choose Entry and Go Into, and a value nothing', () => {
     expect(stepsThatFit(shape('a', 'service'))).toEqual(['select-key', 'get', 'map']);

@@ -15,6 +15,8 @@ import { fixedOf, modeOf, rulesOf, seedRules, toSlot, type Kind, type Mode, type
 import { slotOperand, wordingFor01, type Part } from './tokens';
 import { words } from './words';
 import SaveAsLogic from '../data/logic/SaveLogicDialog';
+import { SelectMenu } from '../SelectMenu';
+import { useLogicScope } from '../data/logic/logicScope';
 
 type Slot = { type: string } & Record<string, unknown>;
 /** The words a Fixed field shows for a slot: its own text, or the text of a literal operand; nothing for logic that is not a plain value (a use, a rule, a read). */
@@ -46,6 +48,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   draft: Draft; path: EditorPath; kind: Kind; modes: readonly ValueMode[]; look?: LookKind; label: string; initialMode?: ValueMode; maxLength?: number;
 }) {
   const document = useDraftDocument(draft);
+  const logicScope = useLogicScope();
   const slot = valueAt(document, path) as Slot | undefined;
   const key = path.join('/'), memo = memoOf(draft, key);
   const derived = modeOf(slot, kind);
@@ -60,9 +63,9 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     const currentValue = was === 'rules' ? memo.rules!.otherwise : was === 'entity' ? (kind === 'text' ? memo.entity! : memo.fixed!) : memo.fixed!;
     memo.mode = next; setModeState(next);
     let written: Slot;
-    if (next === 'rules') { memo.rules ??= seedRules(currentValue); written = toSlot('rules', { rules: memo.rules }, kind); }
-    else if (next === 'entity') { memo.entity ??= (kind === 'text' ? (was === 'fixed' ? memo.fixed : currentValue) as Operand : { type: 'literal', value: '' }); if (kind !== 'text') memo.fixed ??= currentValue; written = toSlot('entity', { entity: memo.entity, fixed: memo.fixed }, kind); }
-    else { memo.fixed ??= was === 'rules' ? memo.rules!.otherwise : currentValue; written = toSlot('fixed', { fixed: memo.fixed }, kind); }
+    if (next === 'rules') { memo.rules ??= seedRules(currentValue); written = toSlot('rules', { rules: memo.rules }, kind, now); }
+    else if (next === 'entity') { memo.entity ??= (kind === 'text' ? (was === 'fixed' ? memo.fixed : currentValue) as Operand : { type: 'literal', value: '' }); if (kind !== 'text') memo.fixed ??= currentValue; written = toSlot('entity', { entity: memo.entity, fixed: memo.fixed }, kind, now); }
+    else { memo.fixed ??= was === 'rules' ? memo.rules!.otherwise : currentValue; written = toSlot('fixed', { fixed: memo.fixed }, kind, now); }
     draft.set(replaceAt(current, path, written as unknown as Json));
   };
   // Opening in a mode the row's value button chose is one step, made once.
@@ -78,7 +81,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     memo.entity = slotOperand(valueAt(draft.get(), path) as Slot);
     memo.rules = { cases: made.cases, otherwise: made.otherwise } as RulesDraft<Operand | Json>;
     memo.mode = 'rules'; setModeState('rules');
-    draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: memo.rules }, kind) as unknown as Json));
+    draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: memo.rules }, kind, valueAt(draft.get(), path)) as unknown as Json));
   };
   const inputs = mode === 'rules' ? (rulesOf(slot, kind)?.cases ?? []).flatMap(entry => inputsOf(entry.when)) : kind === 'text' && slot ? (() => { const operand = slotOperand(slot); return operand ? operandInputs(operand) : []; })() : mode === 'entity' && slot && 'value' in slot ? operandInputs(slot.value as Operand) : [];
   const unique = [...new Map(inputs.map(input => [`${input.sourceId}|${input.path.join('/')}`, input])).values()];
@@ -88,12 +91,30 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     {mode === 'fixed' && <>
       {kind === 'text'
         ? <div className="w2-picker-row" data-stacked><TextInput label={label} value={fixedText(slot)} maxLength={maxLength}
-          onCommit={text => draft.set(replaceAt(draft.get(), path, { type: 'literal', value: text }), `fixed:${key}`)}/></div>
+          onCommit={text => draft.set(replaceAt(draft.get(), path, toSlot('fixed', { fixed: { type: 'literal', value: text } }, kind, valueAt(draft.get(), path)) as unknown as Json), `fixed:${key}`)}/></div>
         : <LookControl look={look ?? 'fill'} value={slot as unknown as Json} label={label} onChange={(next, live) => draft.set(replaceAt(draft.get(), path, next), live ? `look:${key}` : undefined)}/>}
       <p className="w2-caption">{words.sameValue}</p></>}
     {mode === 'entity' && kind === 'text' && <FromEntity draft={draft} path={path} label={label} onWording={wording}/>}
     {mode === 'entity' && kind !== 'text' && <LookFromEntity draft={draft} path={path} kind={kind} look={look ?? 'fill'} label={label}/>}
     {mode === 'rules' && <RulesList draft={draft} path={path} kind={kind} look={look} label={label}/>}
+    {kind === 'text' && !logicScope && slot && (slot.type === 'read' || slot.type === 'expr') && <div data-testid="text-unavailable">
+      <div className="w2-picker-row" data-stacked data-field-path={`${key}/fallback`}><span className="w2-row-label">{words.ifUnavailable}</span>
+        <TextInput label={words.ifUnavailable} value={typeof slot.fallback === 'string' ? slot.fallback : ''} placeholder="The node's own text" maxLength={maxLength ?? 2000}
+          onCommit={text => {
+            const { fallback: _gone, ...rest } = valueAt(draft.get(), path) as Slot;
+            draft.set(replaceAt(draft.get(), path, (text ? { ...rest, fallback: text } : rest) as unknown as Json), `fallback:${key}`);
+          }}/>
+        <p className="w2-caption">{words.ifUnavailableNote}</p>
+      </div>
+      <div className="w2-picker-row" data-stacked data-field-path={`${key}/whenUnavailable`}><span className="w2-row-label">While unavailable</span>
+        <SelectMenu label="While unavailable" value={typeof slot.whenUnavailable === 'string' ? slot.whenUnavailable : 'fallback'} options={[{ value: 'fallback', label: 'Show fallback' }, { value: 'keep', label: 'Keep last' }]}
+          onChange={next => {
+            const { whenUnavailable: _gone, ...rest } = valueAt(draft.get(), path) as Slot;
+            draft.set(replaceAt(draft.get(), path, (next === 'keep' ? { ...rest, whenUnavailable: 'keep' } : rest) as unknown as Json));
+          }}/>
+        <p className="w2-caption">Keep last needs a newer app. Until the first answer, the fallback is shown.</p>
+      </div>
+    </div>}
     <TryValues document={document} inputs={unique}/>
   </div>;
 }

@@ -26,12 +26,13 @@ export const read = object({
 });
 /**
  * A text slot also takes `expr`: any operand (a format, a rule, a count) whose result is text, a number or a boolean (`sh.rules@1`).
- * Its `read` and `expr` take an optional `fallback`: the text drawn while the value is unavailable; while it is loading the slot keeps what it showed.
+ * Its `read` and `expr` keep what they showed while loading. Unavailable draws `fallback` unless `whenUnavailable: 'keep'` (`sh.text-keep@1`)
+ * retains the last answered text; before any answer it still draws the fallback.
  */
 export const textValue = (maximum: number, blank: boolean) => z.discriminatedUnion('type', [
   object({ type: z.literal('literal'), value: text(maximum, blank) }),
-  read.extend({ fallback: text(maximum, blank).optional() }),
-  object({ type: z.literal('expr'), value: operandBase, fallback: text(maximum, blank).optional() }),
+  read.extend({ fallback: text(maximum, blank).optional(), whenUnavailable: z.enum(['fallback', 'keep']).optional() }),
+  object({ type: z.literal('expr'), value: operandBase, fallback: text(maximum, blank).optional(), whenUnavailable: z.enum(['fallback', 'keep']).optional() }),
 ]);
 /** A slot whose look depends on a condition: the first case that holds, else `otherwise`. Both hold literal looks, so the author's color stays exact (`sh.rules@1`). */
 export const conditional = <T extends z.ZodType>(then: T) => object({

@@ -574,16 +574,21 @@ describe('the handshake for sh.component-values@1', () => {
   const cases = (JSON.parse(corpus('index.json').toString('utf8')) as { cases: { file: string; outcome: string; pending?: boolean; issue?: { code: string }; studioIssue?: { code: string } }[] }).cases
     .filter(item => /component-values-/.test(item.file));
 
-  it('is pending, so every case is held back by the shipped list and the Studio gives its own answer', () => {
+  it('holds cases that declare the pending id; missing-manifest cases get their real refusal', () => {
     expect(pending).toContain('sh.component-values@1');
     expect(cases.length).toBeGreaterThanOrEqual(20);
-    expect(cases.every(item => item.outcome === 'reject' && item.pending && item.issue?.code === 'unsupported_capability')).toBe(true);
-    expect(cases.filter(item => !item.studioIssue).map(item => item.file.replace(/^.*component-values-|\.json$/g, '')).sort())
+    const held = cases.filter(item => item.pending);
+    expect(held.every(item => item.outcome === 'reject' && item.issue?.code === 'unsupported_capability')).toBe(true);
+    expect(cases.filter(item => !item.pending).map(item => item.issue?.code)).toEqual(['capability_manifest_mismatch', 'capability_manifest_mismatch']);
+    expect(held.filter(item => !item.studioIssue).map(item => item.file.replace(/^.*component-values-|\.json$/g, '')).sort())
       .toEqual(['absent-default', 'at-limit', 'color', 'null', 'private-source', 'rule', 'two-fields', 'with-args']);
   });
 
   it('names the Studio\'s first issue for each refusal', () => {
-    const issue = (name: string) => cases.find(item => item.file.endsWith(`component-values-${name}.json`))?.studioIssue?.code;
+    const issue = (name: string) => {
+      const item = cases.find(item => item.file.endsWith(`component-values-${name}.json`));
+      return item?.studioIssue?.code ?? item?.issue?.code;
+    };
     expect(['overlap', 'overlap-string-under-value'].map(issue)).toEqual(['invalid_value', 'invalid_value']);
     expect(['unknown-key'].map(issue)).toEqual(['unknown_field']);
     expect(['for-text-param', 'args-for-value-param'].map(issue)).toEqual(['invalid_combination', 'invalid_combination']);

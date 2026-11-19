@@ -249,6 +249,8 @@ export default function StepPage({ ctx }: { ctx: StepContext }) {
     // The extra steps (`sh.flow-extras@1`).
     case 'min': return <ValueStep ctx={ctx} label="Smallest of" field="value"/>;
     case 'max': return <ValueStep ctx={ctx} label="Largest of" field="value"/>;
+    case 'average': return <><ValueStep ctx={ctx} label="Average of" field="value"/>
+      <p className="w2-caption">Needs a newer app. Publishing it waits for an app update.</p></>;
     case 'running-sum': return <RunningSumPage ctx={ctx}/>;
     case 'annotate': return <AnnotatePage ctx={ctx}/>;
     default: return <PlainPage ctx={ctx}/>;

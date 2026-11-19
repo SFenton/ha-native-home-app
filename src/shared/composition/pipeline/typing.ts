@@ -377,8 +377,8 @@ export function typeStep(step: PipelineStep, input: Shape, params: TypeScope['pa
     }
     // `sh.flow-extras@1`. `min` and `max` reduce a list to one number (null when it holds none), as `sum` does; `running-sum` and `annotate` keep the
     // list and write a field onto every object in it.
-    case 'min': case 'max': {
-      facts.flowExtras = true;
+    case 'min': case 'max': case 'average': {
+      facts.flowExtras ||= step.op !== 'average';
       const element = list();
       expectKinds(facts, operand(step.value, element ?? ANY, 'value'), ['number'], join(at, 'value'));
       return element ? orNull(NUMBER) : ANY;

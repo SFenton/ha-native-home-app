@@ -127,7 +127,7 @@ export const stepNames: Record<PipelineStep['op'], string> = {
   get: 'Go Into', 'select-key': 'Choose Entry', filter: 'Filter', sort: 'Sort', limit: 'Limit', map: 'Set Fields', group: 'Group', count: 'Count', sum: 'Add Up', first: 'First Item',
   flatten: 'Flatten', unique: 'Remove Duplicates', default: 'Fill In Missing',
   // `sh.flow-extras@1`
-  min: 'Lowest', max: 'Highest', 'running-sum': 'Running Total', annotate: 'Add List-Wide Values',
+  min: 'Lowest', max: 'Highest', average: 'Average', 'running-sum': 'Running Total', annotate: 'Add List-Wide Values',
 };
 /** A new step of an operation, with the first field of the item filled in where it takes one. */
 export function newStep(op: PipelineStep['op'], id: string, given?: string | string[]): PipelineStep {
@@ -147,7 +147,7 @@ export function newStep(op: PipelineStep['op'], id: string, given?: string | str
     case 'flatten': return { id, op, path: given ? path : [] };
     case 'unique': return { id, op, by: item };
     case 'default': return { id, op, path, value: { type: 'literal', value: '' } };
-    case 'min': case 'max': return { id, op, value: item };
+    case 'min': case 'max': case 'average': return { id, op, value: item };
     case 'running-sum': return { id, op, value: item, into: 'total', nullPropagates: true };
     case 'annotate': return { id, op, fields: { lowest: { aggregate: 'min', value: item } } };
   }
@@ -170,7 +170,7 @@ export function stepsThatFit(shape: Shape): PipelineStep['op'][] {
   if (kindsOf(core).has('array')) {
     const element = elementOf(core);
     const objects = element !== undefined && hasObject(element);
-    return objects ? ['filter', 'sort', 'limit', 'map', 'group', 'count', 'sum', 'first', 'unique', 'default', 'min', 'max', 'running-sum', 'annotate']
+    return objects ? ['filter', 'sort', 'limit', 'map', 'group', 'count', 'sum', 'first', 'unique', 'default', 'min', 'max', 'average', 'running-sum', 'annotate']
       : ['limit', 'count', 'first'];
   }
   if (core.kind === 'object') return isEntityKeyed(core) ? ['select-key', 'get', 'map'] : ['get', 'map', 'default'];
@@ -196,6 +196,7 @@ export function stepSummary(step: PipelineStep): string {
     case 'default': return `${step.path.join(' › ')} is ${name(step.value) || 'empty'} when missing`;
     case 'min': return `The lowest ${name(step.value)}`;
     case 'max': return `The highest ${name(step.value)}`;
+    case 'average': return `The average ${name(step.value)}`;
     case 'running-sum': return `${step.into} is the total of ${name(step.value)} so far`;
     case 'annotate': return `Every item gets ${Object.entries(step.fields).map(([field, entry]) => `${field} (${entry.aggregate === 'min' ? 'lowest' : 'highest'} ${name(entry.value)})`).join(', ')}`;
   }
@@ -405,7 +406,7 @@ export function defaultFieldFor(op: PipelineStep['op'], shape: Shape): string[] 
   if (op === 'select-key') return [Object.keys((withoutNull(shape).kind === 'object' ? (withoutNull(shape) as Extract<Shape, { kind: 'object' }>).fields : {}))[0] ?? ''];
   const fields = itemFields(shape), words = fields.map(field => ({ name: field.name, kind: kindWords(field.shape).kind }));
   const prefer = (...kinds: FieldKind[]) => words.find(field => kinds.includes(field.kind))?.name;
-  const chosen = op === 'sum' ? prefer('Number') : op === 'sort' ? prefer('Date', 'Date and Time', 'Number', 'Text') : op === 'default' ? fields.find(field => field.optional)?.name
+  const chosen = op === 'sum' || op === 'average' ? prefer('Number') : op === 'sort' ? prefer('Date', 'Date and Time', 'Number', 'Text') : op === 'default' ? fields.find(field => field.optional)?.name
     : op === 'get' ? words.find(field => field.kind === 'List' || field.kind === 'Group')?.name : op === 'flatten' ? words.find(field => field.kind === 'List')?.name : op === 'filter' || op === 'group' || op === 'unique' ? prefer('Text', 'Number', 'Date', 'Yes or No') : undefined;
   const name = chosen ?? words[0]?.name;
   return name === undefined ? undefined : [name];

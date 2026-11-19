@@ -15,6 +15,7 @@ type J = Record<string, any>;
 
 export interface WgFlowCase {
   name: string; note: string; components: J[]; tweak?: (envelope: J) => void; needs: string[]; reject: boolean;
+  finish?: (envelope: J) => void;
   /** The Studio's first issue, written by hand: a reject must give exactly this. */
   expect?: { code: string; pointer: string };
 }
@@ -22,11 +23,11 @@ export interface WgFlowEvaluation { name: string; note: string; subject: J; env:
 /** A flow case for `contract/corpus/pipelines`, in the shape `generate-pipeline-corpus.ts` writes. */
 export interface WgFlowPipeline { name: string; note: string; inputs: J; response: unknown; context?: J; budget?: number; expected: J; compiles: boolean }
 /** The families this module owns: `reject/pending-<family>-*` and `reject/<family>-*`. */
-export const wgFlowFamilies = ['repeat', 'flow-extras', 'owned-flow', 'records'];
+export const wgFlowFamilies = ['repeat', 'flow-extras', 'flow-average', 'owned-flow', 'records'];
 /** Capability ids by the short names the cases use. */
 export const wgFlowNeeds: Record<string, string> = {
   repeat: 'sh.repeat@1', 'flow-extras': 'sh.flow-extras@1', pipeline: 'sh.pipeline@1', 'component-ref': 'sh.component-ref@1', 'text-style': 'sh.text-style@1',
-  stack: 'sh.stack@1', 'symbol-part': 'sh.symbol-part@1', 'visible-when': 'sh.visible-when@1', 'list-parts': 'sh.list-parts@1', 'call-service': 'sh.call-service@1',
+  stack: 'sh.stack@1', 'symbol-part': 'sh.symbol-part@1', 'visible-when': 'sh.visible-when@1', 'list-parts': 'sh.list-parts@1', 'call-service': 'sh.call-service@1', 'flow-average': 'sh.flow-average@1',
 };
 
 // MARK: Builders
@@ -316,6 +317,24 @@ const addFlow = (flow: J) => (envelope: J) => { envelope.document.dataSources.pu
 const FLOW_AT = '/document/dataSources/5/inputs';
 const ofRecords: J = { kind: 'records', max: 24 }, ofScalar: J = { kind: 'scalar' };
 const temperature = item('temperature');
+const AVERAGE = ['flow-average', 'pipeline'];
+accept('flow-average-numbers', 'average takes the mean of the finite numbers in a list; gaps are skipped.', AVERAGE, [],
+  addFlow(extrasFlow([step('mean', 'average', { value: temperature })], ofScalar)));
+reject('flow-average-typed-text', 'average refuses a value typed as text, exactly as min and max do.', AVERAGE, [],
+  { code: 'binding_type', pointer: `${FLOW_AT}/steps/1/value` },
+  addFlow(extrasFlow([step('mean', 'average', { value: item('condition') })], ofScalar)));
+reject('flow-average-missing-value', 'average requires its value operand.', AVERAGE, [],
+  { code: 'missing_required', pointer: `${FLOW_AT}/steps/1/value` },
+  addFlow(extrasFlow([step('mean', 'average')], ofScalar, { schema: { kind: 'number' } })));
+reject('flow-average-extra-field', 'average has only id, op and value; it cannot round the answer.', AVERAGE, [],
+  { code: 'unknown_field', pointer: `${FLOW_AT}/steps/1/round` },
+  addFlow(extrasFlow([step('mean', 'average', { value: temperature, round: 2 })], ofScalar, { schema: { kind: 'number' } })));
+wgFlowCases.push({
+  name: 'flow-average-missing-capability', note: 'An average step requires sh.flow-average@1 in the publication manifest.',
+  needs: AVERAGE, components: [], reject: true, tweak: addFlow(extrasFlow([step('mean', 'average', { value: temperature })], ofScalar)),
+  finish: envelope => { envelope.capabilities = envelope.capabilities.filter((id: string) => id !== 'sh.flow-average@1'); },
+  expect: { code: 'capability_manifest_mismatch', pointer: '/capabilities' },
+});
 accept('pending-flow-extras-min', 'min is the smallest number over the list: a number or null.', EXTRAS, [], addFlow(extrasFlow([step('low', 'min', { value: temperature })], ofScalar)));
 accept('pending-flow-extras-max', 'max is the largest number over the list.', EXTRAS, [], addFlow(extrasFlow([step('high', 'max', { value: temperature })], ofScalar)));
 accept('pending-flow-extras-min-of-a-computation', 'The value is any operand of the item: the smallest of a sum.', EXTRAS, [], addFlow(extrasFlow([step('low', 'min', { value: math('add', temperature, lit(1)) })], ofScalar)));
@@ -439,6 +458,29 @@ const pipe = (name: string, note: string, response: unknown, steps: J[], output:
 const scalarOut: J = { kind: 'scalar' };
 const recordsOut = (max = 24): J => ({ kind: 'records', max });
 const temps = [{ t: 3 }, { t: null }, { t: -2 }, { t: 9 }];
+const averageStep = [step('mean', 'average', { value: item('t') })];
+pipe('flow-average-mixed', 'Only numbers count: 2 and 6 give 4; null, numeric text, booleans and records are skipped.',
+  [{ t: 2 }, { t: null }, { t: '10' }, { t: 6 }, { t: true }, { t: {} }], averageStep, scalarOut, 4);
+pipe('flow-average-all-non-numbers', 'No numeric parts means null, not zero; numeric text is not a number.',
+  [{ t: null }, { t: '10' }, { t: false }, { t: [] }], averageStep, scalarOut, null, [], temps);
+pipe('flow-average-empty', 'An empty list has no mean.', [], averageStep, scalarOut, null, [], temps);
+pipe('flow-average-unrounded', 'The mean is not rounded: 1, 2 and 2 give 1.6666666666666667.', [{ t: 1 }, { t: 2 }, { t: 2 }], averageStep, scalarOut, 1.6666666666666667);
+pipe('flow-average-negative', 'Negative and positive values share the same mean: -4 and 1 give -1.5.', [{ t: -4 }, { t: 1 }], averageStep, scalarOut, -1.5);
+pipe('flow-average-ordinary-fractions', 'Ordinary floating-point summation is unchanged: 0.1, 0.2 and 0.3 give 0.20000000000000004.',
+  [{ t: 0.1 }, { t: 0.2 }, { t: 0.3 }], averageStep, scalarOut, 0.20000000000000004);
+const largest = Number.MAX_VALUE;
+pipe('flow-average-three-positive-max', 'Three identical largest finite parts have that same finite mean, even though their sum overflows.',
+  [{ t: largest }, { t: largest }, { t: largest }], averageStep, scalarOut, largest);
+pipe('flow-average-three-negative-max', 'Three identical negative largest finite parts have that same finite mean.',
+  [{ t: -largest }, { t: -largest }, { t: -largest }], averageStep, scalarOut, -largest);
+pipe('flow-average-positive-overflow-mixed-signs', 'Two largest positive parts and one negative largest part give largest / 3, not infinity.',
+  [{ t: largest }, { t: largest }, { t: -largest }], averageStep, scalarOut, largest / 3);
+pipe('flow-average-negative-overflow-mixed-signs', 'Two negative largest parts and one positive largest part give -largest / 3.',
+  [{ t: -largest }, { t: -largest }, { t: largest }], averageStep, scalarOut, -largest / 3);
+pipe('flow-average-overflow-cancels', 'Largest parts cancel to zero even when same-sign parts overflow before their opposite signs arrive.',
+  [{ t: largest }, { t: largest }, { t: -largest }, { t: -largest }], averageStep, scalarOut, 0);
+pipe('flow-average-mixed-signs-cancel', 'Alternating largest positive and negative parts still give zero.',
+  [{ t: largest }, { t: -largest }, { t: largest }, { t: -largest }], averageStep, scalarOut, 0);
 // `peakChance` (`WeatherPrecipitationTimeline.swift:30-32`): the highest known chance, nil when none is known; the same shape as min and max.
 pipe('min-of-a-list', 'min is the smallest number over the list; a null is skipped.', temps, [step('low', 'min', { value: item('t') })], scalarOut, -2);
 pipe('max-of-a-list', 'max is the largest number over the list; a null is skipped.', temps, [step('high', 'max', { value: item('t') })], scalarOut, 9);

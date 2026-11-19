@@ -31,7 +31,7 @@ export const forecastTypes = ['daily', 'hourly', 'twice_daily'] as const;
 export const subscriptionKinds = ['todo-items', 'weather-forecast'] as const;
 export const sortKinds = ['text', 'number', 'date'] as const;
 export { compareOperations };
-export const stepOperations = ['get', 'select-key', 'filter', 'sort', 'limit', 'map', 'group', 'count', 'sum', 'first', 'flatten', 'unique', 'default'] as const;
+export const stepOperations = ['get', 'select-key', 'filter', 'sort', 'limit', 'map', 'group', 'count', 'sum', 'average', 'first', 'flatten', 'unique', 'default'] as const;
 /** The steps that need `sh.flow-extras@1`: two list aggregates, a running total and a list-wide value written onto each item. */
 export const flowExtrasSteps = ['min', 'max', 'running-sum', 'annotate'] as const;
 /** The aggregates `annotate` writes onto every item of the list. */
@@ -89,6 +89,7 @@ export const stepSchema = z.discriminatedUnion('op', [
   // `sh.flow-extras@1`: aggregates and scans over a list (see `FLOW_EXTRAS_CAPABILITY`).
   object({ ...stepId, op: z.literal('min'), value: operand }),
   object({ ...stepId, op: z.literal('max'), value: operand }),
+  object({ ...stepId, op: z.literal('average'), value: operand }),
   object({ ...stepId, op: z.literal('running-sum'), value: operand, into: fieldName, nullPropagates: z.boolean() }),
   object({ ...stepId, op: z.literal('annotate'), fields: z.record(z.string(), object({ aggregate: z.enum(annotateAggregates), value: operand })) }),
 ]);

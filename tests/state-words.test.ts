@@ -16,26 +16,26 @@ const bytes = (file: string) => readFileSync(path.join(corpus, file));
 const envelope = (file: string) => JSON.parse(bytes(file).toString('utf8'));
 
 describe('sh.state-words@1 corpus', () => {
-  it('is pending and sorted, with compile cases and refusals that each carry an expect', () => {
-    expect(pendingCompositionCapabilities).toContain('sh.state-words@1');
+  it('is shipped and sorted, with compile cases and refusals that each carry an expect', () => {
+    expect(pendingCompositionCapabilities).not.toContain('sh.state-words@1');
     expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
-    expect(ours.filter(item => item.studioIssue).length).toBe(18);
-    expect(ours.filter(item => item.pending && !item.studioIssue).length).toBe(9);
-    for (const item of ours.filter(entry => entry.studioIssue)) expect(item.studioIssue).toMatchObject({ code: expect.any(String), pointer: expect.any(String) });
+    expect(ours.filter(item => item.outcome === 'reject').length).toBe(19);
+    expect(ours.filter(item => item.outcome === 'accept').length).toBe(10);
+    for (const item of ours.filter(entry => entry.outcome === 'reject')) expect(item.issue).toMatchObject({ code: expect.any(String), pointer: expect.any(String) });
   });
-  it.each(ours.filter(item => item.pending && !item.studioIssue))('compiles $file and declares the id', item => {
+  it.each(ours.filter(item => item.outcome === 'accept' && !item.file.includes('without-words')))('compiles $file and declares the id', item => {
     const document = envelope(item.file);
     expect(() => decodeCompositionPublication(bytes(item.file))).not.toThrow();
     expect(document.capabilities).toContain('sh.state-words@1');
     expect(legacyManifest(compileCompositionDocument(document.document).capabilities)).toEqual(legacyManifest(document.capabilities));
   });
-  it.each(ours.filter(item => item.studioIssue))('refuses $file with its own code at its own pointer', item => {
+  it.each(ours.filter(item => item.outcome === 'reject'))('refuses $file with its own code at its own pointer', item => {
     let first: { code: string; pointer: string } | undefined;
     try { decodeCompositionPublication(bytes(item.file)); } catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
       first = error.issues[0];
     }
-    expect({ code: first?.code, pointer: first?.pointer }).toEqual({ code: item.studioIssue!.code, pointer: item.studioIssue!.pointer });
+    expect({ code: first?.code, pointer: first?.pointer }).toEqual({ code: item.issue!.code, pointer: item.issue!.pointer });
   });
   it('declares the id only on a document that has words', () => {
     expect(envelope('accept/state-words-light-group-without-words-needs-no-id.json').capabilities).not.toContain('sh.state-words@1');
