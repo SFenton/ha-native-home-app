@@ -21,6 +21,9 @@ actions, or UI dependencies.
   Document destinations always run the document compiler, including documents
   missing required fields. Synthetic multi-field examples must explicitly use
   `kind: "fragment"`; fragment checks are not whole-document validation.
+  Source maps retain authored entries and add `stage: "expanded"` entries for
+  native template landings. `authoredPointer` and `usePointer` keep each copied
+  argument tied to its block and use, including failing expanded budget paths.
 - `projectGraph(graph)` only projects a working buffer, including opaque JSON.
   It is **not** validation or permission to apply/save/publish an invalid import.
 - `validateGraph`, `portsCompatible`, `autoLayout`, `measureBudget`, and

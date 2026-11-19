@@ -39,7 +39,7 @@ export function expressionScope(value: Json, scopeId: string, scopes: readonly G
 }
 export function inputType(node: Pick<GraphNode, 'payload' | 'scopeId'>, binding: string, actual: PortType): PortType {
   const kind = node.payload.kind === 'template' || node.payload.kind === 'logic-ref' ? node.payload.representation
-    : node.payload.kind === 'hole' ? 'auto' : node.payload.kind;
+    : node.payload.kind === 'hole' || node.payload.kind === 'opaque' ? 'auto' : node.payload.kind;
   const child = describeGrammar(copy(node.payload.value), kind).children.find(child => child.binding === binding);
   const representation = child?.kind === 'condition' ? 'condition' : child?.kind === 'source-selection' ? 'source-selection'
     : child?.kind === 'operand' ? 'operand' : child ? 'stream' : actual.representation;

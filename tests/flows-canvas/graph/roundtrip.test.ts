@@ -6,7 +6,7 @@ import { evaluateOperand, evaluatePredicate, type Environment } from '../../../s
 import { operandBase, predicateBase, type Operand, type Predicate } from '../../../src/shared/composition/expression';
 import { canonicalCompositionJSON, CompositionValidationError, parseCompositionJSON } from '../../../src/shared/composition/json';
 import { decodeCompositionPublication } from '../../../server/composition';
-import { expandLogic } from '../../../src/shared/composition/logic-library';
+import { expandLogic, type LogicEntry } from '../../../src/shared/composition/logic-library';
 import { autoLayout, lift, liftJSON, lower, measureBudget, portType, projectGraph, semanticFingerprint, type LogicGraph } from '../../../src/shared/composition/graph';
 import type { Json } from '../../../src/shared/types';
 import { exampleA, exampleB, immutable, predicateBudgetFixtures, sourceParameterTemplate, tooWarmWarning } from './fixtures';
@@ -32,11 +32,42 @@ function roundtrip(value: Json, kind?: 'operand' | 'condition' | 'flow' | 'docum
     if (candidate !== null && typeof candidate === 'object') Object.entries(candidate).forEach(([key, inner]) => collect(inner, `${at}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`));
   };
   collect(value, '');
-  expect(result.sourceMap.map(entry => entry.pointer).sort()).toEqual(pointers.sort());
+  expect(result.sourceMap.filter(entry => entry.stage !== 'expanded').map(entry => entry.pointer).sort()).toEqual(pointers.sort());
   return result;
 }
 
 describe('G-roundtrip worked examples, templates and opaque buffers', () => {
+  const duplicate: LogicEntry = {
+    id: 'duplicate', name: 'Duplicate', kind: 'operand', params: [{ name: 'value', kind: 'operand' }],
+    body: { type: 'math', op: 'add', args: Array.from({ length: 8 }, () => ({ type: 'hole', name: 'value' })) },
+  };
+  it('maps an over-budget duplicated argument to its responsible block and use', () => {
+    const ast: Json = { type: 'logic-ref', logicId: 'duplicate', args: { value: { type: 'math', op: 'add', args: Array.from({ length: 8 }, () => ({ type: 'literal', value: 1 })) } } };
+    const graph = lift(ast, { kind: 'operand' }).graph;
+    const argument = graph.nodes.find(node => node.origins[0] === '/args/value')!;
+    const result = lower(graph, { library: [duplicate] });
+    expect(result).toMatchObject({
+      ok: false, errors: expect.arrayContaining([expect.objectContaining({
+        code: 'limit_exceeded', pointer: '/args/7', nodeId: argument.id, portId: 'value', usePointer: '', authoredPointer: '/args/value',
+      })]),
+    });
+  });
+  it('retains separate per-use source locations for every duplicated argument landing', () => {
+    const use = (value: number): Json => ({ type: 'logic-ref', logicId: 'duplicate', args: { value: { type: 'literal', value } } });
+    const ast: Json = { logicLibrary: [duplicate], first: use(1), second: use(2) };
+    const graph = lift(ast, { kind: 'fragment' }).graph, result = lower(graph);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('Expected valid template uses.');
+    const copies = result.sourceMap.filter(location => location.stage === 'expanded' && /^\/(first|second)\/args\/\d$/.test(location.pointer));
+    expect(copies).toHaveLength(16);
+    for (const name of ['first', 'second']) {
+      const argument = graph.nodes.find(node => node.origins[0] === `/${name}/args/value`)!;
+      expect(copies.filter(location => location.usePointer === `/${name}`)).toHaveLength(8);
+      for (let i = 0; i < 8; i++) expect(copies).toContainEqual(expect.objectContaining({
+        pointer: `/${name}/args/${i}`, nodeId: argument.id, authoredPointer: `/${name}/args/value`, usePointer: `/${name}`,
+      }));
+    }
+  });
   it('retains A and B including refs, flow prefixes, format options and missing properties', () => {
     roundtrip(clone(exampleA), 'fragment');
     roundtrip(clone(exampleB), 'fragment');

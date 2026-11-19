@@ -12,6 +12,7 @@ import { expressionPort, portsCompatible } from './ports';
 import { describeGrammar, type FragmentKind } from './grammar';
 import type { GraphBudget, GraphDiagnostic, GraphRoot, GraphSourceLocation, LogicGraph, LoweringResult } from './types';
 import { validateGraph } from './validate';
+import { expansionSourceMap } from './provenance';
 
 export interface LowerOptions {
   readonly targetCapabilities?: readonly string[];
@@ -99,18 +100,23 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
     };
     try {
       if (root.destination.kind === 'document') {
-        const compiled = compileCompositionDocument(withoutCanvasMetadata(value));
+        const semantic = withoutCanvasMetadata(value), expansion = expandLogic(semantic);
+        const plain = parseCompositionShape(z.json(), expansion.document);
+        sourceMap = [...sourceMap, ...expansionSourceMap(value, plain, expansion.origins, root.anchor, sourceMap)];
+        const compiled = compileCompositionDocument(semantic);
         compiled.capabilities.forEach(capability => capabilities.add(capability));
         expanded = compiled.expanded;
       } else if (root.destination.kind === 'fragment') {
-        const result = expandLogic(value).document;
+        const expansion = expandLogic(value), result = expansion.document;
         assertCompositionBounds(result);
-        expanded = result as Json;
+        expanded = parseCompositionShape(z.json(), result);
+        sourceMap = [...sourceMap, ...expansionSourceMap(value, expanded, expansion.origins, root.anchor, sourceMap)];
         check(expanded, 'document');
       } else {
-        const result = expandLogic({ logicLibrary: options.library ?? [], value }).document;
+        const expansion = expandLogic({ logicLibrary: options.library ?? [], value }), result = expansion.document;
         if (!record(result)) throw new Error('Logic expansion did not return an object.');
         expanded = result.value;
+        sourceMap = [...sourceMap, ...expansionSourceMap(value, expanded, expansion.origins.map(origin => ({ ...origin, pointer: origin.pointer.replace(/^\/value(?=\/|$)/, '') })), root.anchor, sourceMap, options.library)];
         check(expanded, root.destination.kind === 'flow' ? record(expanded) && expanded.model === 'pipeline@1' ? 'flow' : 'flow-inputs' : root.destination.kind);
       }
     } catch (error) {
@@ -163,6 +169,7 @@ export function semanticFingerprint(graph: LogicGraph): string {
     : Array.isArray(ast) ? ast.map((value, i) => graph.roots[i].destination.kind === 'document' ? withoutCanvasMetadata(value) : value) : ast);
 }
 function diagnostic(issue: CompositionIssue, root: GraphRoot, sourceMap: readonly GraphSourceLocation[] = []): GraphDiagnostic {
-  const origin = sourceMap.find(location => location.anchor === root.anchor && location.pointer === issue.pointer);
-  return { severity: 'error', code: issue.code, message: `Graph lowering refused: ${issue.code}.`, anchor: root.anchor, pointer: issue.pointer, ...(origin ? { nodeId: origin.nodeId, portId: origin.portId } : {}), ...(issue.capability ? { capability: issue.capability } : {}) };
+  const origin = sourceMap.filter(location => location.anchor === root.anchor && (location.pointer === issue.pointer || issue.pointer.startsWith(`${location.pointer}/`)))
+    .sort((a, b) => b.pointer.length - a.pointer.length || Number(b.stage === 'expanded') - Number(a.stage === 'expanded'))[0];
+  return { severity: 'error', code: issue.code, message: `Graph lowering refused: ${issue.code}.`, anchor: root.anchor, pointer: issue.pointer, ...(origin ? { nodeId: origin.nodeId, portId: origin.portId, ...(origin.usePointer === undefined ? {} : { usePointer: origin.usePointer, authoredPointer: origin.authoredPointer }) } : {}), ...(issue.capability ? { capability: issue.capability } : {}) };
 }

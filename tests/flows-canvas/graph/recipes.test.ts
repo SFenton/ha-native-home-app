@@ -136,13 +136,13 @@ describe('G-average target-gated step and finite-total two-flow fallback', () =>
     const build = (strategy: 'step' | 'two-flow') => value(lowerListAverage({ id: 'large', prefix, value: { type: 'item', path: [] }, targetCapabilities: capabilities, strategy }));
     const step = build('step'), fallback = build('two-flow'), reads = new Map<string, Json>();
     for (const source of fallback.sources) {
-      const run = evaluatePipeline(pipelineSourceSchema.parse(source).inputs, null, {});
+      const run = evaluatePipeline(pipelineSourceSchema.parse(source).inputs, null, { clock: { now: '2026-11-18T16:00:00', utcOffsetMinutes: 0 } });
       expect(run.status).toBe('ok');
       if (run.status === 'ok') reads.set(source.id, run.value);
     }
     expect(evaluateOperand(operandBase.parse(fallback.ast), { read: id => ({ status: 'value', value: reads.get(id)! }) })).toEqual({ status: 'unavailable' });
     expect(fallback.diagnostics).toContainEqual(expect.objectContaining({ code: 'average_fallback_overflow', severity: 'warning' }));
-    const run = evaluatePipeline(pipelineSourceSchema.parse(step.sources[0]).inputs, null, {});
+    const run = evaluatePipeline(pipelineSourceSchema.parse(step.sources[0]).inputs, null, { clock: { now: '2026-11-18T16:00:00', utcOffsetMinutes: 0 } });
     expect(run.status).toBe('ok');
     if (run.status === 'ok') expect(run.value).toBe(mean);
   });

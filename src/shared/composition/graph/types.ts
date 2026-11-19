@@ -114,6 +114,8 @@ export interface GraphDiagnostic {
   readonly portId?: string;
   readonly pointer: string;
   readonly capability?: string;
+  readonly usePointer?: string;
+  readonly authoredPointer?: string;
 }
 export interface BudgetMeter {
   readonly kind: string;
@@ -161,6 +163,8 @@ export interface GraphSourceLocation {
   readonly portId?: string;
   readonly anchor: LogicAnchor;
   readonly usePointer?: string;
+  readonly authoredPointer?: string;
+  readonly stage?: 'expanded';
 }
 export type GraphSourceMap = readonly GraphSourceLocation[];
 export interface ASTReplacement { readonly anchor: LogicAnchor; readonly ast: GraphJSON }
