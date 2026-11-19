@@ -10,18 +10,25 @@ published.
   `metadata` when available, and `warnings`. Missing layout means auto layout.
   Invalid versions/shapes, stale owners/origins and ambiguous associations warn
   `"Saved layout can't be used."` without invalidating the AST or deleting raw
-  metadata. Pass usable metadata to graph `lift`; its content-and-origin IDs
-  check individual associations and auto-layout unmatched nodes. Stored origins
-  may be document-relative or relative to their canvas root. The reader resolves
-  each root's stable owner/node identity and returns fragment-relative origins
-  for `lift`, without changing `raw`. Historical absolute array addresses are
-  decoded against that anchor, not against whichever owner now occupies an old
-  index. Reordering owners or nodes retains positions; a removed/replaced owner
-  cannot transfer them to another owner, even with identical fragment content.
-  Whole-document origins remain document-relative, and the
-  whole-document fingerprint excludes root layout, as in `lift`. Ambiguous
-  coordinate frames warn instead of guessing. Layout reset must be an explicit
-  authoring transaction.
+  metadata. Only the canonical stored v2 encoding below is usable. Pass the
+  returned `metadata` to graph `lift`: the reader adapts v2 into the graph core's
+  unchanged in-memory v1 format, preserving explicit anchor-relative origins.
+  It never infers a frame from prefixes or treats descendants as alternative
+  roots. Reordering owners or moving the selected node through containers,
+  tabs or blocks retains positions; removed/replaced owners cannot transfer
+  positions to another owner with identical fragment content. The graph's
+  content-and-origin IDs still auto-layout unmatched nodes. Whole-document
+  anchors exclude root layout from their fingerprint, as in `lift`. Layout
+  reset must be an explicit authoring transaction.
+- `encodeStudioCanvas(document, canvases, bundles?)` returns canonical
+  `StoredStudioCanvasMetadata`. Each `CanvasLayoutInput` has `id`,
+  `roots: [{anchor, nodes: [{id, origins, x, y}]}]`, optional `viewport`, and
+  optional `groups`. Input node IDs are graph-local and origins must already
+  be relative to the selected anchor. Groups reference the encoded canvas-wide
+  IDs, never unqualified graph-local IDs. The writer resolves owners, qualifies
+  IDs deterministically, validates the result and throws
+  `CompositionValidationError` for unusable inputs. Apply its result through
+  the host's normal immutable save/undo transaction; save is not publish.
 - `resolveLogicAnchor` resolves stable owner/node IDs at access time and refuses
   ambiguity. Document-only anchors require the exact canonical subtree
   fingerprint, matching the graph API. Fields use RFC 6901 pointers.
@@ -74,6 +81,46 @@ capability derivation and limits are unchanged. The draft's outer JSON safety
 and size limits also apply to raw layout. There are at most 128 use bindings;
 existing per-component and template expansion limits still apply.
 
+## Canonical stored layout
+
+The only writer format is:
+
+```text
+{
+  version: 2,
+  canvases: [{
+    id,
+    roots: [{id, anchor, ownerId, originFrame: "anchor-relative"}],
+    nodes: [{id, rootId, nodeId, origins, x, y}],
+    viewport?, groups?
+  }],
+  bundles?
+}
+```
+
+`ownerId` is the actual stable owner's ID, including the document ID for a
+whole-document anchor. A root's `id` is the canonical JSON tuple
+`[anchor.kind, anchor.id, anchor.nodeId ?? null, anchor.field, ownerId]`.
+A node's canvas-wide `id` is the canonical JSON tuple `[rootId, nodeId]`;
+`nodeId` retains its original graph ID. This is collision-free namespacing,
+not a short hash or an array-index identity, and needs no secure-context API.
+Identical graphs under different owners may share graph IDs but never stored
+canvas-wide IDs. Each node explicitly names its root and uses only that root's
+frame. Root/node key disagreement, missing owners/frames, duplicate keys and
+unresolvable origins warn and auto-layout; they never trigger prefix guessing.
+Viewport and group associations survive the adapter, with cross-owner groups
+restricted to each selected root's nodes for `lift`.
+
+No persisted layout writer shipped on `origin/main` through
+`427eaba` (release 0.3.15). The merged graph-core code has an
+in-memory v1 reader and unit fixtures, not a document layout writer; the merged
+native document schema does not accept `studioCanvas`. Earlier heads of this
+unmerged PR are not shipped formats. Consequently there is **no legacy reader
+or migration inference**: v1 document-absolute/prefix-relative layouts and all
+other noncanonical metadata remain intact in raw draft storage/export but warn
+and use auto-layout. The proposed v1 example in `docs/flows-canvas.md` is not
+this storage contract. Raw invalid metadata is never silently rewritten.
+
 ## HTTP seam for W2-I
 
 Use the existing relative URL conventions, e.g. `./native/api/draft/prepare`.
@@ -122,9 +169,15 @@ pure checks and mounted real HTTP routes. Server harnesses honour
 `test-results/studio-data/w2-d` subdirectories; only HA transport is faked.
 Regression coverage publishes both component uses through the real routes and
 checks their expanded source reads, refuses changed references without replacing
-the saved publication, and saves/reopens/lifts whole-document and nested-fragment
-positions in both origin formats. Browser save/reopen, canvas-buffer conflict UX
-and mounted browser publication evidence remain W2-I's integration work.
+the saved publication, and saves/reopens/lifts canonical whole-document and
+nested-fragment positions. The permanent 41-case round-3 adversarial matrix
+covers both historical encodings falling back to auto-layout and their canonical
+equivalents retaining positions, unchanged/moved whole components with parent
+and child visibility, identical graph IDs under distinct owners, nested node
+moves, owner replacement, atomic conflicts and write-failure restart cleanup.
+An additional multi-owner single-canvas test covers canvas-wide IDs and groups.
+Browser save/reopen, canvas-buffer conflict UX and mounted browser publication
+evidence remain W2-I's integration work.
 
 The compatibility test pins the before/after compiler result and publication
 decode digest for all 1,797 existing corpus documents and publication fixtures

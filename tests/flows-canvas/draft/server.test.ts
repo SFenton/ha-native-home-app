@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import http from 'node:http';
-import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../../server/app';
@@ -14,7 +14,7 @@ import { canonicalCompositionJSON, CompositionValidationError } from '../../../s
 import { expandDocument } from '../../../src/shared/composition/components';
 import { liftJSON, type LiftOptions } from '../../../src/shared/composition/graph/lift';
 import type { LogicAnchor } from '../../../src/shared/composition/graph/types';
-import { atPointer, readStudioCanvas, replacePointer, resolveLogicAnchor } from '../../../src/shared/composition/studio-logic';
+import { atPointer, encodeStudioCanvas, readStudioCanvas, replacePointer, resolveLogicAnchor } from '../../../src/shared/composition/studio-logic';
 import { fakeHomeAssistant } from '../../fake-ha-publication';
 import { componentDocument, draftDocument, labelTemplate, read } from './fixtures';
 
@@ -56,9 +56,9 @@ async function lab() {
   cleanups.push(close);
   await new Promise<void>((resolve, reject) => { host.once('error', reject); host.listen(port, '127.0.0.1', resolve); });
   const base = `http://127.0.0.1:${port}${mount}`;
-  const request = (endpoint: string, method = 'GET', body?: unknown) => fetch(`${base}${endpoint}`, {
+  const request = (endpoint: string, method = 'GET', body?: unknown, headers: Record<string, string> = {}, authenticated = true) => fetch(`${base}${endpoint}`, {
     method,
-    headers: { Authorization: `Bearer ${authToken}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    headers: { ...(authenticated ? { Authorization: `Bearer ${authToken}` } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const draft = async (): Promise<CompositionDraft> => {
@@ -75,16 +75,14 @@ async function lab() {
   return { fake, store, directory, request, draft, prepare, close };
 }
 
-function positionedCanvas(before: ReturnType<typeof liftJSON>, field: string, encoding: 'relative' | 'absolute') {
-  return {
-    version: 1, canvases: [{
-      id: 'round-trip', roots: before.graph.roots.map(root => root.anchor),
-      nodes: before.graph.nodes.map((node, index) => ({
-        id: node.id, origins: node.origins.map(origin => encoding === 'absolute' ? `${field}${origin}` : origin),
-        x: 384 + index * 17, y: 240 + index * 11,
+function positionedCanvas(document: unknown, before: ReturnType<typeof liftJSON>) {
+  return encodeStudioCanvas(document, [{
+    id: 'round-trip', roots: before.graph.roots.map(root => ({
+      anchor: root.anchor, nodes: before.graph.nodes.map((node, index) => ({
+        id: node.id, origins: node.origins, x: 384 + index * 17, y: 240 + index * 11,
       })),
-    }],
-  };
+    })),
+  }]);
 }
 async function reopenDraft(f: Awaited<ReturnType<typeof lab>>) {
   await f.close();
@@ -98,7 +96,225 @@ const positionedTemplate = {
   body: { type: 'format', pattern: '{value}', args: { value: read('source-a') } },
 };
 
+interface LayoutScenario {
+  readonly original: Record<string, unknown>;
+  readonly changed: Record<string, unknown>;
+  readonly anchors: readonly LogicAnchor[];
+  readonly replacements?: readonly LogicAnchor[];
+  readonly kind?: LiftOptions['kind'];
+  readonly publicationUnchanged?: boolean;
+}
+const section = (children: readonly unknown[]) => ({
+  id: 'container', type: 'section', title: 'Container', layout: { span: 1 },
+  props: { header: '', footer: '', style: 'plain', density: 'thin', hasGlyphs: false, spacing: { type: 'token', name: 'm' } }, children,
+});
+const pageWith = (document: ReturnType<typeof draftDocument>, components: readonly unknown[]) =>
+  ({ ...document, pages: [{ ...document.pages[0], components }] });
+const layoutScenarios: [string, (id: string) => LayoutScenario][] = [
+  ['round-2-repro', id => {
+    const base = draftDocument(id), unused = { ...positionedTemplate, id: 'unused-template' };
+    const original = { ...base, logicLibrary: [labelTemplate, unused] };
+    return {
+      original, changed: { ...original, logicLibrary: [unused, labelTemplate] },
+      anchors: [{ kind: 'logic', id: labelTemplate.id, field: '/body' }], publicationUnchanged: true,
+    };
+  }],
+  ...(['forward', 'backward'] as const).flatMap(direction => ['/body', '/body/args/value'].map((field): [string, (id: string) => LayoutScenario] =>
+    [`logic-move/${direction}/${field}`, id => {
+      const base = draftDocument(id);
+      const original = { ...base, logicLibrary: direction === 'forward' ? [positionedTemplate, labelTemplate] : [labelTemplate, positionedTemplate] };
+      return { original, changed: { ...original, logicLibrary: [...original.logicLibrary].reverse() }, anchors: [{ kind: 'logic', id: positionedTemplate.id, field }] };
+    }])),
+  ['two-templates-swap-identical-node-ids', id => {
+    const base = draftDocument(id), other = { ...positionedTemplate, id: 'different-owner' };
+    const original = { ...base, logicLibrary: [positionedTemplate, other, labelTemplate] };
+    return {
+      original, changed: { ...original, logicLibrary: [other, positionedTemplate, labelTemplate] },
+      anchors: [positionedTemplate, other].map(entry => ({ kind: 'logic', id: entry.id, field: '/body' })),
+    };
+  }],
+  ...(['remove-insert', 'replace'] as const).map((change): [string, (id: string) => LayoutScenario] => [`wrong-owner/${change}`, id => {
+    const base = draftDocument(id), other = { ...positionedTemplate, id: 'other-owner' }, replacement = { ...positionedTemplate, id: 'replacement-owner' };
+    const original = { ...base, logicLibrary: [positionedTemplate, other, labelTemplate] };
+    return {
+      original, changed: { ...original, logicLibrary: change === 'replace' ? [replacement, other, labelTemplate] : [other, labelTemplate] },
+      anchors: [{ kind: 'logic', id: positionedTemplate.id, field: '/body' }],
+      replacements: [{ kind: 'logic', id: change === 'replace' ? replacement.id : other.id, field: '/body' }],
+    };
+  }]),
+  ...(['deeper', 'shallower'] as const).map((direction): [string, (id: string) => LayoutScenario] => [`tile-across-nesting/${direction}`, id => {
+    const base = draftDocument(id), [tileA, tileB] = base.pages[0].components;
+    const shallow = pageWith(base, [tileA, tileB]), deep = pageWith(base, [section([tileA]), tileB]);
+    return {
+      original: direction === 'deeper' ? shallow : deep, changed: direction === 'deeper' ? deep : shallow,
+      anchors: [{ kind: 'page', id: base.pages[0].id, nodeId: tileA.id, field: '/props/subtitle/value' }],
+    };
+  }]),
+  ...(['deeper', 'shallower'] as const).map((direction): [string, (id: string) => LayoutScenario] => [`component-tile-across-nesting/${direction}`, id => {
+    const base = draftDocument(id), node = { ...base.pages[0].components[0], id: 'component-inner' };
+    const entry = { id: 'saved-container', name: 'Saved container', params: [], bindings: [], node };
+    const use: LogicAnchor = { kind: 'component', id: entry.id, nodeId: node.id, field: '/props/subtitle/value' };
+    const shallow = { ...base, componentLibrary: [entry], logicUseBindings: [...base.logicUseBindings, { ...base.logicUseBindings[0], use }] };
+    const deep = { ...shallow, componentLibrary: [{ ...entry, node: section([node]) }] };
+    return { original: direction === 'deeper' ? shallow : deep, changed: direction === 'deeper' ? deep : shallow, anchors: [use] };
+  }]),
+  ...(['tabs', 'blocks'] as const).flatMap(branch => (['deeper', 'shallower'] as const).map((direction): [string, (id: string) => LayoutScenario] =>
+    [`tile-across-${branch}/${direction}`, id => {
+      const base = draftDocument(id), [tileA, tileB] = base.pages[0].components;
+      const tabs = {
+        id: 'tab-container', title: 'Tabs', type: 'local-tabs', layout: { span: 1 },
+        props: { stateId: 'selected-tab', transition: 'canonical-swap@1' },
+        tabs: [{ id: 'first', label: 'First', children: branch === 'tabs' ? [tileA] : [] }, { id: 'second', label: 'Second', children: [] }],
+        ...(branch === 'blocks' ? { blocks: [{ id: 'common-block', tabs: 'all', children: [tileA] }] } : {}),
+      };
+      const shallow = pageWith(base, [tileA, tileB]);
+      const deep = { ...pageWith(base, [tabs, tileB]), localState: [{ id: 'selected-tab', type: 'choice', initial: 'first', options: [{ id: 'first', label: 'First' }, { id: 'second', label: 'Second' }] }] };
+      return {
+        original: direction === 'deeper' ? shallow : deep, changed: direction === 'deeper' ? deep : shallow,
+        anchors: [{ kind: 'page', id: base.pages[0].id, nodeId: tileA.id, field: '/props/subtitle/value' }],
+      };
+    }])),
+  ...(['forward', 'backward'] as const).map((direction): [string, (id: string) => LayoutScenario] => [`page-owner-move/${direction}`, id => {
+    const base = draftDocument(id), home = base.pages[0], empty = { ...home, id: 'page-other', components: [] };
+    const original = { ...base, pages: direction === 'forward' ? [home, empty] : [empty, home] };
+    return {
+      original, changed: { ...original, pages: [...original.pages].reverse() },
+      anchors: [{ kind: 'page', id: home.id, nodeId: 'tile-a', field: '/props/subtitle/value' }],
+    };
+  }]),
+  ...([false, true] as const).map((moved): [string, (id: string) => LayoutScenario] => [`whole-nested-component/${moved ? 'moved' : 'unchanged'}`, id => {
+    const base = draftDocument(id), predicate = { type: 'viewer', isAdmin: true };
+    const node = { ...base.pages[0].components[0], id: 'whole-inner', visibleWhen: predicate };
+    const rootNode = { ...section([node]), id: 'whole-container', visibleWhen: predicate };
+    const entry = { id: 'whole-component', name: 'Whole component', params: [], bindings: [], node: rootNode };
+    const empty = { ...entry, id: 'other-component', node: { ...section([]), id: 'other-container' } };
+    const original = { ...base, componentLibrary: [entry, empty] };
+    return {
+      original, changed: moved ? { ...original, componentLibrary: [empty, entry] } : original, kind: 'fragment',
+      anchors: [{ kind: 'component', id: entry.id, nodeId: rootNode.id, field: '' }],
+    };
+  }]),
+];
+
+describe('round-3 adversarial layout matrix: canonical frames, never legacy inference', () => {
+  it.each(layoutScenarios.flatMap(([name, scenario]) => (['relative', 'absolute'] as const).map(encoding =>
+    [`${name}/${encoding}`, scenario, encoding] as const)))('%s', async (_name, scenario, encoding) => {
+    for (const format of ['legacy', 'canonical'] as const) {
+      const f = await lab(), initial = await f.draft();
+      const { original, changed, anchors, replacements, kind = 'operand', publicationUnchanged } = scenario(initial.document.id);
+      const layouts = anchors.map((anchor, owner) => {
+        const root = resolveLogicAnchor(original, anchor);
+        if (!root) throw new Error('Expected the authored matrix anchor');
+        const before = liftJSON(Buffer.from(canonicalCompositionJSON(root.value)), { kind, anchor });
+        return {
+          id: `canvas-${owner}`, anchor, root, before,
+          nodes: before.graph.nodes.map((node, index) => ({ id: node.id, origins: node.origins, x: 631 + owner * 300 + index * 19, y: 427 + owner * 200 + index * 13 })),
+        };
+      });
+      const studioCanvas = format === 'canonical'
+        ? encodeStudioCanvas(original, layouts.map(saved => ({ id: saved.id, roots: [{ anchor: saved.anchor, nodes: saved.nodes }] })))
+        : { version: 1, canvases: layouts.map(saved => ({
+          id: saved.id, roots: [saved.anchor],
+          nodes: saved.nodes.map(node => ({ ...node, origins: node.origins.map(origin => encoding === 'absolute' ? saved.root.pointer + origin : origin) })),
+        })) };
+      const first = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...original, studioCanvas } });
+      expect(first.status).toBe(200);
+      const saved: CompositionDraft = await first.json();
+      const second = await f.request('native/api/draft', 'PUT', { expectedRevision: saved.revision, document: { ...changed, studioCanvas } });
+      expect(second.status).toBe(200);
+      const prepared = await f.prepare({ ...changed, studioCanvas });
+      if (publicationUnchanged) expect(prepared.publicationDocumentSha256).toBe((await f.prepare(original)).publicationDocumentSha256);
+      const restored = await reopenDraft(f), layout = readStudioCanvas(restored);
+      expect(layout).toEqual(prepared.layout);
+      expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
+      const preserve = format === 'canonical' && !replacements;
+      expect(layout.warnings).toEqual(preserve ? [] : [expect.objectContaining({ code: 'invalid_layout' })]);
+      if (!preserve) expect(layout.metadata).toBeUndefined();
+      for (const [index, anchor] of (replacements ?? anchors).entries()) {
+        const root = resolveLogicAnchor(restored, anchor);
+        if (!root) throw new Error('Expected the current matrix owner');
+        const bytes = Buffer.from(canonicalCompositionJSON(root.value));
+        const after = liftJSON(bytes, { kind, anchor, metadata: layout.metadata });
+        expect(after.warnings.filter(item => item.code === 'invalid_layout')).toEqual([]);
+        const positions = layouts[index].nodes.map(({ x, y }) => ({ x, y }));
+        expect(after.graph.nodes.map(node => node.id)).toEqual(layouts[index].nodes.map(node => node.id));
+        if (preserve) expect(after.graph.nodes.map(node => node.position)).toEqual(positions);
+        else {
+          expect(after.graph.nodes.map(node => node.position)).toEqual(liftJSON(bytes, { kind, anchor }).graph.nodes.map(node => node.position));
+          expect(after.graph.nodes.map(node => node.position)).not.toEqual(positions);
+        }
+      }
+    }
+  });
+
+  it('auth-invalid-canonical-atomic-conflict-write-cleanup-restart', async () => {
+    const f = await lab(), initial = await f.draft();
+    const local = { ...draftDocument(initial.document.id), studioCanvas: { version: 55, future: 'keep' } };
+    expect((await f.request('native/api/draft/prepare', 'POST', { document: local }, {}, false)).status).toBe(401);
+    expect((await f.request('native/api/draft/prepare', 'POST', { document: local }, { Origin: 'http://example.invalid' })).status).toBe(403);
+    const state = path.join(f.directory, 'native-v2/state.json'), before = await readFile(state, 'utf8');
+    const invalid = replacePointer(local, '/logicLibrary/0/body', { type: 'math', op: 'not-an-op', args: [] });
+    for (const endpoint of ['native/api/draft/prepare', 'native/api/draft']) {
+      expect((await f.request(endpoint, endpoint.endsWith('prepare') ? 'POST' : 'PUT', { document: invalid, ...(endpoint.endsWith('prepare') ? {} : { expectedRevision: initial.revision }) })).status).toBe(422);
+    }
+    expect(await readFile(state, 'utf8')).toBe(before);
+    const responses = await Promise.all(['winner-a', 'winner-b'].map(name => f.request('native/api/draft', 'PUT', { document: { ...local, name }, expectedRevision: initial.revision })));
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    const winner = await f.draft(), buffer = structuredClone(local);
+    expect((await f.request('native/api/draft', 'PUT', { document: local, expectedRevision: initial.revision })).status).toBe(409);
+    expect(local).toEqual(buffer);
+    const backup = `${state}.matrix-original`;
+    await rename(state, backup); await mkdir(state);
+    try {
+      expect((await f.request('native/api/draft', 'PUT', { document: local, expectedRevision: winner.revision })).status).toBe(500);
+      expect(await f.draft()).toEqual(winner);
+      expect((await readdir(path.dirname(state))).filter(name => name.endsWith('.tmp'))).toEqual([]);
+    } finally { await rmdir(state); await rename(backup, state); }
+    const restored = await reopenDraft(f), layout = readStudioCanvas(restored);
+    expect(restored).toEqual(winner.document);
+    expect(JSON.parse(await readFile(state, 'utf8')).draft).toEqual(winner);
+    expect(layout).toMatchObject({ raw: local.studioCanvas, warnings: [{ code: 'invalid_layout' }] });
+    expect(layout.metadata).toBeUndefined();
+    const anchor: LogicAnchor = { kind: 'logic', id: labelTemplate.id, field: '/body' }, root = resolveLogicAnchor(restored, anchor);
+    if (!root) throw new Error('Expected the retained logic owner after restart');
+    const bytes = Buffer.from(canonicalCompositionJSON(root.value));
+    const after = liftJSON(bytes, { kind: 'operand', anchor, metadata: layout.metadata });
+    expect(after.graph.nodes.map(node => node.position)).toEqual(liftJSON(bytes, { kind: 'operand', anchor }).graph.nodes.map(node => node.position));
+  });
+});
+
 describe('D-layout / D-binding / D-strip: mounted real draft and publication routes', () => {
+  it('keeps canvas-wide IDs and groups distinct for identical graphs under two moved owners', async () => {
+    const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
+    const other = { ...positionedTemplate, id: 'other-owner' };
+    const original = { ...base, logicLibrary: [positionedTemplate, other, labelTemplate] };
+    const roots = [positionedTemplate, other].map((owner, index) => {
+      const anchor: LogicAnchor = { kind: 'logic', id: owner.id, field: '/body' };
+      const graph = liftJSON(Buffer.from(canonicalCompositionJSON(owner.body)), { kind: 'operand', anchor }).graph;
+      return { anchor, nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 700 + index * 300, y: 800 + index * 200 })) };
+    });
+    expect(roots[0].nodes.map(node => node.id)).toEqual(roots[1].nodes.map(node => node.id));
+    const studioCanvas = encodeStudioCanvas(original, [{ id: 'shared-canvas', roots, viewport: { x: 20, y: 30, zoom: 1.5 } }]);
+    const canvas = studioCanvas.canvases[0];
+    expect(new Set(canvas.nodes.map(node => node.id)).size).toBe(canvas.nodes.length);
+    canvas.groups = [{ id: 'both-owners', label: 'Both owners', nodeIds: canvas.nodes.map(node => node.id) }];
+    const changed = { ...original, logicLibrary: [other, positionedTemplate, labelTemplate], studioCanvas };
+    expect((await f.request('native/api/draft', 'PUT', { document: changed, expectedRevision: initial.revision })).status).toBe(200);
+    const restored = await reopenDraft(f), layout = readStudioCanvas(restored);
+    expect(layout.raw).toEqual(studioCanvas);
+    expect(layout.warnings).toEqual([]);
+    for (const root of roots) {
+      const current = resolveLogicAnchor(restored, root.anchor);
+      if (!current) throw new Error('Expected the current stable owner');
+      const after = liftJSON(Buffer.from(canonicalCompositionJSON(current.value)), { kind: 'operand', anchor: root.anchor, metadata: layout.metadata });
+      expect(after.warnings.filter(item => item.code === 'invalid_layout')).toEqual([]);
+      expect(after.graph.nodes.map(node => node.position)).toEqual(root.nodes.map(({ x, y }) => ({ x, y })));
+      const adapted = layout.metadata?.canvases.find(saved => saved.roots[0].id === root.anchor.id);
+      expect(adapted?.viewport).toEqual(canvas.viewport);
+      expect(adapted?.groups?.[0].nodeIds).toEqual(root.nodes.map(node => node.id));
+    }
+  });
+
   it('serves HTTP and persists state in the configured port and data root', async () => {
     const f = await lab(), response = await f.request('native/api/draft');
     expect(response.status).toBe(200);
@@ -152,7 +368,7 @@ describe('D-layout / D-binding / D-strip: mounted real draft and publication rou
     expect(JSON.stringify(republished.document)).not.toContain('DIFFERENT');
   });
 
-  it.each([['document', 'relative'], ['nested fragment', 'relative'], ['nested fragment', 'absolute']] as const)('round-trips saved %s positions with %s origins through reopen and lift', async (scope, encoding) => {
+  it.each(['document', 'nested fragment'] as const)('round-trips canonical saved %s positions through reopen and lift', async scope => {
     const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
     const nested = {
       ...labelTemplate, id: 'nested-label', params: [],
@@ -162,7 +378,7 @@ describe('D-layout / D-binding / D-strip: mounted real draft and publication rou
     const field = '/logicLibrary/1/body/args/value', kind = scope === 'document' ? 'document' : 'operand';
     const options: LiftOptions = { kind, ...(scope === 'document' ? {} : { anchor: { kind: 'logic', id: nested.id, field: '/body/args/value' } }) };
     const before = liftJSON(Buffer.from(canonicalCompositionJSON(scope === 'document' ? document : atPointer(document, field))), options);
-    const studioCanvas = positionedCanvas(before, field, encoding);
+    const studioCanvas = positionedCanvas(document, before);
     const saved = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
     expect(saved.status).toBe(200);
     const restored = await reopenDraft(f), layout = readStudioCanvas(restored);
@@ -174,11 +390,7 @@ describe('D-layout / D-binding / D-strip: mounted real draft and publication rou
     expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
   });
 
-  it.each([
-    ['fragment', 'relative'], ['fragment', 'absolute'],
-    ['nested fragment', 'relative'], ['nested fragment', 'absolute'],
-    ['tile fragment', 'relative'], ['tile fragment', 'absolute'],
-  ] as const)('retains a moved %s with %s origins through save, reopen and lift', async (scope, encoding) => {
+  it.each(['fragment', 'nested fragment', 'tile fragment'] as const)('retains a moved canonical %s through save, reopen and lift', async scope => {
     const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
     const document = { ...base, logicLibrary: [positionedTemplate, ...base.logicLibrary] };
     const anchor: LogicAnchor = scope === 'tile fragment'
@@ -187,7 +399,7 @@ describe('D-layout / D-binding / D-strip: mounted real draft and publication rou
     const field = scope === 'tile fragment' ? `/pages/0/components/0${anchor.field}` : `/logicLibrary/0${anchor.field}`;
     const options: LiftOptions = { kind: 'operand', anchor };
     const before = liftJSON(Buffer.from(canonicalCompositionJSON(atPointer(document, field))), options);
-    const studioCanvas = positionedCanvas(before, field, encoding);
+    const studioCanvas = positionedCanvas(document, before);
     const first = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
     expect(first.status).toBe(200);
     const saved: CompositionDraft = await first.json();
@@ -210,16 +422,14 @@ describe('D-layout / D-binding / D-strip: mounted real draft and publication rou
     expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
   });
 
-  it.each([
-    ['removed', 'relative'], ['removed', 'absolute'], ['replaced', 'relative'], ['replaced', 'absolute'],
-  ] as const)('does not attach %s fragment positions (%s origins) to another owner after save, reopen and lift', async (change, encoding) => {
+  it.each(['removed', 'replaced'] as const)('does not attach %s canonical fragment positions to another owner after save, reopen and lift', async change => {
     const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
     const other = { ...positionedTemplate, id: 'other-label' }, replacement = { ...positionedTemplate, id: 'replacement-label' };
     const document = { ...base, logicLibrary: [positionedTemplate, other, ...base.logicLibrary] };
     const anchor: LogicAnchor = { kind: 'logic', id: positionedTemplate.id, field: '/body/args/value' };
     const field = `/logicLibrary/0${anchor.field}`, options: LiftOptions = { kind: 'operand', anchor };
     const before = liftJSON(Buffer.from(canonicalCompositionJSON(atPointer(document, field))), options);
-    const studioCanvas = positionedCanvas(before, field, encoding);
+    const studioCanvas = positionedCanvas(document, before);
     const first = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
     expect(first.status).toBe(200);
     const saved: CompositionDraft = await first.json();

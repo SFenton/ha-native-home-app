@@ -1,7 +1,7 @@
 import type { GraphDiagnostic, LogicAnchor, StudioCanvasMetadata } from '../graph/types';
-import { canonicalOfBounded } from '../json';
+import { canonicalOfBounded, CompositionValidationError } from '../json';
 import { atPointer, record, resolveLogicAnchor, type ResolvedLogicAnchor } from './anchors';
-import { studioCanvasMetadataSchema } from './schemas';
+import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from './schemas';
 
 export type LayoutWarning = Pick<GraphDiagnostic, 'severity' | 'code' | 'message' | 'pointer'>;
 export interface DraftCanvasLayout {
@@ -10,78 +10,101 @@ export interface DraftCanvasLayout {
   readonly metadata?: StudioCanvasMetadata;
   readonly warnings: readonly LayoutWarning[];
 }
+type GraphCanvas = StudioCanvasMetadata['canvases'][number];
+export interface CanvasLayoutInput extends Pick<GraphCanvas, 'id' | 'viewport' | 'groups'> {
+  readonly roots: readonly { readonly anchor: LogicAnchor; readonly nodes: GraphCanvas['nodes'] }[];
+}
 const warning: LayoutWarning = { severity: 'warning', code: 'invalid_layout', message: "Saved layout can't be used.", pointer: '/studioCanvas' };
 
 function layoutRoot(document: Record<string, unknown>, anchor: LogicAnchor): ResolvedLogicAnchor | undefined {
   if (anchor.kind !== 'document' || anchor.field !== '') return resolveLogicAnchor(document, anchor);
   const { studioCanvas: _layout, ...semantic } = document;
-  // Whole-document lift excludes layout from its fingerprint and defaults its anchor ID to "document".
   return (anchor.id === document.id || anchor.id === 'document') && canonicalOfBounded(semantic) === anchor.fingerprint
     ? { value: document, pointer: '', owner: { value: document, pointer: '' } } : undefined;
 }
+const rootId = (anchor: LogicAnchor, ownerId: string) =>
+  canonicalOfBounded([anchor.kind, anchor.id, 'nodeId' in anchor ? anchor.nodeId ?? null : null, anchor.field, ownerId]);
+const canvasNodeId = (root: string, node: string) => canonicalOfBounded([root, node]);
 
-function originPrefixes(root: ResolvedLogicAnchor, origin: string): string[] {
-  if (!root.owner.pointer) return [root.pointer];
-  const path = origin.split('/').slice(1), collection = root.owner.pointer.split('/')[1];
-  const index = (part: string | undefined) => part !== undefined && /^(?:0|[1-9]\d*)$/.test(part);
-  if (path[0] !== collection || !index(path[1])) return [];
-  const ends: number[] = [];
-  if (!root.node) ends.push(2);
-  else {
-    let end = 2;
-    if (collection === 'componentLibrary') {
-      if (path[end++] !== 'node') return [];
-    } else if (path[end++] !== 'components' || !index(path[end++])) return [];
-    ends.push(end);
-    while (true) {
-      if (path[end] === 'children' && index(path[end + 1])) end += 2;
-      else if ((path[end] === 'tabs' || path[end] === 'blocks') && index(path[end + 1]) && path[end + 2] === 'children' && index(path[end + 3])) end += 4;
-      else break;
-      ends.push(end);
+/** Stored frames are explicit; the graph core still consumes its root-local, in-memory v1 metadata. */
+function graphMetadata(document: Record<string, unknown>, stored: StoredStudioCanvasMetadata): StudioCanvasMetadata | undefined {
+  const canvasIds = new Set<string>(), rootIds = new Set<string>();
+  const canvases: GraphCanvas[] = [];
+  for (const canvas of stored.canvases) {
+    if (canvasIds.has(canvas.id)) return undefined;
+    canvasIds.add(canvas.id);
+    const roots = new Map<string, { anchor: LogicAnchor; value: unknown }>();
+    for (const root of canvas.roots) {
+      const resolved = layoutRoot(document, root.anchor);
+      if (!resolved || resolved.owner.value.id !== root.ownerId || root.id !== rootId(root.anchor, root.ownerId) || rootIds.has(root.id)) return undefined;
+      rootIds.add(root.id);
+      roots.set(root.id, { anchor: root.anchor, value: resolved.value });
+    }
+    const nodes = new Map<string, typeof canvas.nodes[number]>();
+    for (const node of canvas.nodes) {
+      const root = roots.get(node.rootId);
+      if (!root || nodes.has(node.id) || node.id !== canvasNodeId(node.rootId, node.nodeId)
+        || node.origins.some(origin => atPointer(root.value, origin) === undefined)) return undefined;
+      nodes.set(node.id, node);
+    }
+    const groupIds = new Set<string>();
+    for (const group of canvas.groups ?? []) {
+      if (groupIds.has(group.id) || group.nodeIds.some(id => !nodes.has(id))) return undefined;
+      groupIds.add(group.id);
+    }
+    for (const [id, root] of roots) {
+      const own = canvas.nodes.filter(node => node.rootId === id);
+      canvases.push({
+        id: canonicalOfBounded([canvas.id, id]), roots: [root.anchor],
+        nodes: own.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })),
+        ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
+        ...(canvas.groups ? { groups: canvas.groups.flatMap(group => {
+          const nodeIds = group.nodeIds.flatMap(nodeId => {
+            const node = nodes.get(nodeId);
+            return node?.rootId === id ? [node.nodeId] : [];
+          });
+          return nodeIds.length ? [{ ...group, nodeIds }] : [];
+        }) } : {}),
+      });
     }
   }
-  // The anchor resolved the stable owner/node above; these are only its historical array addresses.
-  const field = root.pointer.slice((root.node ?? root.owner).pointer.length);
-  return ends.map(end => `/${path.slice(0, end).join('/')}${field}`);
+  return { version: 1, canvases, ...(stored.bundles ? { bundles: stored.bundles } : {}) };
 }
 
-function relativeOrigins(root: ResolvedLogicAnchor, origins: readonly string[]): string[][] {
-  const relative = origins.map(origin => {
-    const matches = new Set<string>();
-    if (atPointer(root.value, origin) !== undefined) matches.add(origin);
-    for (const prefix of originPrefixes(root, origin)) {
-      const local = origin === prefix || origin.startsWith(`${prefix}/`) ? origin.slice(prefix.length) : undefined;
-      if (local !== undefined && atPointer(root.value, local) !== undefined) matches.add(local);
-    }
-    return matches.size === 1 ? [...matches][0] : undefined;
-  });
-  return relative.every((origin): origin is string => origin !== undefined) ? [relative] : [];
+/** Inputs contain anchor-relative origins. Groups refer to the encoded canvas-wide node IDs. */
+export function encodeStudioCanvas(
+  document: unknown, canvases: readonly CanvasLayoutInput[], bundles?: StudioCanvasMetadata['bundles'],
+): StoredStudioCanvasMetadata {
+  const invalid = () => new CompositionValidationError([{ code: 'invalid_value', pointer: '/studioCanvas' }]);
+  if (!record(document)) throw invalid();
+  const encoded = {
+    version: 2,
+    canvases: canvases.map(canvas => {
+      const roots = canvas.roots.map(({ anchor }) => {
+        const resolved = layoutRoot(document, anchor), ownerId = resolved?.owner.value.id;
+        if (typeof ownerId !== 'string') throw invalid();
+        return { id: rootId(anchor, ownerId), anchor, ownerId, originFrame: 'anchor-relative' };
+      });
+      return {
+        id: canvas.id, roots,
+        nodes: canvas.roots.flatMap((root, index) => root.nodes.map(node => ({
+          ...node, id: canvasNodeId(roots[index].id, node.id), rootId: roots[index].id, nodeId: node.id,
+        }))),
+        ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
+        ...(canvas.groups ? { groups: canvas.groups } : {}),
+      };
+    }),
+    ...(bundles ? { bundles } : {}),
+  };
+  const parsed = studioCanvasMetadataSchema.safeParse(encoded);
+  if (!parsed.success || !graphMetadata(document, parsed.data)) throw invalid();
+  return parsed.data;
 }
 
-/** Raw metadata is retained even when the editor must fall back to auto layout. */
+/** Noncanonical metadata never acquires an inferred frame. Raw data is retained for explicit reset/export. */
 export function readStudioCanvas(document: unknown): DraftCanvasLayout {
   if (!record(document) || !Object.hasOwn(document, 'studioCanvas')) return { present: false, warnings: [] };
   const raw = document.studioCanvas, parsed = studioCanvasMetadataSchema.safeParse(raw);
-  if (!parsed.success) return { present: true, raw, warnings: [warning] };
-  const ids = new Set<string>(), roots = new Set<string>();
-  let ambiguous = false;
-  const canvases = parsed.data.canvases.map(canvas => {
-    const nodes = new Set<string>();
-    const resolved = canvas.roots.flatMap(anchor => {
-      const root = layoutRoot(document, anchor);
-      if (!root || roots.has(root.pointer)) { ambiguous = true; return []; }
-      roots.add(root.pointer);
-      return [root];
-    });
-    const normalized = canvas.nodes.map(node => {
-      const origins = resolved.flatMap(root => relativeOrigins(root, node.origins));
-      if (nodes.has(node.id) || !node.origins.length || origins.length !== 1) ambiguous = true;
-      nodes.add(node.id);
-      return { ...node, origins: origins[0] ?? node.origins };
-    });
-    if (ids.has(canvas.id)) ambiguous = true;
-    ids.add(canvas.id);
-    return { ...canvas, nodes: normalized };
-  });
-  return ambiguous ? { present: true, raw, warnings: [warning] } : { present: true, raw, metadata: { ...parsed.data, canvases }, warnings: [] };
+  const metadata = parsed.success ? graphMetadata(document, parsed.data) : undefined;
+  return metadata ? { present: true, raw, metadata, warnings: [] } : { present: true, raw, warnings: [warning] };
 }

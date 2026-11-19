@@ -4,7 +4,7 @@ import { expandDocument } from '../../../src/shared/composition/components';
 import { lift } from '../../../src/shared/composition/graph/lift';
 import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
 import { assertNoLogic, publishedDocument, usesLogic } from '../../../src/shared/composition/logic-library';
-import { atPointer, bindLogicUse, MAX_LOGIC_USE_BINDINGS, readStudioCanvas, replacePointer, unbindLogicUse } from '../../../src/shared/composition/studio-logic';
+import { atPointer, bindLogicUse, encodeStudioCanvas, MAX_LOGIC_USE_BINDINGS, readStudioCanvas, replacePointer, unbindLogicUse } from '../../../src/shared/composition/studio-logic';
 import { binding, componentDocument, draftDocument, labelTemplate, read, tile } from './fixtures';
 
 const prepared = (document: unknown) => compileCompositionDocument(document).expanded;
@@ -28,23 +28,26 @@ describe('D-layout: presentation is expendable, authored JSON is not', () => {
     const document = draftDocument();
     const anchor = { kind: 'logic', id: 'tile-label', field: '/body' } as const;
     const graph = lift(labelTemplate.body, { kind: 'operand', anchor }).graph;
-    const studioCanvas = {
-      version: 1, canvases: [{ id: 'layout', roots: [anchor], nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 384, y: 240 })) }],
-    };
-    const stored = { ...studioCanvas, canvases: studioCanvas.canvases.map(canvas => ({ ...canvas, nodes: canvas.nodes.map(node => ({ ...node, origins: node.origins.map(origin => `/logicLibrary/0/body${origin}`) })) })) };
-    for (const raw of [studioCanvas, stored]) {
-      const layout = readStudioCanvas({ ...document, studioCanvas: raw });
-      expect(layout).toMatchObject({ raw, metadata: studioCanvas, warnings: [] });
-      expect(lift(labelTemplate.body, { kind: 'operand', anchor, metadata: layout.metadata }).graph.nodes[0].position).toEqual({ x: 384, y: 240 });
-    }
+    const stored = encodeStudioCanvas(document, [{
+      id: 'layout', roots: [{ anchor, nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 384, y: 240 })) }],
+    }]);
+    const layout = readStudioCanvas({ ...document, studioCanvas: stored });
+    expect(layout).toMatchObject({ raw: stored, warnings: [] });
+    expect(layout.metadata?.canvases[0].roots).toEqual([anchor]);
+    expect(lift(labelTemplate.body, { kind: 'operand', anchor, metadata: layout.metadata }).graph.nodes[0].position).toEqual({ x: 384, y: 240 });
     for (const metadata of [
       { ...stored, canvases: [stored.canvases[0], stored.canvases[0]] },
-      { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...anchor, id: 'removed' }] }] },
-      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ id: 'stale', origins: ['/logicLibrary/99/body/removed-node'], x: 10, y: 20 }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...stored.canvases[0].roots[0], anchor: { ...anchor, id: 'removed' } }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...stored.canvases[0].roots[0], ownerId: 'another-owner' }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...stored.canvases[0].roots[0], originFrame: 'document-absolute' }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ ...stored.canvases[0].nodes[0], origins: ['/removed-node'] }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ ...stored.canvases[0].nodes[0], id: 'not-canvas-wide' }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ ...stored.canvases[0].nodes[0], rootId: 'missing-root' }] }] },
     ]) {
       expect(readStudioCanvas({ ...document, studioCanvas: metadata })).toMatchObject({ raw: metadata, warnings: [{ code: 'invalid_layout' }] });
       expect(prepared({ ...document, studioCanvas: metadata })).toEqual(prepared(document));
     }
+    expect(() => encodeStudioCanvas(document, [{ id: 'invalid', roots: [{ anchor, nodes: [{ id: 'node', origins: ['/removed-node'], x: 0, y: 0 }] }] }])).toThrow(CompositionValidationError);
   });
 
   it('never applies an old array position to a different lifted node', () => {
