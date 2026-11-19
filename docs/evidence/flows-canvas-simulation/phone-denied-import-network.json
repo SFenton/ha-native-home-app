@@ -1,0 +1,13 @@
+{
+  "failure": "SecurityError",
+  "unchangedPersistedList": true,
+  "unsavedImportRetained": true,
+  "warning": "Import not saved. Scenarios weren't saved (invalid data, unavailable storage, or quota exceeded). Keep this view open to retry or export. The saved scenario list is unchanged.",
+  "simulationFetches": 0,
+  "requests": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    }
+  ]
+}

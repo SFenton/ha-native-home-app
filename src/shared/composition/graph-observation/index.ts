@@ -70,6 +70,11 @@ export function createObservation(options: {
   };
   index(options.ast, '');
   const report: ObservationReport = { events: [], iterations: [], steps: [], truncated: false };
+  const evidence = (value: Json): Json => {
+    const copy = evidenceValue(value);
+    if (JSON.stringify(copy) !== JSON.stringify(value)) report.truncated = true;
+    return copy;
+  };
   const limit = options.maxEvents ?? 2000;
   const room = (count = 1) => {
     if (report.events.length + report.iterations.length + report.steps.length + count <= limit) return true;
@@ -86,7 +91,7 @@ export function createObservation(options: {
         ...(event.reads?.length ? {
           identity: [...new Set(event.reads.map(read => read.sourceId))].join(', '),
           reads: event.reads.map(read => ({ ...read, ...(read.path ? { path: [...read.path] } : {}), answer: read.answer.status === 'value'
-            ? { status: 'value', value: evidenceValue(read.answer.value) } : { status: read.answer.status } })),
+            ? { status: 'value', value: evidence(read.answer.value) } : { status: read.answer.status } })),
         } : {}),
         tested: [...evaluated].filter(([key, trace]) => key.startsWith(`${at}/of/${event.index}/test|`) && trace.output)
           .map(([, trace]) => ({ pointer: trace.pointer, result: trace.output! })),
@@ -123,10 +128,12 @@ export function createObservation(options: {
     const location = options.locate(at), { blockId } = location;
     if (event.kind === 'step') {
       const input = evidenceValue(event.input), output = evidenceValue(event.output);
+      const truncated = JSON.stringify(input) !== JSON.stringify(event.input) || JSON.stringify(output) !== JSON.stringify(event.output);
+      report.truncated ||= truncated;
       report.steps.push({
         blockId, id: event.step.id, op: event.step.op,
         before: Array.isArray(event.input) ? event.input.length : null, after: Array.isArray(event.output) ? event.output.length : null,
-        input, output, truncated: JSON.stringify(input) !== JSON.stringify(event.input) || JSON.stringify(output) !== JSON.stringify(event.output),
+        input, output, truncated,
       });
       report.events.push({
         runId: options.runId, root: options.root, blockId, pointer: location.pointer ?? at, inputs: [{ portId: 'stream', result: { kind: 'operand', answer: { status: 'value', value: input } } }],
@@ -135,14 +142,14 @@ export function createObservation(options: {
       });
     } else if (event.kind === 'item') {
       report.iterations.push({
-        blockId, index: event.index, identity: identityOf(event.item), item: evidenceValue(event.item),
+        blockId, index: event.index, identity: identityOf(event.item), item: evidence(event.item),
         included: event.included, reason: event.field ? `${event.field}: ${event.reason}` : event.reason,
         tested: [{ pointer: event.field ? `${location.pointer ?? at}/fields/${event.field}` : location.pointer ?? at,
-          result: { kind: 'operand', answer: { status: 'value', value: evidenceValue(event.value) } } }],
+          result: { kind: 'operand', answer: { status: 'value', value: evidence(event.value) } } }],
       });
     } else {
       report.iterations.push({
-        blockId, index: event.index, identity: identityOf(event.item), item: evidenceValue(event.item),
+        blockId, index: event.index, identity: identityOf(event.item), item: evidence(event.item),
         included: event.kind === 'sort' || event.kept,
         ...(event.kind === 'filter' ? { result: event.kept ? 'yes' : 'no', reason: event.kept ? 'Condition Yes - kept' : 'Condition No - dropped (flow gaps are null)' }
           : { position: event.position, reason: `Sorted from ${event.index + 1} to ${event.position + 1}` }),

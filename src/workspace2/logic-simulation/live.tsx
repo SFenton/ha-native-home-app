@@ -27,15 +27,17 @@ export function sharedFlowRequests(program: SimulationProgram): readonly { reado
   return [...grouped.values()];
 }
 /** Keep mounted while switching modes: undefined inputs cancel the shared debounce and invalidate in-flight answers. */
-export function SimulationFlowBridge({ id, ids, inputs, enabled, onRun }: {
+export function SimulationFlowBridge({ id, ids, inputs, enabled, onRun, onDisabled }: {
   id: string; ids: readonly string[]; inputs: PipelineInputs; enabled: boolean;
   onRun: (ids: readonly string[], state: FlowState) => void;
+  onDisabled?: () => void;
 }) {
   const run = useLiveRun(id, enabled ? inputs : undefined);
   const fingerprint = flowFingerprint(inputs), keys = ids.join('\u0000');
   useEffect(() => {
     if (enabled) onRun(ids, { fingerprint, run });
   }, [enabled, keys, fingerprint, run.answer, run.error, run.running, onRun]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!enabled) onDisabled?.(); }, [enabled, onDisabled]);
   return null;
 }
 /** Subscribe to versions, never mutable map identity. This adapter opens no socket and owns no request helper. */

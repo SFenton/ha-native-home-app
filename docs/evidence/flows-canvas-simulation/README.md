@@ -41,8 +41,8 @@ as a flaky CI assertion.
 
 ## Recorded checks and artifacts
 
-`npm test -- --maxWorkers=2`: 269 files, 12,183 passed and one existing skip.
-`npm run build`: passed. Focused Playwright: six passed across desktop
+`npm test -- --maxWorkers=2`: 269 files, 12,191 passed and one existing skip.
+`npm run build`: passed. Focused Playwright: 16 passed across desktop
 (1440 x 900; design scene 1440 x 1100) and phone (390 x 844, 2x capture).
 The permanent corpus comparison and observer invariants remain in those tests.
 `npm run scan:house`: zero findings. Temporary browser servers were stopped.
@@ -53,10 +53,56 @@ The permanent corpus comparison and observer invariants remain in those tests.
   [phone scenario traffic](phone-scenarios-network.json),
   [desktop design-scene traffic](desktop-design-network.json),
   [phone design-scene traffic](phone-design-network.json).
+- Import traffic: [desktop](desktop-import-network.json),
+  [phone](phone-import-network.json). An unchanged import, active-row deletion,
+  empty-list replacement and re-import all retain Simulated and make zero
+  requests after advancing beyond the shared debounce.
+- Failed imports: denied storage on [desktop](desktop-denied-import-network.json)
+  and [phone](phone-denied-import-network.json); quota exceeded on
+  [desktop](desktop-quota-import-network.json) and
+  [phone](phone-quota-import-network.json). The persisted and visible lists stay
+  equal, the unsaved JSON stays available, the warning remains visible and no
+  request resumes.
 - [Actual drawer observations](drawers.json), generated from one shared-evaluator
   run of Sensor offline against the same fake fixture. Eight chores become
   six after Keep Where; First Few separately cuts six to five. These are actual
   observations, not reconstructed drawer evidence.
+
+## Independent-review corrections
+
+The five P2 findings at `3669b21` are addressed without changing the native
+hooks, shared live-run hook, canvas, document contract or network API.
+
+| Finding | Regression evidence |
+| --- | --- |
+| Import resumed Live | Import/delete retain the active captured scenario, pins and mode, even when the saved row is removed. Desktop/phone intercepted traffic covers replacement and unchanged round trips. Only an explicit Live action resumes reads. |
+| Disappearing bridges skipped cancellation | The host's headless two-phase retire list commits old identities disabled before dropping them or enabling a same-store successor. Unit tests cover pending removal, in-flight removal/late-answer rejection, restored refreshes, direct host unmount and Strict Mode handoffs with both unchanged and renamed store IDs. The shared hook is untouched. |
+| Failed import hid storage errors | UI saved-list state commits only after persistence succeeds. Denied/quota browser tests compare the visible names with the unchanged stored bytes and retain the attempted import with its warning. |
+| Bounded evidence falsely appeared complete | Real 60-item pipeline runs keep actual counts/results identical while bounded step/iteration copies set the report flag. Browser captures show the trace-wide warning and actual count 60: [desktop](desktop-truncated-trace.png), [phone](phone-truncated-trace.png). |
+| Text contrast below AA | Scoped text corrections cover mixed Live backgrounds, selected purple rows and result badges. The rendered contrast audit below checks every visible text/input pair in each exercised surface and state, in both appearances. No global or canvas colours changed. |
+
+### Rendered contrast
+
+The permanent Playwright audit uses computed foregrounds and the full composed
+background stack, including CSS `color-mix`, then applies the Studio's existing
+WCAG luminance/contrast functions. It checks Live and pinned values, selected
+and hovered scenario rows, all result badges, review/import/typed-pin fields,
+menus, source radios (including readable disabled Replay), the clock and its
+ticks, and Each Run/Items/Trace. It does not merely test tokens against white.
+
+| Text/background pair | Light | Dark |
+| --- | ---: | ---: |
+| Live tag | 5.76:1 | 8.35:1 |
+| Muted Live value on selected scenario row | 6.05:1 | 6.58:1 |
+| Matches badge | 5.52:1 | 7.89:1 |
+| Failed expectation badge | 5.76:1 | 8.76:1 |
+| Minimum across all measured pairs | **5.16:1** | **6.26:1** |
+
+Every measured pair exceeds **4.5:1**. Full machine-readable foregrounds,
+backgrounds and ratios: [desktop](desktop-contrast.json) (6,848 text samples,
+202 scene/appearance/colour pairs), [phone](phone-contrast.json) (5,216 samples,
+180 pairs). All 14 design captures below were regenerated after these colour
+corrections.
 
 ## Design comparison
 
@@ -84,6 +130,8 @@ resolution; the simulation reference contains both light and dark scenes.
 | Live 21.9 restored, phone | <img src="../../design/flows/14-preview.png" width="330" alt="Approved compact values lens"> | <img src="phone-live.png" width="260" alt="Phone Live restored"> |
 | Saved cases after reload, desktop | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios table"> | <img src="desktop-scenarios.png" width="420" alt="Desktop explicit scenario results"> |
 | Saved cases after reload, phone | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios table"> | <img src="phone-scenarios.png" width="260" alt="Phone saved scenarios table"> |
+| Bounded evidence warning and actual counts, desktop | <img src="../../design/flows/13-sim.png" width="330" alt="Approved trace concept"> | <img src="desktop-truncated-trace.png" width="420" alt="Desktop bounded trace warning and actual counts"> |
+| Bounded evidence warning and actual counts, phone | <img src="../../design/flows/13-sim.png" width="330" alt="Approved trace concept"> | <img src="phone-truncated-trace.png" width="260" alt="Phone bounded trace warning and actual counts"> |
 
 ### Intentional deviations and reasons
 
@@ -94,7 +142,9 @@ resolution; the simulation reference contains both light and dark scenes.
 - The harness is visibly labelled fake HA, not the integrated workspace.
   It loads the real Studio theme, segmented controls, fields, buttons, tags
   and sheet primitives. The reference's purple pin semantic has no existing
-  Studio theme token, so a single scoped light/dark purple token was added.
+  Studio theme token, so a scoped light/dark purple token was added. Text
+  contrast corrections are also scoped here; the global Studio palette is
+  unchanged.
 - The authored fixture uses the approved native Add/Divide average recipe,
   so the trace includes its real Add and If/Otherwise results instead of
   concealing them or inventing a native Aggregate block. Subtitle kept is
@@ -120,23 +170,21 @@ resolution; the simulation reference contains both light and dark scenes.
 
 The final reservation check used origin/main
 `427eaba6236804275de58d3759c467f4bfcf3798` and fetched all open heads:
-#27 `f069fe5b0af48092722d9d7eb2f8506d77e8c534` (26 paths),
-#28 `7c634668b4d55831e3e81ccb933151537bf33907` (8 paths), and
-#29 `196cac8653b0b9e910f5bc3fedd3b5829510eba7` (62 paths).
+#27 `1de7dd914293844db4c6d00f0695340cb9c9745d` (26 paths),
+#28 `57705b34fbcb69dfd8f1eef0795bee2c2809f228` (8 paths), and
+#29 `57919bd8ffea8c0db9d88d96db8b905cbf5123be` (75 paths).
 The full diff-derived reservation sets had zero intersections with this lane.
 
-The pre-revision CI e2e shard 6 failed during **browser dependency installation**,
-before any tests: the Ubuntu 26.04 runner could not locate its font packages
-([job log](https://github.com/SFenton/ha-native-home-app/actions/runs/44490049920/job/135443080632)).
-That workflow/runner configuration is outside W2-S ownership. The isolated
-local desktop/phone run above completed; it is not represented as a passing
-remote CI run.
+The reviewed baseline `3669b21` subsequently completed all CI checks green,
+including shard 6. The earlier browser-package installation failure is no
+longer a current blocker. Fresh-head CI status is reported separately in the
+PR handoff; the local results above are not substituted for remote CI.
 
 ## Scope and limitations
 
 The host is not yet integrated into the production workspace; W2-I owns that
 integration. Existing connection freshness must be supplied by its owner.
-Deactivation must render once before unmount to cancel the shared live-run
-hook's existing timer. No changes were made to graph core, compiler forwarding,
+The host now owns disabled bridge retirement even on direct unmount; W2-I
+does not need a special closing render. No changes were made to graph core, compiler forwarding,
 schema, server, workspace shell, iOS or Core integration. Browser geometry and
 the fake data are not evidence of physical hardware behavior.

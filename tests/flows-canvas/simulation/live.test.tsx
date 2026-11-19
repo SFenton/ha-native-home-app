@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react';
+import { act, StrictMode, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveHouse } from '../../../src/preview2/live-house';
@@ -7,6 +7,8 @@ import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/Workspace
 import { resetLiveRuns } from '../../../src/workspace2/data/liveRun';
 import { SimulationFlowBridge, sharedFlowRequests, useSimulationSnapshot, type FlowState } from '../../../src/workspace2/logic-simulation/live';
 import { runSimulation, type HeldSnapshot } from '../../../src/workspace2/logic-simulation/engine';
+import { SimulationFlowBridges } from '../../../src/workspace2/logic-simulation/BridgeOwner';
+import { SimulationHost } from '../../../src/workspace2/logic-simulation/SimulationHost';
 import { FIXTURE_CLOCK, simulationFixture } from './fixture';
 import type { PipelineInputs } from '../../../src/shared/composition/pipeline';
 
@@ -75,5 +77,71 @@ describe('S-live shared owner and request path', () => {
     expect(live.states).toBe(states);
     expect(runSimulation(fixture.program, held!).outputs.find(output => output.output.id === 'subtitle')?.result).toEqual({ kind: 'operand', answer: { status: 'value', value: 'Too Warm' } });
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it('retires a removed group before its debounce fires and refreshes when restored', async () => {
+    const requests = sharedFlowRequests(fixture.program);
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {}));
+    const onRun = vi.fn();
+    await render(<SimulationFlowBridges requests={requests} enabled onRun={onRun} />);
+    await act(() => vi.advanceTimersByTimeAsync(599));
+    await render(<SimulationFlowBridges requests={[]} enabled onRun={onRun} />);
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(fetch).not.toHaveBeenCalled();
+    await render(<SimulationFlowBridges requests={requests} enabled onRun={onRun} />);
+    await act(() => vi.advanceTimersByTimeAsync(600));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('drops removed in-flight answers, retires changed identities and never reuses their late answers', async () => {
+    const requests = sharedFlowRequests(fixture.program), resolvers: ((response: Response) => void)[] = [];
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(resolve => { resolvers.push(resolve); }));
+    const observed: FlowState[] = [], onRun = (_ids: readonly string[], state: FlowState) => { observed.push(state); };
+    const pool = (current = requests) => <SimulationFlowBridges requests={current} enabled onRun={onRun} />;
+    await render(pool()); await act(() => vi.advanceTimersByTimeAsync(600));
+    await render(pool([]));
+    await act(async () => resolvers[0](Response.json({ response: { removed: true }, at: '2026-11-18T16:00:00Z' })));
+    await render(pool());
+    expect(observed.some(state => state.run.answer)).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(600)); expect(fetch).toHaveBeenCalledTimes(2);
+    const changed = requests.map(request => ({ ...request, inputs: { ...request.inputs,
+      parameters: [{ name: 'changed', type: 'number' as const, value: { type: 'literal' as const, value: 1 } }] } }));
+    await render(pool(changed));
+    await act(async () => resolvers[1](Response.json({ response: { oldIdentity: true }, at: '2026-11-18T16:00:01Z' })));
+    await act(() => vi.advanceTimersByTimeAsync(600)); expect(fetch).toHaveBeenCalledTimes(3);
+    expect(observed.some(state => state.run.answer)).toBe(false);
+    await act(async () => resolvers[2](Response.json({ response: { fresh: true }, at: '2026-11-18T16:00:02Z' })));
+    expect(observed.at(-1)?.run.answer?.response).toEqual({ fresh: true });
+  });
+  it.each(['pending', 'in flight'] as const)('retires a directly unmounted host with a request %s', async phase => {
+    let resolve!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(done => { resolve = done; }));
+    const host = <SimulationHost program={fixture.program} document={fixture.document} canvasId="direct-unmount"
+      liveClock={FIXTURE_CLOCK} blockNames={fixture.blockNames} />;
+    await render(host);
+    await act(() => vi.advanceTimersByTimeAsync(phase === 'pending' ? 599 : 600));
+    await render(null);
+    if (phase === 'in flight') await act(async () => resolve(Response.json({ response: { late: true }, at: '2026-11-18T16:00:00Z' })));
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(fetch).toHaveBeenCalledTimes(phase === 'pending' ? 0 : 1);
+    const observed: FlowState[] = [];
+    await render(<SimulationFlowBridges requests={sharedFlowRequests(fixture.program)} enabled onRun={(_ids, state) => { observed.push(state); }} />);
+    expect(observed.some(state => state.run.answer)).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(600));
+    expect(fetch).toHaveBeenCalledTimes(phase === 'pending' ? 1 : 2);
+  });
+  it.each(['same group', 'renamed group'])('retires replaced owners during a Strict Mode handoff: %s', async identity => {
+    const requests = sharedFlowRequests(fixture.program), resolvers: ((response: Response) => void)[] = [];
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(resolve => { resolvers.push(resolve); }));
+    const observed: FlowState[] = [], onRun = (_ids: readonly string[], state: FlowState) => { observed.push(state); };
+    const pool = (key: string, current = requests) => <StrictMode><SimulationFlowBridges key={key} requests={current} enabled onRun={onRun} /></StrictMode>;
+    await render(pool('first')); await act(() => vi.advanceTimersByTimeAsync(599));
+    await render(pool('second', identity === 'same group' ? requests : requests.map(request => ({ ...request, id: 'renamed-group', ids: ['renamed-group'] }))));
+    await act(() => vi.advanceTimersByTimeAsync(599)); expect(fetch).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(1)); expect(fetch).toHaveBeenCalledTimes(1);
+    await render(pool('third'));
+    await act(async () => resolvers[0](Response.json({ response: { retired: true }, at: '2026-11-18T16:00:00Z' })));
+    await act(() => vi.advanceTimersByTimeAsync(600)); expect(fetch).toHaveBeenCalledTimes(2);
+    expect(observed.some(state => state.run.answer)).toBe(false);
+    await act(async () => resolvers[1](Response.json({ response: { fresh: true }, at: '2026-11-18T16:00:01Z' })));
+    expect(observed.at(-1)?.run.answer?.response).toEqual({ fresh: true });
   });
 });

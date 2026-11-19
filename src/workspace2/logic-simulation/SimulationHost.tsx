@@ -9,7 +9,8 @@ import { captureScenario, mergePins, runAll, runSimulation, type ScenarioResult 
 import { anchorKey, caseSchema, parseScenarios, pinSchema, readKey, sourceKey, STORE_COUNT } from './contracts';
 import { pinProblems, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
 import { loadScenarios, saveScenarios } from './storage';
-import { sharedFlowRequests, SimulationFlowBridge, useSimulationSnapshot, type FlowState } from './live';
+import { sharedFlowRequests, useSimulationSnapshot, type FlowState } from './live';
+import { SimulationFlowBridges } from './BridgeOwner';
 import { SimulationDrawers } from './Drawers';
 import { ClockInspector, SourceInspector, type PinChoice } from './Inspector';
 import { ScenariosDrawer } from './Scenarios';
@@ -32,7 +33,7 @@ export interface SimulationHostProps {
   readonly previousText?: SimulationCase['base']['previousText'];
   /** The existing connection owner supplies freshness; LiveHouse alone cannot detect transport failures. */
   readonly freshness?: { readonly stale: boolean; readonly error?: string };
-  /** Set false for a render before unmounting to release the existing shared live-run debounce. */
+  /** Pause live requests while this canvas is inactive. Unmount also retires its bridges. */
   readonly active?: boolean;
 }
 /** Mount inside WorkspaceDataProvider. A new canvas/document identity always opens Live. */
@@ -44,7 +45,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const [loaded] = useState(() => loadScenarios(document.id, canvasId));
   const [scenarios, setScenarios] = useState<SimulationCase[]>(loaded.ok ? loaded.value : []);
   const [message, setMessage] = useState(loaded.ok ? '' : loaded.error);
-  const [pins, setPins] = useState<SimulationPin[]>([]), [scenarioId, setScenarioId] = useState('');
+  const [pins, setPins] = useState<SimulationPin[]>([]), [selectedCase, setSelectedCase] = useState<SimulationCase>();
   const [muted, setMuted] = useState<ReadonlySet<string>>(new Set());
   const [clock, setClock] = useState<SimulationClock>();
   const [clockLive, setClockLive] = useState(false);
@@ -56,7 +57,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const [capture, setCapture] = useState(''), [captureName, setCaptureName] = useState('');
   const [results, setResults] = useState<readonly ScenarioResult[]>([]), [exchange, setExchange] = useState('');
   const [drawer, setDrawer] = useState<'scenarios' | 'evidence'>();
-  const selected = scenarios.find(scenario => scenario.id === scenarioId);
+  const selected = scenarios.find(scenario => scenario.id === selectedCase?.id) ?? selectedCase;
+  const scenarioId = selected?.id ?? '';
   const scenario = useMemo(() => {
     const live = program.roots.flatMap(root => root.graph.nodes.filter(node => muted.has(node.id))).flatMap(node => {
       const source = sourceCaptureForNode(node, program); return source ? [sourceKey(source)] : [];
@@ -109,17 +111,21 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const selectBlock = (node: GraphNode) => { setSelection(node.id); setPinChoice(undefined); setInspecting(true); setDrawer(undefined); onSelectBlock?.(node.id); };
   const stalePins = scenarios.flatMap(scenario => pinProblems(program, scenario.pins));
   const returnLive = () => {
-    setPins([]); setScenarioId(''); setMuted(new Set()); setClock(undefined); setClockLive(false); setPaused(false); setSimulating(false); setResults([]); setPinChoice(undefined);
+    setPins([]); setSelectedCase(undefined); setMuted(new Set()); setClock(undefined); setClockLive(false); setPaused(false); setSimulating(false); setResults([]); setPinChoice(undefined);
     setMessage('Live restored. Saved scenarios were not changed.');
   };
   const selectScenario = (id: string) => {
     if (!id) { returnLive(); return; }
-    setScenarioId(id); setPins([]); setClock(undefined); setClockLive(false); setMuted(new Set()); setPaused(true); setSimulating(true); setPinChoice(undefined);
+    setSelectedCase(scenarios.find(scenario => scenario.id === id)); setPins([]); setClock(undefined); setClockLive(false); setMuted(new Set()); setPaused(true); setSimulating(true); setPinChoice(undefined);
   };
-  const persist = (next: SimulationCase[]) => {
-    setScenarios(next);
+  const persist = (next: SimulationCase[], action = 'Scenario changes') => {
     const saved = saveScenarios(document.id, canvasId, next);
-    setMessage(saved.ok ? 'Scenarios saved in this browser.' : saved.error);
+    if (saved.ok) {
+      setSelectedCase(selected);
+      setScenarios(next);
+      setResults([]);
+    }
+    setMessage(saved.ok ? 'Scenarios saved in this browser.' : `${action} not saved. ${saved.error} The saved scenario list is unchanged.`);
     return saved.ok;
   };
   const saveCapture = () => {
@@ -199,7 +205,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     </section>
   </>;
   return <section className="w2-scope w2-simulation w2-simulation-surface" aria-label="Flow simulation">
-    {requests.map(request => <SimulationFlowBridge key={request.id} {...request} enabled={enabled} onRun={onRun} />)}
+    <SimulationFlowBridges requests={requests} enabled={enabled} onRun={onRun} />
     <header className="w2-sim-toolbar">
       <div className="w2-sim-heading"><FlaskConical size={18} aria-hidden /><h2>Simulation</h2><span className="w2-caption">Studio only · no device controls</span></div>
       <div className="w2-sim-toolbar-cluster">
@@ -246,18 +252,18 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       onSelect={selectScenario} onCapture={() => startCapture()} onCreate={() => startCapture(true)} blocked={stalePins.length > 0}
       onRunAll={() => { setPaused(true); setSimulating(true); setResults(runAll(program, scenarios, snapshot)); setMessage('Run All complete. No network reads or device writes.'); }}
       onEdit={scenario => { setCaptureName(scenario.name); setCapture(JSON.stringify(scenario, null, 2)); }}
-      onDelete={scenario => { persist(scenarios.filter(candidate => candidate.id !== scenario.id)); if (scenario.id === scenarioId) selectScenario(''); }}>
+      onDelete={scenario => { persist(scenarios.filter(candidate => candidate.id !== scenario.id), `Deletion of "${scenario.name}"`); }}>
       {stalePins.length > 0 && <p role="alert" className="w2-sim-notice">Unresolved pins block Run All. {stalePins.map(issueText).join(' ')}</p>}
       {capture && <fieldset className="w2-sim-review w2-form">
         <legend>Review scenario before saving</legend><p className="w2-caption">Household states may be personal. Stored only in this browser; never in draft or native exports.</p>
         <TextField label="Scenario name" value={captureName} onChange={setCaptureName} />
-        <details><summary>Captured values and expectations</summary><Field label="Scenario data (JSON)"><textarea rows={10} value={capture} onChange={event => setCapture(event.target.value)} /></Field>
+        <details><summary>Captured values and expectations</summary><Field label="Scenario data (JSON)"><textarea aria-label="Scenario data (JSON)" rows={10} value={capture} onChange={event => setCapture(event.target.value)} /></Field>
           <p className="w2-caption">Previous-text seeds are separate base.previousText entries. Numeric tolerance is explicit.</p></details>
         <div className="w2-sim-actions"><button type="button" className="w2-primary" onClick={saveCapture}>Save scenario</button><button type="button" onClick={() => setCapture('')}>Discard capture</button></div>
       </fieldset>}
-      <details className="w2-sim-exchange"><summary>Import or export scenarios</summary><Field label="Scenario exchange JSON"><textarea rows={6} value={exchange} onChange={event => setExchange(event.target.value)} /></Field>
+      <details className="w2-sim-exchange"><summary>Import or export scenarios</summary><Field label="Scenario exchange JSON"><textarea aria-label="Scenario exchange JSON" rows={6} value={exchange} onChange={event => setExchange(event.target.value)} /></Field>
         <div className="w2-sim-actions"><button type="button" onClick={() => { setExchange(JSON.stringify({ version: 1, scenarios }, null, 2)); setMessage('Export prepared. This contains personal captured values, not configuration.'); }}>Prepare export</button>
-          <button type="button" onClick={() => { try { const imported = parseScenarios(exchange); persist(imported); selectScenario(''); } catch (error) { setMessage(error instanceof Error ? `Import refused: ${error.message}` : 'Import refused.'); } }}>Import scenarios (replace browser list)</button></div>
+          <button type="button" onClick={() => { try { const imported = parseScenarios(exchange); if (persist(imported, 'Import')) setMessage('Scenarios imported. Active simulation was not changed.'); } catch (error) { setMessage(error instanceof Error ? `Import refused: ${error.message}` : 'Import refused.'); } }}>Import scenarios (replace browser list)</button></div>
       </details>
     </ScenariosDrawer>
     <Overlay narrow open={drawer === 'evidence'} onOpenChange={open => { if (!open) setDrawer(undefined); }} label="Run evidence" className="w2-simulation-surface">

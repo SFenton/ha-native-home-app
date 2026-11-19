@@ -1,5 +1,9 @@
-/* The semantic pin colour has no existing Studio token. Everything else inherits the workspace theme. */
+/* Contrast corrections are local to simulation surfaces, including their portalled sheets. */
 .w2-simulation-surface {
+  --w2-muted: light-dark(#595959, #b0b0b0);
+  --w2-ok-text: light-dark(#246b2f, #91d49a);
+  --w2-err-text: light-dark(#a82a23, #ffb4ab);
+  --w2-warn-text: light-dark(#785000, #ffd18a);
   --w2-sim-pin: light-dark(#7540db, #c0a2ff);
   --w2-sim-pin-bg: color-mix(in srgb, var(--w2-sim-pin) 10%, var(--w2-card));
   color: var(--w2-ink-card);
@@ -9,6 +13,7 @@
 .w2-simulation h2, .w2-simulation-surface h2 { font-size: 15px; margin: 0; }
 .w2-simulation h3, .w2-simulation-surface h3 { font-size: 12px; }
 .w2-simulation-surface .w2-caption { color: var(--w2-muted); font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.w2-simulation-surface input::placeholder, .w2-simulation-surface textarea::placeholder { color: var(--w2-muted); opacity: 1; }
 .w2-sim-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--w2-line); }
 .w2-sim-heading, .w2-sim-toolbar-cluster, .w2-sim-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .w2-sim-heading { gap: 10px; }
@@ -43,7 +48,7 @@
 .w2-sim-radio small { display: block; color: var(--w2-muted); font-size: 12px; margin-top: 2px; }
 .w2-sim-radio input[type=radio] { appearance: none; flex: none; width: 16px; height: 16px; min-height: 16px; padding: 0; margin: 2px 0 0; border: 1px solid var(--w2-muted); border-radius: 50%; background: var(--w2-card); }
 .w2-sim-radio input:checked { border: 5px solid var(--w2-sim-pin); }
-.w2-sim-later { opacity: .6; cursor: not-allowed; }
+.w2-sim-later { color: var(--w2-muted); cursor: not-allowed; }
 .w2-sim-pin-control { margin: 2px 12px 8px 24px; }
 .w2-sim-pin-control .field { margin-top: 8px; }
 .w2-sim-pin-control .field > span { margin-right: 8px; }

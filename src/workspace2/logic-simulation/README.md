@@ -45,8 +45,11 @@ from the workspace; the isolated harness mounts those same styles/theme.
 It reuses `SegmentRow`, `TextField`/`Field`, `SelectMenu`, `Tag`, Base UI Drawer
 and the Studio Overlay/sheet. Local `.sec`, `.kv2`, `.tag.live` and `.tag.pinned`
 classes adapt the reference's compact sections, value rows and provenance
-without changing global chrome. The only new semantic colour is the scoped,
-light/dark purple pin token; the existing theme has no pin-purple token.
+without changing global chrome. Purple pin tokens and the AA text corrections
+are scoped to simulation surfaces (including portalled sheets), not the
+workspace or canvas. The rendered contrast regression measures mixed grounds,
+selected rows, badges, fields, menus, hover, clock labels and evidence in both
+appearances, rather than testing tokens against white alone.
 
 `presentation.blocks` is keyed by block ID; `presentation.outputs` by
 `anchorKey(root.anchor)`. Supply authored display names, units, optional
@@ -81,13 +84,19 @@ bridge owner per group; do not also mount independent live-run consumers for
 the other grouped IDs. Steps-only edits evaluate the held response locally.
 There is no canvas socket or polling timer.
 
-**Closing:** render `active={false}` before unmounting. This supplies undefined
-inputs to the existing shared hook, cancelling its pending debounce and
-invalidating late responses. That hook does not currently have unmount cleanup;
-this lane does not own `data/liveRun.ts`. The harness demonstrates the two-phase
-close. Reopening or changing document/canvas identity starts Live with no pins.
-If integration cannot provide this lifecycle, obtain an allocation to fix the
-shared hook rather than assuming unmount cancels it.
+**Retirement:** the host owns a two-phase bridge retire list. Removed or changed
+request identities stay mounted with undefined inputs until the shared hook's
+disable effect has cancelled its debounce and invalidated late responses; only
+then are they removed. A same-ID replacement waits for that disabled commit.
+A headless React root, supplied with the existing house/store, lets retirement
+finish even after a direct host unmount. It opens no connection, cancels before
+releasing listeners and disposes itself once drained. This is necessary because
+the unchanged `data/liveRun.ts` hook has no unmount cleanup. `active={false}`
+can still pause a retained host, but callers no longer need a special closing
+render. Tests cover pending/in-flight removal, identity changes, refreshed
+restoration, direct unmount and Strict Mode handoffs. The browser harness now
+closes directly. Reopening or changing document/canvas identity starts Live
+with no pins.
 
 ## Evaluation and personal state
 
@@ -109,7 +118,11 @@ active pins/scenario/clock without deleting saved cases.
 explicit review. Previous-text seeds are separate from readings. Save/import/
 export are explicit Studio-only operations, separate from draft/publication.
 Storage is versioned, bounded to 20 cases/256 KiB, and guarded against denial
-and quota errors; failed saves retain the candidate/list in memory. Imports
+and quota errors. The visible saved list changes only after storage succeeds;
+failed saves leave that list unchanged and retain the unsaved review/import
+JSON with an explicit warning. Import/delete never switch mode or resume the
+bridge. Removing the active saved row retains its in-session captured scenario
+until an explicit Live action or another scenario selection. Imports
 reject duplicate keys, conflicting pins and credential/connection fields.
 
 `runAll` clones its held argument once, then evaluates saved rows independently
@@ -190,6 +203,8 @@ item values, and step inputs/outputs with real meter usage. It never evaluates
 anything. Each Run groups reducer rows with their actual result; Items keeps
 filter counts and First Few cuts separate. Unobserved/skipped values are named
 as such. Display cuts and the combined 2,000-record cap never change evaluation.
+Every bounded step, iteration value and count read propagates truncation to
+the report-wide warning; actual counts and results are still unchanged.
 Documents have node-visit observations, not an invented runtime budget cap.
 
 Every event/copy is gated by observation; the unobserved hot paths allocate no

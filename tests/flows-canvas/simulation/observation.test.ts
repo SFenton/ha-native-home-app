@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { evaluateOperand, value } from '../../../src/shared/composition/evaluator';
 import { evaluatePipeline, type PipelineInputs } from '../../../src/shared/composition/pipeline';
 import { baselineDirectory } from './baseline';
+import { createObservation } from '../../../src/shared/composition/graph-observation';
 describe('read-only observation', () => {
   it('is byte-identical to origin/main across every pipeline and evaluation corpus case, with and without observation', () => {
     const baseline = baselineDirectory();
@@ -69,5 +70,24 @@ describe('read-only observation', () => {
       expect(evaluatePipeline(reducer, null, { ...context, observe: { pipeline: event => events.push(event) } })).toEqual(evaluatePipeline(reducer, null, context));
       expect(events.filter(event => event.kind === 'item').map(event => event.included)).toEqual([true, false, false, true]);
     }
+  });
+  it.each(['step', 'iteration'] as const)('marks the entire report incomplete when bounded %s evidence is cut', kind => {
+    const values = Array.from({ length: 60 }, (_, index) => index);
+    const inputs = {
+      title: 'Bounded evidence', parameters: [], request: { type: 'none', value: { type: 'literal', value: kind === 'step' ? values : [{ values }] } },
+      steps: [{ id: 'map', op: 'map', fields: { value: { type: 'item', path: [] } } }],
+      output: { kind: 'scalar' }, schema: { kind: 'null' },
+    } satisfies PipelineInputs;
+    const clock = { now: '2026-11-18T12:00:00', utcOffsetMinutes: 0 };
+    const observation = createObservation({ ast: inputs, clock, root: { kind: 'flow', id: 'bounded', field: 'inputs' },
+      runId: 'bounded', locate: pointer => ({ blockId: pointer }), provenance: () => 'live' });
+    const plain = evaluatePipeline(inputs, null, { clock });
+    const observed = evaluatePipeline(inputs, null, { clock, observe: { pipeline: event => {
+      if (kind === 'step' ? event.kind === 'step' : event.kind === 'item') observation.pipeline(event);
+    } } });
+    expect(observed).toEqual(plain);
+    expect(observation.report.truncated).toBe(true);
+    if (kind === 'step') expect(observation.report.steps[0]).toMatchObject({ before: 60, after: 60, truncated: true, output: expect.any(Array) });
+    else expect(observation.report.iterations).toHaveLength(1);
   });
 });
