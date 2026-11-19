@@ -255,12 +255,9 @@ describe('structurally refused rules use one observation-only Checker', () => {
   it('tries a malformed refused node once while retaining each partial guard snapshot', () => {
     const action = call(), observed = recording();
     action.optimistic = Array.from({ length: 17 }, () => ({ sourceId: 'source', value: 'on', revertAfterSeconds: 1, failsOnTimeout: false }));
-    confirmationMalformed(action);
-    function confirmationMalformed(value: CallService) {
-      if (!value.data || value.confirmation?.type !== 'additional') throw new Error('Expected call fixture');
-      Reflect.set(value.data, 'fields', null);
-      value.confirmation.title = 'x'.repeat(241);
-    }
+    if (!action.data || action.confirmation?.type !== 'additional') throw new Error('Expected call fixture');
+    Reflect.set(action.data, 'fields', null);
+    action.confirmation.title = 'x'.repeat(241);
     const input = document({ id: 'run', title: 'Run', type: 'primary-button', layout: { span: 1 }, props: {}, action });
     const spy = vi.spyOn(expression, 'checkCallService'), plain = refusal(() => compileCompositionDocument(input));
     expect(spy).not.toHaveBeenCalled();
