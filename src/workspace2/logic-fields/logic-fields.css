@@ -58,6 +58,7 @@
 .w2-logic-simulation .w2-sim-values-area { padding-inline: 0; background: transparent; }
 .w2-logic-overlay .w2-logic-simulation button.w2-link-button { color: var(--w2-ink-card); text-decoration: none; font-weight: 500; text-align: start; white-space: normal; }
 .w2-logic-simulation .w2-logic-lens > .w2-caption { margin: 0; }
+.w2-logic-overlay .w2-canvas button.w2-canvas-primary:hover:not(:disabled) { background: var(--w2-primary-fill); color: var(--w2-on-primary); border-color: transparent; }
 .w2-logic-overlay .w2-canvas button:disabled { opacity: 1; background: var(--w2-field); color: var(--w2-ink-card); border-color: var(--w2-line); cursor: not-allowed; }
 [aria-label="Properties"]:has(.w2-logic-editor) .w2-props-titles p { white-space: normal; overflow: visible; text-overflow: clip; }
 .w2-logic-error { position: fixed; inset-block-end: 20px; inset-inline: 20px; z-index: 140; padding: 16px; background: var(--w2-card); color: var(--w2-ink-card); border: 1px solid var(--w2-line); border-radius: 10px; }

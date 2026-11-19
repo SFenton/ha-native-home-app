@@ -1,11 +1,12 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { integrationDocument } from '../flows-canvas/integration/fixture';
+import { integrationDocument, integrationSnapshot } from '../flows-canvas/integration/fixture';
 import { isPhone, openLibrary, previewRoot, seed, waitForWorkspace } from './workspace2-helpers';
 import { liftField } from '../../src/workspace2/logic-fields/registry';
 import { readStudioCanvas } from '../../src/shared/composition/studio-logic/layout';
 import { compileCompositionDocument } from '../../src/shared/composition/compiler';
 import type { CompositionPublication } from '../../src/shared/composition/schema';
+import { contrast, parseColor } from '../../src/workspace2/theme';
 
 const mount = process.env.STUDIO_E2E_PROD ? '/api/hassio_ingress/w2-i/' : '/';
 const canvas = (page: Page) => page.locator('.w2-logic-overlay');
@@ -19,6 +20,7 @@ test.beforeEach(async ({ page, request, baseURL }) => {
     const response = await route.fetch({ url: `${baseURL}/${url.pathname.slice(mount.length)}${url.search}` });
     await route.fulfill({ response });
   });
+  await page.route('**/api/native-home', route => route.fulfill({ json: integrationSnapshot }));
 });
 async function open(page: Page) { await page.goto(mount); await waitForWorkspace(page); }
 async function flows(page: Page) {
@@ -41,13 +43,21 @@ async function select(page: Page, id: string) {
 async function condition(page: Page, id: string) {
   await select(page, id);
   const field = props(page).locator('[data-testid=logic-field][data-field-kind=condition]').first();
+  const disclosure = props(page).getByRole('button', { name: /^Only show when/ });
   const advanced = props(page).locator('.w2-advanced > button[aria-expanded=false]');
-  if (!await field.isVisible() && await advanced.count()) await advanced.click();
+  if (!await field.isVisible() && !await disclosure.isVisible() && await advanced.count()) await advanced.click();
+  if (!await field.isVisible() && await disclosure.isVisible()) await disclosure.click();
+  await expect(field).toBeVisible();
   return field;
 }
 async function closeProperties(page: Page) {
-  const close = props(page).getByRole('button', { name: 'Close', exact: true });
-  if (await close.isVisible()) await close.click();
+  await expect(async () => {
+    const done = props(page).getByRole('button', { name: 'Done', exact: true });
+    if (await done.isVisible()) await done.click({ timeout: 1_000 });
+    const close = props(page).getByRole('button', { name: 'Close', exact: true });
+    if (await close.isVisible()) await close.click({ timeout: 1_000 });
+    await expect(props(page)).not.toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
 }
 async function shot(page: Page, scheme: string, subject: string) {
   if (!process.env.STUDIO_EVIDENCE_DIR) return;
@@ -85,13 +95,30 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await shot(page, scheme, 'logic-tab');
   if (isPhone(page)) await page.keyboard.press('Escape');
 
+  const tile = previewRoot(page).locator('[data-sel="node:inline"] .sh-tile');
+  const surface = () => tile.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.background, color: style.color, text: element.textContent };
+  });
+  const unselected = await surface();
+  expect(unselected.background).toContain('gradient');
+  await tile.hover();
+  expect(await surface()).toEqual(unselected);
   const single = await condition(page, 'inline');
-  await expect(single.getByRole('button', { name: '+ And', exact: true })).toBeVisible();
+  expect(await surface()).toEqual(unselected);
+  await expect(single.getByRole('button', { name: '+ And…', exact: true })).toBeVisible();
+  await expect(props(page).getByRole('heading', { name: 'Only Show When', exact: true })).toBeVisible();
+  await expect(single.locator(':scope > .w2-row-label')).toHaveCount(0);
+  await expect(single.getByRole('button', { name: 'Entity', exact: true })).toHaveText('Window');
+  await expect(single.getByRole('button', { name: 'Value', exact: true })).toHaveText('Open');
+  await expect(single.getByTestId('result-line')).toContainText(/No.*Window is Closed right now.*Live/);
+  await expect(single.locator('.w2-picker-secondary')).toHaveCount(0);
+  await expect(single.getByRole('combobox', { name: 'Read', exact: true })).toHaveCount(0);
   await expect(props(page).getByRole('radiogroup', { name: 'Condition view' })).toHaveCount(0);
-  await single.getByRole('button', { name: '+ And', exact: true }).scrollIntoViewIfNeeded();
+  await single.getByRole('button', { name: '+ And…', exact: true }).scrollIntoViewIfNeeded();
   await expect(single.getByTestId('simple-condition')).toBeInViewport();
   await shot(page, scheme, 'one-check-inline');
-  await single.getByRole('button', { name: '+ And', exact: true }).click();
+  await single.getByRole('button', { name: '+ And…', exact: true }).click();
   await expect(canvas(page)).toBeVisible();
   await closePalette(page);
   await expect(canvas(page).getByRole('button', { name: /^Select Entity State/ })).toHaveCount(2);
@@ -99,7 +126,7 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await canvas(page).getByRole('button', { name: 'Close canvas', exact: true }).click();
   await expect(canvas(page)).toHaveCount(0);
   expect((await (await request.get('/native/api/draft')).json()).document).toEqual(before);
-  await single.getByRole('button', { name: '+ Or', exact: true }).click();
+  await single.getByRole('button', { name: '+ Or…', exact: true }).click();
   await closePalette(page);
   await expect(canvas(page).getByRole('button', { name: /^Select Any Of/ })).toBeVisible();
   await expect(canvas(page).getByRole('button', { name: /^Select Entity State/ })).toHaveCount(2);
@@ -109,13 +136,21 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   const many = await condition(page, 'summary');
   await expect(many.getByTestId('logic-field-summary')).toBeVisible();
   await expect(many.getByRole('img', { name: /^Logic mini-map:/ })).toBeVisible();
+  await expect(many.locator('figcaption')).toContainText('Window is Open and the person using the app is an admin');
+  await expect(many.locator('.w2-logic-map-label strong', { hasText: 'Window' }).first()).toBeVisible();
+  await expect(many.getByLabel('Logic status')).toContainText(/Live.*0 pinned.*of 64 blocks/);
+  if (isPhone(page)) await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
   await many.getByRole('button', { name: 'Edit in Canvas', exact: true }).scrollIntoViewIfNeeded();
+  await expect(many.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeInViewport({ ratio: 1 });
   await expect(many.getByTestId('logic-field-summary')).toBeInViewport();
   await shot(page, scheme, 'multi-check-summary');
   await closeProperties(page);
 
   const editor = await template(page);
   await expect(editor.getByText('Used by', { exact: true })).toBeVisible();
+  await expect(editor.getByTestId('logic-body')).toBeVisible();
+  await expect(editor.getByRole('img', { name: /^Logic mini-map:/ })).toBeVisible();
+  await expect(editor.locator('.w2-logic-map')).not.toContainText('graph-setting');
   await editor.getByRole('button', { name: 'Edit in Canvas', exact: true }).first().scrollIntoViewIfNeeded();
   await expect(editor.getByRole('button', { name: 'Edit in Canvas', exact: true }).first()).toBeInViewport();
   await shot(page, scheme, 'templates-and-uses');
@@ -136,6 +171,14 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await expect(block.locator('..')).not.toHaveAttribute('style', initialPosition!);
   await canvas(page).getByRole('button', { name: 'Apply to draft', exact: true }).click();
   await expect(canvas(page).locator('.w2-canvas-footer [role=status]')).toContainText('Edits applied to the draft');
+  const apply = canvas(page).getByRole('button', { name: 'Apply to draft', exact: true });
+  await apply.hover();
+  const applyStyle = await apply.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { ink: style.color, fill: style.backgroundColor, opacity: style.opacity };
+  });
+  expect(applyStyle.opacity).toBe('1');
+  expect(contrast(parseColor(applyStyle.ink)!, parseColor(applyStyle.fill)!), `${applyStyle.ink} on ${applyStyle.fill}`).toBeGreaterThanOrEqual(4.5);
   if (isPhone(page)) await canvas(page).getByRole('group', { name: 'Simulation mode', exact: true }).scrollIntoViewIfNeeded();
   await shot(page, scheme, 'canvas-simulation');
   await canvas(page).getByRole('button', { name: 'Save draft', exact: true }).click();
@@ -151,12 +194,15 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await reopened.getByRole('button', { name: 'Edit in Canvas', exact: true }).first().click();
   await closePalette(page);
   await expect(canvas(page).getByRole('button', { name: /^Select Attribute/ }).locator('..')).not.toHaveAttribute('style', initialPosition!);
-  await canvas(page).getByRole('combobox', { name: 'Preview lens' }).selectOption('stand-in');
+  await canvas(page).getByRole('combobox', { name: 'Preview lens' }).click();
+  await page.getByRole('option', { name: 'Stand-in', exact: true }).click();
   await expect(canvas(page).getByRole('article', { name: 'Stand-in field preview' })).toBeVisible();
-  await canvas(page).getByRole('combobox', { name: 'Preview lens' }).selectOption('use-0');
-  const useOptions = await canvas(page).getByRole('combobox', { name: 'Preview lens' }).locator('option').allTextContents();
+  await canvas(page).getByRole('combobox', { name: 'Preview lens' }).click();
+  await expect(page.getByRole('option', { name: /^A use:.*First room/ }).first()).toBeVisible();
+  const useOptions = await page.getByRole('option').allTextContents();
   expect(useOptions.join(' ')).toContain('First room');
   expect(useOptions.join(' ')).toContain('Second room');
+  await page.getByRole('option', { name: /^A use:.*First room/ }).first().click();
   await closeCanvas(page);
   expect(JSON.stringify((await (await request.get('/native/api/draft')).json()).document.studioCanvas)).toBe(metadata);
   expect(liftField(saved, ['logicLibrary', 0, 'body'], 'operand').graph.roots[0].anchor).toMatchObject({ kind: 'logic', id: 'tile-label', field: '/body' });
@@ -199,7 +245,9 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
 test('a non-tile field uses explicit template arguments; tile uses resolve independently; unlink survives reload', async ({ page, request }) => {
   await open(page);
   await select(page, 'standalone');
-  const field = props(page).locator('[data-testid=logic-field][data-field-path$="/primary"]');
+  const primary = () => props(page).locator('[data-field-path$="/primary"] [data-testid=value-field]');
+  await primary().click();
+  const field = props(page).getByTestId('value-editor');
   await field.getByRole('button', { name: 'Use Template', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Use a Logic Template', exact: true });
   await dialog.getByRole('combobox', { name: 'Template', exact: true }).selectOption('tile-label');
@@ -207,6 +255,7 @@ test('a non-tile field uses explicit template arguments; tile uses resolve indep
   await dialog.getByRole('combobox', { name: 'Entity', exact: true }).selectOption('source-b');
   await dialog.getByRole('button', { name: 'Use Template', exact: true }).click();
   await expect(field.getByTestId('logic-use')).toBeVisible();
+  await props(page).getByRole('button', { name: 'Done', exact: true }).click();
   const draft = async () => (await (await request.get('/native/api/draft')).json()).document;
   await expect.poll(async () => (await draft()).pages[0].components[5].props.primary.value.type).toBe('logic-ref');
   const saved = await draft();
@@ -216,7 +265,9 @@ test('a non-tile field uses explicit template arguments; tile uses resolve indep
   const prepared = await response.json();
   expect(prepared.expanded.pages[0].components[0].props.subtitle.value.from.sourceId).toBe('source-a');
   expect(prepared.expanded.pages[0].components[1].props.subtitle.value.from.sourceId).toBe('source-b');
-  await field.getByRole('button', { name: 'Unlink From Template', exact: true }).click();
+  await primary().click();
+  await field.getByTestId('logic-use').getByRole('button', { name: 'Unlink From Template', exact: true }).click();
+  await props(page).getByRole('button', { name: 'Done', exact: true }).click();
   await expect.poll(async () => (await draft()).pages[0].components[5].props.primary.value.type).toBe('read');
   const unlinked = await draft();
   expect(unlinked.pages[0].components[5].props.primary.value.from.sourceId).toBe('source-b');
@@ -279,7 +330,8 @@ test('existing request formula displays, edits, saves and reopens without turnin
   await panel.getByRole('button', { name: /^Existing formula/ }).first().click();
   const editor = page.getByTestId('flow-editor');
   const field = editor.getByTestId('request-section').getByTestId('logic-field');
-  await expect(field.getByTestId('logic-field-summary')).toContainText(/2|3|Add/);
+  await expect(field).toContainText('2 + 3');
+  await expect(field.getByTestId('logic-field-summary')).toHaveCount(0);
   await field.getByRole('button', { name: 'Edit in Canvas', exact: true }).click();
   await expect(canvas(page)).toBeVisible();
   await closePalette(page);

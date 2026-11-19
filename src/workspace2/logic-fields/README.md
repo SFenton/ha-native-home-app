@@ -23,7 +23,10 @@ nothing. Compound checks show a sentence, a graph mini-map and Edit in Canvas,
 not an in-panel condition-card editor. A field inside a pipeline opens its whole
 flow so item and parameter scopes remain valid.
 
-Template bodies use canonical library anchors. New uses require explicit
+Template bodies use canonical library anchors. The value editor's temporary
+slot view, including nested rule requests, is translated back to the operand
+body before addressing or lifting; its wrapper never enters layout anchors.
+New uses require explicit
 arguments, including explicitly selected compatible enclosing holes. Samples
 are preview inputs, never implicit use arguments. Tile bindings resolve per
 addressed use; unlink materializes its bindings before expanding nested holes.
