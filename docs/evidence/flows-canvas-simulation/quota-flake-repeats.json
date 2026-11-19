@@ -1,0 +1,7859 @@
+{
+  "base": "285584234bdfd60c2cca4dcd255d46f9eb7419c3",
+  "reviewedHead": "58bed383cfd2df5e5aa8e9de7e6e1d210e89a158",
+  "failureRun": "https://github.com/SFenton/ha-native-home-app/actions/runs/44514049130/job/135525330885",
+  "cause": "Fixture loading explicitly remounted the host in Live. Its debounced refresh fired while Playwright waited for the scenario drawer to stop moving, before scenario selection and before the failed import.",
+  "originalTraceMonotonicMs": {
+    "initialRead": 411272.035,
+    "fixtureLoadClick": 411509.715,
+    "remountRead": 412155.324,
+    "scenarioSelectionClickDispatched": 412537.265,
+    "failedImportClickStarted": 412683.396
+  },
+  "command": "STUDIO_E2E_CPU_RATE=<1 or 4> STUDIO_E2E_PORT=4823 STUDIO_E2E_DATA_DIR=./test-results/studio-data/w2-s npx playwright test tests/e2e/workspace2-flows-simulation.spec.ts --grep 'failed import is transactional and visible: QuotaExceededError' --project=phone --project=desktop --repeat-each=30 --workers=2",
+  "credentials": "HA credential variables unset; fixture-only intercepted responses",
+  "timerDrain": {
+    "boundMs": 5000,
+    "callbackLimit": 100,
+    "stepLimit": 100,
+    "networkTimeoutMs": 8000,
+    "delaysMs": [
+      0,
+      300,
+      600,
+      1500,
+      3000,
+      4999
+    ]
+  },
+  "totalPassed": 840,
+  "unmodifiedZeroRequestWindows": 120,
+  "delayedMutationsRejectedBySameGuard": 720,
+  "failed": 0,
+  "runs": [
+    {
+      "cpuRate": 1,
+      "passed": 420,
+      "durationMs": 583436.531
+    },
+    {
+      "cpuRate": 4,
+      "passed": 420,
+      "durationMs": 920856.575
+    }
+  ],
+  "groups": [
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": null,
+      "expectedGuard": "accept",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": 0,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": 300,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": 600,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": 1500,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": 3000,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "desktop",
+      "delayMs": 4999,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": null,
+      "expectedGuard": "accept",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": 0,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": 300,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": 600,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": 1500,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": 3000,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 1,
+      "project": "phone",
+      "delayMs": 4999,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": null,
+      "expectedGuard": "accept",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": 0,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": 300,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": 600,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": 1500,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": 3000,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "desktop",
+      "delayMs": 4999,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": null,
+      "expectedGuard": "accept",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 0,
+          "routeDelta": 0,
+          "elapsedMs": 1,
+          "callbacks": 1,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": 0,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": 300,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 300,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": 600,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 600,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": 1500,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 1500,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": 3000,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 3000,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    },
+    {
+      "cpuRate": 4,
+      "project": "phone",
+      "delayMs": 4999,
+      "expectedGuard": "reject",
+      "passed": 30,
+      "repetitions": [
+        {
+          "repeatIndex": 0,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 1,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 2,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 3,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 4,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 5,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 6,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 7,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 8,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 9,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 10,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 11,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 12,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 13,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 14,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 15,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 16,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 17,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 18,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 19,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 20,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 21,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 22,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 23,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 24,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 25,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 26,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 27,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 28,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        },
+        {
+          "repeatIndex": 29,
+          "initialReads": 2,
+          "browserStarts": 1,
+          "routeDelta": 1,
+          "elapsedMs": 4999,
+          "callbacks": 2,
+          "pendingTimers": 0
+        }
+      ]
+    }
+  ]
+}

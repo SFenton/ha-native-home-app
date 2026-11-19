@@ -20,6 +20,111 @@ async function attachNetwork(info: TestInfo, value: unknown) {
   await info.attach('intercepted-network.json', { path, contentType: 'application/json' });
 }
 const output = (page: Page, name: string) => page.getByRole('article', { name: `Output ${name}`, exact: true }).locator('output');
+type NetworkRead = { method: string; url: string };
+const IMPORT_TIMER_BOUND_MS = 5_000;
+const IMPORT_TIMER_CALLBACK_LIMIT = 100;
+const IMPORT_REQUEST_DELAYS_MS = [0, 300, 600, 1_500, 3_000, IMPORT_TIMER_BOUND_MS - 1];
+type ImportTimer = { kind: 'timeout' | 'interval' | 'animation frame' | 'idle callback'; due: number };
+declare global {
+  interface Window {
+    __simulationImportTraffic: {
+      requests: NetworkRead[]; pending: number; startedAt: number;
+      timers: Map<number, ImportTimer>; callbacks: number;
+    };
+  }
+}
+async function pauseImportClock(page: Page) {
+  await page.clock.install({ time: new Date('2026-11-19T12:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-11-19T12:01:00Z'));
+}
+async function observeImport(page: Page) {
+  await page.evaluate(({ bound, callbackLimit }) => {
+    const browser: Window = window;
+    const traffic = window.__simulationImportTraffic = {
+      requests: [] as NetworkRead[], pending: 0, startedAt: performance.now(),
+      timers: new Map<number, ImportTimer>(), callbacks: 0,
+    };
+    const fire = (callback: () => void) => {
+      if (++traffic.callbacks > callbackLimit) throw new Error(`Import timers did not settle within ${bound} ms: exceeded ${callbackLimit} callbacks.`);
+      callback();
+    };
+    const timeout = browser.setTimeout.bind(browser), interval = browser.setInterval.bind(browser);
+    const clearTimeout = browser.clearTimeout.bind(browser), clearInterval = browser.clearInterval.bind(browser);
+    const schedule = (repeat: boolean, handler: TimerHandler, delay = 0, ...args: unknown[]) => {
+      if (typeof handler !== 'function') throw new Error('Import timer audit requires a function callback.');
+      const id = (repeat ? interval : timeout)(() => {
+        if (repeat) traffic.timers.set(id, { kind: 'interval', due: performance.now() + Math.max(1, delay) });
+        else traffic.timers.delete(id);
+        fire(() => handler(...args));
+      }, delay);
+      traffic.timers.set(id, { kind: repeat ? 'interval' : 'timeout', due: performance.now() + Math.max(0, delay) });
+      return id;
+    };
+    browser.setTimeout = (handler, delay, ...args) => schedule(false, handler, delay, ...args);
+    browser.setInterval = (handler, delay, ...args) => schedule(true, handler, delay, ...args);
+    browser.clearTimeout = id => { if (id !== undefined) traffic.timers.delete(id); clearTimeout(id); };
+    browser.clearInterval = id => { if (id !== undefined) traffic.timers.delete(id); clearInterval(id); };
+    const frame = window.requestAnimationFrame.bind(window), cancelFrame = window.cancelAnimationFrame.bind(window);
+    window.requestAnimationFrame = callback => {
+      const id = frame(time => { traffic.timers.delete(id); fire(() => callback(time)); });
+      traffic.timers.set(id, { kind: 'animation frame', due: performance.now() + 16 });
+      return id;
+    };
+    window.cancelAnimationFrame = id => { traffic.timers.delete(id); cancelFrame(id); };
+    const idle = window.requestIdleCallback.bind(window), cancelIdle = window.cancelIdleCallback.bind(window);
+    window.requestIdleCallback = (callback, options) => {
+      const id = idle(deadline => { traffic.timers.delete(id); fire(() => callback(deadline)); }, options);
+      traffic.timers.set(id, { kind: 'idle callback', due: performance.now() + 1 });
+      return id;
+    };
+    window.cancelIdleCallback = id => { traffic.timers.delete(id); cancelIdle(id); };
+    const fetch = window.fetch;
+    window.fetch = function (input, init) {
+      traffic.requests.push({
+        method: init?.method ?? (input instanceof Request ? input.method : 'GET'),
+        url: new URL(input instanceof Request ? input.url : String(input), document.baseURI).href,
+      });
+      traffic.pending++;
+      return fetch.call(this, input, init).finally(() => { traffic.pending--; });
+    };
+    const requests = new WeakMap<XMLHttpRequest, NetworkRead>();
+    const open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method: string, url: string | URL, async: boolean = true, username?: string | null, password?: string | null) {
+      requests.set(this, { method, url: new URL(String(url), document.baseURI).href });
+      return open.call(this, method, url, async, username, password);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+      const request = requests.get(this);
+      if (!request) throw new Error('Import audit observed XMLHttpRequest.send without open.');
+      traffic.requests.push(request);
+      traffic.pending++;
+      this.addEventListener('loadend', () => { traffic.pending--; }, { once: true });
+      return send.call(this, body);
+    };
+  }, { bound: IMPORT_TIMER_BOUND_MS, callbackLimit: IMPORT_TIMER_CALLBACK_LIMIT });
+}
+async function drainImportTimers(page: Page) {
+  for (let step = 0; step < IMPORT_TIMER_CALLBACK_LIMIT; step++) {
+    await page.waitForFunction(() => window.__simulationImportTraffic.pending === 0, undefined, { timeout: 8_000 });
+    const state = await page.evaluate(() => {
+      const traffic = window.__simulationImportTraffic;
+      const now = performance.now();
+      return { now, elapsedMs: now - traffic.startedAt, callbacks: traffic.callbacks, timers: [...traffic.timers.values()] };
+    });
+    if (!state.timers.length) return { elapsedMs: state.elapsedMs, callbacks: state.callbacks, pendingTimers: 0 };
+    const remaining = IMPORT_TIMER_BOUND_MS - state.elapsedMs;
+    if (remaining <= 0) throw new Error(`Import timers did not settle within ${IMPORT_TIMER_BOUND_MS} ms: ${JSON.stringify(state.timers)}`);
+    const nextDue = Math.min(...state.timers.map(timer => timer.due));
+    await page.clock.runFor(Math.min(remaining, Math.max(1, nextDue - state.now)));
+  }
+  throw new Error(`Import timers did not settle within ${IMPORT_TIMER_BOUND_MS} ms: exceeded ${IMPORT_TIMER_CALLBACK_LIMIT} drain steps.`);
+}
+async function assertNoImportRequests(page: Page, network: readonly NetworkRead[], initialReads: number) {
+  await drainImportTimers(page);
+  const requests = await page.evaluate(() => window.__simulationImportTraffic.requests);
+  expect(requests, 'No requests may start during import, including delayed flow-run reads.').toEqual([]);
+  expect(network.length - initialReads, 'The final live route delta must also stay zero.').toBe(0);
+}
 async function open(page: Page) {
   const network: { method: string; url: string }[] = [];
   await page.emulateMedia({ colorScheme: 'light' });
@@ -236,10 +341,21 @@ for (const change of ['active', 'unchanged', 'inactive'] as const) {
     await attachNetwork(info, { change, activeCaptureUnchangedUntilSelection: true, persistedImport: true, simulationFetches: 0, requests: network });
   });
 }
-for (const failure of ['SecurityError', 'QuotaExceededError']) {
-  test(`failed import is transactional and visible: ${failure}`, async ({ page }, info) => {
+for (const failure of ['SecurityError', 'QuotaExceededError']) for (const delayMs of [null, ...IMPORT_REQUEST_DELAYS_MS]) {
+  test(`failed import is transactional and visible: ${failure}${delayMs !== null ? ` (delayed flow-run negative control: ${delayMs} ms)` : ''}`, async ({ page }, info) => {
+    const cpuRate = Number(process.env.STUDIO_E2E_CPU_RATE ?? 1);
+    expect(Number.isFinite(cpuRate) && cpuRate >= 1, 'STUDIO_E2E_CPU_RATE must be a finite number >= 1.').toBe(true);
+    if (cpuRate !== 1) {
+      const session = await page.context().newCDPSession(page);
+      await session.send('Emulation.setCPUThrottlingRate', { rate: cpuRate });
+    }
     const network = await open(page);
+    // Loading fixtures remounts the host in Live; settle that refresh before entering simulation.
+    const refreshed = page.waitForResponse(response => response.url().endsWith('/native/api/ha/flow-run') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+    expect(await (await refreshed).finished()).toBeNull();
+    await expect(output(page, 'Chores count')).toHaveText('6');
+    expect(network).toHaveLength(2);
     const drawer = await scenarios(page);
     await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
     const saved = await page.evaluate(() => {
@@ -251,14 +367,19 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) {
     const exchange = drawer.getByLabel('Scenario exchange JSON', { exact: true });
     const replacement = JSON.stringify({ version: 1, scenarios: [] });
     await exchange.fill(replacement);
-    await page.evaluate(({ failure, key }) => {
+    await page.evaluate(({ failure, key, delayMs }) => {
       const set = Storage.prototype.setItem;
       Storage.prototype.setItem = function (name, value) {
-        if (name === key) throw new DOMException('Test storage failure', failure);
+        if (name === key) {
+          if (delayMs !== null) setTimeout(() => { void fetch('./native/api/ha/flow-run', { method: 'POST' }); }, delayMs);
+          throw new DOMException('Test storage failure', failure);
+        }
         return set.call(this, name, value);
       };
-    }, { failure, key: saved.key });
-    await page.clock.install();
+    }, { failure, key: saved.key, delayMs });
+    await pauseImportClock(page);
+    await observeImport(page);
+    const initialReads = network.length;
     await drawer.getByRole('button', { name: 'Import scenarios (replace browser list)', exact: true }).click();
     const warning = page.getByRole('status').filter({ hasText: 'Import not saved.' });
     await expect(warning).toContainText('The saved scenario list is unchanged.');
@@ -267,9 +388,32 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) {
     expect(await page.evaluate(key => localStorage.getItem(key), saved.key)).toBe(saved.value);
     await expect(page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Simulated', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(output(page, 'Subtitle')).toHaveText('Too Warm');
-    await page.clock.runFor(1000);
-    expect(network).toHaveLength(1);
-    await attachNetwork(info, { failure, unchangedPersistedList: true, unsavedImportRetained: true, warning: await warning.textContent(), simulationFetches: 0, requests: network });
+    const timerDrain = await drainImportTimers(page);
+    const warningText = await warning.textContent();
+    const simulationRequests = await page.evaluate(() => window.__simulationImportTraffic.requests);
+    await attachNetwork(info, { failure, cpuRate, delayMs, timerBoundMs: IMPORT_TIMER_BOUND_MS, timerDrain, initialReads, unchangedPersistedList: true, unsavedImportRetained: true, warning: warningText, simulationFetches: simulationRequests.length, simulationRequests, requests: network });
+    // Re-read both counters after the asynchronous evidence work; no import endpoint is exempt.
+    if (delayMs !== null) {
+      expect(simulationRequests).toEqual([{ method: 'POST', url: network[0].url }]);
+      expect(network.length - initialReads).toBe(1);
+      await expect(assertNoImportRequests(page, network, initialReads)).rejects.toThrow('No requests may start during import');
+    } else await assertNoImportRequests(page, network, initialReads);
+  });
+}
+for (const timer of ['beyond bound', 'recurring', 'self-rescheduling'] as const) {
+  test(`import timer drain fails finitely: ${timer}`, async ({ page }) => {
+    await page.goto('about:blank');
+    await pauseImportClock(page);
+    await observeImport(page);
+    await page.evaluate(({ timer, bound }) => {
+      if (timer === 'beyond bound') setTimeout(() => {}, bound + 1);
+      else if (timer === 'recurring') setInterval(() => {}, 500);
+      else {
+        const again = () => { setTimeout(again, 0); };
+        again();
+      }
+    }, { timer, bound: IMPORT_TIMER_BOUND_MS });
+    await expect(drainImportTimers(page)).rejects.toThrow(`Import timers did not settle within ${IMPORT_TIMER_BOUND_MS} ms:`);
   });
 }
 test('AA contrast for every rendered simulation text/background pair in both appearances', async ({ page }, info) => {

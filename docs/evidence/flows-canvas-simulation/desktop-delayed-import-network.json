@@ -1,0 +1,36 @@
+{
+  "failure": "QuotaExceededError",
+  "cpuRate": 4,
+  "delayMs": 4999,
+  "timerBoundMs": 5000,
+  "timerDrain": {
+    "elapsedMs": 4999,
+    "callbacks": 2,
+    "pendingTimers": 0
+  },
+  "initialReads": 2,
+  "unchangedPersistedList": true,
+  "unsavedImportRetained": true,
+  "warning": "Import not saved. Scenarios weren't saved (invalid data, unavailable storage, or quota exceeded). Keep this view open to retry or export. The saved scenario list is unchanged.",
+  "simulationFetches": 1,
+  "simulationRequests": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    }
+  ]
+}
