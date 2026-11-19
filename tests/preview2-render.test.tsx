@@ -305,6 +305,13 @@ describe('Preview2 Use actions', () => {
 });
 
 describe('Preview2 same-frame edits', () => {
+  beforeEach(() => {
+    // A wall-clock tick is a separate context update, not a document edit.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-18T20:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it('re-renders the edited node and not its siblings', () => {
     const hit = find('navigation-tile')!;
     const tile = (id: string) => ({ ...hit.node, id, title: id }) as CompositionNode;
