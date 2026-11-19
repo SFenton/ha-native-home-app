@@ -12,6 +12,8 @@ import { newFacts, typeSteps } from '../../../src/shared/composition/pipeline/ty
 import { createCompositionDocument } from '../../../src/shared/composition/workspace';
 import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from '../../../src/shared/composition/schema';
 import { CompositionValidationError, parseCompositionJSON } from '../../../src/shared/composition/json';
+import { expandLogic } from '../../../src/shared/composition/logic-library';
+import { pipelineSourceSchema } from '../../../src/shared/composition/pipeline/schema';
 
 afterEach(() => vi.restoreAllMocks());
 const literal = (value: string | number | boolean = 1): Operand => ({ type: 'literal', value });
@@ -125,6 +127,122 @@ describe('compiler accounting observer forwarding', () => {
     expect(observed).toStrictEqual(plain);
     expect(Object.keys(observed)).toEqual(Object.keys(plain));
     expect(spies[0].mock.calls.some(args => args[5] === observer)).toBe(true);
+  });
+});
+
+describe('named-logic structural refusal accounting', () => {
+  const rule = (otherwise: Operand = literal()): Operand => ({
+    type: 'choose', cases: Array.from({ length: 17 }, () => ({ when: { type: 'viewer', isAdmin: true }, then: literal() })), otherwise,
+  });
+  const boundaries = ['expression', 'expression-origins', 'flow', 'flow-origins', 'bundle'] as const;
+  type Boundary = typeof boundaries[number];
+  const entry = (body: unknown, kind: 'operand' | 'condition' = 'operand') => ({ id: 'template', name: 'Template', kind, params: [], body });
+  const use = { type: 'logic-ref', logicId: 'template', args: {} };
+  function input(body: unknown, boundary: Boundary, kind: 'operand' | 'condition' = 'operand') {
+    const base = document(), source = flow();
+    return {
+      ...base, logicLibrary: [entry(body, kind)],
+      pages: [{ ...base.pages[0], components: [{
+        ...text(), ...(kind === 'condition' ? { visibleWhen: use } : {
+          props: { value: { type: 'expr', value: use }, style: 'body', unavailableText: 'None' },
+        }),
+      }] }],
+      dataSources: boundary.startsWith('flow') || boundary === 'bundle' ? [{
+        ...source, inputs: { ...source.inputs, steps: kind === 'condition'
+          ? [{ id: 'keep', op: 'filter', where: use }]
+          : [{ id: 'map', op: 'map', fields: { value: use } }] },
+      }] : [],
+    };
+  }
+  function compile(value: unknown, boundary: Boundary, observer?: BudgetAccountingObserver) {
+    if (boundary === 'bundle') {
+      // Fragment consumers expand named logic before passing plain sources to the bundle checker.
+      const expanded = expandLogic(value, observer, '/document').document;
+      if (expanded === null || typeof expanded !== 'object' || !('dataSources' in expanded) || !Array.isArray(expanded.dataSources)) throw new Error('Expected expanded sources');
+      return checkCompositionPipelineBundle(expanded.dataSources.map(source => parseCompositionShape(pipelineSourceSchema, source)), '/document/dataSources', observer);
+    }
+    return boundary.endsWith('origins') ? compileCompositionDocumentWithOrigins(value, { accountingObserver: observer })
+      : compileCompositionDocument(value, { accountingObserver: observer });
+  }
+  function direct(value: Operand | Predicate, at: string, kind: 'operand' | 'condition' = 'operand') {
+    const recorded = recording();
+    if (kind === 'operand') expression.checkOperand(value as Operand, at, true, false, 'lenient', recorded.observer);
+    else expression.checkPredicate(value as Predicate, at, false, 'lenient', recorded.observer);
+    return recorded.events;
+  }
+
+  it.each(boundaries.flatMap(boundary => [false, true].map(format => ({ boundary, format }))))(
+    'matches direct 90/91-event template observation at $boundary (format fallback: $format)', ({ boundary, format }) => {
+      const value = rule(format ? { type: 'format', pattern: '{value}', args: { value: literal() } } : literal());
+      const expected = direct(value, '/document/logicLibrary/0/body'), compiled = recording(), valueInput = input(value, boundary);
+      const spy = vi.spyOn(expression, 'checkOperand');
+      const plain = refusal(() => compile(valueInput, boundary));
+      expect(spy).not.toHaveBeenCalled();
+      expect(refusal(() => compile(valueInput, boundary, compiled.observer))).toStrictEqual(plain);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(compiled.events).toStrictEqual(expected);
+      expect(compiled.events).toHaveLength(format ? 91 : 90);
+      expect(plain).toEqual([{ code: 'invalid_value', pointer: `${boundary === 'bundle' ? '' : '/document'}/logicLibrary/0/body` }]);
+    },
+  );
+
+  it.each(boundaries)('retains the owning condition template budget at %s', boundary => {
+    const value: Predicate = { type: 'exists', value: rule() }, compiled = recording(), valueInput = input(value, boundary, 'condition');
+    const plain = refusal(() => compile(valueInput, boundary));
+    expect(refusal(() => compile(valueInput, boundary, compiled.observer))).toStrictEqual(plain);
+    expect(compiled.events).toStrictEqual(direct(value, '/document/logicLibrary/0/body', 'condition'));
+  });
+
+  it('observes each refused definition once even when several components use it', () => {
+    const value = rule(), base = document(), first = entry(value), second = { ...entry(rule()), id: 'second' };
+    const valueInput = {
+      ...base, logicLibrary: [first, second],
+      pages: [{ ...base.pages[0], components: Array.from({ length: 4 }, (_, index) => ({
+        ...text(), id: `text-${index}`, props: { value: { type: 'expr', value: { ...use, logicId: index % 2 ? 'second' : 'template' } }, style: 'body', unavailableText: 'None' },
+      })) }],
+    };
+    const expected = [first, second].flatMap((definition, index) => direct(definition.body as Operand, `/document/logicLibrary/${index}/body`));
+    const spy = vi.spyOn(expression, 'checkOperand'), compiled = recording();
+    const plain = refusal(() => compileCompositionDocument(valueInput));
+    expect(spy).not.toHaveBeenCalled();
+    expect(refusal(() => compileCompositionDocument(valueInput, { accountingObserver: compiled.observer }))).toStrictEqual(plain);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(compiled.events).toStrictEqual(expected);
+  });
+
+  it.each(['operand', 'condition'] as const)('observes refused %s parameter samples and use arguments at their own roots', kind => {
+    const value = kind === 'operand' ? rule() : { type: 'exists' as const, value: rule() };
+    for (const sample of [false, true]) {
+      const base = document(), compiled = recording(), body = { type: 'hole', name: 'value' };
+      const valueInput = {
+        ...base,
+        logicLibrary: [{ ...entry(body, kind), params: [{ name: 'value', kind, ...(sample ? { sample: value } : {}) }] }],
+        pages: [{ ...base.pages[0], components: [{
+          ...text(), ...(kind === 'condition' ? { visibleWhen: { ...use, args: { value } } } : {
+            props: { value: { type: 'expr', value: { ...use, args: { value } } }, style: 'body', unavailableText: 'None' },
+          }),
+        }] }],
+      };
+      const at = sample ? '/document/logicLibrary/0/params/0/sample'
+        : `/document/pages/0/components/0/${kind === 'condition' ? 'visibleWhen' : 'props/value/value'}/args/value`;
+      const plain = refusal(() => compileCompositionDocument(valueInput));
+      expect(refusal(() => compileCompositionDocument(valueInput, { accountingObserver: compiled.observer }))).toStrictEqual(plain);
+      expect(compiled.events).toStrictEqual(direct(value, at, kind));
+    }
+  });
+
+  it.each(boundaries)('emits only a partial guard for a malformed oversized template at %s', boundary => {
+    const value = { type: 'choose', cases: Array.from({ length: 17 }, () => ({ when: { type: 'viewer', isAdmin: true }, then: null })), otherwise: literal() };
+    const valueInput = input(value, boundary), compiled = recording(), plain = refusal(() => compile(valueInput, boundary));
+    expect(refusal(() => compile(valueInput, boundary, compiled.observer))).toStrictEqual(plain);
+    expect(compiled.events).toEqual([{ type: 'schema-limit', pointer: '/document/logicLibrary/0/body/cases', count: 17, limit: 16, direction: 'maximum', partial: true }]);
+  });
+
+  it.each(boundaries)('propagates template observer exceptions unchanged at %s', boundary => {
+    const valueInput = input(rule(), boundary);
+    for (const error of [new TypeError('observer'), new CompositionValidationError([{ code: 'invalid_value', pointer: '/observer' }]), 'observer']) {
+      expect(thrown(() => compile(valueInput, boundary, () => { throw error; }))).toBe(error);
+    }
   });
 });
 

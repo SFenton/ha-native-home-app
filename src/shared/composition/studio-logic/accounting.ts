@@ -76,6 +76,26 @@ export function emitSchemaAccounting(
 }
 
 type RefusedKind = 'operand' | 'predicate' | 'call';
+/** Select the same discriminator-matching union branch as composition diagnostics. */
+export function expandSchemaIssues(list: readonly z.core.$ZodIssue[]): z.core.$ZodIssue[] {
+  return list.flatMap(issue => {
+    if (issue.code !== 'invalid_union' || !('errors' in issue) || !Array.isArray(issue.errors)) return [issue];
+    const branches = (issue.errors as z.core.$ZodIssue[][]).filter(branch => branch.length && !branch.some(inner => inner.path.at(-1) === 'type' && inner.path.length === 1));
+    if (branches.length !== 1) return [issue];
+    return expandSchemaIssues(branches[0].map(inner => ({ ...inner, path: [...issue.path, ...inner.path] }) as z.core.$ZodIssue));
+  });
+}
+
+/** Template validation retains its own diagnostics; only refused structural guards are observed here. */
+export function observeStructuralRefusals(
+  schema: z.ZodType, input: unknown, issues: readonly z.core.$ZodIssue[], observer: BudgetAccountingObserver, base: string,
+): void {
+  const observed = new Map<string, 'complete' | 'partial'>();
+  const read = (path: readonly PropertyKey[]) => path.reduce<unknown>((value, key) =>
+    value !== null && typeof value === 'object' ? Reflect.get(value, key) : undefined, input);
+  for (const issue of expandSchemaIssues(issues)) observeSchemaRefusal(schema, input, read, issue, observer, base, observed);
+}
+
 interface SchemaRoot { readonly kind: RefusedKind; readonly value: unknown; readonly depth: number }
 function schemaVariantMatches(schema: z.core.$ZodType, value: unknown): boolean {
   if (schema instanceof z.ZodLazy) return schemaVariantMatches(schema.unwrap(), value);

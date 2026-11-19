@@ -6,7 +6,8 @@
   "description": "A Home Assistant app for designing and publishing native server-driven experiences.",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/generate-expression-checker.mjs --check && tsc --noEmit && vite build",
+    "generate:expression-checker": "node scripts/generate-expression-checker.mjs",
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",

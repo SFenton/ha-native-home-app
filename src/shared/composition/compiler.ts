@@ -34,7 +34,7 @@ import { PIPELINE_LIMITS, pipelineSourceSchema, type PipelineSource } from './pi
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
-import { emitSchemaAccounting, isAccountingObserverFailure, observeSchemaRefusal, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
+import { emitSchemaAccounting, expandSchemaIssues, isAccountingObserverFailure, observeSchemaRefusal, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
 
@@ -234,13 +234,7 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown, a
    * A plain union reports one failure at its own path. The app names the exact field of the branch the value's `type` selects,
    * so descend into the branch that matched the discriminator, whose first failure is not about `type` itself.
    */
-  const expand = (list: readonly z.core.$ZodIssue[]): z.core.$ZodIssue[] => list.flatMap(issue => {
-    if (issue.code !== 'invalid_union' || !('errors' in issue) || !Array.isArray(issue.errors)) return [issue];
-    const branches = (issue.errors as z.core.$ZodIssue[][]).filter(branch => branch.length && !branch.some(inner => inner.path.at(-1) === 'type' && inner.path.length === 1));
-    if (branches.length !== 1) return [issue];
-    return expand(branches[0].map(inner => ({ ...inner, path: [...issue.path, ...inner.path] }) as z.core.$ZodIssue));
-  });
-  const expandedIssues = expand(parsed.error.issues);
+  const expandedIssues = expandSchemaIssues(parsed.error.issues);
   if (accountingObserver) {
     const emitted = new Set<object>();
     const observed = new Map<string, 'complete' | 'partial'>();
@@ -347,7 +341,7 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
 } {
   assertCompositionBounds(input);
   let expansion: ReturnType<typeof expandBounded>;
-  try { expansion = expandBounded(input); }
+  try { expansion = expandBounded(input, options.accountingObserver, '/document'); }
   catch (error) {
     // Like every other compile issue, a logic issue reads from the document's root.
     if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
