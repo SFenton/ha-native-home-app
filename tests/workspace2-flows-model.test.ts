@@ -70,13 +70,19 @@ it('finds named transitive readers, not service intent names or literal words th
   expect(readers.get('switch.demo_light_1')).not.toContain('Power switch');
 });
 
-it('resolves each placed component private source with its entity argument, not only the library fallback', () => {
+it.each([false, true])('resolves placed private sources with entity overrides, including logic arguments (logic: %s)', throughLogic => {
   const node: NonNullable<CompositionDocument['componentLibrary']>[number]['node'] = {
     id: 'private-text', type: 'text', title: 'Actual temperature', layout: { span: 1 },
     props: { value: { type: 'read', from: { type: 'source', sourceId: 'private-source', path: ['state'] }, as: 'string', missing: 'unavailable' }, style: 'body', unavailableText: 'Unavailable' },
   };
-  const edited: CompositionDocument = {
-    ...document, componentLibrary: [{
+  let edited: CompositionDocument = {
+    ...document,
+    ...(throughLogic ? { logicLibrary: [{
+      id: 'private-value', name: 'Private value', kind: 'operand' as const,
+      params: [{ name: 'src', kind: 'source-id' as const, sample: 'demo-light-1' }],
+      body: { type: 'read', from: { type: 'source', sourceId: { type: 'hole', name: 'src' }, path: ['state'] }, as: 'string', missing: 'unavailable' },
+    }] } : {}),
+    componentLibrary: [{
       id: 'private-component', name: 'Temperature component', node,
       sources: [{ id: 'private-source', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.demo_fallback' } }],
       params: [{ name: 'entity', kind: 'entity-id' }],
@@ -84,6 +90,7 @@ it('resolves each placed component private source with its entity argument, not 
     }],
     pages: [{ ...document.pages[0], components: [{ id: 'private-place', type: 'component-ref', componentId: 'private-component', layout: { span: 1 }, args: { entity: 'light.demo_actual' } }] }],
   };
+  if (throughLogic) edited = replaceAt(edited, ['componentLibrary', 0, 'node', 'props', 'value'], { type: 'expr', value: { type: 'logic-ref', logicId: 'private-value', args: { src: 'private-source' } } });
   expect(() => compileCompositionDocument(edited)).not.toThrow();
   const readers = entityReaders(edited);
   expect(readers.get('light.demo_actual')).toContain('Actual temperature');

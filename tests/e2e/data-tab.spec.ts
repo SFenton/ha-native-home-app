@@ -1,6 +1,8 @@
 import { test, expect, panelDocument, haToken } from './data-tab-harness';
 import { isPhone, openLibrary, openWorkspace, seed, snap } from './workspace2-helpers';
 import type { Page } from '@playwright/test';
+import { replaceAt } from '../../src/composition-editor';
+import type { CompositionDocument } from '../../src/shared/composition/schema';
 
 async function openData(page: Page) {
   if (!isPhone(page)) return openLibrary(page, 'Data');
@@ -73,6 +75,40 @@ test('App and Models remain editable and Source creation opens its fields', asyn
   await value.fill('weather.demo_forecast');
   await value.press('Tab');
   await expect(value).toHaveValue('weather.demo_forecast');
+});
+
+test('In Use includes a placed private source passed through a logic argument', async ({ page, request }) => {
+  const base = panelDocument();
+  const document: CompositionDocument = {
+    ...base,
+    dataSources: base.dataSources.filter(source => source.id === 'demo-light-3'),
+    logicLibrary: [{
+      id: 'private-value', name: 'Private value', kind: 'operand',
+      params: [{ name: 'src', kind: 'source-id', sample: 'demo-light-3' }],
+      body: { type: 'read', from: { type: 'source', sourceId: { type: 'hole', name: 'src' }, path: ['state'] }, as: 'string', missing: 'unavailable' },
+    }],
+    componentLibrary: [{
+      id: 'saved-lamp', name: 'Saved lamp',
+      node: { id: 'lamp-value', title: 'Placed lamp', type: 'text', layout: { span: 1 }, props: { value: { type: 'literal', value: 'Lamp' }, style: 'body', unavailableText: 'Unavailable' } },
+      sources: [{ id: 'private-lamp', kind: 'ha-entity', entityId: { type: 'literal', value: 'switch.demo_light_2' } }],
+      params: [{ name: 'entity', kind: 'entity-id' }],
+      bindings: [{ param: 'entity', sourceId: 'private-lamp', field: 'entityId/value' }],
+    }],
+    pages: [{ ...base.pages[0], components: [{ id: 'placed-lamp', type: 'component-ref', componentId: 'saved-lamp', layout: { span: 1 }, args: { entity: 'switch.demo_light_1' } }] }],
+    modals: [],
+  };
+  await seed(request, replaceAt(document, ['componentLibrary', 0, 'node', 'props', 'value'], { type: 'expr', value: { type: 'logic-ref', logicId: 'private-value', args: { src: 'private-lamp' } } }));
+  await openWorkspace(page);
+  await openData(page);
+  const panel = page.getByTestId('data-panel');
+  await expect(panel.getByRole('button', { name: 'In Use · 3' })).toHaveAttribute('aria-pressed', 'true');
+  await panel.getByRole('button', { name: 'Kitchen, 2' }).click();
+  const lamp = panel.locator('.w2-ha-entity').filter({ hasText: 'Kitchen Lamp' });
+  await expect(lamp.locator('.w2-ha-readers')).toHaveText('Placed lamp');
+  await expect(lamp.locator('.w2-ha-state')).toHaveText('on');
+  await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Desk Lamp' }).locator('.w2-ha-readers')).toHaveText('Private value');
+  await panel.getByRole('button', { name: 'Hall, 1' }).click();
+  await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Hall Lamp' }).locator('.w2-ha-readers')).toHaveText('Saved lamp');
 });
 
 test('area groups remember expansion and a selected component reveals the entities it reads', async ({ page }) => {

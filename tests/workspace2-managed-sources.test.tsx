@@ -14,7 +14,7 @@ import fixture from '../src/preview2/fixtures/logic-gallery.json';
 vi.mock('../src/api', async original => ({ ...await original<typeof import('../src/api')>(), request: vi.fn() }));
 afterEach(cleanup);
 const base = fixture.document as unknown as CompositionDocument;
-const entity = (id: string, value = 'light.demo_kitchen'): CompositionDocument['dataSources'][number] => ({ id, kind: 'ha-entity', entityId: { type: 'literal', value } });
+const entity = (id: string, value = 'light.demo_kitchen') => ({ id, kind: 'ha-entity', entityId: { type: 'literal', value } } satisfies CompositionDocument['dataSources'][number]);
 const doc = (id = 'light.demo_kitchen'): CompositionDocument => {
   const made = tileType('bound-control')!.make({ document: { ...base, dataSources: [] }, entityId: 'light.demo_kitchen', name: 'Kitchen light' });
   const node = { ...made.node, props: { ...('props' in made.node ? made.node.props : {}), kind: 'toggle', surface: 'tile', isOn: { type: 'state', sourceId: id, path: ['state'], in: ['on'] }, unavailableText: 'Unavailable' } };
@@ -63,6 +63,15 @@ describe('Studio-managed entity sources', () => {
     const chain = { ...before, dataSources: [...before.dataSources, dependent] };
     const usedChain = replaceAt(chain, ['pages', 0, 'components', 0, 'props', 'isOn', 'sourceId'], dependent.id);
     expect(pruneEntitySources(usedChain, { ...withoutTile, dataSources: chain.dataSources }).dataSources).toEqual([]);
+  });
+
+  it('keeps reference discovery available while a logic setting is half-made', () => {
+    const before = doc('entity-legacy');
+    const draft: CompositionDocument = {
+      ...before, logicLibrary: [{ id: 'template', name: 'Half-made', kind: 'operand', params: [{ name: 'unfinished', kind: 'source-id', sample: '' }], body: { type: 'literal', value: '' } }],
+    };
+    expect(sourceUses(draft).get('entity-legacy')).toBe(1);
+    expect(pruneEntitySources(before, draft).dataSources).toEqual(before.dataSources);
   });
 
   it('resolves plain-string value bindings before pruning, retaining validity through undo and redo', async () => {
@@ -127,6 +136,41 @@ describe('Studio-managed entity sources', () => {
     const textOnly = replaceAt(edited, ['componentLibrary', 0, 'params', 0, 'kind'], 'text');
     expect(() => compileCompositionDocument(textOnly)).not.toThrow();
     expect(sourceUses(textOnly).get('legacy-actual')).toBe(0);
+  });
+
+  it('prunes a global source after its last read even when private logic arguments use the same id, with undo and redo', async () => {
+    const initial = doc('shared-source');
+    const node: NonNullable<CompositionDocument['componentLibrary']>[number]['node'] = {
+      id: 'private-reader', title: 'Private reader', type: 'text', layout: { span: 1 },
+      props: { value: { type: 'literal', value: 'Private' }, style: 'body', unavailableText: 'Unavailable' },
+    };
+    const definition: CompositionDocument = {
+      ...initial, dataSources: [...initial.dataSources, entity('sample-source', 'light.demo_sample')],
+      logicLibrary: [{
+        id: 'source-value', name: 'Source value', kind: 'operand',
+        params: [{ name: 'src', kind: 'source-id', sample: 'sample-source' }],
+        body: { type: 'read', from: { type: 'source', sourceId: { type: 'hole', name: 'src' }, path: ['state'] }, as: 'string', missing: 'unavailable' },
+      }],
+      componentLibrary: [{ id: 'private-component', name: 'Private component', node, sources: [entity('shared-source', 'light.demo_private')] }],
+      pages: [{ ...initial.pages[0], components: [...initial.pages[0].components, { id: 'private-place', type: 'component-ref', componentId: 'private-component', layout: { span: 1 } }] }],
+    };
+    const before = replaceAt(definition, ['componentLibrary', 0, 'node', 'props', 'value'], { type: 'expr', value: { type: 'logic-ref', logicId: 'source-value', args: { src: 'shared-source' } } });
+    const edit = { ...before, pages: [{ ...before.pages[0], components: before.pages[0].components.slice(1) }] };
+    expect(() => compileCompositionDocument(before)).not.toThrow();
+    expect(() => compileCompositionDocument(edit)).not.toThrow();
+    expect(sourceUses(before).get('shared-source')).toBe(1);
+    expect(sourceUses(edit).get('shared-source')).toBe(0);
+    vi.mocked(request).mockResolvedValueOnce({ envelopeVersion: '2.0', document: before, revision: 1 });
+    const { result } = renderHook(useCompositionStudio);
+    await waitFor(() => expect(result.current.document).toBeDefined());
+    act(() => result.current.apply(edit));
+    expect(result.current.document!.dataSources.map(source => source.id)).toEqual(['sample-source']);
+    expect(() => compileCompositionDocument(result.current.document)).not.toThrow();
+    act(() => result.current.undo());
+    expect(result.current.document).toBe(before);
+    act(() => result.current.redo());
+    expect(result.current.document!.dataSources.map(source => source.id)).toEqual(['sample-source']);
+    expect(() => compileCompositionDocument(result.current.document)).not.toThrow();
   });
 
   it.each([

@@ -1,6 +1,7 @@
 import { compositionEditorSchema, defaultField, fieldVariants, resolveField, variantName } from '../../composition-editor';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { checkedBody, expandRef, expandSources, isSourceKey, ownedSources, privateNames, renameSources } from '../../shared/composition/components';
+import { plainDocument } from '../data/logic/logicPlain';
 import type { ComponentRefNode } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
 
@@ -94,17 +95,19 @@ export function dataReferences(document: CompositionDocument, value: unknown): {
 /** The compiler checks library defaults as well as placed expansions; neither may lose a referenced global source. */
 export function sourceUses(document: CompositionDocument): Map<string, number> {
   const uses = new Map<string, number>(document.dataSources.map(source => [source.id, 0]));
-  const add = (value: unknown) => {
-    for (const id of dataReferences(document, value).sources) if (uses.has(id)) uses.set(id, uses.get(id)! + 1);
+  const plain = plainDocument(document);
+  const add = (value: unknown, context = plain) => {
+    for (const id of dataReferences(context, value).sources) if (uses.has(id)) uses.set(id, uses.get(id)! + 1);
   };
-  const { componentLibrary, logicLibrary, ...rest } = document;
+  // Logic arguments must become source fields before private names are rewritten, as in the compiler.
+  const { componentLibrary, logicLibrary: _logicLibrary, ...rest } = plain;
   add(rest);
   for (const entry of componentLibrary ?? []) {
     add(checkedBody(entry));
     add(renameSources(ownedSources(entry), privateNames(entry.id, entry)));
   }
-  for (const entry of logicLibrary ?? []) {
-    add({ type: 'logic-ref', logicId: entry.id, args: Object.fromEntries(entry.params.filter(param => param.sample !== undefined).map(param => [param.name, param.sample])) });
+  for (const entry of document.logicLibrary ?? []) {
+    add({ type: 'logic-ref', logicId: entry.id, args: Object.fromEntries(entry.params.filter(param => param.sample !== undefined).map(param => [param.name, param.sample])) }, document);
   }
   return uses;
 }
