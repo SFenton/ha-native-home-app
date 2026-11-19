@@ -101,12 +101,33 @@ The shared port descriptor carries both `valueType` and `representation`:
   bypass destination typing; narrowing requires an existing grammar operation.
 
 In the catalog, `N(x)` is the recursive **expanded AST node count**, not the
-number of drawn cards. Each operand or predicate costs 1 plus its children.
+number of drawn cards. Each operand or predicate contributes 1; children add
+their counts. `D_N(x)` is the combined operand/predicate AST depth, root at 1.
 Paths, `from`, cases' containers, formatting options, and count viewer selectors
-add no expression node. `S` is a flow-step slot: every step costs one of 32 slots;
-its nested operands/conditions also have their own expression limits. Runtime
-flow cost is separate: step base cost, item visits, and evaluator node visits,
-with the existing 100,000 budget. Do not equate step slots with runtime cost.
+add no node or depth. These structural totals are not the predicate budget.
+
+`P(c)` counts **predicate nodes only** in one condition scope, and `D_P(c)`
+counts predicate nesting only, with the condition root at 1. A compare, numeric,
+in or exists leaf contributes 1 regardless of the operands it contains;
+all/any/not contribute 1 plus their predicate children. Walking an operand does
+not spend this 32-node budget or increase this depth-6 limit. Conditions nested
+inside an operand's Choose/count are checked in their own condition scopes.
+
+The separate **expression budget** follows the checker for that context. The
+document checker shares a combined operand/predicate counter (normally 64,
+128 across a service call) and combined depth 8, alongside predicate-only
+checks where applicable. Flow typing instead gives each operand tree entered
+from `typeWhere` a fresh 64-node/depth-8 operand budget: it does not pool all
+the condition's operands into a synthetic 64-node filter budget. A flow Choose
+shares its operand budget across its value branches but types its `when`
+conditions separately. Section 5 specifies these interactions and meter scopes.
+Do not implement the meter by applying 32 to `N(condition)`.
+
+`S` is a flow-step slot: every step costs one of 32 slots. Nested operands and
+conditions still have their context-specific budgets. Runtime flow cost is
+separate: step base cost, item visits, and evaluator node visits, with the
+existing 100,000 budget. Do not equate AST nodes, predicate nodes, step slots,
+or runtime cost.
 
 Inline editable values are stored as fields where the grammar has primitives,
 or as explicit literal operand children where it has operands. Hiding a literal
@@ -185,7 +206,7 @@ retain `sh.countdown@1`; none of these UI labels bypass capability derivation.
 | Checks / Any Of / `Waypoints` | 1..16 conditions -> condition | Input labels/order | `any {of}`; `1+sum N(of)`. |
 | Checks / Not / `CircleSlash` | condition -> condition | None | `not {of}`; `1+N(of)`. |
 | Outputs / Text Slot / `TextCursorInput` | scalar operand -> text field | Fallback; pending whenUnavailable | `{type:"expr",value,fallback?,whenUnavailable?}` or existing `read` slot; wrapper adds no expression node. Literal slots remain literal. |
-| Outputs / Look Rules / `Palette` | conditions, literal looks -> exact look field | Ordered cases, otherwise | Slot `conditional {cases,otherwise}`; each `when` has its condition budget. No fabricated operand for a color/symbol object. |
+| Outputs / Look Rules / `Palette` | conditions, literal looks -> exact look field | Ordered cases, otherwise | Slot `conditional {cases,otherwise}`; check each `when` in its destination's document-predicate context (section 5), not as a flow filter. No fabricated operand for a color/symbol object. |
 | Outputs / Bound Symbol / `Shapes` | text operand -> symbol field | Literal SF Symbol fallback | `bound-symbol {value,fallback}`; operand cost `N(value)`. Keep placement restrictions. |
 | Outputs / Action Rules / `MousePointerClick` | conditions, existing action descriptors -> action field | Ordered cases, otherwise | Existing action `conditional` in `compositionActionSchema`; per-case condition costs. Canvas previews never invoke the selected action. |
 | Outputs / Field Output / `LogOut` | one compatible value/condition -> destination | Output label, destination, supported unknown policy | No expression node; installs AST at the exact field path. Wrappers/policies are retained, not replaced with a universal output schema. |
@@ -273,7 +294,7 @@ Minimum normative members:
 | GraphEdge | Studio ID; from node/port; to node/port; one AST binding location for that input. A flow stream edge is distinguished from an operand edge. |
 | LogicGraph | Version 1; ordered roots with anchors and destination constraints; nodes; edges; frames/scopes. Values/positions and temporary pins are not part of semantic equality. |
 | GraphDiagnostic | Severity, existing code where applicable, message, anchor, node/port IDs, AST pointer; no raw HA error payload. |
-| GraphBudget | Per lowered root: nodes/depth, condition sub-budgets, cases, steps, capabilities, duplicated-use cost, generated flow count; diagnostics include the first exceeding pointer. |
+| GraphBudget | Per lowered root: informational total AST nodes/depth; separately identified expression-budget scopes and predicate-only scopes, each with its own node/depth counts and limits; cases, steps, capabilities, duplicated-use cost and generated flow count. Scope IDs/pointers distinguish a document's shared expression counter, a call's shared 128-node counter, and fresh flow operand counters. Diagnostics name the actual exceeding scope/pointer. |
 | LoweringResult | Either success with AST replacements, generated sources/library entries, source map and budgets; or errors with the original document unchanged. No partial success document. |
 | LiftResult | Graph, source map, opaque regions, warnings; lossless original fragments retained. |
 | CanvasHost | Open by anchor/output; immutable draft snapshot and revision; atomic apply transaction; existing save/conflict hooks; workspace data/target capabilities; typed callbacks for uses and preview lens. |
@@ -418,9 +439,11 @@ retains semantic bindings and layout; scenarios remain browser-local.
 For a fixed selection of 1..32 declared document sources and document checks,
 For Each + How Many lowers to `count.of`, substituting each source ID into the
 test. The frame/item placeholder is Studio-only; no `item` escapes into this
-document count. Each count test has its 32-node/depth-6 condition budget and the
-**whole count expression** must still fit 64 nodes/depth 8. Thirty-two simple
-state tests cost 33; thirty-two more complex tests may not fit.
+document count. Each count test has its own **32-predicate-node/depth-6**
+budget; its operand nodes do not spend that predicate budget. The **whole count
+expression**, including all predicate and operand nodes in every test, must
+still fit the shared 64-node/depth-8 expression budget. Thirty-two simple state
+tests cost 33 expression nodes; thirty-two more complex tests may not fit.
 
 Any in this count recipe is `compare above(count,0)`. All for the fixed unfiltered
 selection is `compare eq(count,selectedLength)`. These mean "at least one counted"
@@ -507,22 +530,50 @@ average step itself has no such option.
 
 ### Limits meter
 
-| Boundary | Exact existing bound and presentation |
+Use the counters and scope boundaries in `expression.ts` (`Checker.enter`,
+`Checker.predicate`, `Checker.call`) and `pipeline/typing.ts` (`typeOperand`,
+`typeWhere`). A predicate leaf's operand may be deep or wide without using
+additional predicate nodes/depth, but it must still pass its expression check.
+No limit is raised or replaced by a canvas-specific approximation.
+
+| Boundary | Exact existing bound and interaction |
 | --- | --- |
-| Field operand | 64 expanded nodes, depth 8, including nested predicates/operands |
-| Conditions in flow where, choose cases, count tests | 32 nodes, depth 6; also count against an enclosing expression when present |
-| Standalone document predicate | Existing checker permits 64 nodes/depth 8. Do **not** reject a previously valid 33-node visibility predicate by imposing the tighter flow condition bound globally. Show the correct contextual meter. |
+| Document field operand | One shared 64-node expression budget counts **all operand and predicate nodes**, including Choose conditions/branches and count tests; combined AST depth is at most 8 from the field root. |
+| Document Choose `when` / count `test` | Each condition starts a 32-**predicate**-node/depth-6 check. All of its predicates **and operands** also spend the enclosing expression budget above; entering the condition does not reset that expression counter or combined depth. |
+| Standalone document predicate, including a look-rule `when` checked through `usePredicate` | Combined 64-node/depth-8 expression check; no separate top-level 32-predicate-node/depth-6 cap. Nested Choose/count conditions retain their own checks. Preserve previously valid larger visibility/look conditions. |
+| Service-call context | Shared **128-node** expression counter across data, target operands and additional confirmation condition; combined depth 8, rooted separately at each data/target/confirmation entry. `confirmation.when` additionally starts a predicate-only 32/depth-6 check; nested Choose/count checks also apply. Do not give each call operand a fresh 128 nodes or incorrectly cap it at 64. |
+| Flow filter / `typeWhere` | 32 **predicate nodes**, predicate depth 6. Each operand entered from a leaf gets a fresh `typeOperand` budget of 64 nodes/depth 8, rooted at that operand. There is no shared `N(where) <= 64` or combined condition-plus-operand depth-8 test in this typing path. |
+| Flow operand / `typeOperand` | 64 nodes/depth 8 along its operand walk; value branches share that counter. A nested Choose calls `typeWhere` separately for each `when`, with its own predicate budget and fresh leaf-operand budgets. Do not add those separate condition walks to the enclosing operand counter. |
 | Rule cases | 16, preserving order; map-value cases are a different 32-case construct |
 | Flow | 32 steps, 8 parameters, runtime budget 100,000; 128 flow sources/document at this baseline |
-| Other | Count entries 32; entities 64; all/any inputs 16; expression/list/shape/path limits from the compiler; service-call payload budget remains 128 nodes where applicable |
+| Other | Count entries 32; entities 64; all/any inputs 16; list/shape/path limits from the compiler |
 
-The compact meter appears when **any ratio is strictly greater than 75%**.
-Examples: nodes 48/64 hidden, 49/64 shown; conditions 24/32 hidden, 25/32 shown;
-depth 6/8 hidden, 7/8 shown; condition depth 5/6 shown; cases 13/16 shown;
-steps 25/32 shown. Details are always reachable from "Limits", including costs
-when the compact meter is hidden. At the maximum, Apply is allowed if valid;
-past it, show an error and disable Apply/Save for that edit. Existing valid
-document save/publish is not replaced by an invalid graph buffer.
+**Required accepted regression:** `all` of 16 comparisons, each comparing two
+number literals. The condition has `N=49`, `D_N=3`, but only `P=17`, `D_P=2`.
+It is not a 49-of-32 condition failure.
+
+| Placement of that same condition | Expression accounting | Predicate accounting | Expected result |
+| --- | --- | --- | --- |
+| One-case document Choose, with literal then/otherwise | Entire Choose `N=52/64`, combined depth `4/8` | `when`: `P=17/32`, predicate depth `2/6` | Accepted; compact meter shown for the expression count |
+| One-entry document count | Entire count `N=50/64`, combined depth `4/8` | `test`: `P=17/32`, predicate depth `2/6` | Accepted; compact meter shown for the expression count |
+| Flow filter | Informational condition AST total 49; each literal operand is independently `1/64`, depth `1/8` | `where`: `P=17/32`, predicate depth `2/6` | Accepted; no compact meter from these scopes alone |
+
+The compact meter appears when **any applicable budget ratio is strictly greater
+than 75%**. Label the dimensions separately: Expression nodes / Expression depth
+and Predicate nodes / Predicate depth, with the owning field/case/test/operand
+pointer. Examples: expression nodes 48/64 hidden, 49/64 shown; call nodes 96/128
+hidden, 97/128 shown; predicate nodes 24/32 hidden, 25/32 shown; expression depth
+6/8 hidden, 7/8 shown; predicate depth 4/6 hidden, 5/6 shown; cases 13/16 shown;
+steps 25/32 shown. A flow condition's aggregate AST count has no single
+expression-budget denominator; it is informational while its actual predicate
+and operand scopes remain bounded.
+
+Details are always reachable from "Limits", including scopes whose compact
+meter is hidden. At a maximum, Apply is allowed if valid; past it, show the
+actual compiler error and disable Apply/Save for that edit. A predicate count
+under 32 does not excuse a document expression over 64, and an AST count over
+32 does not imply a predicate overflow. Existing valid document save/publish
+is not replaced by an invalid graph buffer.
 
 Show separate meters for multiple outputs, with the worst one summarized.
 Templates show **per-use expanded costs**, not just the small definition.
@@ -607,9 +658,11 @@ Average Fixed Values, thermostat Read, margin Number, Add, Compare, window
 State, All Of and output. Lifting the subtitle keeps its template reference
 as a use, with Expand View to inspect the shared definition.
 
-The warning costs 11 expanded nodes, depth 5. The subtitle costs 14 nodes,
-depth 6; its embedded condition is 11 nodes/depth 5. Two outputs share one
-authoring canvas but remain separate library entries. At live values 23.6 and
+The warning costs 11 expanded AST nodes, combined depth 5. The subtitle costs
+14 expression nodes, combined depth 6; its embedded condition has 11 AST nodes/
+depth 5, but only 3 predicate nodes/predicate depth 2 for the separate 32/6 check.
+Two outputs share one authoring canvas but remain separate library entries.
+At live values 23.6 and
 21.9, mean 22.75 is not above 24: No / Comfortable. Pin bedroom to 25:
 mean 24.3, threshold 24, window `"off"`: Yes / Too Warm. At exactly 24 the
 strict comparison is No. Opening the window makes the final All Of No.
@@ -835,9 +888,15 @@ Test strategy for W2-G:
   Studio accepts, `contract/corpus/evaluation`, and `contract/corpus/pipelines`.
   Keep expected refusals and first issue pointers for reject cases. Files marked
   `compiles:false` prove total evaluation, not acceptance.
-- Include the two worked examples and boundary pairs: 64/65 nodes, depth 8/9,
-  condition 32/33 and depth 6/7 in each applicable scope, cases 16/17, steps
-  32/33, count entries 32/33, entities 64/65. Include fan-out expansion, a cycle,
+- Include the two worked examples and boundary pairs: expression nodes 64/65
+  and depth 8/9 in their actual checker scopes; shared call nodes 128/129;
+  predicate-only nodes 32/33 and predicate depth 6/7 where those checks apply;
+  cases 16/17, steps 32/33, count entries 32/33, entities 64/65. **G-limits must
+  accept all of 16 literal comparisons in a document Choose, a document count
+  test and a flow filter**, with the separate counts/depths and compact-meter
+  outcomes in section 5. Also test that flow leaf operands get fresh budgets
+  while document condition operands spend the enclosing expression's budget.
+  Include fan-out expansion, a cycle,
   duplicate inputs, incompatible ports, count inside a flow, all-missing means,
   unavailable state strings, and a standalone document predicate above 32.
 - Future unknown nodes/keys and malformed layout must survive draft reopening
@@ -1239,55 +1298,135 @@ proposed ownership boundaries, not instructions to start workers from this
 design task. Each lane stops at its bounded PR/evidence handoff; none edits the
 iOS app or Core integration, deploys to HA, or raises limits.
 
-**External dependencies:** Lane A already owns `contract/**`,
-`src/shared/composition/pipeline/**`, and `src/shared/composition/slots.ts`
-for promotion/average/text-keep. Lane B owns `src/workspace2/flows/**` for the
-Flows tab. No wave-2 lane writes those paths. Lane A supplies capability/schema/
-corpus handoff and A-number-state disposition; Lane B supplies its open-output/
-open-field callback and typed output/uses model. Canvas integration happens
-through host callbacks, not a parallel rewrite of the Flows tab.
+### External reservations: excluded from every initial wave-2 grant
 
-| Lane | Objective and exclusive owned paths | Dependencies / stop condition |
+The orchestrator's review updates the original ownership brief. Lane A's
+PR #20 is in fix-up; Lane B's Flows/Data work is running. The following are
+**current exclusive write reservations**, not merely files to avoid editing
+at the same instant. All paths are repository-relative; `Library*.tsx` includes
+every matching file. A file's write ownership is indivisible, even where A's
+planned change is only compiler integration.
+
+| Reservation set | Current owner | Exact excluded paths |
+| --- | --- | --- |
+| **A-kept** | A | `contract/**`; `src/shared/composition/pipeline/**`; `src/shared/composition/slots.ts`; `src/shared/composition/pending.ts`; `src/preview2/**` |
+| **A-D** | A | `src/shared/composition/compiler.ts` |
+| **A-S** | A | `src/shared/composition/evaluator.ts` |
+| **A-I** | A | `src/workspace2/expr/**` (all expression editors); `src/workspace2/data/logic/SaveLogicDialog.tsx`; `src/workspace2/data/StepList.tsx`; `src/workspace2/data/StepPage.tsx`; `src/workspace2/data/StepResult.tsx`; `src/workspace2/data/flow.ts` |
+| **B-kept** | B | `src/workspace2/flows/**`; `server/ha-entities.ts`; `server/ha-live.ts`; `src/api.ts` |
+| **B-D** | B | `server/app.ts` |
+| **B-I-data** | B | `src/workspace2/data/DataPanel.tsx`; `src/workspace2/data/UsedBy.tsx`; `src/workspace2/data/EntitiesChooser.tsx`; `src/workspace2/data/data.css`; `src/workspace2/data/Library*.tsx`; `src/workspace2/data/useLibrary.ts`; `src/workspace2/data/useLibraryTrail.ts` |
+| **B-I-shell** | B | `src/workspace2/Workspace2.tsx`; `src/workspace2/useWorkspace2.ts`; `src/workspace2/selection.ts`; `src/workspace2/focusField.ts`; `src/workspace2/levels.ts`; `src/workspace2/layout.ts`; `src/useCompositionStudio.ts` |
+| **B-I-authoring** | B | `src/workspace2/dialogs/sources.ts`; `src/workspace2/dialogs/Data.tsx` (its source dialog); `src/workspace2/add/**` |
+
+Lane A supplies the capability/schema/corpus handoff and A-number-state
+disposition. Lane B supplies the open-output/open-field callback and typed
+output/uses model. `A-kept` and `B-kept` stay reserved to those lanes after
+merge: no wave-2 grant below includes them. In particular W2-S cannot edit
+`src/preview2/**` or pipeline code to add observation, and W2-I cannot edit
+the Flows tab or `src/api.ts`. Request an owner-supplied adapter when necessary.
+
+### Initial wave-2 grants (W0)
+
+Each lane initially owns **only** its row below. There is no blanket grant to
+the rest of `src/workspace2/**`, `src/**`, or `server/**`. All external sets
+above are excluded, as are every other wave-2 lane's paths. Unlisted integration
+files need a new explicit orchestrator allocation before editing.
+
+| Lane | Objective and exclusive initial paths (W0) | Dependencies / stop condition |
 | --- | --- | --- |
 | **W2-G Graph core** | `src/shared/composition/graph/**`, `tests/flows-canvas/graph/**`. First land `types.ts`; then catalog, port/scoping validation, deterministic lift/lower/layout, recipes, source maps and budgets. | Existing grammar; Lane A handoff before enabling pending recipes. Stop with pure APIs and corpus/property evidence; no UI/store/network writes. |
-| **W2-D Draft and expansion** | `src/shared/composition/studio-logic/**`, `server/studio-logic/**`, `tests/flows-canvas/draft/**`; existing `src/shared/composition/schema.ts`, `compiler.ts`, `logic-library.ts`, plus `server/composition-store.ts`, `server/ha-publication.ts`, `server/app.ts` solely for shared preparation/strip integration. | W2-G types; Lane A's contract integration must be landed before touching shared compiler/schema integration files. Stop with tolerant layout, strict use bindings, atomic save/conflict and publication refusal evidence. No pipeline/slots/corpus edits. |
+| **W2-D Draft and expansion** | `src/shared/composition/studio-logic/**`, `server/studio-logic/**`, `tests/flows-canvas/draft/**`; existing `src/shared/composition/schema.ts`, `src/shared/composition/logic-library.ts`, `server/composition-store.ts`, `server/ha-publication.ts` solely for shared preparation/strip integration. | W2-G types; compiler/app integration waits for the named A-D/B-D transfers below. Stop with tolerant layout, strict use bindings, atomic save/conflict and publication refusal evidence. No pipeline/slots/corpus edits. |
 | **W2-C Canvas interaction** | `src/workspace2/canvas/**`, `tests/flows-canvas/canvas/**`, `tests/e2e/workspace2-flows-canvas.spec.ts`. Palette, graph/outline, ports/wires, inspector, rules, keyboard, theme and limits UI. | W2-G types/APIs; use CanvasHost test harness, no existing workspace entry-file edits. Stop with accessible light/dark/narrow interaction evidence and no device actions. |
-| **W2-S Simulation** | `src/workspace2/logic-simulation/**`, `src/shared/composition/graph-observation/**`, `tests/flows-canvas/simulation/**`, `tests/e2e/workspace2-flows-simulation.spec.ts`; existing `src/shared/composition/evaluator.ts` only for optional observation hooks. | W2-G trace/types; existing live data/flow endpoint. Coordinate any optional pipeline observation hook as a request to Lane A, not a parallel edit. Stop with deterministic overlays/scenarios, provenance, trace/drawer tests; no new HA connection or request endpoints. |
-| **W2-I Integration and uses** | `src/workspace2/logic-fields/**`, `tests/flows-canvas/integration/**`, `tests/e2e/workspace2-flows-integration.spec.ts`; sole wave-2 writer of existing `src/workspace2/**` files **outside** `flows/**`, `canvas/**`, `logic-simulation/**`, `logic-fields/**`, for thin entry-point/data/host adapters. | Lane B callback; W2-G/D/C/S APIs. Stop with every logic field wired, one-check/summary behavior, templates/uses/lenses/unlink and end-to-end draft/publish evidence. No source grammar/server edits. |
+| **W2-S Simulation** | `src/workspace2/logic-simulation/**`, `src/shared/composition/graph-observation/**`, `tests/flows-canvas/simulation/**`, `tests/e2e/workspace2-flows-simulation.spec.ts`. | W2-G trace/types; existing live data/flow endpoint. Optional shared-evaluator hooks wait for A-S; pipeline hooks remain a request to A. Stop with deterministic overlays/scenarios, provenance, trace/drawer tests; no new HA connection or request endpoints. |
+| **W2-I Integration and uses** | `src/workspace2/logic-fields/**`, `tests/flows-canvas/integration/**`, `tests/e2e/workspace2-flows-integration.spec.ts`. | W2-G/D/C/S APIs and Lane B callback; existing expression/data/shell entry points wait for their explicit transfers. Stop with every logic field wired, one-check/summary behavior, templates/uses/lenses/unlink and end-to-end draft/publish evidence. No source grammar/server edits. |
 
-The path sets are disjoint, including tests and existing-file integration
-ownership. W2-I's broad adapter set does not authorize unrelated cleanup.
-If another active lane owns an existing integration file, queue that edit after
-its handoff; do not use "small fix" as an exception to exclusive ownership.
-No shared test fixture file is concurrently edited: cross-lane immutable
-fixtures/types land with W2-G first.
+### Explicit ownership transfers after merge
 
-**Order:** W2-G lands the shared types and representative fixtures first.
-After Lane A's prerequisite changes, W2-D can integrate draft preparation while
-W2-G completes lowering, W2-C builds the canvas against the host harness, and
-W2-S builds simulation against immutable graph inputs. W2-I starts with field
-adapters against those stable APIs and finishes after their behavior lands and
-Lane B's callback is available. The final gate is independent review and
-combined acceptance, not five lanes independently modifying publication.
+A transfer becomes available only after the originating lane's PR and fix-ups
+are merged and the orchestrator records the release. At that transition, remove
+the paths from the old owner's write grant and add them to **one** recipient's
+grant atomically. Until then, W0 applies even if a worker has finished its local
+edits. The old owner cannot resume fix-ups on transferred files without another
+explicit transfer; "queue after handoff" alone grants no permission.
+For this plan, release the three A transfers as one batch and the four B
+transfers as another; either batch can land first.
+
+| Transfer | Prerequisite | Exact path set transferred | Sole recipient / permitted integration |
+| --- | --- | --- | --- |
+| **T-A-D** | A merge/release | **A-D**: `src/shared/composition/compiler.ts` | **W2-D**: draft preparation, stripping and compiler source-map integration |
+| **T-A-S** | A merge/release | **A-S**: `src/shared/composition/evaluator.ts` | **W2-S**: optional observation hooks preserving answers/budgets |
+| **T-A-I** | A merge/release | **A-I**, exactly the expression-editor tree, SaveLogicDialog and four flow/step files listed above | **W2-I**: all existing expression-editor and step-inspector entry-point integration; not W2-C or W2-S |
+| **T-B-D** | B merge/release | **B-D**: `server/app.ts` | **W2-D**: HTTP draft/publication preparation integration; not W2-I |
+| **T-B-I-data** | B merge/release | **B-I-data**, exactly the seven file/pattern entries listed above | **W2-I**: Data-tab, uses/library and entity-selection adapters |
+| **T-B-I-shell** | B merge/release | **B-I-shell**, including `src/workspace2/Workspace2.tsx` and `src/useCompositionStudio.ts` | **W2-I**: canvas host, draft transactions, selection/focus/navigation integration |
+| **T-B-I-authoring** | B merge/release | **B-I-authoring**, exactly sources.ts, its Data.tsx dialog and add/** above | **W2-I**: source/use creation and authoring entry points |
+
+The resulting write sets are literally disjoint at every stage. Here `A-all`
+and `B-all` mean the unions of their reservation rows; `B-I` is the union of
+the three B-I rows. Each W2 lane also keeps its own W0 row; G and C gain no
+external files at any stage.
+
+| Released transfers | A's remaining write set | B's remaining write set | Additions to W0 |
+| --- | --- | --- | --- |
+| Neither lane released | A-all | B-all | None |
+| A released, B still running | A-kept | B-all | D gets A-D; S gets A-S; I gets A-I |
+| B released, A still in fix-up | A-all | B-kept | D gets B-D; I gets B-I |
+| Both released | A-kept | B-kept | D gets A-D + B-D; S gets A-S; I gets A-I + B-I |
+
+No recipient receives a kept reservation or another recipient's set. The
+orchestrator verifies the expanded file/glob sets have zero intersections before
+dispatch and at each transfer. No shared fixture file is concurrently edited:
+cross-lane immutable fixtures/types land with W2-G first.
+
+**Order:** W2-G lands shared types and representative fixtures first. W2-D,
+W2-C and W2-S can build in their W0 paths against the host/test interfaces while
+A/B finish. Apply A's and B's named transfers independently as their merges
+permit; only then integrate the affected existing files. W2-I finishes after
+its A-I/B-I transfers and G/D/C/S behavior are available. The final gate is
+independent review and combined acceptance, not concurrent ownership of the
+compiler, expression editors, evaluator, server/app.ts or workspace host.
 
 | Lane acceptance IDs | Required unit/contract evidence | Required Playwright evidence |
 | --- | --- | --- |
-| **G-catalog**, **G-roundtrip**, **G-limits**, **G-average** | All catalog variants traced to named nodes; property/corpus equality; opaque preservation; worked examples; exact limit boundary pairs; sum/filter-count and supported-average parity including empty/missing; A-number-state refusal until cleared. | W2-C/I consumes the same fixture outputs and meter values; pure core has no independent browser/server to launch. |
+| **G-catalog**, **G-roundtrip**, **G-limits**, **G-average** | All catalog variants traced to named nodes; property/corpus equality; opaque preservation; worked examples; distinct expression/predicate boundary pairs, including shared call 128/129. **G-limits accepts the 49-AST-node / 17-predicate-node All Of in Choose, a count test and a flow filter**, with section 5's exact depths and meter outcomes. Sum/filter-count and supported-average parity including empty/missing; A-number-state refusal until cleared. | W2-C/I consumes the same fixture outputs and scoped meter values; pure core has no independent browser/server to launch. |
 | **D-layout**, **D-binding**, **D-strip**, **D-conflict** | Invalid/unknown layout leaves valid AST valid; metadata-insensitive publication hash; tile binding per use and component remap; no refs/holes/library/layout/bindings in publication; stale binding errors; save conflict leaves local edits. | W2-I integration suite saves/reopens positions; publishes through mounted route; examines publication response and confirms Studio-only fields absent; induced 409 retains local edits. |
-| **C-palette**, **C-wire**, **C-keyboard**, **C-themes**, **C-meter** | Port compatibility/occupied-input refusal; graph editing transactions; exact 75% thresholds; focus/selection restoration. | Add/connect/replace/move/delete entirely by keyboard; cycle/type refusal; screen-reader names via role/name locators; light/dark/custom HA themes and narrow view; screenshots of two-column palette, canvas, summary and above-threshold meter. |
+| **C-palette**, **C-wire**, **C-keyboard**, **C-themes**, **C-meter** | Port compatibility/occupied-input refusal; graph editing transactions; separately scoped expression/predicate 75% thresholds and G-limits accepted-case meter outcomes; focus/selection restoration. | Add/connect/replace/move/delete entirely by keyboard; cycle/type refusal; screen-reader names via role/name locators; light/dark/custom HA themes and narrow view; screenshots of two-column palette, canvas, summary and above-threshold meter. |
 | **S-live**, **S-pins**, **S-scenarios**, **S-trace** | One shared live subscription/request path; response races/stale labels; immutable overlays; no-network Run All; clock and keep seeds; storage quota/stale pins; trace does not alter answers/cost; Each Run/filter reasons. | Pin bedroom 25 -> Too Warm; return Live restores 21.9 result; Run All explicit pass/fail/incomplete; capture/save/reload scenario; clock edge; drawers' actual counts; intercepted network proves no device writes or simulation fetches. |
 | **I-fields**, **I-templates**, **I-lens**, **I-publish** | Exhaustive field-adapter registry; output typing; actual args versus samples; per-use binding; Unlink including nested holes; no stand-in in document; conflict-safe apply. | One-check +And/+Or opens prewired canvas, never condition cards; multi-check summary; use from non-tile field; two uses resolve different tile settings; values/stand-in/use lenses; save/reload/unlink/publish via mounted relative routes. |
 
+### Parallel test isolation
+
+Reserve one test port and one isolated data directory per lane, including any
+temporary browser/HTTP host harness. W2-G's port is reserved even though its
+normal pure tests need no server. **4801 belongs to the `studio-ux2` worktree**;
+no wave-2 lane may use it. Never take the interactive 4800 server or use/reset
+the user's `data/`. Do not rely on the baseline config's default port.
+
+| Lane | `STUDIO_E2E_PORT` | `STUDIO_E2E_DATA_DIR` |
+| --- | --- | --- |
+| W2-G | `4820` | `./test-results/studio-data/w2-g` |
+| W2-D | `4821` | `./test-results/studio-data/w2-d` |
+| W2-C | `4822` | `./test-results/studio-data/w2-c` |
+| W2-S | `4823` | `./test-results/studio-data/w2-s` |
+| W2-I | `4824` | `./test-results/studio-data/w2-i` |
+
 Use `npm test` and `npm run build` at the combined gate, and focused commands
-such as `npx vitest run tests/flows-canvas/graph` and
-`STUDIO_E2E_PORT=4801 npx playwright test tests/e2e/workspace2-flows-canvas.spec.ts`
-for each lane. The `workspace2-` prefix includes the existing phone project.
-Use the existing browser configuration with an explicit port 4801 override
-(the baseline config currently defaults to 4815) and isolated
-`test-results/studio-data`. Never reset `data/` or take the interactive
-4800 server. Stop temporary test servers. If production publication/auth/routing
-integration changes, build the image and run `node scripts/smoke-container.mjs`;
-that evidence is not replaced by a browser preview or a unit test.
+such as `npx vitest run tests/flows-canvas/graph`. For W2-C browser evidence:
+
+```sh
+STUDIO_E2E_PORT=4822 STUDIO_E2E_DATA_DIR=./test-results/studio-data/w2-c \
+  npx playwright test tests/e2e/workspace2-flows-canvas.spec.ts
+```
+
+Other lanes use their own exact table values and test selectors, never W2-C's
+port or data directory. The `workspace2-` prefix includes the existing phone
+project. One server per lane at a time; if its assigned port is occupied, report
+the conflict rather than reuse/stop another session's server or switch ports.
+Stop each temporary server/container when its evidence run ends. If production
+publication/auth/routing integration changes, build the image and run
+`node scripts/smoke-container.mjs` with isolated lane-owned resources; that
+evidence is not replaced by a browser preview or a unit test.
 
 Retain relevant traces/screenshots and generated publication JSON with fake
 entities and no credentials. Check exact output/status/limits/network behavior,
@@ -1300,7 +1439,7 @@ this Studio verification.
 | ID | Contract evidence |
 | --- | --- |
 | **C-catalog** | Sections 2-3 name every operand, predicate, request, step/output and recipe; exact source nodes, scope, ports and cost. |
-| **C-lower-lift** | Sections 4-6: draft/graph boundary, lowering and lifting invariants, both JSON examples, fallbacks and precise limits; A-number-state is an explicit dependency, not a passing claim. |
-| **C-lanes** | Section 11: five disjoint path owners, first shared types file, external A/B dependencies, order and acceptance/evidence IDs. |
+| **C-lower-lift** | Sections 4-6: draft/graph boundary, lowering and lifting invariants, both JSON examples, fallbacks and separate expression/predicate budgets, depths and accepted regression cases; A-number-state is an explicit dependency, not a passing claim. |
+| **C-lanes** | Section 11: five disjoint W0 grants, complete external A/B exclusions, named single-recipient transfers and stage matrix, first shared types file, dependencies, acceptance/evidence IDs and per-lane ports/data directories. |
 | **C-decisions** | Sections 1, 5, 7-9: panel 2 superseded, canvas And/Or, component-independent outputs, Live default, Studio-only simulation, capability gates and no limit raise. |
 | **C-build** | This change contains documentation/PNG assets only; handoff records the actual `npm run build` result. No runtime/native acceptance is implied. |
