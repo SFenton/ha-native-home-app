@@ -3,6 +3,7 @@ import { shapeAt, type Shape } from './pipeline/shape';
 import { identifierSchema } from '../validation';
 import type { Json } from '../types';
 import type { CompositionIssue } from './json';
+import { attachSchemaAccounting, beginSchemaAccounting, reportAccounting } from './studio-logic/accounting';
 
 /**
  * The generic grammar the native app accepts (`ServerUIOperand`, `ServerUIPredicate`, `ServerUICallService`,
@@ -259,13 +260,13 @@ export class BudgetAccountingScope {
   private maxChargedDepth = 0;
   constructor(readonly observer: BudgetAccountingObserver, kind: BudgetScopeKind, pointer: string, nodeLimit: number | null, depthLimit: number | null, scopeId = `${kind}:${pointer}`) {
     this.id = scopeId;
-    observer({ type: 'scope', scopeId: this.id, kind, pointer, nodeLimit, depthLimit });
+    reportAccounting(observer, { type: 'scope', scopeId: this.id, kind, pointer, nodeLimit, depthLimit });
   }
   enter(pointer: string, depth: number, charged: boolean, remaining: number) {
     this.attemptedNodes += 1;
     this.maxDepth = Math.max(this.maxDepth, depth);
     if (charged) { this.nodes += 1; this.maxChargedDepth = Math.max(this.maxChargedDepth, depth); }
-    this.observer({ type: 'node', scopeId: this.id, pointer, depth, charged, nodes: this.nodes, attemptedNodes: this.attemptedNodes,
+    reportAccounting(this.observer, { type: 'node', scopeId: this.id, pointer, depth, charged, nodes: this.nodes, attemptedNodes: this.attemptedNodes,
       maxDepth: this.maxDepth, maxChargedDepth: this.maxChargedDepth, remaining: Number.isFinite(remaining) ? remaining : null });
   }
 }
@@ -306,7 +307,7 @@ class Checker implements ExpressionFacts {
     if (accounting) {
       const previousScopeId = accounting.predicate!.id;
       accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH);
-      accounting.observer({ type: 'condition-budget', action: 'reset', pointer, previousScopeId, scopeId: accounting.predicate.id,
+      reportAccounting(accounting.observer, { type: 'condition-budget', action: 'reset', pointer, previousScopeId, scopeId: accounting.predicate.id,
         previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: MAX_CONDITION_NODES });
     }
     this.conditionBudget = MAX_CONDITION_NODES;
@@ -420,7 +421,7 @@ class Checker implements ExpressionFacts {
           });
         });
         if (accounting) {
-          accounting.observer({ type: 'condition-budget', action: 'restore', pointer, previousScopeId: accounting.predicate!.id,
+          reportAccounting(accounting.observer, { type: 'condition-budget', action: 'restore', pointer, previousScopeId: accounting.predicate!.id,
             scopeId: outerScope!.id, previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: Number.isFinite(outer) ? outer : null });
           accounting.predicate = outerScope;
         }
@@ -486,7 +487,7 @@ class Checker implements ExpressionFacts {
       case 'choose': {
         this.needs.add('rules');
         const accounting = checkerAccounting?.get(this);
-        accounting?.observer({ type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
+        if (accounting) reportAccounting(accounting.observer, { type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
         if (!value.cases.length || value.cases.length > MAX_RULE_CASES) this.add('limit_exceeded', at('cases'));
         value.cases.forEach((entry, index) => {
           this.beginCondition(accounting ? at('cases', index, 'when') : '');
@@ -623,19 +624,22 @@ export function checkCallService(value: CallService, pointer: string, allowContr
 // MARK: Schemas with the parser's checks attached
 
 /** Attaches the parser port to a schema; its issues keep the app's code through `params.shCode`. */
-function withChecks<T>(schema: z.ZodType<T>, run: (value: T) => ExpressionFacts) {
+function withChecks<T>(schema: z.ZodType<T>, run: (value: T, observer?: BudgetAccountingObserver) => ExpressionFacts) {
   return schema.check(z.check<T>(context => {
     // The structure is already wrong somewhere below; the parser port only judges values that are well formed.
     if (context.issues.length) return;
-    for (const issue of run(context.value).issues) {
+    const accounting = beginSchemaAccounting();
+    for (const issue of run(context.value, accounting?.observer).issues) {
       const path = issue.pointer.split('/').slice(1).map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
-      context.issues.push({ code: 'custom', input: context.value, path, params: { shCode: issue.code }, message: issue.code });
+      const found = { code: 'custom' as const, input: context.value, path, params: { shCode: issue.code }, message: issue.code };
+      if (accounting) attachSchemaAccounting(found, accounting, path.length);
+      context.issues.push(found);
     }
   }));
 }
-export const operandSchema = withChecks(operandBase, value => checkOperand(value, '', true, false, 'lenient'));
-export const predicateSchema = withChecks(predicateBase, value => checkPredicate(value, '', false, 'lenient'));
-export const callServiceSchema = withChecks(callServiceBase, value => checkCallService(value, '', true, 'lenient', 'any'));
+export const operandSchema = withChecks(operandBase, (value, observer) => checkOperand(value, '', true, false, 'lenient', observer));
+export const predicateSchema = withChecks(predicateBase, (value, observer) => checkPredicate(value, '', false, 'lenient', observer));
+export const callServiceSchema = withChecks(callServiceBase, (value, observer) => checkCallService(value, '', true, 'lenient', 'any', observer));
 export const whenUnknownSchema = z.enum(whenUnknownPolicies);
 /** `enabledWhen` (`sh.enabled-when@1`): a condition and what to do while it cannot be answered. Both are required: never an implicit look. */
 export const enabledWhenSchema = object({ condition: predicateSchema, whenUnknown: z.enum(enabledUnknownPolicies) });

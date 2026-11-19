@@ -34,6 +34,7 @@ import { PIPELINE_LIMITS, pipelineSourceSchema, type PipelineSource } from './pi
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
+import { emitSchemaAccounting, isAccountingObserverFailure, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
 
@@ -62,19 +63,26 @@ export function compositionDependencyIssues(dependencies: readonly { from: strin
 
 /** A source needs its binding envelope as well as the pipeline's local requirements. */
 export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1, accountingObserver?: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> {
-  const facts = checkPipelineSource(source, at, accountingObserver);
+  const facts = accountingObserver ? checkObservedPipelineSource(source, at, accountingObserver) : checkPipelineSource(source, at);
   if (ordinal > PIPELINE_LIMITS.pipelines) facts.issues.push({ code: 'limit_exceeded', pointer: at });
   return { ...facts, capabilities: [...new Set(['sh.bindings@1', ...facts.capabilities])].sort() };
+}
+
+function checkObservedPipelineSource(source: PipelineSource, at: string, observer: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> {
+  try { return checkPipelineSource(source, at, observer); }
+  catch (error) { rethrowAccountingObserverFailure(error); }
 }
 
 /** Fragment checking permits external reads; a consuming document additionally resolves those reads. */
 export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources', accountingObserver?: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
   const facts = sources.map((source, index): ReturnType<typeof checkPipelineSource> => {
-    try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1, accountingObserver); }
+    let parsed: PipelineSource;
+    try { parsed = parseCompositionShape(pipelineSourceSchema, source, accountingObserver, `${at}/${index}`); }
     catch (error) {
-      if (!(error instanceof CompositionValidationError)) throw error;
+      if (!(error instanceof CompositionValidationError) || isAccountingObserverFailure(error)) throw error;
       return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), entities: [], reads: [], dependencies: [], capabilities: [] };
     }
+    return checkCompositionPipelineSource(parsed, `${at}/${index}`, index + 1, accountingObserver);
   });
   const dependencies = facts.flatMap(fact => fact.dependencies);
   const issues = [...facts.flatMap(fact => fact.issues), ...compositionDependencyIssues(dependencies)];
@@ -213,8 +221,13 @@ function at(input: unknown, path: PropertyKey[]): unknown {
 }
 
 /** Converts Zod failures to value-free diagnostics, preserving explicit unsupported capabilities. */
-export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown): T {
-  const parsed = schema.safeParse(input);
+export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown, accountingObserver?: BudgetAccountingObserver, accountingAt = ''): T {
+  const parsed = accountingObserver ? withSchemaAccounting(() => {
+    const result = schema.safeParse(input);
+    // Zod finalizes size-limit issues lazily, without re-running schema checks.
+    if (!result.success) void result.error.issues;
+    return result;
+  }) : schema.safeParse(input);
   if (parsed.success) return parsed.data;
   const issues: CompositionIssue[] = [];
   /**
@@ -227,7 +240,12 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown): 
     if (branches.length !== 1) return [issue];
     return expand(branches[0].map(inner => ({ ...inner, path: [...issue.path, ...inner.path] }) as z.core.$ZodIssue));
   });
-  for (const issue of expand(parsed.error.issues)) {
+  const expandedIssues = expand(parsed.error.issues);
+  if (accountingObserver) {
+    const emitted = new Set<object>();
+    for (const issue of expandedIssues) emitSchemaAccounting(issue, accountingObserver, accountingAt, emitted);
+  }
+  for (const issue of expandedIssues) {
     const path = issue.path;
     let capability: string | undefined;
     let unsupportedPath: PropertyKey[] = path;
@@ -285,7 +303,10 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
 export interface CompileOptions {
   tileInkDefault?: boolean;
-  /** Synchronous snapshots of the existing checker pass; no accounting state is added to results. */
+  /**
+   * Synchronous snapshots from the enforcing schema or scoped checker pass, without replay or result state.
+   * Observer exceptions propagate unchanged (including CompositionValidationError), never as document diagnostics.
+   */
   accountingObserver?: BudgetAccountingObserver;
 }
 /** Native diagnostics keep their public authored pointers and the compiler's corresponding expansion landings. */
@@ -309,6 +330,7 @@ function compileRecording(input: unknown, options: CompileOptions, references?: 
   if (references && record(input)) referenceCache.set(input, references);
   try { return compileCompositionDocumentWithOrigins(input, options, references).compiled; }
   catch (error) {
+    if (isAccountingObserverFailure(error)) throw error;
     if (references && error instanceof CompositionValidationError) references.issues = error.issues;
     throw error;
   }
@@ -322,7 +344,7 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
   try { expansion = expandBounded(input); }
   catch (error) {
     // Like every other compile issue, a logic issue reads from the document's root.
-    if (error instanceof CompositionValidationError) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
+    if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
     throw error;
   }
   if (expansion.document === input) {
@@ -336,7 +358,7 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
     const compiled = compilePlain(expansion.document, options, false, references);
     return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   } catch (error) {
-    if (error instanceof CompositionValidationError) throw new CompositionExpansionError(
+    if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionExpansionError(
       remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings),
       error.issues, expansion.document, expansion.origins,
     );
@@ -413,16 +435,16 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   if (settings.document !== input) {
     try { return { ...compilePlain(settings.document, options, true, references), badged: true }; }
     catch (error) {
-      if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapBadgeIssues(error.issues, settings.badges, input));
+      if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionValidationError(remapBadgeIssues(error.issues, settings.badges, input));
       throw error;
     }
   }
   if (record(input) && input.schemaVersion !== undefined && input.schemaVersion !== '2.0') reject('unsupported_schema', '/document/schemaVersion');
   if (new TextEncoder().encode(canonicalOfBounded(input)).byteLength > MAX_COMPOSITION_BYTES) reject('limit_exceeded', '/document');
   let document: CompositionDocument;
-  try { document = parseCompositionShape(compositionDocumentSchema, input); }
+  try { document = parseCompositionShape(compositionDocumentSchema, input, options.accountingObserver, '/document'); }
   catch (error) {
-    if (!(error instanceof CompositionValidationError)) throw error;
+    if (!(error instanceof CompositionValidationError) || isAccountingObserverFailure(error)) throw error;
     throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
   }
   const issues: CompositionIssue[] = [];
@@ -820,7 +842,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       expandedSources += owned.length;
       if (references) expandSources(ref, entry).forEach((source, index) => {
         const at = `${path}/sources/${index}`;
-        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1' ? checkPipelineSource(source, at, options.accountingObserver).entities : []);
+        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1'
+          ? (options.accountingObserver ? checkObservedPipelineSource(source, at, options.accountingObserver) : checkPipelineSource(source, at)).entities : []);
       });
     }
     if ((keys.length || valueKeys.length) && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });

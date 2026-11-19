@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  checkCompositionPipelineBundle, checkCompositionPipelineSource, compileCompositionDocument, compileCompositionDocumentWithOrigins,
+  checkCompositionPipelineBundle, checkCompositionPipelineSource, compileCompositionDocument, compileCompositionDocumentWithOrigins, parseCompositionShape,
 } from '../../../src/shared/composition/compiler';
 import * as expression from '../../../src/shared/composition/expression';
 import type { BudgetAccountingEvent, BudgetAccountingObserver, CallService, Operand, Predicate } from '../../../src/shared/composition/expression';
@@ -8,14 +9,42 @@ import { checkPipelineSource } from '../../../src/shared/composition/pipeline/co
 import type { PipelineSource } from '../../../src/shared/composition/pipeline/schema';
 import { newFacts, typeSteps } from '../../../src/shared/composition/pipeline/typing';
 import { createCompositionDocument } from '../../../src/shared/composition/workspace';
-import type { CompositionDocument, CompositionNode } from '../../../src/shared/composition/schema';
-import { CompositionValidationError } from '../../../src/shared/composition/json';
+import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from '../../../src/shared/composition/schema';
+import { CompositionValidationError, parseCompositionJSON } from '../../../src/shared/composition/json';
 
 afterEach(() => vi.restoreAllMocks());
 const literal = (value: string | number | boolean = 1): Operand => ({ type: 'literal', value });
 const compare = (): Predicate => ({ type: 'compare', op: 'eq', left: literal(), right: literal() });
 const allOf = (): Predicate => ({ type: 'all', of: Array.from({ length: 16 }, compare) });
 const choose = (): Operand => ({ type: 'choose', cases: [{ when: allOf(), then: literal() }], otherwise: literal(0) });
+function call(targets = 59): CallService {
+  return {
+    type: 'call-service', domain: 'light', service: 'turn_on',
+    data: { type: 'object', fields: { payload: { type: 'list', items: Array.from({ length: 63 }, () => literal()) } } },
+    target: { entity_id: { type: 'list', items: Array.from({ length: targets }, () => literal('light.demo')) } },
+    confirmation: { type: 'additional', style: 'alert', title: 'Confirm', confirmLabel: 'Run', cancelLabel: 'Cancel', destructive: false, when: compare() },
+  };
+}
+function earlyReset(): Predicate {
+  return { type: 'all', of: Array.from({ length: 2 }, (_, group) => ({
+    type: 'all', of: Array.from({ length: 16 }, (_, index): Predicate => group === 0 && index === 0
+      ? {
+        type: 'compare', op: 'eq', right: literal(),
+        left: { type: 'choose', cases: [{ when: { type: 'viewer', isAdmin: true }, then: literal() }], otherwise: literal(0) },
+      }
+      : { type: 'viewer', isAdmin: true }),
+  })) };
+}
+function thrown(operation: () => unknown): unknown {
+  try { operation(); }
+  catch (error) { return error; }
+  throw new Error('Expected an exception');
+}
+function refusal(operation: () => unknown) {
+  const error = thrown(operation);
+  if (!(error instanceof CompositionValidationError)) throw error;
+  return error.issues;
+}
 function recording() {
   const events: BudgetAccountingEvent[] = [];
   const observer: BudgetAccountingObserver = event => { events.push(event); };
@@ -76,15 +105,10 @@ describe('compiler accounting observer forwarding', () => {
   });
 
   it('forwards the unchanged observer through shared 128-node service-call accounting', () => {
-    const call: CallService = {
-      type: 'call-service', domain: 'light', service: 'turn_on',
-      data: { type: 'object', fields: { payload: { type: 'list', items: Array.from({ length: 63 }, () => literal()) } } },
-      target: { entity_id: { type: 'list', items: Array.from({ length: 59 }, () => literal('light.demo')) } },
-      confirmation: { type: 'additional', style: 'alert', title: 'Confirm', confirmLabel: 'Run', cancelLabel: 'Cancel', destructive: false, when: compare() },
-    };
+    const action = call();
     const direct = recording(), compiled = recording();
-    expression.checkCallService(call, '/document/pages/0/components/0/action', false, undefined, undefined, direct.observer);
-    const input = document({ id: 'run', title: 'Run', type: 'primary-button', layout: { span: 1 }, props: {}, action: call });
+    expression.checkCallService(action, '/document/pages/0/components/0/action', false, undefined, undefined, direct.observer);
+    const input = document({ id: 'run', title: 'Run', type: 'primary-button', layout: { span: 1 }, props: {}, action });
     expect(compileCompositionDocument(input, { accountingObserver: compiled.observer })).toStrictEqual(compileCompositionDocument(input));
     expect(compiled.events).toStrictEqual(direct.events);
     expect(compiled.events).toContainEqual(expect.objectContaining({ type: 'node', nodes: 128, remaining: 0 }));
@@ -100,6 +124,91 @@ describe('compiler accounting observer forwarding', () => {
     expect(observed).toStrictEqual(plain);
     expect(Object.keys(observed)).toEqual(Object.keys(plain));
     expect(spies[0].mock.calls.some(args => args[5] === observer)).toBe(true);
+  });
+});
+
+describe('accounting from the schema pass that actually refuses a document', () => {
+  it('observes shared-call 129 exactly once, with the direct Checker trace and unchanged diagnostics', () => {
+    const action = call(60), input = document({ id: 'run', title: 'Run', type: 'primary-button', layout: { span: 1 }, props: {}, action });
+    const direct = recording(), compiled = recording();
+    expression.checkCallService(action, '/document/pages/0/components/0/action', true, 'lenient', 'any', direct.observer);
+    const spy = vi.spyOn(expression, 'checkCallService');
+    const plain = refusal(() => compileCompositionDocument(input)), calls = spy.mock.calls.length;
+    spy.mockClear();
+    expect(refusal(() => compileCompositionDocument(input, { accountingObserver: compiled.observer }))).toStrictEqual(plain);
+    expect(spy.mock.calls).toHaveLength(calls);
+    expect(compiled.events).toStrictEqual(direct.events);
+    expect(compiled.events).toHaveLength(134);
+    expect(plain).toEqual([{ code: 'limit_exceeded', pointer: '/document/pages/0/components/0/action/confirmation/when/right' }]);
+  });
+
+  it.each(['visibleWhen', 'activeWhen', 'filledWhen', 'errorWhen'] as const)('observes the early CHK-nested-choose-budget refusal in %s without changing it', field => {
+    const envelope = parseCompositionJSON(readFileSync('contract/corpus/accept/tile-look-all.json'));
+    if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope) || !('document' in envelope)) throw new Error('Expected publication fixture');
+    const input = parseCompositionShape(compositionDocumentSchema, envelope.document), tile = input.pages[2].components[0];
+    if (tile.type !== 'state-tile') throw new Error('Expected state tile fixture');
+    const predicate = earlyReset(), direct = recording(), compiled = recording();
+    tile[field] = predicate;
+    expression.checkPredicate(predicate, `/document/pages/2/components/0/${field}`, false, 'lenient', direct.observer);
+    const spy = vi.spyOn(expression, 'checkPredicate');
+    const plain = refusal(() => compileCompositionDocument(input)), calls = spy.mock.calls.length;
+    spy.mockClear();
+    expect(refusal(() => compileCompositionDocument(input, { accountingObserver: compiled.observer }))).toStrictEqual(plain);
+    expect(spy.mock.calls).toHaveLength(calls);
+    expect(compiled.events).toStrictEqual(direct.events);
+    expect(compiled.events).toHaveLength(81);
+    expect(plain).toEqual([{ code: 'limit_exceeded', pointer: `/document/pages/2/components/0/${field}/of/1/of/15` }]);
+  });
+
+  it('reports the actual 33-step schema limit, equal to direct typeSteps observation, without starting flow typing', () => {
+    const source = flow(), input = document(), direct = recording(), compiled = recording();
+    source.inputs.parameters = [];
+    source.inputs.steps = Array.from({ length: 33 }, (_, index) => ({ id: `step-${index}`, op: 'limit', count: 1 }));
+    input.dataSources = [source];
+    typeSteps(source.inputs.steps, { kind: 'array', of: { kind: 'number' } }, new Map(), '/document/dataSources/0/inputs', newFacts(), direct.observer);
+    const spy = vi.spyOn(expression, 'checkOperand');
+    const plain = refusal(() => compileCompositionDocument(input)), calls = spy.mock.calls.length;
+    spy.mockClear();
+    expect(refusal(() => compileCompositionDocument(input, { accountingObserver: compiled.observer }))).toStrictEqual(plain);
+    expect(spy.mock.calls).toHaveLength(calls);
+    expect(compiled.events).toStrictEqual(direct.events);
+    expect(compiled.events).toEqual([{ type: 'steps', scopeId: 'steps:/document/dataSources/0/inputs', pointer: '/document/dataSources/0/inputs/steps', count: 33, limit: 32 }]);
+    const bundle = recording(), bundleDirect = recording();
+    typeSteps(source.inputs.steps, { kind: 'array', of: { kind: 'number' } }, new Map(), '/dataSources/0/inputs', newFacts(), bundleDirect.observer);
+    expect(checkCompositionPipelineBundle([source], undefined, bundle.observer)).toStrictEqual(checkCompositionPipelineBundle([source]));
+    expect(bundle.events).toStrictEqual(bundleDirect.events);
+  });
+});
+
+describe('observer exceptions are not document diagnostics', () => {
+  it.each(['Error', 'CompositionValidationError'] as const)('propagates the identical %s from every native entry point and from early schema refusal', kind => {
+    const source = flow(), valid = document(text(choose()));
+    source.inputs.parameters = [];
+    source.inputs.steps = [];
+    const pipeline = document();
+    pipeline.dataSources = [source];
+    const bad = document({ id: 'run', title: 'Run', type: 'primary-button', layout: { span: 1 }, props: {}, action: call(60) });
+    const entries: ((observer: BudgetAccountingObserver) => unknown)[] = [
+      observer => expression.checkOperand(choose(), '/value', false, false, undefined, observer),
+      observer => expression.checkPredicate(compare(), '/condition', false, undefined, observer),
+      observer => expression.checkCallService(call(), '/action', false, undefined, undefined, observer),
+      observer => checkPipelineSource(source, '/source', observer),
+      observer => checkCompositionPipelineSource(source, '/source', 1, observer),
+      observer => checkCompositionPipelineBundle([source], '/sources', observer),
+      observer => compileCompositionDocument(valid, { accountingObserver: observer }),
+      observer => compileCompositionDocumentWithOrigins(valid, { accountingObserver: observer }),
+      observer => compileCompositionDocument({ ...valid, logicLibrary: [] }, { accountingObserver: observer }),
+      observer => compileCompositionDocumentWithOrigins({ ...pipeline, logicLibrary: [] }, { accountingObserver: observer }),
+      observer => compileCompositionDocument(bad, { accountingObserver: observer }),
+      observer => compileCompositionDocumentWithOrigins({ ...bad, logicLibrary: [] }, { accountingObserver: observer }),
+    ];
+    for (const compile of entries) {
+      const error = kind === 'Error' ? new Error('Observer failed') : new CompositionValidationError([{ code: 'invalid_value', pointer: '/observer' }]);
+      expect(thrown(() => compile(() => { throw error; }))).toBe(error);
+    }
+    const spy = vi.spyOn(expression, 'checkOperand');
+    compileCompositionDocument(valid);
+    expect(spy.mock.calls.every(args => args[5] === undefined)).toBe(true);
   });
 });
 
