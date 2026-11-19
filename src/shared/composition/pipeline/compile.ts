@@ -33,6 +33,8 @@ export const TEXT_CASE_WORDS_CAPABILITY = 'sh.text-case-words@1';
 /** What compiling one flow found. Pointers are absolute (they start at the source's own pointer). */
 export interface PipelineFacts {
   issues: CompositionIssue[];
+  /** Literal entity endpoints actually requested or watched, never record/literal payload fields. */
+  entities: { id: string; path: string }[];
   /** `read` operands (in parameters only), for the document's source and type checks. */
   reads: { read: Extract<PipelineOperand, { type: 'read' }>; path: string }[];
   /** `from` reads `to`: a parameter reading another flow's value. The document rejects cycles across sources. */
@@ -42,7 +44,8 @@ export interface PipelineFacts {
 
 const entityPattern = /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/;
 /** Checks a literal entity id (and its domain when one is required); the issue pointer is `at`/value. */
-function entity(facts: TypeFacts, value: string, at: string, domain?: string) {
+function entity(facts: TypeFacts & Pick<PipelineFacts, 'entities'>, value: string, at: string, domain?: string) {
+  facts.entities.push({ id: value, path: at });
   if (!entityPattern.test(value)) facts.issues.push({ code: 'invalid_value', pointer: join(at, 'value') });
   else if (domain && !value.startsWith(`${domain}.`)) facts.issues.push({ code: 'invalid_combination', pointer: join(at, 'value') });
 }
@@ -52,7 +55,7 @@ function entity(facts: TypeFacts, value: string, at: string, domain?: string) {
 /** Compiles one pipeline source. `at` is the source's pointer, such as `/document/dataSources/3`. */
 export function checkPipelineSource(source: PipelineSource, at: string): PipelineFacts {
   const inputs = source.inputs, base = join(at, 'inputs');
-  const facts = newFacts();
+  const facts = { ...newFacts(), entities: [] as PipelineFacts['entities'] };
   const issue = (code: CompositionIssue['code'], pointer: string) => facts.issues.push({ code, pointer });
 
   // Parameters: unique names, typed values, no reference to an unknown name, no cycle.
@@ -98,6 +101,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
       typeOperand(operand!, requestScope, own, local);
       if (operand!.type === 'literal') {
         const value = operand!.value;
+        if (key === 'entity_id') for (const id of Array.isArray(value) ? value : [value]) if (typeof id === 'string') facts.entities.push({ id, path: own });
         const ok = key === 'entity_id' ? typeof value === 'string' && entityPattern.test(value) || (Array.isArray(value) && value.length > 0 && value.every(item => typeof item === 'string' && entityPattern.test(item)))
           : typeof value === 'string' ? value.length > 0 : Array.isArray(value) && value.length > 0 && value.every(item => typeof item === 'string' && item.length > 0);
         if (!ok) issue('invalid_value', join(own, 'value'));
@@ -219,7 +223,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
     ...(inputs.steps.some(step => step.op === 'average') ? [FLOW_AVERAGE_CAPABILITY] : []),
     ...[...facts.edge].sort().map(name => `sh.${name}@1`)];
   const dependencies = facts.reads.map(entry => ({ from: source.id, to: entry.read.from.sourceId, path: join(join(entry.pointer, 'from'), 'sourceId') }));
-  return { issues: facts.issues, reads: facts.reads.map(entry => ({ read: entry.read, path: entry.pointer })), dependencies, capabilities };
+  return { issues: facts.issues, entities: facts.entities, reads: facts.reads.map(entry => ({ read: entry.read, path: entry.pointer })), dependencies, capabilities };
 }
 
 // MARK: Reads and providers

@@ -1,6 +1,7 @@
 import { compositionEditorSchema, defaultField, fieldVariants, resolveField, variantName } from '../../composition-editor';
 import type { CompositionDocument } from '../../shared/composition/schema';
-import { compositionDependencies } from '../../shared/composition/dependencies';
+import { compositionDependencies } from '../../shared/composition/compiler';
+import type { CompositionDependencies } from '../../shared/composition/dependencies';
 import { plainDocument } from '../data/logic/logicPlain';
 import type { Json } from '../../shared/types';
 
@@ -39,7 +40,17 @@ export function sourceName(source: Source, entityNames?: ReadonlyMap<string, str
 }
 
 /** One dependency graph for retention and named entity readers, in compiler expansion order. */
-export const documentDependencies = (document: CompositionDocument) => compositionDependencies(plainDocument(document), document.logicLibrary);
+const dependencyCache = new WeakMap<CompositionDocument, CompositionDependencies>();
+export function documentDependencies(document: CompositionDocument): CompositionDependencies {
+  const held = dependencyCache.get(document);
+  if (held) return held;
+  const plain = plainDocument(document);
+  // An unused, half-made logic template must not stop the compiler checking the rest of the editable draft.
+  const { logicLibrary: _library, ...withoutLibrary } = plain;
+  const graph = compositionDependencies(plain.logicLibrary ? withoutLibrary : plain, document.logicLibrary);
+  dependencyCache.set(document, graph);
+  return graph;
+}
 
 /** The compiler checks library defaults as well as placed expansions; neither may lose a referenced global source. */
 export function sourceUses(document: CompositionDocument): Map<string, number> {
@@ -55,6 +66,7 @@ export function pruneEntitySources(before: CompositionDocument, document: Compos
   const previous = sourceUses(before);
   let next = document;
   for (;;) {
+    if (!documentDependencies(next).complete) return next;
     const uses = sourceUses(next);
     const dataSources = next.dataSources.filter(source => source.kind !== 'ha-entity' || !previous.get(source.id) || (uses.get(source.id) ?? 0) > 0);
     if (dataSources.length === next.dataSources.length) return next;
@@ -64,6 +76,7 @@ export function pruneEntitySources(before: CompositionDocument, document: Compos
 
 /** The document without the sources nothing reads. */
 export function removeUnusedSources(document: CompositionDocument): CompositionDocument {
+  if (!documentDependencies(document).complete) return document;
   const uses = sourceUses(document);
   return { ...document, dataSources: document.dataSources.filter(source => (uses.get(source.id) ?? 0) > 0) };
 }

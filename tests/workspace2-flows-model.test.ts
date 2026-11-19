@@ -93,8 +93,10 @@ it.each([false, true])('excludes a single-entity equality regardless of operand 
 });
 
 it('finds named transitive readers, not service intent names or literal words that look like entity ids', () => {
-  let edited = replaceAt(document, [...path, 'props', 'primary'], { type: 'literal', value: 'sensor.demo_not_a_read' });
-  edited = replaceAt(edited, [...path, 'props', 'subtitle'], { type: 'expr', value: read });
+  const edited = replaceAt(document, [...path, 'props', 'subtitle'], {
+    type: 'expr', value: { type: 'format', pattern: '{value} {words}', args: { value: sourceRead('demo-light-1'), words: { type: 'literal', value: 'sensor.demo_not_a_read' } } },
+  });
+  compileCompositionDocument(edited);
   const readers = entityReaders(edited);
   expect(readers.get('switch.demo_light_1')).toContain('Lights');
   expect(readers.has('power.toggle')).toBe(false);
@@ -142,7 +144,9 @@ it.each([false, true])('resolves placed private sources with entity overrides, i
 
 it('includes navigation visibility, chrome items, and surface-owned readers', () => {
   let edited = replaceAt(document, ['navigation', 'tabs', 0, 'visibleWhen'], { type: 'not', of: state });
-  edited = replaceAt(edited, ['navigation', 'chrome', 'groups'], [{ id: 'chrome', items: [{ id: 'chrome-read', title: 'Status action', visibleWhen: state }] }]);
+  const group = toolbarReader('demo-light-1');
+  group.items = group.items.map(item => ({ ...item, label: 'Status action' }));
+  edited = { ...edited, navigation: { ...edited.navigation, chrome: { ...edited.navigation.chrome, groups: [...edited.navigation.chrome.groups, group] } } };
   edited = replaceAt(edited, ['pages', 0, 'titleSourceId'], 'demo-light-1');
   const readers = entityReaders(edited).get('switch.demo_light_1');
   expect(readers).toContain(document.navigation.tabs[0].label);
@@ -287,4 +291,36 @@ it('agrees with compiler-required dependencies across every surface and source k
   }
   expect(readers.get(entitySource('saved-sample').entityId.value)).toContain('Editable sample');
   expect([...readers.keys()].sort()).toEqual(ids.filter(id => id !== 'argument-only' && id !== 'unused').map(id => entitySource(id).entityId.value).sort());
+});
+
+it.each(['operand', 'condition'] as const)('retains an unused saved %s sample as an editable reader in global scope', kind => {
+  const edited = withLevel();
+  edited.logicLibrary = [{
+    id: 'constant', name: 'Saved with sample', kind: 'operand', body: { type: 'literal', value: 'Constant' },
+    params: [{ name: 'unused', kind, sample: kind === 'operand' ? sourceRead('level-reader') : sourceState('level-reader') }],
+  }];
+  compileCompositionDocument(edited);
+  expect(sourceUses(edited).get('level-reader')).toBe(1);
+  expect(entityReaders(edited).get('sensor.demo_level_reader')).toEqual(new Set(['Saved with sample']));
+  const before = { ...edited, pages: [{ ...edited.pages[0], components: [textReader('level-reader')] }] };
+  expect(pruneEntitySources(before, edited).dataSources).toEqual(edited.dataSources);
+  expect(documentDependencies(edited).edges.filter(edge => edge.target.id === 'level-reader')).toMatchObject([{
+    path: ['logicLibrary', 0, 'params', 0, 'sample', kind === 'operand' ? 'from' : 'sourceId', ...(kind === 'operand' ? ['sourceId'] : [])], kind: 'read', sample: true,
+  }]);
+});
+
+it.each(['sourceId', 'providerId', 'titleSourceId', 'sourceIds'])('treats a service literal containing %s as data rather than a source reference', key => {
+  const edited = withLevel();
+  edited.pages[0].components = [{
+    id: 'payload', title: 'Payload action', type: 'primary-button', layout: { span: 1 }, props: {},
+    action: { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.demo_action' } },
+      data: { type: 'object', fields: { payload: { type: 'literal', value: { [key]: key === 'sourceIds' ? ['level-reader'] : 'level-reader' } } } } },
+  }];
+  compileCompositionDocument(edited);
+  expect(sourceUses(edited).get('level-reader')).toBe(0);
+  expect(entityReaders(edited).has('sensor.demo_level_reader')).toBe(false);
+  const before = { ...edited, pages: [{ ...edited.pages[0], components: [...edited.pages[0].components, textReader('level-reader')] }] };
+  const pruned = pruneEntitySources(before, edited);
+  expect(pruned.dataSources.map(source => source.id)).not.toContain('level-reader');
+  compileCompositionDocument(pruned);
 });

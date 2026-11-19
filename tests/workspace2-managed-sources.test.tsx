@@ -6,9 +6,11 @@ import { useCompositionStudio } from '../src/useCompositionStudio';
 import { tileType } from '../src/workspace2/add/catalog';
 import { ensureSource } from '../src/workspace2/add/sources';
 import { replaceAt } from '../src/composition-editor';
-import { pruneEntitySources, sourceUses } from '../src/workspace2/dialogs/sources';
+import { documentDependencies, pruneEntitySources, removeUnusedSources, sourceUses } from '../src/workspace2/dialogs/sources';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import type { Predicate } from '../src/shared/composition/expression';
+import { newFlow } from '../src/workspace2/data/flow';
 import fixture from '../src/preview2/fixtures/logic-gallery.json';
 
 vi.mock('../src/api', async original => ({ ...await original<typeof import('../src/api')>(), request: vi.fn() }));
@@ -72,6 +74,16 @@ describe('Studio-managed entity sources', () => {
     };
     expect(sourceUses(draft).get('entity-legacy')).toBe(1);
     expect(pruneEntitySources(before, draft).dataSources).toEqual(before.dataSources);
+  });
+
+  it('does not destructively infer unused sources from a draft the typed compiler could not walk', () => {
+    const before = doc('entity-legacy');
+    const draft = replaceAt(before, ['pages', 0, 'components', 0, 'props', 'unexpected'], 'Incomplete edit');
+    const graph = documentDependencies(draft);
+    expect(graph.complete).toBe(false);
+    expect(graph.issues).toContainEqual({ code: 'unknown_field', pointer: '/document/pages/0/components/0/props/unexpected' });
+    expect(pruneEntitySources(before, draft)).toBe(draft);
+    expect(removeUnusedSources(draft)).toBe(draft);
   });
 
   it('resolves plain-string value bindings before pruning, retaining validity through undo and redo', async () => {
@@ -173,16 +185,32 @@ describe('Studio-managed entity sources', () => {
     expect(() => compileCompositionDocument(result.current.document)).not.toThrow();
   });
 
-  it.each([
-    ['navigation visibility', ['navigation', 'tabs', 0, 'visibleWhen']],
-    ['chrome', ['navigation', 'chrome', 'groups']],
-    ['surface toolbar', ['pages', 0, 'toolbar']],
-    ['models and flow parameter reads', ['dataSources', 1]],
-    ['rules, looks and controls', ['pages', 0, 'components']],
-  ])('counts references throughout %s', (_name, path) => {
+  it.each(['navigation visibility', 'chrome', 'surface toolbar', 'models and flow parameter reads', 'rules, looks and controls'])('counts references throughout %s', name => {
     const initial = doc('legacy-actual');
-    const empty = { ...initial, pages: [{ ...initial.pages[0], components: [] }] };
-    const edited = replaceAt(empty, path as (string | number)[], { from: { sourceId: 'legacy-actual' }, subtitleSourceIds: ['legacy-actual'], scopeProviderId: 'legacy-actual' });
+    const empty: CompositionDocument = { ...initial, pages: [{ ...initial.pages[0], components: [] }] };
+    const condition: Predicate = { type: 'all', of: Array.from({ length: 3 }, () => ({ type: 'state', sourceId: 'legacy-actual', path: ['state'], in: ['on'] })) };
+    const group: CompositionDocument['navigation']['chrome']['groups'][number] = {
+      id: 'reader-group', placement: 'trailing', horizontal: 'shared@1', vertical: 'shared@1',
+      items: [{ id: 'reader-item', type: 'button', label: 'Reader', menuLabel: 'Reader', icon: initial.pages[0].icon,
+        visibility: 'always', priority: 'normal', rail: 'eligible', badge: { type: 'none' },
+        action: { type: 'conditional', cases: [{ when: condition, then: { type: 'back' } }], otherwise: { type: 'none' } } }],
+    };
+    let edited = empty;
+    if (name === 'navigation visibility') edited = replaceAt(empty, ['navigation', 'tabs', 0, 'visibleWhen'], condition);
+    else if (name === 'chrome') edited = replaceAt(empty, ['navigation', 'chrome', 'groups'], [...initial.navigation.chrome.groups, group]);
+    else if (name === 'surface toolbar') edited = replaceAt(empty, ['pages', 0, 'toolbar'], {
+      type: 'replace', groups: [...initial.navigation.chrome.groups.map(group => ({ ...group, id: `page-${group.id}`, items: group.items.map(item => ({ ...item, id: `page-${item.id}` })) })), group],
+    });
+    else if (name === 'rules, looks and controls') edited = replaceAt(initial, ['pages', 0, 'components', 0, 'props', 'isOn'], condition);
+    else {
+      const flow = newFlow(empty, 'none').document.dataSources.at(-1)!;
+      if (flow.kind !== 'model' || flow.model !== 'pipeline@1') throw new Error('Expected a flow');
+      edited = { ...empty, dataSources: [...empty.dataSources, { ...flow, inputs: {
+        ...flow.inputs, parameters: Array.from({ length: 3 }, (_, at) => ({ name: `input${at}`, type: 'string',
+          value: { type: 'read', from: { type: 'source', sourceId: 'legacy-actual', path: ['state'] }, as: 'string', missing: 'unavailable' } })),
+      } }] };
+    }
+    compileCompositionDocument(edited);
     expect(sourceUses(edited).get('legacy-actual')).toBe(3);
     expect(pruneEntitySources(initial, edited).dataSources).toContainEqual(initial.dataSources[0]);
   });

@@ -5,19 +5,18 @@ import { useWorkspaceData } from '../pickers/WorkspaceData';
 import { useRows } from '../rows';
 import { PushRow } from '../dialogs/parts';
 import FlowEditor from '../data/FlowEditor';
-import { canAddFlow, flowSources, newFlow, requestKinds, requestWords, type RequestKind } from '../data/flow';
+import { canAddFlow, flowSources, newFlow, requestKinds, requestWords, usedCount, type RequestKind } from '../data/flow';
 import LogicEditor from '../data/logic/LogicEditor';
 import { addEntry, canAddEntry, entryOf, libraryOf, useCounts } from '../data/logic/logicModel';
 import { setHeldLogicScope } from '../data/logic/logicScope';
 import { logicWords } from '../data/logic/logicWords';
 import type { Workspace2 } from '../useWorkspace2';
-import { sourceUses } from '../dialogs/sources';
 
 /** Existing pushed editors, now reached through Project > Flows instead of the read-only Data sheet. */
 export default function PhoneFlows({ ws }: { ws: Workspace2 }) {
   const { document, onChange, onError } = useRows(), push = usePush(), { entities } = useWorkspaceData();
   const [query, setQuery] = useState('');
-  const uses = useMemo(() => sourceUses(document), [document]), counts = useMemo(() => useCounts(document), [document]);
+  const uses = useMemo(() => new Map(flowSources(document).map(source => [source.id, usedCount(document, source.id)])), [document]), counts = useMemo(() => useCounts(document), [document]);
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const flows = flowSources(document).filter(source => words.every(word => source.inputs.title.toLowerCase().includes(word)));
   const library = libraryOf(document), templates = library.filter(entry => words.every(word => entry.name.toLowerCase().includes(word)));

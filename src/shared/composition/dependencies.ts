@@ -1,98 +1,110 @@
-import { checkedBody, derivedId, expandRef, expandSources, isSourceKey, ownedSources, type DocumentSource, type NodePath } from './components';
-import type { ComponentRefNode, CompositionDocument } from './schema';
+import { derivedId, type DocumentSource, type NodePath } from './components';
+import type { CompositionDocument } from './schema';
+import type { CompositionIssue } from './json';
+import type { ExpressionFacts } from './expression';
 
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): value is RecordValue => value !== null && typeof value === 'object' && !Array.isArray(value);
+const entityId = /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/;
+const steps = (pointer: string): NodePath => pointer.replace(/^\/document\/?/, '').split('/').filter(Boolean)
+  .map(step => /^\d+$/.test(step) ? Number(step) : step.replace(/~1/g, '/').replace(/~0/g, '~'));
 
-/** A reader's location in its expanded scope and owning object, before UI-specific naming. */
 export interface DependencyReader { path: NodePath; value: RecordValue }
 export interface CompositionDependency {
   target: { type: 'source' | 'entity'; id: string };
   path: NodePath;
   reader: DependencyReader;
-  /** Source whose definition contains this edge; literal entity definitions are not independent readers. */
   from?: string;
-  /** Arguments retain sources without reading them; literal definitions are followed only by a reader. */
   kind: 'read' | 'argument' | 'definition';
+  /** Editable saved logic is the one intentional addition to published compiler references. */
+  sample?: true;
 }
-export interface CompositionDependencies { edges: CompositionDependency[] }
+export interface CompositionDependencies { edges: CompositionDependency[]; issues: CompositionIssue[]; complete: boolean }
 
 /**
- * The pruning reference walk, with dependency edges and reader locations. Pass logic-expanded fields before component
- * namespaces, as the compiler does; editable logic samples are evaluated separately in their original global scope.
- * The entire document is walked, not a list of rendering surfaces. Only library scope and argument expansion are special.
+ * The compiler's source lookup. Its callers are the typed reference checks, not a second field-name walk.
+ * Entity endpoints project already-typed source definitions; literals are opaque except in entity-ID slots.
  */
-export function compositionDependencies(plain: CompositionDocument, samples = plain.logicLibrary ?? []): CompositionDependencies {
-  const edges: CompositionDependency[] = [];
-  type Scope = { reader: DependencyReader; from?: string; locked?: boolean; literalDefinitions?: boolean };
-  const fill = (value: unknown, args: RecordValue): unknown => {
-    if (Array.isArray(value)) return value.map(item => fill(item, args));
-    if (!record(value)) return value;
-    if (value.type === 'hole' && typeof value.name === 'string') return args[value.name] ?? value;
-    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, fill(child, args)]));
-  };
-  const edge = (type: 'source' | 'entity', id: string, path: NodePath, scope: Scope, kind: CompositionDependency['kind'] = 'read') => {
-    if (type === 'entity' && (scope.literalDefinitions || !scope.reader.path.length)) kind = 'definition';
-    edges.push({ target: { type, id }, path, reader: scope.reader, ...(scope.from ? { from: scope.from } : {}), kind });
-  };
-  const walk = (value: unknown, path: NodePath, scope: Scope, args: RecordValue = {}, stack = new Set<string>(), field = ''): void => {
-    if (typeof value === 'string' && (/entity_?ids?$/i.test(field) || field === 'copySourceId') && /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/.test(value)) edge('entity', value, path, scope);
-    if (Array.isArray(value)) { value.forEach((item, at) => walk(item, [...path, at], scope, args, stack, field)); return; }
-    if (!record(value)) return;
-    if (!scope.locked && typeof value.id === 'string' && ('type' in value || 'title' in value || 'label' in value || value.kind === 'ha-entity' || value.kind === 'model')) {
-      scope = { ...scope, reader: { path, value } };
-    }
-    if (typeof value.id === 'string' && (value.kind === 'ha-entity' || value.kind === 'model')) {
-      scope = { ...scope, from: value.id, locked: true, literalDefinitions: value.kind === 'ha-entity' || value.model !== 'pipeline@1' };
-    }
-    if (value.type === 'component-ref') {
-      const entry = plain.componentLibrary?.find(entry => entry.id === value.componentId);
+export class CompositionReferences {
+  private readonly seen = new Set<string>();
+  readonly graph: CompositionDependencies;
+  constructor(private readonly document: CompositionDocument, private readonly sources: ReadonlyMap<string, DocumentSource>, private readonly recording?: CompositionDependencies) {
+    this.graph = recording ?? { edges: [], issues: [], complete: false };
+  }
+
+  private location(pointer: string): { path: NodePath; reader: DependencyReader; from?: string } {
+    const path = steps(pointer);
+    if (path[0] === 'componentLibrary' && typeof path[1] === 'number') {
+      const entry = this.document.componentLibrary?.[path[1]];
       if (entry) {
-        const ref = value as ComponentRefNode;
-        for (const param of entry.params ?? []) {
-          const id = ref.args?.[param.name];
-          if (param.kind === 'source-id' && typeof id === 'string') edge('source', id, [...path, 'args', param.name], scope, 'argument');
-        }
-        walk(expandRef(ref, entry), path, scope, args, stack);
-        expandSources(ref, entry).forEach((source, at) => walk(source, [...path, 'sources', at], scope, args, stack));
+        const source = (path[2] === 'sources' ? entry.sources : path[2] === 'flows' ? entry.flows : undefined)?.[Number(path[3])];
+        return { path, reader: { path: path.slice(0, 2), value: entry }, ...(source ? { from: derivedId(entry.id, source.id) } : {}) };
       }
-      return;
     }
-    if (value.type === 'logic-ref') {
-      const entry = samples.find(entry => entry.id === value.logicId);
-      if (entry && !stack.has(entry.id)) walk(entry.body, path, scope, record(value.args) ? fill(value.args, args) as RecordValue : {}, new Set([...stack, entry.id]), field);
-      return;
+    if (path[0] === 'dataSources' && typeof path[1] === 'number') {
+      const source = this.document.dataSources[path[1]];
+      if (source) return { path, reader: { path: path.slice(0, 2), value: source }, from: source.id };
     }
-    if (value.type === 'hole') {
-      if (typeof value.name === 'string' && args[value.name] !== undefined) walk(args[value.name], path, scope, {}, stack, field);
-      return;
+    let reader: DependencyReader = { path: [], value: this.document };
+    let value: unknown = this.document;
+    for (let at = 0; at < path.length; at++) {
+      if (!value || typeof value !== 'object' || !Object.hasOwn(value, path[at])) break;
+      value = Reflect.get(value, path[at]);
+      if (record(value) && typeof value.id === 'string' && ('type' in value || 'title' in value || 'label' in value)) reader = { path: path.slice(0, at + 1), value };
     }
-    for (const [key, child] of Object.entries(value)) {
-      const at = [...path, key];
-      const resolved = isSourceKey(key) || /(?:source|provider)Ids$/i.test(key) ? fill(child, args) : child;
-      if (isSourceKey(key) && typeof resolved === 'string') edge('source', resolved, at, scope);
-      else if (/(?:source|provider)Ids$/i.test(key) && Array.isArray(resolved)) {
-        resolved.forEach((id, index) => { if (typeof id === 'string') edge('source', id, [...at, index], scope); });
-      }
-      walk(child, at, scope, args, stack, key === 'value' ? value.type === 'entity-id' ? 'entityId' : field : key);
-    }
-  };
-  const { componentLibrary, logicLibrary: _logicLibrary, ...rest } = plain;
-  walk(rest, [], { reader: { path: [], value: rest } });
-  componentLibrary?.forEach((entry, at) => {
-    const path: NodePath = ['componentLibrary', at], scope = { reader: { path, value: entry }, locked: true };
-    walk(checkedBody(entry), [...path, 'node'], scope);
-    // Like the compiler's privateSources, only the definition's id changes; reads inside it retain their global scope.
-    ownedSources(entry).forEach((source, index) => {
-      const namespaced: DocumentSource = { ...source, id: derivedId(entry.id, source.id) };
-      const sourceCount = entry.sources?.length ?? 0;
-      const field = index < sourceCount ? 'sources' : 'flows', offset = index < sourceCount ? index : index - sourceCount;
-      walk(namespaced, [...path, field, offset], scope);
+    return { path, reader };
+  }
+
+  add(edge: CompositionDependency): void {
+    if (!this.recording) return;
+    const key = JSON.stringify([edge.target, edge.path, edge.from, edge.kind, edge.sample]);
+    if (!this.seen.has(key)) { this.seen.add(key); this.graph.edges.push(edge); }
+  }
+
+  source(id: string, pointer: string, kind: CompositionDependency['kind'] = 'read'): DocumentSource | undefined {
+    if (this.recording) this.add({ target: { type: 'source', id }, ...this.location(pointer), kind });
+    return this.sources.get(id);
+  }
+
+  entity(id: string, pointer: string): void {
+    if (this.recording && entityId.test(id)) this.add({ target: { type: 'entity', id }, ...this.location(pointer), kind: 'read' });
+  }
+
+  editable(facts: ExpressionFacts, reader: DependencyReader): void {
+    for (const ref of facts.references) this.add({
+      target: { type: 'source', id: ref.sourceId }, reader, kind: 'read', sample: true,
+      path: steps(ref.pointer + (ref.kind === undefined ? '/sourceId' : '/from/sourceId')),
     });
-  });
-  samples.forEach((entry, at) => {
-    const path: NodePath = ['logicLibrary', at];
-    walk({ type: 'logic-ref', logicId: entry.id, args: Object.fromEntries(entry.params.filter(param => param.sample !== undefined).map(param => [param.name, param.sample])) }, path, { reader: { path, value: entry }, locked: true });
-  });
-  return { edges };
+  }
+
+  define(source: DocumentSource, pointer: string, owner?: DependencyReader, requests: { id: string; path: string }[] = []): void {
+    if (!this.recording) return;
+    const reader = owner ?? this.location(pointer).reader;
+    if (source.kind === 'model' && source.model === 'pipeline@1') {
+      for (const { id, path } of requests) if (entityId.test(id)) this.add({ target: { type: 'entity', id }, path: steps(path), reader, from: source.id, kind: 'read' });
+      return;
+    }
+    const visit = (value: unknown, path: NodePath, field = ''): void => {
+      const endpoint = (id: unknown) => {
+        if (typeof id === 'string' && entityId.test(id)) this.add({ target: { type: 'entity', id }, path, reader, from: source.id, kind: 'definition' });
+      };
+      const entitySlot = /entity_?ids?$/i.test(field) || field === 'copySourceId';
+      if (typeof value === 'string' && entitySlot) endpoint(value);
+      if (Array.isArray(value)) { value.forEach((item, at) => visit(item, [...path, at], field)); return; }
+      if (!record(value)) return;
+      if (value.type === 'literal') {
+        if (entitySlot) Array.isArray(value.value) ? value.value.forEach(endpoint) : endpoint(value.value);
+        return;
+      }
+      for (const [key, child] of Object.entries(value)) visit(child, [...path, key], key === 'value' && value.type === 'entity-id' ? 'entityId' : key);
+    };
+    visit(source, steps(pointer));
+  }
+
+  merge(graph: CompositionDependencies, names = new Map<string, string>()): void {
+    for (const edge of graph.edges) this.add({
+      ...edge, target: { ...edge.target, id: names.get(edge.target.id) ?? edge.target.id },
+      ...(edge.from ? { from: names.get(edge.from) ?? edge.from } : {}),
+    });
+  }
 }
