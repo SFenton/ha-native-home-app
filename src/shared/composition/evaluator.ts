@@ -25,6 +25,23 @@ export type ReadResult = { status: 'value'; value: Json } | { status: 'loading' 
 export type Tri = 'yes' | 'no' | 'unknown';
 /** The signed-in person an expression can ask about. Absent fields are not known yet. */
 export interface Viewer { userId?: string; isAdmin?: boolean; personEntityId?: string }
+export interface ObservedRead {
+  readonly sourceId: string;
+  readonly access: 'read' | 'raw-state' | 'last-changed';
+  readonly path?: readonly string[];
+  readonly answer: ReadResult;
+}
+export type EvaluationEvent = (
+  | { readonly kind: 'operand'; readonly node: Operand; readonly result: ReadResult; readonly item?: Json; readonly index?: number }
+  | { readonly kind: 'condition'; readonly node: Predicate; readonly result: Tri; readonly item?: Json; readonly index?: number }
+  | { readonly kind: 'count-entry'; readonly node: Extract<Operand, { type: 'count' }>; readonly index: number; readonly reads?: readonly ObservedRead[]; readonly result?: Tri; readonly reason: 'tested' | 'viewer-excluded' | 'viewer-loading' }
+) & { readonly cost?: { readonly used: number; readonly limit: number } };
+/** Observers are read-only Studio diagnostics, never an evaluator or budget hook. */
+export type EvaluationObserver = (event: EvaluationEvent) => void;
+export function notifyEvaluation(observer: EvaluationObserver, event: EvaluationEvent): void {
+  try { observer(event); }
+  catch { console.warn('Studio evaluation observation failed; the answer is unchanged.'); }
+}
 /** The state snapshot an evaluation reads. */
 export interface Environment {
   /** The value at `path` of a declared source (`['state']` or `['attributes', ...]` for an entity; a read field for a model). */
@@ -65,6 +82,8 @@ export interface Environment {
   hasSymbol?(name: string): boolean;
   /** Called once for every operand and condition node evaluated; a flow's budget throws from here. */
   spend?(): void;
+  observe?: EvaluationObserver;
+  observationCost?: { readonly spent: number; readonly limit: number };
 }
 
 export const unavailable: ReadResult = { status: 'unavailable' };
@@ -151,7 +170,9 @@ export function evaluateOperand(operand: Operand, env: Environment): ReadResult 
   env.spend?.();
   const result = operandResult(operand, env);
   // A flow has no loading or unavailable: a gap is null.
-  return env.flow && result.status !== 'value' ? value(null) : result;
+  const answer = env.flow && result.status !== 'value' ? value(null) : result;
+  if (env.observe) notifyEvaluation(env.observe, { kind: 'operand', node: operand, result: answer, item: env.item, index: env.index, cost: env.observationCost ? { used: env.observationCost.spent, limit: env.observationCost.limit } : undefined });
+  return answer;
 }
 function operandResult(operand: Operand, env: Environment): ReadResult {
   switch (operand.type) {
@@ -193,16 +214,38 @@ function operandResult(operand: Operand, env: Environment): ReadResult {
       if (env.flow) return unavailable;
       // Every way a test reads is watched; any "not yet" makes an unanswerable count `loading` rather than `unavailable`.
       let waiting = false;
-      const watched = watching(env, () => { waiting = true; });
+      let watched = watching(env, () => { waiting = true; });
+      let observedReads: ObservedRead[] | undefined;
+      if (env.observe) {
+        observedReads = [];
+        const base = watched, reads = observedReads;
+        watched = Object.create(base);
+        Object.defineProperties(watched, {
+          read: { value: (sourceId: string, path: string[]) => { const answer = base.read(sourceId, path); reads.push({ sourceId, path, access: 'read', answer }); return answer; } },
+          ...(base.readRaw ? { readRaw: { value: (sourceId: string) => { const answer = base.readRaw!(sourceId); reads.push({ sourceId, access: 'raw-state', answer }); return answer; } } } : {}),
+          ...(base.readChanged ? { readChanged: { value: (sourceId: string) => { const answer = base.readChanged!(sourceId); reads.push({ sourceId, access: 'last-changed', answer }); return answer; } } } : {}),
+        });
+      }
       let held = 0, considered = 0, unknown = 0;
-      for (const entry of operand.of) {
+      for (let index = 0; index < operand.of.length; index++) {
+        const entry = operand.of[index];
         if (entry.viewer) {
           // No signed-in person yet: nothing about "whose" can be said. A person who is not one of the listed ones, or has no person entity, is simply not counted.
-          if (!env.viewer) return loading;
-          if (env.viewer.personEntityId === undefined || !entry.viewer.personEntityIds.includes(env.viewer.personEntityId)) continue;
+          if (!env.viewer) {
+            if (env.observe) notifyEvaluation(env.observe, { kind: 'count-entry', node: operand, index, reason: 'viewer-loading' });
+            return loading;
+          }
+          if (env.viewer.personEntityId === undefined || !entry.viewer.personEntityIds.includes(env.viewer.personEntityId)) {
+            if (env.observe) notifyEvaluation(env.observe, { kind: 'count-entry', node: operand, index, reason: 'viewer-excluded' });
+            continue;
+          }
         }
         considered += 1;
         const answer = evaluatePredicate(entry.test, watched);
+        if (env.observe) {
+          notifyEvaluation(env.observe, { kind: 'count-entry', node: operand, index, reads: observedReads!.slice(), result: answer, reason: 'tested' });
+          observedReads!.length = 0;
+        }
         if (answer === 'yes') held += 1;
         else if (answer === 'unknown') unknown += 1;
       }
@@ -333,7 +376,9 @@ const scalarValue = (v: Json): boolean => v !== null && typeof v !== 'object';
 export function evaluatePredicate(predicate: Predicate, env: Environment): Tri {
   env.spend?.();
   const answer = predicateResult(predicate, env);
-  return env.flow && answer === 'unknown' ? 'no' : answer;
+  const result = env.flow && answer === 'unknown' ? 'no' : answer;
+  if (env.observe) notifyEvaluation(env.observe, { kind: 'condition', node: predicate, result, item: env.item, index: env.index, cost: env.observationCost ? { used: env.observationCost.spent, limit: env.observationCost.limit } : undefined });
+  return result;
 }
 function predicateResult(predicate: Predicate, env: Environment): Tri {
   switch (predicate.type) {

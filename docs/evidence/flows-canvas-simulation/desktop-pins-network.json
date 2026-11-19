@@ -1,0 +1,10 @@
+{
+  "initialReads": 1,
+  "simulationFetches": 0,
+  "requestsIncludingExplicitReturnLive": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    }
+  ]
+}

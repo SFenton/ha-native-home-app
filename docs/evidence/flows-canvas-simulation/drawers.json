@@ -1,0 +1,5711 @@
+{
+  "scenario": "Sensor offline",
+  "outputs": [
+    {
+      "output": {
+        "kind": "logic",
+        "id": "warning",
+        "field": "/body"
+      },
+      "result": {
+        "kind": "condition",
+        "answer": "unknown"
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-650d1397-9334c08f",
+            "pointer": "/of/0/left/args/0/args/0",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 23.6
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 5,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-98f3e13f-40578fc1",
+            "pointer": "/of/0/left/args/0/args/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "pin",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 6,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-928089fd-95221197",
+            "pointer": "/of/0/left/args/0",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "args/0",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 23.6
+                  }
+                }
+              },
+              {
+                "portId": "args/1",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "unavailable"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 6,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-cffd6578-186e243e",
+            "pointer": "/of/0/left/args/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 2
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 7,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-3cd2491b-c15525b5",
+            "pointer": "/of/0/left",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "args/0",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "unavailable"
+                  }
+                }
+              },
+              {
+                "portId": "args/1",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 7,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-e36c199-30f88ed3",
+            "pointer": "/of/0/right/args/0",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 22
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 9,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-6e38d015-a875a1c5",
+            "pointer": "/of/0/right/args/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 2
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 10,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-7db055bf-d31df463",
+            "pointer": "/of/0/right",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "args/0",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 22
+                  }
+                }
+              },
+              {
+                "portId": "args/1",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 24
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 10,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-1a737ee9-a5a78a9f",
+            "pointer": "/of/0",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "unavailable"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 24
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "unknown"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 10,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-6545c30c-aca34456",
+            "pointer": "/of/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 11,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "warning",
+              "field": "/body"
+            },
+            "blockId": "warning-lift-535d269f-698426fd",
+            "pointer": "",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "of/0",
+                "result": {
+                  "kind": "condition",
+                  "answer": "unknown"
+                }
+              },
+              {
+                "portId": "of/1",
+                "result": {
+                  "kind": "condition",
+                  "answer": "yes"
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "unknown"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 11,
+              "limit": 0
+            }
+          }
+        ],
+        "iterations": [],
+        "steps": [],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "logic",
+        "id": "subtitle",
+        "field": "/body"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "value",
+          "value": "Too Warm"
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-ca5fb131-f1a89b47",
+            "pointer": "/value/cases/0/when/of/0/left/args/0/args/0",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 23.6
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 6,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-35673439-2953b309",
+            "pointer": "/value/cases/0/when/of/0/left/args/0/args/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "pin",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 7,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-b5bbb787-c7dcd0df",
+            "pointer": "/value/cases/0/when/of/0/left/args/0",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "args/0",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 23.6
+                  }
+                }
+              },
+              {
+                "portId": "args/1",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "unavailable"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 7,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-c3a208ca-8eb14e76",
+            "pointer": "/value/cases/0/when/of/0/left/args/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 2
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 8,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-ffc6ade5-8abe9efd",
+            "pointer": "/value/cases/0/when/of/0/left",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "args/0",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "unavailable"
+                  }
+                }
+              },
+              {
+                "portId": "args/1",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 8,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-d39688bf-99bb281b",
+            "pointer": "/value/cases/0/when/of/0/right/args/0",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 22
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 10,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-57805ae7-16ac6d8d",
+            "pointer": "/value/cases/0/when/of/0/right/args/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 2
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 11,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-c445c1c5-a09cdd2b",
+            "pointer": "/value/cases/0/when/of/0/right",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "args/0",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 22
+                  }
+                }
+              },
+              {
+                "portId": "args/1",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 24
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 11,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-5e8d6c47-e54d8f57",
+            "pointer": "/value/cases/0/when/of/0",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "unavailable"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 24
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "unknown"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 11,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-2d5aafb6-db0cab1e",
+            "pointer": "/value/cases/0/when/of/1",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-1027f2d1-466cc1b5",
+            "pointer": "/value/cases/0/when",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "of/0",
+                "result": {
+                  "kind": "condition",
+                  "answer": "unknown"
+                }
+              },
+              {
+                "portId": "of/1",
+                "result": {
+                  "kind": "condition",
+                  "answer": "yes"
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "unknown"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-1a4b2495-4e197edd",
+            "pointer": "/value",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "cases/0/when",
+                "result": {
+                  "kind": "condition",
+                  "answer": "unknown"
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "loading"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-89bd9527-e058bc21",
+            "pointer": "/value/cases/0/then",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "subtitle",
+              "field": "/body"
+            },
+            "blockId": "subtitle-lift-9b666250-93a3a954",
+            "pointer": "/value/otherwise",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 0
+            }
+          }
+        ],
+        "iterations": [],
+        "steps": [],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "logic",
+        "id": "bedroom",
+        "field": "/body"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "unavailable"
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "bedroom",
+              "field": "/body"
+            },
+            "blockId": "bedroom-lift-86aaffdb-5e2848d",
+            "pointer": "",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "unavailable"
+              }
+            },
+            "provenance": "pin",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 1,
+              "limit": 0
+            }
+          }
+        ],
+        "iterations": [],
+        "steps": [],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "logic",
+        "id": "today",
+        "field": "/body"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "value",
+          "value": "2026-11-18"
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "today",
+              "field": "/body"
+            },
+            "blockId": "today-lift-423564ed-ecbc04f",
+            "pointer": "",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "2026-11-18"
+              }
+            },
+            "provenance": "pin",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 1,
+              "limit": 0
+            }
+          }
+        ],
+        "iterations": [],
+        "steps": [],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "logic",
+        "id": "lights",
+        "field": "/body"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "value",
+          "value": 1
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "lights",
+              "field": "/body"
+            },
+            "blockId": "lights-lift-879c5d28-c6e45a3c",
+            "pointer": "/of/0/test",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 2,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "lights",
+              "field": "/body"
+            },
+            "blockId": "lights-lift-3147e6bf-680352a1",
+            "pointer": "/of/1/test",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "condition",
+              "answer": "no"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "lights",
+              "field": "/body"
+            },
+            "blockId": "lights-lift-25d0d1c1-5a8b8ae5",
+            "pointer": "",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "of/0/test",
+                "result": {
+                  "kind": "condition",
+                  "answer": "yes"
+                }
+              },
+              {
+                "portId": "of/1/test",
+                "result": {
+                  "kind": "condition",
+                  "answer": "no"
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "lights",
+              "field": "/body"
+            },
+            "blockId": "lights-lift-a670e19a-50a8b7e",
+            "pointer": "/of/2/test",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          }
+        ],
+        "iterations": [
+          {
+            "blockId": "lights-lift-25d0d1c1-5a8b8ae5",
+            "index": 0,
+            "included": true,
+            "result": "yes",
+            "identity": "lamp",
+            "reads": [
+              {
+                "sourceId": "lamp",
+                "path": [
+                  "state"
+                ],
+                "access": "read",
+                "answer": {
+                  "status": "value",
+                  "value": "on"
+                }
+              }
+            ],
+            "tested": [
+              {
+                "pointer": "/of/0/test",
+                "result": {
+                  "kind": "condition",
+                  "answer": "yes"
+                }
+              }
+            ],
+            "reason": "Yes - counted"
+          },
+          {
+            "blockId": "lights-lift-25d0d1c1-5a8b8ae5",
+            "index": 1,
+            "included": false,
+            "result": "no",
+            "identity": "window",
+            "reads": [
+              {
+                "sourceId": "window",
+                "path": [
+                  "state"
+                ],
+                "access": "read",
+                "answer": {
+                  "status": "value",
+                  "value": "off"
+                }
+              }
+            ],
+            "tested": [
+              {
+                "pointer": "/of/1/test",
+                "result": {
+                  "kind": "condition",
+                  "answer": "no"
+                }
+              }
+            ],
+            "reason": "No - not counted"
+          },
+          {
+            "blockId": "lights-lift-25d0d1c1-5a8b8ae5",
+            "index": 2,
+            "included": false,
+            "tested": [],
+            "reason": "Viewer excluded"
+          }
+        ],
+        "steps": [],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "flow",
+        "id": "chores-count",
+        "field": "/inputs"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "value",
+          "value": 6
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-9c18b0b-5109f00d",
+            "pointer": "/steps/0",
+            "inputs": [
+              {
+                "portId": "stream",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": {
+                      "items": [
+                        {
+                          "uid": "chore-0",
+                          "summary": "Fixture chore 1",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-1",
+                          "summary": "Fixture chore 2",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-2",
+                          "summary": "Fixture chore 3",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-3",
+                          "summary": "Fixture chore 4",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-4",
+                          "summary": "Fixture chore 5",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-5",
+                          "summary": "Fixture chore 6",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-6",
+                          "summary": "Fixture chore 7",
+                          "status": "completed",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-7",
+                          "summary": "Fixture chore 8",
+                          "status": "completed",
+                          "due": "2026-11-18",
+                          "description": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": [
+                  {
+                    "uid": "chore-0",
+                    "summary": "Fixture chore 1",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-1",
+                    "summary": "Fixture chore 2",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-2",
+                    "summary": "Fixture chore 3",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-3",
+                    "summary": "Fixture chore 4",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-4",
+                    "summary": "Fixture chore 5",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-5",
+                    "summary": "Fixture chore 6",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-6",
+                    "summary": "Fixture chore 7",
+                    "status": "completed",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-7",
+                    "summary": "Fixture chore 8",
+                    "status": "completed",
+                    "due": "2026-11-18",
+                    "description": null
+                  }
+                ]
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 1,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 13,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 13,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 15,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 16,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 16,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 18,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 19,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 19,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 21,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 22,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 22,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 24,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 25,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 25,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 5,
+              "identity": "chore-5"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 27,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 5,
+              "identity": "chore-5"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 28,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 5,
+              "identity": "chore-5"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 28,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 6,
+              "identity": "chore-6"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "completed"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 30,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 6,
+              "identity": "chore-6"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 31,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 6,
+              "identity": "chore-6"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "completed"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "no"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 31,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 7,
+              "identity": "chore-7"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "completed"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 33,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 7,
+              "identity": "chore-7"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 34,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 7,
+              "identity": "chore-7"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "completed"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "no"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 34,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "pointer": "/steps/1",
+            "inputs": [
+              {
+                "portId": "stream",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": [
+                      {
+                        "uid": "chore-0",
+                        "summary": "Fixture chore 1",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-1",
+                        "summary": "Fixture chore 2",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-2",
+                        "summary": "Fixture chore 3",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-3",
+                        "summary": "Fixture chore 4",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-4",
+                        "summary": "Fixture chore 5",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-5",
+                        "summary": "Fixture chore 6",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-6",
+                        "summary": "Fixture chore 7",
+                        "status": "completed",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-7",
+                        "summary": "Fixture chore 8",
+                        "status": "completed",
+                        "due": "2026-11-18",
+                        "description": null
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": [
+                  {
+                    "uid": "chore-0",
+                    "summary": "Fixture chore 1",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-1",
+                    "summary": "Fixture chore 2",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-2",
+                    "summary": "Fixture chore 3",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-3",
+                    "summary": "Fixture chore 4",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-4",
+                    "summary": "Fixture chore 5",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-5",
+                    "summary": "Fixture chore 6",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  }
+                ]
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 34,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-count",
+              "field": "/inputs"
+            },
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "pointer": "/steps/2",
+            "inputs": [
+              {
+                "portId": "stream",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": [
+                      {
+                        "uid": "chore-0",
+                        "summary": "Fixture chore 1",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-1",
+                        "summary": "Fixture chore 2",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-2",
+                        "summary": "Fixture chore 3",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-3",
+                        "summary": "Fixture chore 4",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-4",
+                        "summary": "Fixture chore 5",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-5",
+                        "summary": "Fixture chore 6",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 6
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 35,
+              "limit": 100000
+            }
+          }
+        ],
+        "iterations": [
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 0,
+            "identity": "chore-0",
+            "item": {
+              "uid": "chore-0",
+              "summary": "Fixture chore 1",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 1,
+            "identity": "chore-1",
+            "item": {
+              "uid": "chore-1",
+              "summary": "Fixture chore 2",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 2,
+            "identity": "chore-2",
+            "item": {
+              "uid": "chore-2",
+              "summary": "Fixture chore 3",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 3,
+            "identity": "chore-3",
+            "item": {
+              "uid": "chore-3",
+              "summary": "Fixture chore 4",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 4,
+            "identity": "chore-4",
+            "item": {
+              "uid": "chore-4",
+              "summary": "Fixture chore 5",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 5,
+            "identity": "chore-5",
+            "item": {
+              "uid": "chore-5",
+              "summary": "Fixture chore 6",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 6,
+            "identity": "chore-6",
+            "item": {
+              "uid": "chore-6",
+              "summary": "Fixture chore 7",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": false,
+            "result": "no",
+            "reason": "Condition No - dropped (flow gaps are null)"
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "index": 7,
+            "identity": "chore-7",
+            "item": {
+              "uid": "chore-7",
+              "summary": "Fixture chore 8",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": false,
+            "result": "no",
+            "reason": "Condition No - dropped (flow gaps are null)"
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "index": 0,
+            "identity": "chore-0",
+            "item": {
+              "uid": "chore-0",
+              "summary": "Fixture chore 1",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "reason": "Counted",
+            "tested": [
+              {
+                "pointer": "/steps/2",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "index": 1,
+            "identity": "chore-1",
+            "item": {
+              "uid": "chore-1",
+              "summary": "Fixture chore 2",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "reason": "Counted",
+            "tested": [
+              {
+                "pointer": "/steps/2",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "index": 2,
+            "identity": "chore-2",
+            "item": {
+              "uid": "chore-2",
+              "summary": "Fixture chore 3",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "reason": "Counted",
+            "tested": [
+              {
+                "pointer": "/steps/2",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "index": 3,
+            "identity": "chore-3",
+            "item": {
+              "uid": "chore-3",
+              "summary": "Fixture chore 4",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "reason": "Counted",
+            "tested": [
+              {
+                "pointer": "/steps/2",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "index": 4,
+            "identity": "chore-4",
+            "item": {
+              "uid": "chore-4",
+              "summary": "Fixture chore 5",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "reason": "Counted",
+            "tested": [
+              {
+                "pointer": "/steps/2",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "index": 5,
+            "identity": "chore-5",
+            "item": {
+              "uid": "chore-5",
+              "summary": "Fixture chore 6",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "reason": "Counted",
+            "tested": [
+              {
+                "pointer": "/steps/2",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "blockId": "chores-count-lift-9c18b0b-5109f00d",
+            "id": "items",
+            "op": "get",
+            "before": null,
+            "after": 8,
+            "input": {
+              "items": [
+                {
+                  "uid": "chore-0",
+                  "summary": "Fixture chore 1",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-1",
+                  "summary": "Fixture chore 2",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-2",
+                  "summary": "Fixture chore 3",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-3",
+                  "summary": "Fixture chore 4",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-4",
+                  "summary": "Fixture chore 5",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-5",
+                  "summary": "Fixture chore 6",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-6",
+                  "summary": "Fixture chore 7",
+                  "status": "completed",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-7",
+                  "summary": "Fixture chore 8",
+                  "status": "completed",
+                  "due": "2026-11-18",
+                  "description": null
+                }
+              ]
+            },
+            "output": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-6",
+                "summary": "Fixture chore 7",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-7",
+                "summary": "Fixture chore 8",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "truncated": false
+          },
+          {
+            "blockId": "chores-count-lift-a389bfac-4486b510",
+            "id": "keep",
+            "op": "filter",
+            "before": 8,
+            "after": 6,
+            "input": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-6",
+                "summary": "Fixture chore 7",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-7",
+                "summary": "Fixture chore 8",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "output": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "truncated": false
+          },
+          {
+            "blockId": "chores-count-lift-f0e90fce-5980b604",
+            "id": "count",
+            "op": "count",
+            "before": 6,
+            "after": null,
+            "input": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "output": 6,
+            "truncated": false
+          }
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "flow",
+        "id": "chores-display",
+        "field": "/inputs"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "value",
+          "value": [
+            {
+              "id": "chore-0",
+              "title": "Fixture chore 1"
+            },
+            {
+              "id": "chore-1",
+              "title": "Fixture chore 2"
+            },
+            {
+              "id": "chore-2",
+              "title": "Fixture chore 3"
+            },
+            {
+              "id": "chore-3",
+              "title": "Fixture chore 4"
+            },
+            {
+              "id": "chore-4",
+              "title": "Fixture chore 5"
+            }
+          ]
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-9c18b0b-5109f00d",
+            "pointer": "/steps/0",
+            "inputs": [
+              {
+                "portId": "stream",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": {
+                      "items": [
+                        {
+                          "uid": "chore-0",
+                          "summary": "Fixture chore 1",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-1",
+                          "summary": "Fixture chore 2",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-2",
+                          "summary": "Fixture chore 3",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-3",
+                          "summary": "Fixture chore 4",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-4",
+                          "summary": "Fixture chore 5",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-5",
+                          "summary": "Fixture chore 6",
+                          "status": "needs_action",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-6",
+                          "summary": "Fixture chore 7",
+                          "status": "completed",
+                          "due": "2026-11-18",
+                          "description": null
+                        },
+                        {
+                          "uid": "chore-7",
+                          "summary": "Fixture chore 8",
+                          "status": "completed",
+                          "due": "2026-11-18",
+                          "description": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": [
+                  {
+                    "uid": "chore-0",
+                    "summary": "Fixture chore 1",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-1",
+                    "summary": "Fixture chore 2",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-2",
+                    "summary": "Fixture chore 3",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-3",
+                    "summary": "Fixture chore 4",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-4",
+                    "summary": "Fixture chore 5",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-5",
+                    "summary": "Fixture chore 6",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-6",
+                    "summary": "Fixture chore 7",
+                    "status": "completed",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-7",
+                    "summary": "Fixture chore 8",
+                    "status": "completed",
+                    "due": "2026-11-18",
+                    "description": null
+                  }
+                ]
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 1,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 12,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 13,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 13,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 15,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 16,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 16,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 18,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 19,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 19,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 21,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 22,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 22,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 24,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 25,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 25,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 5,
+              "identity": "chore-5"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 27,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 5,
+              "identity": "chore-5"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 28,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 5,
+              "identity": "chore-5"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 28,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 6,
+              "identity": "chore-6"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "completed"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 30,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 6,
+              "identity": "chore-6"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 31,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 6,
+              "identity": "chore-6"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "completed"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "no"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 31,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-e358c55f-5fdf46d1",
+            "pointer": "/steps/1/where/left",
+            "portId": "value",
+            "item": {
+              "index": 7,
+              "identity": "chore-7"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "completed"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 33,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-f5c89836-fc976938",
+            "pointer": "/steps/1/where/right",
+            "portId": "value",
+            "item": {
+              "index": 7,
+              "identity": "chore-7"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "needs_action"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 34,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-1a33aff8-4d76b7aa",
+            "pointer": "/steps/1/where",
+            "portId": "value",
+            "item": {
+              "index": 7,
+              "identity": "chore-7"
+            },
+            "inputs": [
+              {
+                "portId": "left",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "completed"
+                  }
+                }
+              },
+              {
+                "portId": "right",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "needs_action"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "condition",
+              "answer": "no"
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 34,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "pointer": "/steps/1",
+            "inputs": [
+              {
+                "portId": "stream",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": [
+                      {
+                        "uid": "chore-0",
+                        "summary": "Fixture chore 1",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-1",
+                        "summary": "Fixture chore 2",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-2",
+                        "summary": "Fixture chore 3",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-3",
+                        "summary": "Fixture chore 4",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-4",
+                        "summary": "Fixture chore 5",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-5",
+                        "summary": "Fixture chore 6",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-6",
+                        "summary": "Fixture chore 7",
+                        "status": "completed",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-7",
+                        "summary": "Fixture chore 8",
+                        "status": "completed",
+                        "due": "2026-11-18",
+                        "description": null
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": [
+                  {
+                    "uid": "chore-0",
+                    "summary": "Fixture chore 1",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-1",
+                    "summary": "Fixture chore 2",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-2",
+                    "summary": "Fixture chore 3",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-3",
+                    "summary": "Fixture chore 4",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-4",
+                    "summary": "Fixture chore 5",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-5",
+                    "summary": "Fixture chore 6",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  }
+                ]
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 34,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-5007e238-1470d33a",
+            "pointer": "/steps/2",
+            "inputs": [
+              {
+                "portId": "stream",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": [
+                      {
+                        "uid": "chore-0",
+                        "summary": "Fixture chore 1",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-1",
+                        "summary": "Fixture chore 2",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-2",
+                        "summary": "Fixture chore 3",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-3",
+                        "summary": "Fixture chore 4",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-4",
+                        "summary": "Fixture chore 5",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      },
+                      {
+                        "uid": "chore-5",
+                        "summary": "Fixture chore 6",
+                        "status": "needs_action",
+                        "due": "2026-11-18",
+                        "description": null
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": [
+                  {
+                    "uid": "chore-0",
+                    "summary": "Fixture chore 1",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-1",
+                    "summary": "Fixture chore 2",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-2",
+                    "summary": "Fixture chore 3",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-3",
+                    "summary": "Fixture chore 4",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  },
+                  {
+                    "uid": "chore-4",
+                    "summary": "Fixture chore 5",
+                    "status": "needs_action",
+                    "due": "2026-11-18",
+                    "description": null
+                  }
+                ]
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 35,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-9291512e-337d896c",
+            "pointer": "/output/row/id",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "chore-0"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 41,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-6ab56a17-97723fb5",
+            "pointer": "/output/row/title",
+            "portId": "value",
+            "item": {
+              "index": 0,
+              "identity": "chore-0"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Fixture chore 1"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 42,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-9291512e-337d896c",
+            "pointer": "/output/row/id",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "chore-1"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 43,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-6ab56a17-97723fb5",
+            "pointer": "/output/row/title",
+            "portId": "value",
+            "item": {
+              "index": 1,
+              "identity": "chore-1"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Fixture chore 2"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 44,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-9291512e-337d896c",
+            "pointer": "/output/row/id",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "chore-2"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 45,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-6ab56a17-97723fb5",
+            "pointer": "/output/row/title",
+            "portId": "value",
+            "item": {
+              "index": 2,
+              "identity": "chore-2"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Fixture chore 3"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 46,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-9291512e-337d896c",
+            "pointer": "/output/row/id",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "chore-3"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 47,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-6ab56a17-97723fb5",
+            "pointer": "/output/row/title",
+            "portId": "value",
+            "item": {
+              "index": 3,
+              "identity": "chore-3"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Fixture chore 4"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 48,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-9291512e-337d896c",
+            "pointer": "/output/row/id",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "chore-4"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 49,
+              "limit": 100000
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "flow",
+              "id": "chores-display",
+              "field": "/inputs"
+            },
+            "blockId": "chores-display-lift-6ab56a17-97723fb5",
+            "pointer": "/output/row/title",
+            "portId": "value",
+            "item": {
+              "index": 4,
+              "identity": "chore-4"
+            },
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Fixture chore 5"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 50,
+              "limit": 100000
+            }
+          }
+        ],
+        "iterations": [
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 0,
+            "identity": "chore-0",
+            "item": {
+              "uid": "chore-0",
+              "summary": "Fixture chore 1",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 1,
+            "identity": "chore-1",
+            "item": {
+              "uid": "chore-1",
+              "summary": "Fixture chore 2",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 2,
+            "identity": "chore-2",
+            "item": {
+              "uid": "chore-2",
+              "summary": "Fixture chore 3",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 3,
+            "identity": "chore-3",
+            "item": {
+              "uid": "chore-3",
+              "summary": "Fixture chore 4",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 4,
+            "identity": "chore-4",
+            "item": {
+              "uid": "chore-4",
+              "summary": "Fixture chore 5",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 5,
+            "identity": "chore-5",
+            "item": {
+              "uid": "chore-5",
+              "summary": "Fixture chore 6",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": true,
+            "result": "yes",
+            "reason": "Condition Yes - kept"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 6,
+            "identity": "chore-6",
+            "item": {
+              "uid": "chore-6",
+              "summary": "Fixture chore 7",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": false,
+            "result": "no",
+            "reason": "Condition No - dropped (flow gaps are null)"
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "index": 7,
+            "identity": "chore-7",
+            "item": {
+              "uid": "chore-7",
+              "summary": "Fixture chore 8",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            },
+            "included": false,
+            "result": "no",
+            "reason": "Condition No - dropped (flow gaps are null)"
+          }
+        ],
+        "steps": [
+          {
+            "blockId": "chores-display-lift-9c18b0b-5109f00d",
+            "id": "items",
+            "op": "get",
+            "before": null,
+            "after": 8,
+            "input": {
+              "items": [
+                {
+                  "uid": "chore-0",
+                  "summary": "Fixture chore 1",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-1",
+                  "summary": "Fixture chore 2",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-2",
+                  "summary": "Fixture chore 3",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-3",
+                  "summary": "Fixture chore 4",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-4",
+                  "summary": "Fixture chore 5",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-5",
+                  "summary": "Fixture chore 6",
+                  "status": "needs_action",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-6",
+                  "summary": "Fixture chore 7",
+                  "status": "completed",
+                  "due": "2026-11-18",
+                  "description": null
+                },
+                {
+                  "uid": "chore-7",
+                  "summary": "Fixture chore 8",
+                  "status": "completed",
+                  "due": "2026-11-18",
+                  "description": null
+                }
+              ]
+            },
+            "output": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-6",
+                "summary": "Fixture chore 7",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-7",
+                "summary": "Fixture chore 8",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "truncated": false
+          },
+          {
+            "blockId": "chores-display-lift-a389bfac-4486b510",
+            "id": "keep",
+            "op": "filter",
+            "before": 8,
+            "after": 6,
+            "input": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-6",
+                "summary": "Fixture chore 7",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-7",
+                "summary": "Fixture chore 8",
+                "status": "completed",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "output": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "truncated": false
+          },
+          {
+            "blockId": "chores-display-lift-5007e238-1470d33a",
+            "id": "first-five",
+            "op": "limit",
+            "before": 6,
+            "after": 5,
+            "input": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-5",
+                "summary": "Fixture chore 6",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "output": [
+              {
+                "uid": "chore-0",
+                "summary": "Fixture chore 1",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-1",
+                "summary": "Fixture chore 2",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-2",
+                "summary": "Fixture chore 3",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-3",
+                "summary": "Fixture chore 4",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              },
+              {
+                "uid": "chore-4",
+                "summary": "Fixture chore 5",
+                "status": "needs_action",
+                "due": "2026-11-18",
+                "description": null
+              }
+            ],
+            "truncated": false
+          }
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "output": {
+        "kind": "logic",
+        "id": "badge",
+        "field": "/body"
+      },
+      "result": {
+        "kind": "operand",
+        "answer": {
+          "status": "value",
+          "value": "Hidden"
+        }
+      },
+      "trace": {
+        "events": [
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-ecf40b77-f918ac7b",
+            "pointer": "/cases/0/when",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "condition",
+              "answer": "yes"
+            },
+            "provenance": "pin",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 2,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-cea67eee-8123e712",
+            "pointer": "/cases/0/then",
+            "portId": "value",
+            "inputs": [],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Hidden"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-d7cebda6-1d2a2fa8",
+            "pointer": "",
+            "portId": "value",
+            "inputs": [
+              {
+                "portId": "cases/0/when",
+                "result": {
+                  "kind": "condition",
+                  "answer": "yes"
+                }
+              },
+              {
+                "portId": "cases/0/then",
+                "result": {
+                  "kind": "operand",
+                  "answer": {
+                    "status": "value",
+                    "value": "Hidden"
+                  }
+                }
+              }
+            ],
+            "output": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": "Hidden"
+              }
+            },
+            "provenance": "scenario",
+            "state": "evaluated",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-7f411b20-a302bb10",
+            "pointer": "/cases/1/when",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-1a8dfc3e-e04c9c72",
+            "pointer": "/cases/1/when/of/0",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-11c97058-b36bb798",
+            "pointer": "/cases/1/when/of/0/left",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-6e29ee78-f4fc1f5a",
+            "pointer": "/cases/1/when/of/0/left/args/0",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-c78ae6ba-da5c3ec2",
+            "pointer": "/cases/1/when/of/0/left/args/0/args/0",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-e4916f88-c28ef62c",
+            "pointer": "/cases/1/when/of/0/left/args/0/args/1",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-60ececb1-8ab82873",
+            "pointer": "/cases/1/when/of/0/left/args/1",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-7907b390-e5be564e",
+            "pointer": "/cases/1/when/of/0/right",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-8417532-6d3e173e",
+            "pointer": "/cases/1/when/of/0/right/args/0",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-3ecd5386-e7244428",
+            "pointer": "/cases/1/when/of/0/right/args/1",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-82bb3895-c27d39db",
+            "pointer": "/cases/1/when/of/1",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-f8fd9ee6-e17bbe54",
+            "pointer": "/cases/1/then",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          },
+          {
+            "runId": "studio-run",
+            "root": {
+              "kind": "logic",
+              "id": "badge",
+              "field": "/body"
+            },
+            "blockId": "badge-lift-6f8024b8-dae7e85e",
+            "pointer": "/otherwise",
+            "inputs": [],
+            "provenance": "computed",
+            "state": "skipped",
+            "reason": "Not evaluated by the shared evaluator; no value was observed.",
+            "clock": {
+              "now": "2026-11-18T23:30:00",
+              "utcOffsetMinutes": 0
+            },
+            "cost": {
+              "used": 3,
+              "limit": 0
+            }
+          }
+        ],
+        "iterations": [],
+        "steps": [],
+        "truncated": false
+      }
+    }
+  ]
+}
