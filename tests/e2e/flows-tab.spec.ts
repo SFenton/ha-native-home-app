@@ -1,5 +1,5 @@
 import { test, expect, panelDocument } from './data-tab-harness';
-import { openLibrary, openWorkspace, seed, snap } from './workspace2-helpers';
+import { openLibrary, openWorkspace, seed, snap, waitForWorkspace } from './workspace2-helpers';
 
 // These assert the desktop library rail; the phone's pushed editors are covered by workspace2-data/logic and its Data sheet by data-tab.
 test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'The library rail is desktop-only');
@@ -34,6 +34,7 @@ test('groups remember choices, reveal open items, and search expands matching gr
   const panel = page.getByTestId('flows-panel'), templates = panel.getByRole('button', { name: 'Templates, 3' });
   await templates.click();
   await page.reload();
+  await waitForWorkspace(page);
   await expect(templates).toHaveAttribute('aria-expanded', 'true');
   await panel.getByRole('button', { name: /^Night Hours, logic template/ }).click();
   await templates.click();

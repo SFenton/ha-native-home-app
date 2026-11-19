@@ -131,6 +131,12 @@ const stand: Record<LogicParamKind, unknown> = {
   operand: { type: 'literal', value: 0 }, condition: { type: 'viewer', isAdmin: true },
 };
 
+/** Arguments for checking an unplaced body. A caller may mark absent string samples to distinguish stand-ins from real reads. */
+export function logicSampleArguments(entry: Pick<LogicEntry, 'params'>, stringStandIn?: string): Record<string, unknown> {
+  return Object.fromEntries(entry.params.map(param => [param.name, param.sample
+    ?? (stringStandIn !== undefined && (param.kind === 'source-id' || param.kind === 'text') ? stringStandIn : stand[param.kind])]));
+}
+
 /** A binding of a component entry that fills a field inside a use's `args`, and where the filled value lands once the use is worked out. */
 interface Hook {
   bindingIndex: number; argName: string;
@@ -319,8 +325,8 @@ function checkLibrary(raw: unknown): { issues: CompositionIssue[]; entries: Logi
   const expander = new Expander(map);
   for (const [index, entry] of entries.entries()) {
     const body = `/logicLibrary/${index}/body`;
-    const env = Object.fromEntries(entry.params.map(param => [param.name, param.sample ?? stand[param.kind]]));
-    const sizes = Object.fromEntries(entry.params.map(param => [param.name, valueCount(param.sample ?? stand[param.kind])]));
+    const env = logicSampleArguments(entry);
+    const sizes = Object.fromEntries(Object.entries(env).map(([name, value]) => [name, valueCount(value)]));
     const result = expander.walk(entry.body, body, { env, sizes, stack: [entry.id], collapse: body });
     if (expander.issues.length) { issues.push(...expander.issues.splice(0)); if (expander.exhausted) break; continue; }
     const fits = entry.kind === 'operand' ? operandBase.safeParse(result).success : predicateBase.safeParse(result).success;

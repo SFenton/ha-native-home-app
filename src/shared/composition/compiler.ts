@@ -24,7 +24,7 @@ import { checkPipelineProvider, checkPipelineRead, checkPipelineSource, checkRep
 import { checkRepeat } from './repeat';
 import { checkChartOperandKind, checkChartSource } from './chart-source';
 import { tileInkDefault } from './tile-ink-gate';
-import { expandBounded, expandLogic, remapLogicIssues, type LogicEntry } from './logic-library';
+import { expandBounded, expandLogic, logicSampleArguments, remapLogicIssues, type LogicEntry } from './logic-library';
 import { badgeNodeKinds, expandBadgeSettings, initialsReadable, MAX_BADGE_TEXT, remapBadgeIssues } from './profile-badges';
 import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
@@ -284,6 +284,10 @@ export function compositionDependencies(document: CompositionDocument, samples: 
   collected.merge(compiled);
   collected.graph.issues.push(...compiled.issues);
   collected.graph.complete = compiled.complete;
+  const libraryText = JSON.stringify(samples);
+  let absent = 'logic-sample', suffix = 0;
+  // Only synthetic holes may produce this identifier, even if a real source shares the checker's default stand-in.
+  while (libraryText.includes(JSON.stringify(absent))) absent = `logic-sample-${++suffix}`;
   // Saved logic is editable in global scope, even when unplaced or when a parameter is unused.
   // Use exactly the compiler's typed operand/predicate facts; JSON literal payloads stay opaque.
   samples.forEach((entry, index) => {
@@ -299,17 +303,19 @@ export function compositionDependencies(document: CompositionDocument, samples: 
         return;
       }
       try {
-        collected.editable(kind === 'operand'
+        const facts = kind === 'operand'
           ? checkOperand(parseCompositionShape(operandSchema, expanded), path)
-          : checkPredicate(parseCompositionShape(predicateSchema, expanded), path), reader);
+          : checkPredicate(parseCompositionShape(predicateSchema, expanded), path);
+        collected.editable({ ...facts, references: facts.references.filter(ref => ref.sourceId !== absent) }, reader);
       } catch (error) {
         if (!(error instanceof CompositionValidationError)) throw error;
         collected.graph.issues.push(...error.issues.map(issue => ({ ...issue, pointer: `${path}${issue.pointer}` })));
         collected.graph.complete = false;
       }
     };
-    append({ type: 'logic-ref', logicId: entry.id, args: Object.fromEntries(entry.params.map(param => [param.name, param.sample])) }, entry.kind, `${at}/body`);
+    append({ type: 'logic-ref', logicId: entry.id, args: logicSampleArguments(entry, absent) }, entry.kind, `${at}/body`);
     entry.params.forEach((param, offset) => {
+      if (param.sample === undefined) return;
       const path = `${at}/params/${offset}/sample`;
       if (param.kind === 'operand' || param.kind === 'condition') append(param.sample, param.kind, path);
       else if (param.kind === 'source-id' && typeof param.sample === 'string' && param.sample) collected.add({
