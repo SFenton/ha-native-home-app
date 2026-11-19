@@ -14,7 +14,7 @@ import { deviceControlModel, isRoomDeviceSource, validateDeviceControl, validate
 import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroom';
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
-import { checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
+import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
 import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesStateFills } from './state-styles';
 import { identifierSchema } from '../validation';
 import { APP_STATE_CAPABILITY } from './app-state';
@@ -30,12 +30,60 @@ import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
 import { groupProblems } from './grid-groups';
 import { lateSpans, type FoldSide } from './fold-sides';
-import { PIPELINE_LIMITS } from './pipeline/schema';
+import { PIPELINE_LIMITS, pipelineSourceSchema, type PipelineSource } from './pipeline/schema';
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
+
+/** Reuse the native shape without its lenient semantic pass; adapters run the scoped checker once. */
+export const compositionCallShape = callServiceSchema.clone({ ...callServiceSchema.def, checks: [] });
+
+export function absorbCompositionExpressionCapabilities(facts: ExpressionFacts, into: Set<string>, kind: 'expression' | 'call' = 'expression'): void {
+  if (facts.usedOperands) into.add('sh.operands@1');
+  for (const need of facts.needs) into.add(`sh.${need}@1`);
+  if (facts.references.length || facts.optimisticReferences.length) into.add('sh.bindings@1');
+  if (kind === 'call') into.add('sh.call-service@1');
+}
+
+export function compositionDependencyIssues(dependencies: readonly { from: string; to: string; path: string }[]): CompositionIssue[] {
+  const issues: CompositionIssue[] = [];
+  for (const edge of dependencies) {
+    const pending = [edge.to], seen = new Set<string>();
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (id === edge.from) { issues.push({ code: 'invalid_combination', pointer: edge.path }); break; }
+      if (!seen.has(id)) { seen.add(id); pending.push(...dependencies.filter(item => item.from === id).map(item => item.to)); }
+    }
+  }
+  return issues;
+}
+
+/** A source needs its binding envelope as well as the pipeline's local requirements. */
+export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1): ReturnType<typeof checkPipelineSource> {
+  const facts = checkPipelineSource(source, at);
+  if (ordinal > PIPELINE_LIMITS.pipelines) facts.issues.push({ code: 'limit_exceeded', pointer: at });
+  return { ...facts, capabilities: [...new Set(['sh.bindings@1', ...facts.capabilities])].sort() };
+}
+
+/** Fragment checking permits external reads; a consuming document additionally resolves those reads. */
+export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources'): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
+  const facts = sources.map((source, index): ReturnType<typeof checkPipelineSource> => {
+    try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1); }
+    catch (error) {
+      if (!(error instanceof CompositionValidationError)) throw error;
+      return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), entities: [], reads: [], dependencies: [], capabilities: [] };
+    }
+  });
+  const dependencies = facts.flatMap(fact => fact.dependencies);
+  const issues = [...facts.flatMap(fact => fact.issues), ...compositionDependencyIssues(dependencies)];
+  return {
+    sources: facts, issues: issues.length ? new CompositionValidationError(issues).issues : [],
+    entities: facts.flatMap(fact => fact.entities), reads: facts.flatMap(fact => fact.reads), dependencies,
+    capabilities: [...new Set(facts.flatMap(fact => fact.capabilities))].sort(),
+  };
+}
 
 export const firstSliceCapabilities = [
   'sh.actions.navigation@1', 'sh.assets.publisher@1', 'sh.backdrop@1', 'sh.bindings@1', 'sh.chrome@1',
@@ -236,18 +284,35 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 /** Pure first-slice compiler. No requests, actions, asset-byte checks, or native fidelity claims. */
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
 export interface CompileOptions { tileInkDefault?: boolean }
+/** Native diagnostics keep their public authored pointers and the compiler's corresponding expansion landings. */
+export class CompositionExpansionError extends CompositionValidationError {
+  readonly expandedIssues: readonly CompositionIssue[];
+  constructor(
+    issues: CompositionIssue[],
+    expandedIssues: readonly CompositionIssue[],
+    readonly expanded: unknown,
+    readonly origins: ReturnType<typeof expandBounded>['origins'],
+  ) {
+    const landings = new Map(issues.map((issue, index) => [issue, expandedIssues[index]]));
+    super(issues);
+    this.expandedIssues = this.issues.map(issue => landings.get(issue)!);
+  }
+}
 export function compileCompositionDocument(input: unknown, options: CompileOptions = {}): CompiledComposition {
   return compileRecording(input, options);
 }
 function compileRecording(input: unknown, options: CompileOptions, references?: CompositionDependencies): CompiledComposition {
   if (references && record(input)) referenceCache.set(input, references);
-  try { return compileWithReferences(input, options, references); }
+  try { return compileCompositionDocumentWithOrigins(input, options, references).compiled; }
   catch (error) {
     if (references && error instanceof CompositionValidationError) references.issues = error.issues;
     throw error;
   }
 }
-function compileWithReferences(input: unknown, options: CompileOptions, references?: CompositionDependencies): CompiledComposition {
+/** The same compile with its own expansion landings, for source maps without a second expansion pass. */
+export function compileCompositionDocumentWithOrigins(input: unknown, options: CompileOptions = {}, references?: CompositionDependencies): {
+  compiled: CompiledComposition; origins: ReturnType<typeof expandBounded>['origins'];
+} {
   assertCompositionBounds(input);
   let expansion: ReturnType<typeof expandBounded>;
   try { expansion = expandBounded(input); }
@@ -259,15 +324,18 @@ function compileWithReferences(input: unknown, options: CompileOptions, referenc
   if (expansion.document === input) {
     const compiled = compilePlain(input, options, true, references);
     // A draft with Show at Most or Spoken As is handed back as authored; `expanded` is what a publication holds.
-    return { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document };
+    return { compiled: { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   }
   // The draft holds named logic: every use is worked out first, so capabilities, budgets and every other check read plain operands and conditions.
   // An issue inside a worked-out use is reported where the use stands in the draft.
   try {
     const compiled = compilePlain(expansion.document, options, false, references);
-    return { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document };
+    return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   } catch (error) {
-    if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings));
+    if (error instanceof CompositionValidationError) throw new CompositionExpansionError(
+      remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings),
+      error.issues, expansion.document, expansion.origins,
+    );
     throw error;
   }
 }
@@ -490,18 +558,16 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   const optimisticRefs: ExpressionFacts['optimisticReferences'] = [];
   type Visibility = { visibleWhen?: Predicate; whenUnknown?: WhenUnknown };
   /** Folds an expression walk's issues, source references and capability needs into this compile. */
-  function absorb(facts: ExpressionFacts) {
+  function absorb(facts: ExpressionFacts, kind: 'expression' | 'call' = 'expression') {
     issues.push(...facts.issues);
     expressionRefs.push(...facts.references);
     optimisticRefs.push(...facts.optimisticReferences);
-    if (facts.usedOperands) require('operands');
-    for (const need of facts.needs) require(need);
-    if (facts.references.length || facts.optimisticReferences.length) require('bindings');
+    absorbCompositionExpressionCapabilities(facts, capabilities, kind);
   }
   /** The records the walk is inside while it draws the template of a `repeat` (`sh.repeat@1`); `item` and `index` mean something only there. */
   let repeatScope: ItemScope | undefined;
   function useCall(call: CallService, path: string, control: boolean) {
-    require('call-service'); absorb(checkCallService(call, path, control, repeatScope));
+    absorb(checkCallService(call, path, control, repeatScope), 'call');
     const target = call.target?.entity_id;
     if (target?.type === 'literal') {
       for (const id of Array.isArray(target.value) ? target.value : [target.value]) if (typeof id === 'string') collected.entity(id, `${path}/target/entity_id`);
@@ -1855,13 +1921,12 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     require('bindings');
     register('source', source.id, `${p}/id`);
     if (source.kind === 'model' && source.model === 'pipeline@1') {
-      const found = checkPipelineSource(source, p);
+      const found = checkCompositionPipelineSource(source, p, ++pipelines);
       collected.define(source, p, undefined, found.entities);
       issues.push(...found.issues);
       for (const name of found.capabilities) capabilities.add(name);
       reads.push(...found.reads);
       dependencies.push(...found.dependencies);
-      if (++pipelines > PIPELINE_LIMITS.pipelines) add('limit_exceeded', p);
       return;
     }
     collected.define(source, p);
@@ -2255,14 +2320,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       else if (found) add(found.code, `${path}${found.suffix}`);
     }
   }
-  for (const edge of dependencies) {
-    const pending = [edge.to], seen = new Set<string>();
-    while (pending.length) {
-      const id = pending.pop()!;
-      if (id === edge.from) { add('invalid_combination', edge.path); break; }
-      if (!seen.has(id)) { seen.add(id); pending.push(...dependencies.filter(item => item.from === id).map(item => item.to)); }
-    }
-  }
+  issues.push(...compositionDependencyIssues(dependencies));
   const background = document.theme.background;
   if (background.type === 'downloaded') {
     require('assets.publisher');
