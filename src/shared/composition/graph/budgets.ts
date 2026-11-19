@@ -1,36 +1,27 @@
 import type { Json } from '../../types';
-import { z } from 'zod/v4';
-import { compileCompositionDocument, parseCompositionShape } from '../compiler';
-import { MAX_CALL_NODES, MAX_CONDITION_DEPTH, MAX_CONDITION_NODES, MAX_EXPRESSION_DEPTH, MAX_EXPRESSION_NODES, callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
-import { assertCompositionBounds, CompositionValidationError, type CompositionIssue } from '../json';
-import { expandLogic, type LogicEntry } from '../logic-library';
+import { MAX_CALL_NODES, MAX_CONDITION_DEPTH, MAX_CONDITION_NODES, MAX_EXPRESSION_DEPTH, MAX_EXPRESSION_NODES, operandBase, predicateBase } from '../expression';
 import { PIPELINE_BUDGET } from '../pipeline/evaluate';
 import { PIPELINE_LIMITS } from '../pipeline/schema';
 import { newFacts, typeOperand, typeWhere } from '../pipeline/typing';
-import { checkGraphPipeline, checkGraphSlot, expressionCapabilities, graphInputsSchema, graphSourceSchema } from './capabilities';
+import { compileGraphValue, type FragmentOptions } from './compile';
 import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
-import { record, withoutCanvasMetadata } from './json';
+import { record } from './json';
 import type { BudgetMeter, GraphBudget, LogicAnchor } from './types';
 
 export function budgetMeter(kind: string, used: number, limit: number | null, pointer = ''): BudgetMeter {
   const ratio = limit === null ? null : used / limit;
   return { kind, pointer, used, limit, ratio, visible: ratio !== null && ratio > 0.75, exceeded: limit !== null && used > limit };
 }
-export interface BudgetOptions {
-  readonly kind?: FragmentKind;
+export interface BudgetOptions extends FragmentOptions {
+  /** Retained for call-site compatibility; requirements are never seeded from caller guesses. */
   readonly capabilities?: readonly string[];
-  readonly itemScope?: ItemScope;
-  readonly allowControl?: boolean;
-  readonly library?: readonly LogicEntry[];
 }
 export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: consume the shared read-only expression/call and flow accounting observer for totals, depths, counter scopes/resets, structural limits and expansion provenance; preserve CHK-nested-choose-budget unchanged.';
 
 export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOptions = {}): GraphBudget {
-  assertCompositionBounds(ast);
-  const compilerIssues: CompositionIssue[] = [], scopes: GraphBudget['scopes'][number][] = [];
+  const compiled = compileGraphValue(ast, options), compilerIssues = compiled.issues;
+  const scopes: GraphBudget['scopes'][number][] = [];
   const conditions: GraphBudget['conditions'][number][] = [], meters: BudgetMeter[] = [];
-  const capabilities = new Set(options.capabilities ?? []);
-  const report = (issues: readonly CompositionIssue[]) => compilerIssues.push(...issues);
   const unknownScope = (at: string, limit: number) => {
     scopes.push({ id: `expression:${at}`, kind: 'expression', pointer: at, nodes: null, depth: null, nodeLimit: limit, depthLimit: MAX_EXPRESSION_DEPTH, entries: [at], nodeAccounting: 'unavailable' });
   };
@@ -63,86 +54,27 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
       flowScopes(child.value, childKind, at + child.binding, childKind !== kind);
     }
   };
-  const walk = (value: Json, hint: FragmentKind, at: string, validate: boolean, flow = false): void => {
+  const walk = (value: Json, hint: FragmentKind, at: string, flow = false): void => {
     const kind = inferFragment(value, hint);
-    try {
-      if (validate && kind === 'slot') {
-        const facts = checkGraphSlot(value, at);
-        report(facts.issues); facts.capabilities.forEach(capability => capabilities.add(capability));
-        if (facts.issues.length) return;
-      }
-      if (kind === 'operand' || kind === 'condition') {
-        if (flow) { flowScopes(value, kind, at); return; }
-        unknownScope(at, MAX_EXPRESSION_NODES);
-        if (validate) {
-          const facts = kind === 'operand'
-            ? checkOperand(parseCompositionShape(operandBase, value), at, options.allowControl, false, options.itemScope)
-            : checkPredicate(parseCompositionShape(predicateBase, value), at, false, options.itemScope);
-          report(facts.issues); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
-        }
-        return;
-      }
-      if (kind === 'call') {
-        unknownScope(at, MAX_CALL_NODES);
-        if (validate) {
-          const facts = checkCallService(parseCompositionShape(callServiceSchema, value), at, options.allowControl ?? false, options.itemScope);
-          report(facts.issues); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
-          capabilities.add('sh.call-service@1');
-        }
-        return;
-      }
-      if (kind === 'flow' || kind === 'flow-inputs') {
-        if (validate) {
-          const source = kind === 'flow' ? parseCompositionShape(graphSourceSchema, value)
-            : { id: 'budget-flow', kind: 'model' as const, model: 'pipeline@1' as const, inputs: parseCompositionShape(graphInputsSchema, value) };
-          const facts = checkGraphPipeline(source, at);
-          report(facts.issues); facts.capabilities.forEach(capability => capabilities.add(capability));
-          if (facts.issues.length) return;
-        }
-        flow = true;
-      }
-      if (kind === 'slot' && record(value) && value.type === 'read') {
-        const { fallback: _fallback, whenUnavailable: _policy, ...operand } = value;
-        walk(operand, 'operand', at, validate);
-        return;
-      }
-      const description = describeGrammar(value, kind);
-      if (validate && description.payload.kind === 'opaque') { report([{ code: 'unknown_variant', pointer: at }]); return; }
-      for (const child of description.children) walk(child.value, child.kind, at + child.binding, validate && !flow, flow);
-    } catch (error) {
-      if (!(error instanceof CompositionValidationError)) throw error;
-      report(error.issues.map(issue => ({ ...issue, pointer: at + issue.pointer })));
+    if (kind === 'operand' || kind === 'condition') {
+      if (flow) { flowScopes(value, kind, at); return; }
+      unknownScope(at, MAX_EXPRESSION_NODES);
+      return;
     }
+    if (kind === 'call') {
+      unknownScope(at, MAX_CALL_NODES);
+      return;
+    }
+    if (kind === 'flow' || kind === 'flow-inputs') flow = true;
+    const description = describeGrammar(value, kind);
+    for (const child of description.children) walk(child.value, child.kind, at + child.binding, flow);
   };
-  try {
-    const kind = inferFragment(ast, options.kind);
-    if (kind === 'document') {
-      try {
-        const compiled = compileCompositionDocument(withoutCanvasMetadata(ast));
-        compiled.capabilities.forEach(capability => capabilities.add(capability));
-        walk(compiled.expanded, 'document', '', false);
-      } catch (error) {
-        if (!(error instanceof CompositionValidationError)) throw error;
-        report(error.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/document(?=\/|$)/, '') })));
-      }
-    } else if (kind === 'fragment') {
-      const expanded = expandLogic(ast).document;
-      assertCompositionBounds(expanded);
-      walk(parseCompositionShape(z.json(), expanded), kind, '', true);
-    } else {
-      const expanded = expandLogic({ logicLibrary: options.library ?? [], value: ast }).document;
-      assertCompositionBounds(expanded);
-      if (!record(expanded)) throw new Error('Logic expansion did not return an object.');
-      walk(expanded.value, kind, '', true);
-    }
-  } catch (error) {
-    if (!(error instanceof CompositionValidationError)) throw error;
-    report(error.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/value(?=\/|$)/, '') })));
-  }
+  const kind = inferFragment(ast, options.kind);
+  if (!options.context && kind !== 'document' && (!compilerIssues.length || ['operand', 'condition', 'call'].includes(kind))) walk(compiled.expanded, kind, '');
   const firstExceedingPointer = compilerIssues.find(issue => issue.code === 'limit_exceeded')?.pointer;
   return {
     anchor, nodes: null, depth: null, conditions, scopes, counterResets: null, cases: null, steps: null,
-    capabilities: [...capabilities].sort(), duplicatedUseCost: null, generatedFlowCount: null, runtimeLimit: PIPELINE_BUDGET,
+    capabilities: compiled.capabilities, duplicatedUseCost: null, generatedFlowCount: null, runtimeLimit: PIPELINE_BUDGET,
     accepted: compilerIssues.length === 0, compilerIssues, accounting: meters.length ? 'partial' : 'unavailable', accountingUnavailableReason: ACCOUNTING_FOLLOW_UP,
     meters, compactVisible: meters.some(meter => meter.visible) || firstExceedingPointer !== undefined,
     ...(firstExceedingPointer === undefined ? {} : { firstExceedingPointer }),

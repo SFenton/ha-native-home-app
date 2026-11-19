@@ -10,13 +10,14 @@ import { atPointer, copy, copyShape, fingerprint, record, segments, withoutCanva
 import { autoLayout } from './layout';
 import { expressionPort, expressionScope, inputType, outputPort, portType } from './ports';
 import { graphSourceSchema, typingSteps } from './capabilities';
-import type { GraphDiagnostic, GraphEdge, GraphNode, GraphScope, GraphSourceLocation, LiftResult, LogicAnchor, LogicGraph, OpaqueRegion, PortType, StudioCanvasMetadata } from './types';
+import type { GraphDestination, GraphDiagnostic, GraphEdge, GraphNode, GraphScope, GraphSourceLocation, LiftResult, LogicAnchor, LogicGraph, OpaqueRegion, PortType, StudioCanvasMetadata } from './types';
 
 export interface LiftOptions {
   readonly anchor?: LogicAnchor;
   readonly kind?: FragmentKind;
   readonly metadata?: unknown;
   readonly scope?: GraphScope;
+  readonly context?: GraphDestination['context'];
 }
 export function liftJSON(bytes: Uint8Array, options: LiftOptions = {}): LiftResult {
   return lift(z.json().parse(parseCompositionJSON(bytes)), options);
@@ -116,7 +117,7 @@ export function lift(ast: Json, options: LiftOptions = {}): LiftResult {
   };
   const root = visit(ast, kind, '', scopes[0].id, { params: new Map(), allowRead: true, allowViewer: true, ...(scopes[0].itemShape ? { item: copyShape(scopes[0].itemShape) } : {}) });
   const destination = kind === 'call' ? 'call' : kind === 'condition' ? 'condition' : kind === 'operand' ? 'operand' : kind === 'flow' || kind === 'flow-inputs' ? 'flow' : kind === 'slot' ? 'slot' : kind === 'fragment' ? 'fragment' : 'document';
-  let graph: LogicGraph = { version: 1, nodes, edges, roots: [{ nodeId: root.id, portId: 'value', anchor, destination: { kind: destination } }], scopes, frames: [], original };
+  let graph: LogicGraph = { version: 1, nodes, edges, roots: [{ nodeId: root.id, portId: 'value', anchor, destination: { kind: destination, ...(options.context ? { context: options.context } : {}) } }], scopes, frames: [], original };
   const rawMetadata = options.metadata !== undefined ? options.metadata : record(ast) ? ast.studioCanvas : undefined;
   if (rawMetadata !== undefined) {
     const metadata = rawMetadata;

@@ -89,6 +89,8 @@ export interface GraphDestination {
   readonly kind: 'operand' | 'condition' | 'call' | 'flow' | 'document' | 'fragment' | 'slot';
   readonly type?: PortType;
   readonly allowControl?: boolean;
+  /** The actual consuming field; required for standalone slots, whose native rules vary by destination. */
+  readonly context?: { readonly document: GraphJSON; readonly pointer: string };
 }
 export interface GraphRoot {
   readonly nodeId: string;
@@ -107,6 +109,7 @@ export interface LogicGraph {
 }
 export interface GraphDiagnostic {
   readonly severity: 'error' | 'warning';
+  readonly hint?: true;
   readonly code: CompositionIssue['code'] | 'opaque_region' | 'invalid_layout' | 'scope_mismatch' | 'occupied_input' | 'cycle' | 'recipe_disabled' | 'average_fallback_overflow';
   readonly message: string;
   readonly anchor: LogicAnchor;
@@ -116,6 +119,7 @@ export interface GraphDiagnostic {
   readonly capability?: string;
   readonly usePointer?: string;
   readonly authoredPointer?: string;
+  readonly documentPointer?: string;
 }
 export interface BudgetMeter {
   readonly kind: string;
@@ -177,6 +181,7 @@ export type LoweringResult =
     readonly generatedLibrary: readonly LogicEntry[];
     readonly sourceMap: GraphSourceMap;
     readonly budgets: readonly GraphBudget[];
+    readonly capabilities: readonly string[];
     readonly diagnostics: readonly GraphDiagnostic[];
   }
   | { readonly ok: false; readonly original: GraphJSON; readonly errors: readonly GraphDiagnostic[]; readonly budgets: readonly GraphBudget[] };

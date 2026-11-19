@@ -26,8 +26,9 @@ export function validateGraph(graph: LogicGraph, options: { readonly projection?
 function validateGraphChecked(graph: LogicGraph, options: { readonly projection?: boolean }): readonly GraphDiagnostic[] {
   const errors: GraphDiagnostic[] = [];
   const anchor = graph.roots[0]?.anchor ?? { kind: 'document' as const, id: 'document', field: '', fingerprint: fingerprint(graph.original) };
-  const report = (code: GraphDiagnostic['code'], message: string, nodeId?: string, portId?: string) => {
-    errors.push({ severity: 'error', code, message, anchor, nodeId, portId, pointer: graph.nodes.find(node => node.id === nodeId)?.origins[0] ?? '' });
+  const report = (code: GraphDiagnostic['code'], message: string, nodeId?: string, portId?: string, hint = false) => {
+    if (hint && options.projection) return;
+    errors.push({ severity: hint ? 'warning' : 'error', ...(hint ? { hint: true as const } : {}), code, message: hint ? `Wiring hint: ${message}` : message, anchor, nodeId, portId, pointer: graph.nodes.find(node => node.id === nodeId)?.origins[0] ?? '' });
   };
   const nodes = new Map(graph.nodes.map(node => [node.id, node]));
   if (nodes.size !== graph.nodes.length) report('duplicate_id', 'Block IDs must be unique.');
@@ -94,14 +95,14 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     return current !== undefined && (node.payload.kind === 'operand' || node.payload.kind === 'condition')
       ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(item ? { item } : {}) }, expressionScope(current, node.scopeId, graph.scopes)) : output;
   };
-  if (scopes.size !== graph.scopes.length) report('duplicate_id', 'Scope IDs must be unique.');
+  if (scopes.size !== graph.scopes.length) report('duplicate_id', 'Scope IDs must be unique.', undefined, undefined, true);
   for (const scope of graph.scopes) {
     const seen = new Set([scope.id]);
     let parent = scope.parentId;
     while (parent) {
-      if (seen.has(parent)) { report('cycle', 'Lexical scopes cannot contain a cycle.'); break; }
+      if (seen.has(parent)) { report('cycle', 'Lexical scopes cannot contain a cycle.', undefined, undefined, true); break; }
       seen.add(parent);
-      if (!scopes.has(parent)) { report('invalid_reference', 'Unknown parent scope.'); break; }
+      if (!scopes.has(parent)) { report('invalid_reference', 'Unknown parent scope.', undefined, undefined, true); break; }
       parent = scopes.get(parent)?.parentId;
     }
   }
@@ -111,13 +112,12 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     const input = to?.inputs.find(port => port.id === edge.to.portId);
     if (!from || !to || !output || !input) { report('invalid_reference', 'Connection names a missing block or port.', edge.to.nodeId, edge.to.portId); continue; }
     if (edge.binding !== input.binding) report('invalid_reference', 'Connection binding does not match the input.', to.id, input.id);
-    if (edge.kind !== output.type.representation) report('binding_type', 'Connection representation does not match its output.', to.id, input.id);
+    if (edge.kind !== output.type.representation) report('binding_type', 'Connection representation does not match its output.', to.id, input.id, true);
     const destinationScope = scopes.get(to.scopeId);
     const sourceEntry = catalogByKey.get(from.catalogKey);
     if (!options.projection && destinationScope && sourceEntry && !sourceEntry.scopes.includes(destinationScope.kind) && from.payload.kind !== 'hole'
-      && !['flow', 'flow-inputs', 'logic-entry', 'document'].includes(to.payload.kind)) report('scope_mismatch', 'The connected block is unavailable in the destination scope.', to.id, input.id);
-    // Existing accepted grammar is losslessly retained, including unresolved types.
-    // New or edited wiring must prove its destination type; a live sample never suffices.
+      && !['flow', 'flow-inputs', 'logic-entry', 'document'].includes(to.payload.kind)) report('scope_mismatch', 'The connected block is unavailable in the destination scope.', to.id, input.id, true);
+    if (options.projection) continue;
     const original = atPointer(graph.original, to.origins[0] + edge.binding);
     const fromOriginal = atPointer(graph.original, from.origins[0]);
     const current = assemble(from.id);
@@ -130,10 +130,10 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     const expected = inputType({ ...to, scopeId: destinationScopeId }, edge.binding, input.type, descriptions.get(to.id)?.children.find(child => child.binding === edge.binding)?.kind);
     const sameScope = scopesCompatible(actual, expected, graph.scopes);
     const match = portsCompatible(actual, expected, graph.scopes);
-    if (!match.compatible && (!unchanged || !sameScope)) report(sameScope ? 'binding_type' : 'scope_mismatch', match.reason!, to.id, input.id);
+    if (!match.compatible && (!unchanged || !sameScope)) report(sameScope ? 'binding_type' : 'scope_mismatch', match.reason!, to.id, input.id, true);
   }
   for (const node of graph.nodes) {
-    if (!scopes.has(node.scopeId)) report('invalid_reference', 'Block scope is missing.', node.id);
+    if (!scopes.has(node.scopeId)) report('invalid_reference', 'Block scope is missing.', node.id, undefined, true);
     const ids = [...node.inputs, ...node.outputs.map(port => ({ ...port, id: `out:${port.id}` }))].map(port => port.id);
     if (new Set(ids).size !== ids.length) report('duplicate_id', 'Port IDs must be unique.', node.id);
     if (node.payload.kind !== 'opaque') {
@@ -151,8 +151,8 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     }
     const scope = scopes.get(node.scopeId);
     const entry = catalogByKey.get(node.catalogKey);
-    if (!options.projection && entry && scope && !entry.scopes.includes(scope.kind)) report('invalid_combination', `This block is not available in ${scope.kind} scope.`, node.id);
-    if (entry?.disabledReason) report('recipe_disabled', entry.disabledReason, node.id);
+    if (!options.projection && entry && scope && !entry.scopes.includes(scope.kind)) report('invalid_combination', `This block is not available in ${scope.kind} scope.`, node.id, undefined, true);
+    if (entry?.disabledReason) report('recipe_disabled', entry.disabledReason, node.id, undefined, true);
     if (node.payload.kind === 'opaque') {
       if (node.inputs.length || node.provenance !== 'opaque' || atPointer(graph.original, node.payload.pointer) === undefined
         || fingerprint(node.payload.value) !== fingerprint(atPointer(graph.original, node.payload.pointer)!)) report('opaque_region', 'An opaque region cannot be edited or interpreted.', node.id);
@@ -172,9 +172,9 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
   for (const root of graph.roots) {
     const output = nodes.get(root.nodeId)?.outputs.find(port => port.id === root.portId);
     if (!output) report('invalid_reference', 'Output block or port is missing.', root.nodeId, root.portId);
-    else {
+    else if (!options.projection) {
       const actual = actualOutput(nodes.get(root.nodeId)!) ?? output.type;
-      if (actual.valueType !== 'unresolved' && root.destination.type && !portsCompatible(actual, root.destination.type).compatible) report('binding_type', 'The output does not fit its destination.', root.nodeId, root.portId);
+      if (actual.valueType !== 'unresolved' && root.destination.type && !portsCompatible(actual, root.destination.type).compatible) report('binding_type', 'The output does not fit its destination.', root.nodeId, root.portId, true);
     }
   }
   return errors;

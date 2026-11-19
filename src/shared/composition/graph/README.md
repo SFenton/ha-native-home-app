@@ -5,19 +5,19 @@ Pure projection APIs for `docs/flows-canvas.md`, merged in PR #21 at
 compiler-only accounting addendum. There are no stores, network calls, device
 actions, or UI dependencies.
 
-- `lift(json, {kind, anchor, metadata, scope})` retains all original fragments.
+- `lift(json, {kind, anchor, metadata, scope, context})` retains all original fragments.
   `liftJSON(bytes)` also runs the existing bounded, duplicate-key-aware parser.
-  Payloads contain grammar-checked skeletons; each ordered input binding replaces
-  its skeleton child. Template references remain references. Opaque blocks retain
+  Grammar descriptors are projection/catalog hints, not native validation.
+  Each ordered input binding replaces its payload child. Template references remain references. Opaque blocks retain
   exact JSON and cannot be edited.
-  Input constraints come from grammar positions and destination lexical scopes,
-  not the previous child's enum/refinements. Item values stay in their step;
+  Wiring hints come from grammar positions and destination lexical scopes,
+  not the previous child's enum/refinements. Item hints stay in their step;
   flow parameters remain available in descendant scopes of their own flow.
   Grammar descriptors and edge lookups are reused within a check or projection,
   never cached across edits.
   Edited flow step/output item shapes are retyped from the currently assembled
   prefix, not retained from the lifted snapshot.
-- `lower(graph, {library, targetCapabilities, itemScope})` validates before
+- `lower(graph, {library, targetCapabilities, itemScope})` runs native validation before
   returning atomic replacements. Failures retain `original`; they never return
   a partially modified document. Complete documents use the existing compiler.
   Root `studioCanvas` is excluded only from semantic validation/capabilities and
@@ -25,14 +25,34 @@ actions, or UI dependencies.
   Document destinations always run the document compiler, including documents
   missing required fields. Synthetic multi-field examples must explicitly use
   `kind: "fragment"`; fragment checks are not whole-document validation.
-  Explicit text/symbol slots use the shared schemas and native operand-kind
-  checks, including untouched imports. Read fallbacks require `sh.rules@1`.
+  Standalone slots require `context: {document, pointer}`: the host's document
+  snapshot and the consuming field's RFC 6901 pointer, not an inferred slot kind
+  or text-length envelope. Lowering projects the fragment into that document and
+  calls `compileCompositionDocument`, including for untouched imports. Multiple
+  roots sharing a snapshot are compiled with all their replacements assembled.
+  Slot capabilities are the whole consuming document's exact native manifest.
+  Contextual diagnostics retain the absolute `documentPointer`; a multi-root
+  refusal is mapped to the root owning that field, not the first compiled root.
+  Whole-document roots need no extra context. Missing context is an explicit
+  error; unknown local representations alone never veto compiler-valid JSON.
+  New optional fields and appended array entries can be native destinations.
+  Standalone operands, predicates, calls and flows use the existing native
+  fragment checkers; capability absorption and dependency-cycle checks are
+  shared with the document compiler. `capabilities` on successful lowering and
+  every budget come from those native results, never a caller-provided seed.
   Source maps retain authored entries and add `stage: "expanded"` entries for
-  native template landings. `authoredPointer` and `usePointer` keep each copied
+  native template landings. Whole-document landings come from the compiler's
+  own expansion pass, not a second expansion. `authoredPointer` and `usePointer` keep each copied
   argument tied to its block and use, including failing expanded budget paths.
 - `projectGraph(graph)` only projects a working buffer, including opaque JSON.
   It is **not** validation or permission to apply/save/publish an invalid import.
-- `validateGraph`, `portsCompatible`, `autoLayout`, `measureBudget`, and
+- `validateGraph` checks projection safety and returns local typing/scope/catalog
+  hints marked `severity: "warning", hint: true`. Successful lowering retains
+  them in `diagnostics`; the UI must label them as hints, not native refusals.
+  Only structural ambiguity (missing/occupied bindings, connection cycles,
+  modified opaque buffers) can prevent projection. Compiler diagnostics decide
+  semantic acceptance and are mapped back through the source map.
+  `portsCompatible`, `autoLayout`, `measureBudget`, and
   `budgetMeter` are usable independently. Meters appear strictly above 75%.
   Runtime budget is a separate bound, not an estimate from step count.
   An uncapped scope limit is `null`; its meter ratio is also `null`, with no
@@ -44,8 +64,9 @@ actions, or UI dependencies.
   No graph code increments AST counters, walks depths, or predicts resets.
   Counts not yet consumed from the checker are **null**, never zero or an
   estimate: document/call counts, depths, totals, cases/steps, duplication costs,
-  generated-flow accounting and reset events. Document scopes explicitly report
-  `nodeAccounting: "unavailable"`; overall accounting is `partial` or `unavailable`.
+  generated-flow accounting and reset events.   Whole-document and consuming-field scopes remain unavailable until the native
+  observer is consumed, rather than inventing fresh entry points for arbitrary
+  subtrees. Overall accounting is `partial` or `unavailable`.
   Consumers must surface `accountingUnavailableReason`, not invent missing
   percentages. Missing meters do not mean zero usage or unlimited capacity.
   A native counter stops at its limit: consumers must use the compiler outcome
@@ -72,16 +93,19 @@ actions, or UI dependencies.
 
 After rebasing onto merged PR #20, `GraphPipeline*` and graph schemas are aliases
 of the real shared pipeline exports. There is no temporary average/min bridge.
-Text slots use the shared `textValue` export, including its unavailable policy
-and generic 2000-character envelope; whole-document compilation enforces the
-specific consuming field's limits. There is no local text-keep schema.
-Average and text keep remain gated on target capabilities. Tests use the real
+There is no graph slot schema, capability walker or native-rule copy.
+The consuming document's shared schema enforces each field's constraints,
+including native 16,384-character text and shorter subtitle limits.
+An explicit `targetCapabilities` is checked against the native manifest; without
+one, lowering reports native requirements rather than guessing app support.
+Catalog and recipe availability still gate average and text keep on the target.
+Tests use the real
 shared average evaluator for finite-total parity and explicit overflow
 divergence. A-number-state remains
 disabled with its specific prerequisite and compiler pointer; no cast or
 fabricated shape exists.
-Fragments absorb the native checker's `usedOperands`, references and needs
-consistently for operands, predicates and calls, including budget capabilities.
+The deterministic compiler comparison covers native acceptance/refusal, exact
+manifests, first diagnostics, field limits, edited graphs and lift round trips.
 
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
 expansion, draft layout extraction, persistence/conflicts, and publication.

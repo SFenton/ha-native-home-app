@@ -4,7 +4,7 @@ import { logicEntrySchema, logicHoleSchema, logicRefSchema } from '../logic-libr
 import { outputSchema, pipelineInputsSchema, pipelineSourceSchema, requestSchema, stepSchema } from '../pipeline/schema';
 import type { GraphPayload } from './types';
 import { atPointer, copy, join, record, replaceAt } from './json';
-import { graphInputsSchema, graphSlotSchema, graphSourceSchema, graphStepSchema } from './capabilities';
+import { graphInputsSchema, graphSourceSchema, graphStepSchema } from './capabilities';
 import { identifierSchema } from '../../validation';
 
 export type FragmentKind = 'operand' | 'condition' | 'call' | 'source-selection' | 'flow' | 'flow-inputs' | 'request' | 'step' | 'output' | 'logic-entry' | 'slot' | 'document' | 'fragment' | 'auto';
@@ -196,11 +196,14 @@ export function describeGrammar(value: Json, hint: FragmentKind = 'auto'): Gramm
   }
   if (kind === 'slot' && record(value)) {
     if (value.type === 'expr' || value.type === 'bound-symbol') take('/value', 'operand');
-    if (value.type === 'conditional' && Array.isArray(value.cases)) value.cases.forEach((_, i) => take(join('', 'cases', i, 'when'), 'condition'));
-    let skeleton: Json = value;
-    for (const child of children) skeleton = replaceAt(skeleton, child.binding, child.kind === 'condition' ? condition : literal);
-    const parsed = graphSlotSchema.safeParse(skeleton);
-    return parsed.success ? { payload: { kind, value: skeleton }, key: value.type === 'conditional' ? 'destination.look-rules' : value.type === 'bound-symbol' ? 'destination.bound-symbol' : 'destination.text', children } : opaque("Can't show this as blocks: unknown slot variant or field.");
+    if (value.type === 'conditional' && Array.isArray(value.cases)) {
+      value.cases.forEach((branch, i) => {
+        take(join('', 'cases', i, 'when'), 'condition');
+        if (record(branch) && Object.hasOwn(branch, 'then')) take(join('', 'cases', i, 'then'), record(branch.then) && branch.then.type === 'call-service' ? 'call' : 'slot');
+      });
+      if (Object.hasOwn(value, 'otherwise')) take('/otherwise', record(value.otherwise) && value.otherwise.type === 'call-service' ? 'call' : 'slot');
+    }
+    return { payload: { kind, value }, key: value.type === 'conditional' ? 'destination.look-rules' : value.type === 'bound-symbol' ? 'destination.bound-symbol' : 'destination.text', children };
   }
   if (kind !== 'document' && kind !== 'fragment') return opaque("Can't show this as blocks: unsupported fragment.");
   const scan = (candidate: Json, path: string): void => {

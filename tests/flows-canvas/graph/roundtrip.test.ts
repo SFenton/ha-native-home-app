@@ -14,6 +14,7 @@ import { expressionChildren } from '../../../src/shared/composition/graph/gramma
 import { atPointer, record, replaceAt } from '../../../src/shared/composition/graph/json';
 import { checkPipelineSource } from '../../../src/shared/composition/pipeline/compile';
 import { pipelineSourceSchema } from '../../../src/shared/composition/pipeline/schema';
+import { workedDocument } from './fixtures/native';
 
 const clone = (value: unknown): Json => JSON.parse(JSON.stringify(value));
 function roundtrip(value: Json, kind?: 'operand' | 'condition' | 'flow' | 'document' | 'fragment', scope?: NonNullable<Parameters<typeof lift>[1]>['scope']) {
@@ -69,8 +70,10 @@ describe('G-roundtrip worked examples, templates and opaque buffers', () => {
     }
   });
   it('retains A and B including refs, flow prefixes, format options and missing properties', () => {
-    roundtrip(clone(exampleA), 'fragment');
-    roundtrip(clone(exampleB), 'fragment');
+    for (const example of [exampleA, exampleB]) {
+      expect(projectGraph(lift(clone(example), { kind: 'fragment' }).graph).ast).toEqual(example);
+      roundtrip(workedDocument(clone(example)), 'document');
+    }
     roundtrip(clone({ logicLibrary: [sourceParameterTemplate], output: { type: 'logic-ref', logicId: 'is-on', args: { source: 'light-a' } } }), 'fragment');
   });
   it('has exact example costs and uses the existing evaluator', () => {
@@ -232,7 +235,8 @@ describe('G-roundtrip shared contract corpus', () => {
     try { compileCompositionDocument(document); }
     catch (error) { if (!(error instanceof CompositionValidationError)) throw error; native = error; }
     expect(native === undefined).toBe(accepted);
-    const graph = lift(slot, { kind: 'slot' }).graph, result = lower(graph), budget = measureBudget(slot, graph.roots[0].anchor, { kind: 'slot' });
+    const context = { document: envelope.document, pointer };
+    const graph = lift(slot, { kind: 'slot', context }).graph, result = lower(graph), budget = measureBudget(slot, graph.roots[0].anchor, { kind: 'slot', context });
     expect(result.ok).toBe(accepted);
     expect(budget.accepted).toBe(accepted);
     if (native && !result.ok) {

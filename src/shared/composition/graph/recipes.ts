@@ -6,7 +6,8 @@ import type { CompositionIssue } from '../json';
 import { elementOf, isAssignable, withoutNull } from '../pipeline/shape';
 import { requestShape } from '../pipeline/sources';
 import { newFacts, typeOperand, typeSteps } from '../pipeline/typing';
-import { checkGraphPipeline, AVERAGE_CAPABILITY, expressionCapabilities, graphInputsSchema } from './capabilities';
+import { checkGraphPipeline, AVERAGE_CAPABILITY, graphInputsSchema } from './capabilities';
+import { absorbCompositionExpressionCapabilities } from '../compiler';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record } from './json';
 import type { GraphBudget, GraphDiagnostic, GraphPipelineInputs, GraphPipelineSource, GraphSourceLocation, Immutable, LogicAnchor, TemplateAst } from './types';
@@ -24,17 +25,20 @@ export function allocateGraphId(prefix: string, existing: ReadonlySet<string>): 
   do { id = createId(prefix); } while (existing.has(id));
   return id;
 }
-function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], capabilities: readonly string[] = [], diagnostics: readonly GraphDiagnostic[] = []): RecipeResult {
+function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], diagnostics: readonly GraphDiagnostic[] = []): RecipeResult {
   const condition = predicateBase.safeParse(ast);
   const facts = condition.success ? checkPredicate(condition.data, '') : checkOperand(operandBase.parse(ast), '');
   const issues: CompositionIssue[] = [...facts.issues];
   const sourceFacts = sources.map((source, index) => checkGraphPipeline(source, `/dataSources/${index}`));
   issues.push(...sourceFacts.flatMap(facts => facts.issues));
   if (issues.length) return { ok: false, errors: issues.map(issue => ({ severity: 'error', code: issue.code, pointer: issue.pointer, anchor: recipeAnchor, message: `Recipe does not fit the existing grammar: ${issue.code}.` })) };
-  const required = [...new Set([...capabilities, ...expressionCapabilities(facts), ...sourceFacts.flatMap(facts => facts.capabilities)])].sort();
+  const capabilities = new Set<string>();
+  absorbCompositionExpressionCapabilities(facts, capabilities);
+  sourceFacts.forEach(facts => facts.capabilities.forEach(capability => capabilities.add(capability)));
+  const required = [...capabilities].sort();
   const budgets = [
-    measureBudget(ast, recipeAnchor, { capabilities: required }),
-    ...sources.map((source, index) => measureBudget(source, { kind: 'flow', id: source.id, field: '' }, { kind: 'flow', capabilities: sourceFacts[index].capabilities })),
+    measureBudget(ast, recipeAnchor),
+    ...sources.map(source => measureBudget(source, { kind: 'flow', id: source.id, field: '' }, { kind: 'flow' })),
   ];
   const sourceMap: GraphSourceLocation[] = [];
   const map = (value: Json, pointer: string) => {
@@ -132,7 +136,7 @@ export function lowerForEach(recipe: FixedForEach | FlowForEach): RecipeResult {
   }
   if (sources.some(source => recipe.existingSourceIds?.includes(source.id))) return error('duplicate_id', 'Generated flow IDs collide with existing sources.', '/id');
   if ((recipe.existingFlowCount ?? 0) + sources.length > 128) return error('limit_exceeded', 'For Each would exceed 128 flow sources.', '/dataSources');
-  return finish(ast, sources, ['sh.pipeline@1']);
+  return finish(ast, sources);
 }
 
 export interface ListAverageRecipe {
@@ -178,10 +182,7 @@ export function lowerListAverage(recipe: ListAverageRecipe): RecipeResult {
   if (sources.some(source => recipe.existingSourceIds?.includes(source.id))) return error('duplicate_id', 'Generated flow IDs collide with existing sources.', '/id');
   if ((recipe.existingFlowCount ?? 0) + sources.length > 128) return error('limit_exceeded', 'Average would exceed 128 flow sources.', '/dataSources');
   const ast: Operand = strategy === 'step' ? read(sources[0].id) : { type: 'math', op: 'divide', args: sources.map(source => read(source.id)) };
-  const requirements = [...new Set(sources.flatMap(source => checkGraphPipeline(source, '').capabilities))];
-  const missing = requirements.find(capability => !recipe.targetCapabilities.includes(capability));
-  if (missing) return error('unsupported_capability', `Target does not support ${missing}.`, '/targetCapabilities');
-  const result = finish(ast, sources, requirements, strategy === 'two-flow' ? [{
+  const result = finish(ast, sources, strategy === 'two-flow' ? [{
     severity: 'warning', code: 'average_fallback_overflow', anchor: recipeAnchor, pointer: `/dataSources/0/inputs/steps/${prefix.steps.length}`,
     message: "On apps without the average step, running totals beyond the finite number range (about +/-1.8e308) cannot be told. An overflowing fallback gives Can't tell, even when the average step could answer. Parity requires every running total to stay finite.",
   }] : []);

@@ -37,6 +37,26 @@ import { CompositionReferences, type CompositionDependencies } from './dependenc
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
 
+export function absorbCompositionExpressionCapabilities(facts: ExpressionFacts, into: Set<string>, kind: 'expression' | 'call' = 'expression'): void {
+  if (facts.usedOperands) into.add('sh.operands@1');
+  for (const need of facts.needs) into.add(`sh.${need}@1`);
+  if (facts.references.length || facts.optimisticReferences.length) into.add('sh.bindings@1');
+  if (kind === 'call') into.add('sh.call-service@1');
+}
+
+export function compositionDependencyIssues(dependencies: readonly { from: string; to: string; path: string }[]): CompositionIssue[] {
+  const issues: CompositionIssue[] = [];
+  for (const edge of dependencies) {
+    const pending = [edge.to], seen = new Set<string>();
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (id === edge.from) { issues.push({ code: 'invalid_combination', pointer: edge.path }); break; }
+      if (!seen.has(id)) { seen.add(id); pending.push(...dependencies.filter(item => item.from === id).map(item => item.to)); }
+    }
+  }
+  return issues;
+}
+
 export const firstSliceCapabilities = [
   'sh.actions.navigation@1', 'sh.assets.publisher@1', 'sh.backdrop@1', 'sh.bindings@1', 'sh.chrome@1',
   'sh.composition@1', 'sh.grid@1', 'sh.page@1', 'sh.power-toggle@1', 'sh.sheet@1', 'sh.shell@1',
@@ -241,13 +261,16 @@ export function compileCompositionDocument(input: unknown, options: CompileOptio
 }
 function compileRecording(input: unknown, options: CompileOptions, references?: CompositionDependencies): CompiledComposition {
   if (references && record(input)) referenceCache.set(input, references);
-  try { return compileWithReferences(input, options, references); }
+  try { return compileCompositionDocumentWithOrigins(input, options, references).compiled; }
   catch (error) {
     if (references && error instanceof CompositionValidationError) references.issues = error.issues;
     throw error;
   }
 }
-function compileWithReferences(input: unknown, options: CompileOptions, references?: CompositionDependencies): CompiledComposition {
+/** The same compile with its own expansion landings, for source maps without a second expansion pass. */
+export function compileCompositionDocumentWithOrigins(input: unknown, options: CompileOptions = {}, references?: CompositionDependencies): {
+  compiled: CompiledComposition; origins: ReturnType<typeof expandBounded>['origins'];
+} {
   assertCompositionBounds(input);
   let expansion: ReturnType<typeof expandBounded>;
   try { expansion = expandBounded(input); }
@@ -259,13 +282,13 @@ function compileWithReferences(input: unknown, options: CompileOptions, referenc
   if (expansion.document === input) {
     const compiled = compilePlain(input, options, true, references);
     // A draft with Show at Most or Spoken As is handed back as authored; `expanded` is what a publication holds.
-    return { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document };
+    return { compiled: { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   }
   // The draft holds named logic: every use is worked out first, so capabilities, budgets and every other check read plain operands and conditions.
   // An issue inside a worked-out use is reported where the use stands in the draft.
   try {
     const compiled = compilePlain(expansion.document, options, false, references);
-    return { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document };
+    return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   } catch (error) {
     if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings));
     throw error;
@@ -490,18 +513,16 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   const optimisticRefs: ExpressionFacts['optimisticReferences'] = [];
   type Visibility = { visibleWhen?: Predicate; whenUnknown?: WhenUnknown };
   /** Folds an expression walk's issues, source references and capability needs into this compile. */
-  function absorb(facts: ExpressionFacts) {
+  function absorb(facts: ExpressionFacts, kind: 'expression' | 'call' = 'expression') {
     issues.push(...facts.issues);
     expressionRefs.push(...facts.references);
     optimisticRefs.push(...facts.optimisticReferences);
-    if (facts.usedOperands) require('operands');
-    for (const need of facts.needs) require(need);
-    if (facts.references.length || facts.optimisticReferences.length) require('bindings');
+    absorbCompositionExpressionCapabilities(facts, capabilities, kind);
   }
   /** The records the walk is inside while it draws the template of a `repeat` (`sh.repeat@1`); `item` and `index` mean something only there. */
   let repeatScope: ItemScope | undefined;
   function useCall(call: CallService, path: string, control: boolean) {
-    require('call-service'); absorb(checkCallService(call, path, control, repeatScope));
+    absorb(checkCallService(call, path, control, repeatScope), 'call');
     const target = call.target?.entity_id;
     if (target?.type === 'literal') {
       for (const id of Array.isArray(target.value) ? target.value : [target.value]) if (typeof id === 'string') collected.entity(id, `${path}/target/entity_id`);
@@ -2255,14 +2276,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       else if (found) add(found.code, `${path}${found.suffix}`);
     }
   }
-  for (const edge of dependencies) {
-    const pending = [edge.to], seen = new Set<string>();
-    while (pending.length) {
-      const id = pending.pop()!;
-      if (id === edge.from) { add('invalid_combination', edge.path); break; }
-      if (!seen.has(id)) { seen.add(id); pending.push(...dependencies.filter(item => item.from === id).map(item => item.to)); }
-    }
-  }
+  issues.push(...compositionDependencyIssues(dependencies));
   const background = document.theme.background;
   if (background.type === 'downloaded') {
     require('assets.publisher');

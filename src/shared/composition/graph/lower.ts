@@ -1,14 +1,11 @@
 import type { Json } from '../../types';
-import { z } from 'zod/v4';
-import { compileCompositionDocument, parseCompositionShape } from '../compiler';
-import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
+import type { ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, type CompositionIssue } from '../json';
-import { expandLogic, type LogicEntry } from '../logic-library';
-import { AVERAGE_CAPABILITY, checkGraphPipeline, checkGraphSlot, expressionCapabilities, graphInputsSchema, graphSourceSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
+import type { LogicEntry } from '../logic-library';
+import { compositionDependencyIssues } from '../compiler';
+import { compileGraphValue, consumingDocument } from './compile';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record, replaceAt, withoutCanvasMetadata } from './json';
-import { expressionPort, portsCompatible } from './ports';
-import { describeGrammar, type FragmentKind } from './grammar';
 import type { GraphBudget, GraphDiagnostic, GraphRoot, GraphSourceLocation, LogicGraph, LoweringResult } from './types';
 import { validateGraph } from './validate';
 import { expansionSourceMap } from './provenance';
@@ -20,7 +17,7 @@ export interface LowerOptions {
 }
 /** Lossless buffer projection only. This does not authorize Apply, Save or publication. */
 export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly sourceMap: readonly GraphSourceLocation[] } {
-  const errors = validateGraph(graph, { projection: true });
+  const errors = validateGraph(graph, { projection: true }).filter(diagnostic => diagnostic.severity === 'error');
   if (errors.length) throw new CompositionValidationError(errors.map(error => ({
     code: ['cycle', 'occupied_input', 'scope_mismatch', 'opaque_region', 'invalid_layout', 'recipe_disabled'].includes(error.code) ? 'invalid_combination' : error.code as CompositionIssue['code'],
     pointer: error.pointer,
@@ -53,7 +50,8 @@ export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly 
   return { ast: values.length === 1 ? values[0] : values, sourceMap };
 }
 export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringResult {
-  const errors: GraphDiagnostic[] = [...validateGraph(graph)];
+  const validation = validateGraph(graph), errors: GraphDiagnostic[] = validation.filter(diagnostic => diagnostic.severity === 'error');
+  const hints = validation.filter(diagnostic => diagnostic.severity === 'warning');
   if (!graph.roots.length) return { ok: false, original: graph.original, errors, budgets: [] };
   let ast: Json, sourceMap: readonly GraphSourceLocation[];
   try { ({ ast, sourceMap } = projectGraph(graph)); assertCompositionBounds(ast); }
@@ -63,104 +61,63 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
   }
   const values = graph.roots.length === 1 ? [ast] : Array.isArray(ast) ? ast : [ast];
   const budgets: GraphBudget[] = [];
-  const dependencies: { from: string; to: string; path: string; root: GraphRoot }[] = [];
+  const capabilities = new Set<string>();
+  const dependencies: { from: string; to: string; path: string }[] = [];
   graph.roots.forEach((root, index) => {
-    const value = values[index], capabilities = new Set<string>();
-    let expanded = value;
+    const value = values[index];
     const report = (issue: CompositionIssue) => errors.push(diagnostic(issue, root, sourceMap));
-    const check = (candidate: Json, kind: FragmentKind, at = '', itemScope = options.itemScope): void => {
-      if (kind === 'slot') {
-        const facts = checkGraphSlot(candidate, at);
-        facts.issues.forEach(report); facts.capabilities.forEach(capability => capabilities.add(capability));
-        if (facts.issues.length) return;
-      }
-      if (kind === 'operand') {
-        const facts = checkOperand(parseCompositionShape(operandBase, candidate), at, root.destination.allowControl, false, itemScope);
-        facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
-      } else if (kind === 'condition') {
-        const facts = checkPredicate(parseCompositionShape(predicateBase, candidate), at, false, itemScope);
-        facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
-      } else if (kind === 'call') {
-        const facts = checkCallService(parseCompositionShape(callServiceSchema, candidate), at, root.destination.allowControl ?? false, itemScope);
-        facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
-        capabilities.add('sh.call-service@1');
-      } else if (kind === 'flow' || kind === 'flow-inputs') {
-        const source = kind === 'flow' ? parseCompositionShape(graphSourceSchema, candidate)
-          : { id: 'graph-flow', kind: 'model' as const, model: 'pipeline@1' as const, inputs: parseCompositionShape(graphInputsSchema, candidate) };
-        const facts = checkGraphPipeline(source, at);
-        facts.issues.forEach(report); facts.capabilities.forEach(capability => capabilities.add(capability));
-        dependencies.push(...facts.dependencies.map(dependency => ({ ...dependency, root })));
-      } else if (kind === 'slot' && record(candidate) && candidate.type === 'read') {
-        const { fallback: _fallback, whenUnavailable: _policy, ...operand } = candidate;
-        check(operand, 'operand', at, itemScope);
-      } else {
-        const description = describeGrammar(candidate, kind);
-        if (description.payload.kind === 'opaque') { report({ code: 'unknown_variant', pointer: at }); return; }
-        for (const child of description.children) check(child.value, child.kind, at + child.binding, itemScope);
-      }
-    };
+    let context = root.destination.context;
     try {
-      if (root.destination.kind === 'document') {
-        const semantic = withoutCanvasMetadata(value), expansion = expandLogic(semantic);
-        const plain = parseCompositionShape(z.json(), expansion.document);
-        sourceMap = [...sourceMap, ...expansionSourceMap(value, plain, expansion.origins, root.anchor, sourceMap)];
-        const compiled = compileCompositionDocument(semantic);
-        compiled.capabilities.forEach(capability => capabilities.add(capability));
-        expanded = compiled.expanded;
-      } else if (root.destination.kind === 'fragment') {
-        const expansion = expandLogic(value), result = expansion.document;
-        assertCompositionBounds(result);
-        expanded = parseCompositionShape(z.json(), result);
-        sourceMap = [...sourceMap, ...expansionSourceMap(value, expanded, expansion.origins, root.anchor, sourceMap)];
-        check(expanded, 'document');
-      } else {
-        const expansion = expandLogic({ logicLibrary: options.library ?? [], value }), result = expansion.document;
-        if (!record(result)) throw new Error('Logic expansion did not return an object.');
-        expanded = result.value;
-        sourceMap = [...sourceMap, ...expansionSourceMap(value, expanded, expansion.origins.map(origin => ({ ...origin, pointer: origin.pointer.replace(/^\/value(?=\/|$)/, '') })), root.anchor, sourceMap, options.library)];
-        check(expanded, root.destination.kind === 'flow' ? record(expanded) && expanded.model === 'pipeline@1' ? 'flow' : 'flow-inputs' : root.destination.kind);
+      if (context) {
+        let document = copy(context.document);
+        for (const [otherIndex, other] of graph.roots.entries()) {
+          if (other.destination.context && fingerprint(other.destination.context.document) === fingerprint(context.document)) {
+            document = consumingDocument({ ...other.destination.context, document }, values[otherIndex]);
+          }
+        }
+        context = { ...context, document };
       }
     } catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
-      const diagnostics = error.issues.map(issue => diagnostic({
-        ...issue,
-        pointer: root.destination.kind === 'document' ? issue.pointer.replace(/^\/document(?=\/|$)/, '')
-          : root.destination.kind === 'fragment' ? issue.pointer : issue.pointer.replace(/^\/value(?=\/|$)/, ''),
-      }, root, sourceMap));
-      if (root.destination.kind === 'document') errors.unshift(...diagnostics);
-      else errors.push(...diagnostics);
+      error.issues.forEach(report);
     }
-    if (root.destination.type && (root.destination.kind === 'operand' || root.destination.kind === 'condition')) {
-      const actual = expressionPort(expanded, root.destination.kind === 'condition', {
-        params: new Map(), allowRead: true, allowViewer: true,
-        ...(options.itemScope && options.itemScope !== 'lenient' ? { item: options.itemScope.shape } : {}),
-      });
-      if (!portsCompatible(actual, root.destination.type).compatible) report({ code: 'binding_type', pointer: '' });
-    }
-    for (const node of graph.nodes) if (node.payload.kind === 'opaque') report({ code: 'unknown_variant', pointer: node.payload.pointer });
-    for (const capability of capabilities) {
-      if (options.targetCapabilities ? !options.targetCapabilities.includes(capability) : capability === AVERAGE_CAPABILITY || capability === TEXT_KEEP_CAPABILITY) report({ code: 'unsupported_capability', pointer: '', capability });
-    }
-    const budget = measureBudget(expanded, root.anchor, {
-      kind: root.destination.kind === 'flow' && record(expanded) && expanded.model !== 'pipeline@1' ? 'flow-inputs' : root.destination.kind,
-      capabilities: [...capabilities], itemScope: options.itemScope, allowControl: root.destination.allowControl,
+    const compileOptions = {
+      kind: root.destination.kind === 'flow' && record(value) && value.model !== 'pipeline@1' ? 'flow-inputs' as const : root.destination.kind,
+      context, library: options.library, itemScope: options.itemScope, allowControl: root.destination.allowControl,
+    };
+    const compiled = compileGraphValue(value, compileOptions);
+    sourceMap = [...sourceMap, ...expansionSourceMap(value, compiled.expanded, compiled.origins, root.anchor, sourceMap, options.library)];
+    compiled.issues.forEach((issue, issueIndex) => {
+      const native = compiled.documentIssues?.[issueIndex];
+      if (root.destination.context && native?.pointer.startsWith('/document')) {
+        const documentPointer = native.pointer.replace(/^\/document(?=\/|$)/, '');
+        const owner = graph.roots.filter(candidate => candidate.destination.context
+          && fingerprint(candidate.destination.context.document) === fingerprint(root.destination.context!.document)
+          && (documentPointer === candidate.destination.context.pointer || documentPointer.startsWith(`${candidate.destination.context.pointer}/`)))
+          .sort((a, b) => b.destination.context!.pointer.length - a.destination.context!.pointer.length)[0];
+        const mapped = diagnostic({ ...native, pointer: owner ? documentPointer.slice(owner.destination.context!.pointer.length) : documentPointer }, owner ?? root, owner ? sourceMap : []);
+        if (!errors.some(error => error.anchor === mapped.anchor && error.code === mapped.code && error.pointer === mapped.pointer)) errors.push({ ...mapped, documentPointer });
+      } else report(issue);
     });
-    for (const dependency of dependencies) {
-      const pending = [dependency.to], seen = new Set<string>();
-      while (pending.length) {
-        const current = pending.pop()!;
-        if (current === dependency.from) {
-          errors.push(diagnostic({ code: 'invalid_combination', pointer: dependency.path }, dependency.root, sourceMap));
-          break;
-        }
-        if (!seen.has(current)) { seen.add(current); pending.push(...dependencies.filter(edge => edge.from === current).map(edge => edge.to)); }
-      }
+    dependencies.push(...compiled.dependencies.map(dependency => ({ ...dependency, path: `/${index}${dependency.path}` })));
+    for (const capability of compiled.capabilities) {
+      capabilities.add(capability);
+      if (options.targetCapabilities && !options.targetCapabilities.includes(capability)) report({ code: 'unsupported_capability', pointer: '', capability });
     }
-    budgets.push(budget);
+    budgets.push(measureBudget(value, root.anchor, compileOptions));
   });
+  if (graph.roots.length > 1) for (const issue of compositionDependencyIssues(dependencies)) {
+    const index = Number(issue.pointer.split('/')[1]), root = graph.roots[index];
+    const relative = { ...issue, pointer: issue.pointer.replace(/^\/\d+/, '') };
+    if (!errors.some(error => error.anchor === root.anchor && error.code === relative.code && error.pointer === relative.pointer)) errors.push(diagnostic(relative, root, sourceMap));
+    const budget = budgets[index];
+    if (!budget.compilerIssues.some(found => found.code === relative.code && found.pointer === relative.pointer)) {
+      budgets[index] = { ...budget, accepted: false, compilerIssues: [...budget.compilerIssues, relative] };
+    }
+  }
   if (errors.length) return { ok: false, original: graph.original, errors, budgets };
   return {
-    ok: true, ast, sourceMap, budgets, generatedSources: [], generatedLibrary: [], diagnostics: [],
+    ok: true, ast, sourceMap, budgets, capabilities: [...capabilities].sort(), generatedSources: [], generatedLibrary: [], diagnostics: hints,
     replacements: graph.roots.map((root, index) => ({ anchor: root.anchor, ast: values[index] })),
   };
 }
@@ -172,5 +129,5 @@ export function semanticFingerprint(graph: LogicGraph): string {
 function diagnostic(issue: CompositionIssue, root: GraphRoot, sourceMap: readonly GraphSourceLocation[] = []): GraphDiagnostic {
   const origin = sourceMap.filter(location => location.anchor === root.anchor && (location.pointer === issue.pointer || issue.pointer.startsWith(`${location.pointer}/`)))
     .sort((a, b) => b.pointer.length - a.pointer.length || Number(b.stage === 'expanded') - Number(a.stage === 'expanded'))[0];
-  return { severity: 'error', code: issue.code, message: `Graph lowering refused: ${issue.code}.`, anchor: root.anchor, pointer: issue.pointer, ...(origin ? { nodeId: origin.nodeId, portId: origin.portId, ...(origin.usePointer === undefined ? {} : { usePointer: origin.usePointer, authoredPointer: origin.authoredPointer }) } : {}), ...(issue.capability ? { capability: issue.capability } : {}) };
+  return { severity: 'error', code: issue.code, message: issue.pointer.endsWith('/destination/context') ? 'A standalone slot requires its consuming document and field pointer; native field constraints are not guessed.' : `Graph lowering refused: ${issue.code}.`, anchor: root.anchor, pointer: issue.pointer, ...(origin ? { nodeId: origin.nodeId, portId: origin.portId, ...(origin.usePointer === undefined ? {} : { usePointer: origin.usePointer, authoredPointer: origin.authoredPointer }) } : {}), ...(issue.capability ? { capability: issue.capability } : {}) };
 }
