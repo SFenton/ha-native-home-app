@@ -5,7 +5,7 @@ import { callServiceSchema, checkCallService, checkOperand, checkPredicate, oper
 import { assertCompositionBounds, CompositionValidationError, pointer, type CompositionIssue } from '../json';
 import { expandLogic, type LogicEntry } from '../logic-library';
 import { conditional } from '../slots';
-import { AVERAGE_CAPABILITY, checkGraphPipeline, graphInputsSchema, graphSourceSchema, graphTextSlotSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
+import { AVERAGE_CAPABILITY, checkGraphPipeline, expressionCapabilities, graphInputsSchema, graphSourceSchema, graphTextSlotSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record, replaceAt, withoutCanvasMetadata } from './json';
 import { expressionPort, portsCompatible } from './ports';
@@ -73,14 +73,13 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
       if (kind === 'slot' && record(candidate) && (candidate.type === 'read' || candidate.type === 'expr')) parseCompositionShape(graphTextSlotSchema, candidate);
       if (kind === 'operand') {
         const facts = checkOperand(parseCompositionShape(operandBase, candidate), at, root.destination.allowControl, false, itemScope);
-        facts.issues.forEach(report); facts.needs.forEach(name => capabilities.add(`sh.${name}@1`));
-        capabilities.add('sh.operands@1');
+        facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
       } else if (kind === 'condition') {
         const facts = checkPredicate(parseCompositionShape(predicateBase, candidate), at, false, itemScope);
-        facts.issues.forEach(report); facts.needs.forEach(name => capabilities.add(`sh.${name}@1`));
+        facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
       } else if (kind === 'call') {
         const facts = checkCallService(parseCompositionShape(callServiceSchema, candidate), at, root.destination.allowControl ?? false, itemScope);
-        facts.issues.forEach(report); facts.needs.forEach(name => capabilities.add(`sh.${name}@1`));
+        facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
         capabilities.add('sh.call-service@1');
       } else if (kind === 'flow' || kind === 'flow-inputs') {
         const source = kind === 'flow' ? parseCompositionShape(graphSourceSchema, candidate)
@@ -96,6 +95,7 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
         if (description.payload.kind === 'opaque') { report({ code: 'unknown_variant', pointer: at }); return; }
         for (const child of description.children) check(child.value, child.kind, at + child.binding, itemScope);
       }
+      if (kind === 'slot' && record(candidate) && ['expr', 'conditional', 'bound-symbol'].includes(String(candidate.type))) capabilities.add('sh.rules@1');
       if (record(candidate) && Object.hasOwn(candidate, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
     };
     try {

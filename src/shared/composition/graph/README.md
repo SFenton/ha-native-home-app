@@ -65,10 +65,13 @@ of the real shared pipeline exports. There is no temporary average/min bridge.
 Text slots use the shared `textValue` export, including its unavailable policy
 and generic 2000-character envelope; whole-document compilation enforces the
 specific consuming field's limits. There is no local text-keep schema.
-Average and text keep remain gated on target capabilities, and parity tests run
-the real shared average evaluator unconditionally. A-number-state remains
+Average and text keep remain gated on target capabilities. Tests use the real
+shared average evaluator for finite-total parity and explicit overflow
+divergence. A-number-state remains
 disabled with its specific prerequisite and compiler pointer; no cast or
 fabricated shape exists.
+Fragments absorb the native checker's `usedOperands`, references and needs
+consistently for operands, predicates and calls, including budget capabilities.
 
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
 expansion, draft layout extraction, persistence/conflicts, and publication.

@@ -59,10 +59,10 @@ describe.each(['read', 'expr'] as const)('shared %s text slots', type => {
   it.each(['fallback', 'keep'])('retains the native %s policy and requires the actual target capability', policy => {
     const ast = slot(policy), graph = lift(ast, { kind: 'slot', anchor }).graph;
     expect(measureBudget(ast, anchor, { kind: 'slot' }).accepted).toBe(true);
-    expect(lower(graph, { targetCapabilities: ['sh.operands@1', 'sh.rules@1'] })).toMatchObject({
+    expect(lower(graph, { targetCapabilities: ['sh.operands@1', 'sh.rules@1', 'sh.bindings@1'] })).toMatchObject({
       ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'unsupported_capability', capability: 'sh.text-keep@1' })]),
     });
-    expect(lower(graph, { targetCapabilities: ['sh.operands@1', 'sh.rules@1', 'sh.text-keep@1'] })).toMatchObject({ ok: true, ast });
+    expect(lower(graph, { targetCapabilities: ['sh.operands@1', 'sh.rules@1', 'sh.bindings@1', 'sh.text-keep@1'] })).toMatchObject({ ok: true, ast });
   });
   it.each([
     ['unknown policy', 'later', 'No answer', '/whenUnavailable'],
@@ -73,6 +73,28 @@ describe.each(['read', 'expr'] as const)('shared %s text slots', type => {
     const budget = measureBudget(ast, anchor, { kind: 'slot' });
     expect(budget.accepted).toBe(false);
     expect(budget.compilerIssues[0].pointer).toBe(pointer);
+  });
+});
+
+describe('fragment capability requirements', () => {
+  it.each<{ kind: 'operand' | 'condition' | 'call'; ast: Json; base: string[] }>([
+    { kind: 'operand' as const, ast: scalar(), base: [] },
+    { kind: 'condition' as const, ast: { type: 'compare', op: 'eq', left: scalar(), right: scalar() }, base: ['sh.conditions@1'] },
+    { kind: 'call' as const, ast: { type: 'call-service', domain: 'light', service: 'turn_on', data: { type: 'object', fields: {} } }, base: ['sh.call-service@1'] },
+  ])('requires operands used inside a $kind and reports them in its budget', ({ kind, ast, base }) => {
+    const graph = lift(ast, { kind }).graph;
+    expect(lower(graph, { targetCapabilities: base })).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'unsupported_capability', capability: 'sh.operands@1' })]) });
+    expect(lower(graph, { targetCapabilities: [...base, 'sh.operands@1'] }).ok).toBe(true);
+    expect(measureBudget(ast, anchor, { kind }).capabilities).toEqual([...base, 'sh.operands@1'].sort());
+  });
+  it('does not invent operand requirements for a predicate or call that uses none', () => {
+    for (const [ast, kind, capabilities] of [
+      [{ type: 'viewer', isAdmin: true }, 'condition', []],
+      [{ type: 'call-service', domain: 'light', service: 'turn_on' }, 'call', ['sh.call-service@1']],
+    ] as const) {
+      expect(lower(lift(ast, { kind }).graph, { targetCapabilities: capabilities }).ok).toBe(true);
+      expect(measureBudget(ast, anchor, { kind }).capabilities).not.toContain('sh.operands@1');
+    }
   });
 });
 

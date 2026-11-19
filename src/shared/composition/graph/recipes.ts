@@ -6,7 +6,7 @@ import type { CompositionIssue } from '../json';
 import { elementOf, isAssignable, withoutNull } from '../pipeline/shape';
 import { requestShape } from '../pipeline/sources';
 import { newFacts, typeOperand, typeSteps } from '../pipeline/typing';
-import { checkGraphPipeline, AVERAGE_CAPABILITY, graphInputsSchema } from './capabilities';
+import { checkGraphPipeline, AVERAGE_CAPABILITY, expressionCapabilities, graphInputsSchema } from './capabilities';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record } from './json';
 import type { GraphBudget, GraphDiagnostic, GraphPipelineInputs, GraphPipelineSource, GraphSourceLocation, Immutable, LogicAnchor, TemplateAst } from './types';
@@ -30,7 +30,7 @@ function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], c
   const issues: CompositionIssue[] = [...facts.issues];
   for (const [index, source] of sources.entries()) issues.push(...checkGraphPipeline(source, `/dataSources/${index}`).issues);
   if (issues.length) return { ok: false, errors: issues.map(issue => ({ severity: 'error', code: issue.code, pointer: issue.pointer, anchor: recipeAnchor, message: `Recipe does not fit the existing grammar: ${issue.code}.` })) };
-  const required = [...new Set([...capabilities, ...[...facts.needs].map(name => `sh.${name}@1`), ...(facts.usedOperands ? ['sh.operands@1'] : [])])].sort();
+  const required = [...new Set([...capabilities, ...expressionCapabilities(facts)])].sort();
   const budgets = [
     measureBudget(ast, recipeAnchor, { capabilities: required }),
     ...sources.map(source => measureBudget(source, { kind: 'flow', id: source.id, field: '' }, { kind: 'flow', capabilities: checkGraphPipeline(source, '').capabilities })),

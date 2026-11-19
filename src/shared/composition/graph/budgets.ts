@@ -8,7 +8,7 @@ import { PIPELINE_BUDGET } from '../pipeline/evaluate';
 import { PIPELINE_LIMITS } from '../pipeline/schema';
 import { newFacts, typeOperand, typeWhere } from '../pipeline/typing';
 import { conditional } from '../slots';
-import { checkGraphPipeline, graphInputsSchema, graphSourceSchema, graphTextSlotSchema } from './capabilities';
+import { checkGraphPipeline, expressionCapabilities, graphInputsSchema, graphSourceSchema, graphTextSlotSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
 import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
 import { record, withoutCanvasMetadata } from './json';
 import type { BudgetMeter, GraphBudget, LogicAnchor } from './types';
@@ -76,7 +76,7 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
           const facts = kind === 'operand'
             ? checkOperand(parseCompositionShape(operandBase, value), at, options.allowControl, false, options.itemScope)
             : checkPredicate(parseCompositionShape(predicateBase, value), at, false, options.itemScope);
-          report(facts.issues); facts.needs.forEach(need => capabilities.add(`sh.${need}@1`));
+          report(facts.issues); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
         }
         return;
       }
@@ -84,7 +84,8 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
         unknownScope(at, MAX_CALL_NODES);
         if (validate) {
           const facts = checkCallService(parseCompositionShape(callServiceSchema, value), at, options.allowControl ?? false, options.itemScope);
-          report(facts.issues); facts.needs.forEach(need => capabilities.add(`sh.${need}@1`));
+          report(facts.issues); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
+          capabilities.add('sh.call-service@1');
         }
         return;
       }
@@ -99,9 +100,14 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
         flow = true;
       }
       if (kind === 'slot' && record(value) && value.type === 'read') {
+        if (Object.hasOwn(value, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
         const { fallback: _fallback, whenUnavailable: _policy, ...operand } = value;
         walk(operand, 'operand', at, validate);
         return;
+      }
+      if (kind === 'slot' && record(value)) {
+        if (['expr', 'conditional', 'bound-symbol'].includes(String(value.type))) capabilities.add('sh.rules@1');
+        if (Object.hasOwn(value, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
       }
       const description = describeGrammar(value, kind);
       if (validate && description.payload.kind === 'opaque') { report([{ code: 'unknown_variant', pointer: at }]); return; }
