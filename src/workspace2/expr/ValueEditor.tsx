@@ -15,6 +15,8 @@ import { fixedOf, modeOf, rulesOf, seedRules, toSlot, type Kind, type Mode, type
 import { slotOperand, wordingFor01, type Part } from './tokens';
 import { words } from './words';
 import SaveAsLogic from '../data/logic/SaveLogicDialog';
+import { SelectMenu } from '../SelectMenu';
+import { useLogicScope } from '../data/logic/logicScope';
 
 type Slot = { type: string } & Record<string, unknown>;
 /** The words a Fixed field shows for a slot: its own text, or the text of a literal operand; nothing for logic that is not a plain value (a use, a rule, a read). */
@@ -46,6 +48,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   draft: Draft; path: EditorPath; kind: Kind; modes: readonly ValueMode[]; look?: LookKind; label: string; initialMode?: ValueMode; maxLength?: number;
 }) {
   const document = useDraftDocument(draft);
+  const logicScope = useLogicScope();
   const slot = valueAt(document, path) as Slot | undefined;
   const key = path.join('/'), memo = memoOf(draft, key);
   const derived = modeOf(slot, kind);
@@ -94,6 +97,24 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     {mode === 'entity' && kind === 'text' && <FromEntity draft={draft} path={path} label={label} onWording={wording}/>}
     {mode === 'entity' && kind !== 'text' && <LookFromEntity draft={draft} path={path} kind={kind} look={look ?? 'fill'} label={label}/>}
     {mode === 'rules' && <RulesList draft={draft} path={path} kind={kind} look={look} label={label}/>}
+    {kind === 'text' && !logicScope && slot && (slot.type === 'read' || slot.type === 'expr') && <div data-testid="text-unavailable">
+      <div className="w2-picker-row" data-stacked data-field-path={`${key}/fallback`}><span className="w2-row-label">{words.ifUnavailable}</span>
+        <TextInput label={words.ifUnavailable} value={typeof slot.fallback === 'string' ? slot.fallback : ''} placeholder="The node's own text" maxLength={maxLength ?? 2000}
+          onCommit={text => {
+            const { fallback: _gone, ...rest } = valueAt(draft.get(), path) as Slot;
+            draft.set(replaceAt(draft.get(), path, (text ? { ...rest, fallback: text } : rest) as unknown as Json), `fallback:${key}`);
+          }}/>
+        <p className="w2-caption">{words.ifUnavailableNote}</p>
+      </div>
+      <div className="w2-picker-row" data-stacked data-field-path={`${key}/whenUnavailable`}><span className="w2-row-label">While unavailable</span>
+        <SelectMenu label="While unavailable" value={typeof slot.whenUnavailable === 'string' ? slot.whenUnavailable : 'fallback'} options={[{ value: 'fallback', label: 'Show fallback' }, { value: 'keep', label: 'Keep last' }]}
+          onChange={next => {
+            const { whenUnavailable: _gone, ...rest } = valueAt(draft.get(), path) as Slot;
+            draft.set(replaceAt(draft.get(), path, (next === 'keep' ? { ...rest, whenUnavailable: 'keep' } : rest) as unknown as Json));
+          }}/>
+        <p className="w2-caption">Keep last needs a newer app. Until the first answer, the fallback is shown.</p>
+      </div>
+    </div>}
     <TryValues document={document} inputs={unique}/>
   </div>;
 }

@@ -13,6 +13,8 @@ import { ToastHost } from '../src/workspace2/toasts';
 import ValueEditor from '../src/workspace2/expr/ValueEditor';
 import type { Draft } from '../src/workspace2/editors/draft';
 import type { TextSlot } from '../src/shared/composition/evaluator';
+import { LogicScopeProvider } from '../src/workspace2/data/logic/logicScope';
+import type { Operand } from '../src/shared/composition/expression';
 
 afterEach(cleanup);
 
@@ -41,8 +43,8 @@ async function duplicate() {
   await act(async () => { fireEvent.click(await screen.findByRole('menuitem', { name: 'Duplicate' })); });
 }
 
-describe.each(['read', 'expr'] as const)('editing a %s text slot', kind => {
-  it('preserves fallback and keep when writing text and editing a token', () => {
+describe('editing text slots', () => {
+  it.each(['read', 'expr'] as const)('preserves %s fallback and keep when writing text and editing a token', kind => {
     const slot = kind === 'read' ? { ...operand, ...settings } : { type: 'expr' as const, value: operand, ...settings };
     const base = compileCompositionDocument(fixture.document).document;
     const node: CompositionNode = { id: 'keep-text', title: 'Reading', type: 'text', layout: { span: 1 }, props: { value: slot, style: 'body', unavailableText: 'Unknown' } };
@@ -75,6 +77,36 @@ describe.each(['read', 'expr'] as const)('editing a %s text slot', kind => {
       fireEvent.click(screen.getByRole('button', { name: 'Remove Rule' }));
       expectKept(draft);
       expect(valueAt(draft.get(), [...path, 'value', 'cases'])).toHaveLength(2);
+    });
+
+    describe('shared text unavailable controls', () => {
+      const expressions: Operand[] = [
+        { type: 'format', pattern: '{v} now', args: { v: operand } },
+        choose,
+        { type: 'literal', value: 'Fixed' },
+        { type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] },
+      ];
+      it.each<TextSlot>([operand, ...expressions.map(value => ({ type: 'expr' as const, value }))])('shows the policy on $type / $value.type and edits fallback without changing the operand', slot => {
+        const draft = draftWith({ ...slot, ...settings });
+        mount(draft);
+        const policy = screen.getByRole('combobox', { name: 'While unavailable' });
+        expect(policy.textContent).toBe('Keep last');
+        const fallback = screen.getByRole('textbox', { name: 'If unavailable' });
+        expect(fallback).toHaveProperty('value', 'No reading');
+        fireEvent.change(fallback, { target: { value: 'Waiting' } });
+        fireEvent.blur(fallback);
+        expect(valueAt(draft.get(), path)).toEqual({ ...slot, fallback: 'Waiting', whenUnavailable: 'keep' });
+        expect(compileCompositionDocument(draft.get()).capabilities).toContain('sh.text-keep@1');
+      });
+
+      it('does not offer slot-only settings on a literal slot or a template operand body', () => {
+        mount(draftWith({ type: 'literal', value: 'Fixed' }));
+        expect(screen.queryByRole('combobox', { name: 'While unavailable' })).toBeNull();
+        cleanup();
+        const draft = draftWith({ type: 'expr', value: choose });
+        render(<LogicScopeProvider value={{ entryId: 'template' }}><ValueEditor draft={draft} path={path} kind="text" modes={['fixed', 'entity', 'rules']} label="Reading"/></LogicScopeProvider>);
+        expect(screen.queryByRole('combobox', { name: 'While unavailable' })).toBeNull();
+      });
     });
 
     it('keeps settings across rules, token and fixed modes, including literal-only contents', () => {
