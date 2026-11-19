@@ -127,26 +127,30 @@ export interface BudgetMeter {
 }
 export interface GraphBudget {
   readonly anchor: LogicAnchor;
-  readonly nodes: number;
-  readonly depth: number;
-  readonly conditions: readonly { readonly pointer: string; readonly nodes: number; readonly depth: number; readonly astNodes: number; readonly astDepth: number }[];
+  readonly nodes: number | null;
+  readonly depth: number | null;
+  readonly conditions: readonly { readonly pointer: string; readonly nodes: number | null; readonly depth: number | null; readonly astNodes: number | null; readonly astDepth: number | null }[];
   readonly scopes: readonly {
     readonly id: string;
     readonly kind: 'expression' | 'predicate';
     readonly pointer: string;
-    readonly nodes: number;
-    readonly depth: number;
+    readonly nodes: number | null;
+    readonly depth: number | null;
     readonly nodeLimit: number;
     readonly depthLimit: number;
     readonly entries: readonly string[];
-    readonly nodeAccounting: 'compiler' | 'contextual-walk';
+    readonly nodeAccounting: 'compiler' | 'unavailable';
   }[];
-  readonly counterResets: readonly { readonly pointer: string; readonly kind: 'choose' | 'count' | 'confirmation' | 'restore'; readonly scopeId?: string }[];
-  readonly cases: number;
-  readonly steps: number;
+  readonly counterResets: readonly { readonly pointer: string; readonly kind: 'choose' | 'count' | 'confirmation' | 'restore'; readonly scopeId?: string }[] | null;
+  readonly cases: number | null;
+  readonly steps: number | null;
   readonly capabilities: readonly string[];
-  readonly duplicatedUseCost: number;
-  readonly generatedFlowCount: number;
+  readonly duplicatedUseCost: number | null;
+  readonly generatedFlowCount: number | null;
+  readonly accepted: boolean;
+  readonly compilerIssues: readonly CompositionIssue[];
+  readonly accounting: 'partial' | 'unavailable';
+  readonly accountingUnavailableReason: string;
   readonly runtimeLimit: number;
   readonly meters: readonly BudgetMeter[];
   readonly compactVisible: boolean;

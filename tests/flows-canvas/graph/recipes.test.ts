@@ -24,7 +24,7 @@ describe('explicit For Each and strict arithmetic recipes', () => {
     const result = value(lowerForEach({ ...recipe, selection: ['a', 'b', 'c', 'd', 'e'].map(letter => ({ sourceId: `light-${letter}` })) }));
     expect(result.ast).toEqual(downstairsLights);
     expect(result.sources).toEqual([]);
-    expect(result.budgets[0]).toMatchObject({ nodes: 6, depth: 2 });
+    expect(result.budgets[0]).toMatchObject({ nodes: null, depth: null, accepted: true });
     const duplicate = value(lowerForEach({ ...fixed(2), selection: [{ sourceId: 'light-0' }, { sourceId: 'light-0' }] }));
     expect(evaluateOperand(operandBase.parse(duplicate.ast), { read: () => ({ status: 'value', value: 'on' }) })).toEqual({ status: 'value', value: 2 });
     expect(evaluateOperand(operandBase.parse(duplicate.ast), { read: () => ({ status: 'value', value: 'unavailable' }) })).toEqual({ status: 'value', value: 0 });
@@ -34,26 +34,26 @@ describe('explicit For Each and strict arithmetic recipes', () => {
   it('uses explicit count comparisons for Any/All and viewer-eligible denominators', () => {
     for (const reducer of ['any', 'all'] as const) {
       const result = value(lowerForEach(fixed(3, reducer)));
-      expect(result.budgets[0].nodes).toBe(6);
+      expect(result.budgets[0].accepted).toBe(true);
       expect(evaluatePredicate(predicateBase.parse(result.ast), { read: () => ({ status: 'value', value: 'on' }) })).toBe('yes');
     }
     const result = value(lowerForEach({ ...fixed(1, 'all'), selection: [{ sourceId: 'light-0', viewer: { personEntityIds: ['person.demo'] } }] }));
     expect(result.ast).toMatchObject({ type: 'compare', right: { type: 'count' } });
-    expect(evaluatePredicate(predicateBase.parse(result.ast), { read: () => ({ status: 'value', value: 'off' }), viewer: { personEntityId: 'person.someone_else' } })).toBe('yes');
+    expect(evaluatePredicate(predicateBase.parse(result.ast), { read: () => ({ status: 'value', value: 'off' }), viewer: { personEntityId: 'person.demo_someone_else' } })).toBe('yes');
     expect(evaluatePredicate(predicateBase.parse(result.ast), { read: () => ({ status: 'value', value: 'off' }) })).toBe('unknown');
   });
   it('rejects larger/empty fixed selections, oversized expansion and silently converting duplicate entities', () => {
     expect(lowerForEach(fixed(0)).ok).toBe(false);
     expect(lowerForEach(fixed(33))).toMatchObject({ ok: false });
     expect(lowerForEach({ ...fixed(32), test: { type: 'not', of: fixed(1).test } })).toMatchObject({ ok: false });
-    expect(lowerForEach({ mode: 'flow', id: 'lights', entityIds: ['light.a', 'light.a'], attributes: [], reducer: 'count' })).toMatchObject({ ok: false });
-    const large = value(lowerForEach({ mode: 'flow', id: 'lights', entityIds: Array.from({ length: 64 }, (_, i) => `light.e_${i}`), attributes: [], reducer: 'all' }));
+    expect(lowerForEach({ mode: 'flow', id: 'lights', entityIds: ['light.demo_a', 'light.demo_a'], attributes: [], reducer: 'count' })).toMatchObject({ ok: false });
+    const large = value(lowerForEach({ mode: 'flow', id: 'lights', entityIds: Array.from({ length: 64 }, (_, i) => `light.demo_e_${i}`), attributes: [], reducer: 'all' }));
     expect(large.sources).toHaveLength(2);
     for (const source of large.sources) expect(checkGraphPipeline(source, '').issues).toEqual([]);
   });
   it('strict fixed averages do not skip missing inputs or coerce text sockets', () => {
     const result = value(averageFixed([{ type: 'literal', value: 23.6 }, { type: 'literal', value: 25 }]));
-    expect(result.budgets[0].nodes).toBe(5);
+    expect(result.budgets[0].accepted).toBe(true);
     expect(evaluateOperand(operandBase.parse(result.ast), env)).toEqual({ status: 'value', value: 24.3 });
     expect(averageFixed([{ type: 'literal', value: '2' }, { type: 'literal', value: 4 }]).ok).toBe(false);
     const missing = value(averageFixed([{ type: 'read', from: { type: 'source', sourceId: 'temp', path: ['state'] }, as: 'number', missing: 'unavailable' }, { type: 'literal', value: 4 }]));
@@ -97,7 +97,7 @@ describe('G-average target-gated step and exact two-flow fallback', () => {
     expect(result.sources[0].inputs.steps[0]).toEqual(result.sources[1].inputs.steps[0]);
     expect(result.sources.map(source => source.inputs.steps.length)).toEqual([2, 3]);
     expect(result.sources[1].inputs.steps.slice(-2)).toEqual([{ id: 'valid', op: 'filter', where: { type: 'exists', value: item } }, { id: 'count', op: 'count' }]);
-    expect(result.budgets[0].generatedFlowCount).toBe(2);
+    expect(result.budgets[0].generatedFlowCount).toBeNull();
   });
   it.each<{ rows: Json[]; expected: number | null }>([
     { rows: [], expected: null },

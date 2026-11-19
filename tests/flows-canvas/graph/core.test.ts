@@ -19,7 +19,7 @@ const flow = (steps = 1, entities = 1) => ({
   id: 'flow', kind: 'model', model: 'pipeline@1',
   inputs: {
     title: 'Flow', parameters: [],
-    request: { type: 'entities', entityIds: Array.from({ length: entities }, (_, i) => ({ type: 'literal', value: `light.e_${i}` })), attributes: [] },
+    request: { type: 'entities', entityIds: Array.from({ length: entities }, (_, i) => ({ type: 'literal', value: `light.demo_e_${i}` })), attributes: [] },
     steps: [...Array.from({ length: steps - 1 }, (_, i) => ({ id: `step-${i}`, op: 'limit', count: 100 })), { id: 'count', op: 'count' }],
     output: { kind: 'scalar' }, schema: { kind: 'number' },
   },
@@ -66,45 +66,47 @@ describe('G-limits exact existing boundaries', () => {
     const choose: Operand = { type: 'choose', cases: [{ when, then: scalar() }], otherwise: scalar() };
     const count: Operand = { type: 'count', of: [{ test: when }] };
     const filtered = filterFlow(when);
-    for (const [ast, kind, nodes, depth, visible] of [
-      [choose, 'operand', 52, 4, true],
-      [count, 'operand', 50, 4, true],
-      [filtered, 'flow', 49, 3, false],
+    for (const [ast, kind] of [
+      [choose, 'operand'],
+      [count, 'operand'],
+      [filtered, 'flow'],
     ] as const) {
       expect(allowed(ast, kind)).toBe(true);
       const budget = measureBudget(ast, anchor, { kind });
-      expect(budget).toMatchObject({ nodes, depth, compactVisible: visible });
-      expect(budget.conditions[0]).toMatchObject({ nodes: 17, depth: 2, astNodes: 49, astDepth: 3 });
-      expect(budget.scopes.find(scope => scope.kind === 'predicate')).toMatchObject({ nodes: 17, depth: 2, nodeLimit: 32, depthLimit: 6 });
-      if (kind === 'flow') expect(budget.scopes.every(scope => scope.nodeAccounting === 'compiler')).toBe(true);
+      expect(budget).toMatchObject({ accepted: true, nodes: null, depth: null, compactVisible: false });
+      if (kind === 'flow') {
+        expect(budget.conditions[0]).toMatchObject({ nodes: 17, depth: null, astNodes: null, astDepth: null });
+        expect(budget.scopes.find(scope => scope.kind === 'predicate')).toMatchObject({ nodes: 17, nodeLimit: 32, nodeAccounting: 'compiler' });
+      } else expect(budget.accounting).toBe('unavailable');
     }
   });
   it.each([
-    ['base', 'condition', true, 35, 3],
-    ['early', 'condition', false, 40, 5],
-    ['outerBase', 'operand', false, 38, 4],
-    ['outerLater', 'operand', true, 43, 6],
-  ] as const)('meter matches compiler for CHK-nested-choose-budget %s', (name, kind, accepted, nodes, depth) => {
+    ['base', 'condition', true],
+    ['early', 'condition', false],
+    ['outerBase', 'operand', false],
+    ['outerLater', 'operand', true],
+  ] as const)('meter matches compiler for CHK-nested-choose-budget %s', (name, kind, accepted) => {
     const ast: Json = JSON.parse(JSON.stringify(predicateBudgetFixtures[name]));
     const native = kind === 'condition' ? checkPredicate(predicateBase.parse(ast), '') : checkOperand(operandBase.parse(ast), '');
     const budget = measureBudget(ast, anchor, { kind });
     const lowered = lower(lift(ast, { kind, anchor }).graph);
     expect(native.issues.length === 0).toBe(accepted);
     expect(lowered.ok).toBe(accepted);
-    expect(budget).toMatchObject({ nodes, depth });
+    expect(budget).toMatchObject({ accepted, nodes: null, depth: null, counterResets: null, accounting: 'unavailable' });
+    expect(budget.compilerIssues).toEqual(native.issues);
     expect(budget.firstExceedingPointer).toBe(native.issues.find(issue => issue.code === 'limit_exceeded')?.pointer);
-    expect(budget.meters.some(meter => meter.exceeded)).toBe(!accepted);
+    expect(budget.compactVisible).toBe(!accepted);
     if (name === 'early') expect(budget.firstExceedingPointer).toBe('/of/1/of/15');
-    if (name === 'outerLater') {
-      expect(budget.scopes.filter(scope => scope.kind === 'predicate').map(scope => scope.nodes)).toEqual([20, 16]);
-      expect(budget.counterResets.map(reset => reset.kind)).toEqual(['choose', 'choose']);
-    }
+    expect(budget.meters).toEqual([]);
+    expect(budget.accountingUnavailableReason).toContain('Owner follow-up');
   });
   it.each([[32, true], [33, false]] as const)('flow predicates %i use predicate-only counters accepted=%s', (nodes, expected) => {
     const source = filterFlow(comparisons(nodes));
     const budget = measureBudget(source, anchor, { kind: 'flow' });
     expect(allowed(source, 'flow')).toBe(expected);
-    expect(budget.conditions[0].nodes).toBe(nodes);
+    expect(budget.accepted).toBe(expected);
+    if (expected) expect(budget.conditions[0].nodes).toBe(nodes);
+    else expect(budget.conditions).toEqual([]);
     expect(budget.scopes.filter(scope => scope.kind === 'expression').every(scope => scope.nodes === 1)).toBe(true);
   });
   it.each([[6, true], [7, false]] as const)('flow predicate depth %i uses a separate depth accepted=%s', (depth, expected) => {
@@ -118,7 +120,7 @@ describe('G-limits exact existing boundaries', () => {
     const filtered = filterFlow(when);
     expect(allowed(filtered, 'flow')).toBe(true);
     const budget = measureBudget(filtered, anchor, { kind: 'flow' });
-    expect(budget.nodes).toBeGreaterThan(64);
+    expect(budget).toMatchObject({ nodes: null, accepted: true, accounting: 'partial' });
     expect(budget.firstExceedingPointer).toBeUndefined();
     expect(allowed({ type: 'choose', cases: [{ when, then: scalar() }], otherwise: scalar() }, 'operand')).toBe(false);
   });
@@ -126,28 +128,28 @@ describe('G-limits exact existing boundaries', () => {
     const call: CallService = {
       type: 'call-service', domain: 'light', service: 'turn_on',
       data: { type: 'object', fields: Object.fromEntries(Array.from({ length: 63 }, (_, i) => [`f${i}`, scalar()])) },
-      target: { entity_id: { type: 'list', items: Array.from({ length: nodes - 65 }, (_, i) => ({ type: 'literal', value: `light.e_${i}` })) } },
+      target: { entity_id: { type: 'list', items: Array.from({ length: nodes - 65 }, (_, i) => ({ type: 'literal', value: `light.demo_e_${i}` })) } },
     };
     const result = lower(lift(call, { kind: 'call', anchor }).graph);
     expect(result.ok).toBe(expected);
     expect(checkCallService(call, '', false).issues.length === 0).toBe(expected);
     const budget = measureBudget(call, anchor, { kind: 'call' });
-    expect(budget).toMatchObject({ nodes, depth: 2 });
-    expect(budget.scopes).toMatchObject([{ kind: 'expression', nodes, nodeLimit: 128, entries: ['/data', '/target/entity_id'] }]);
+    expect(budget).toMatchObject({ nodes: null, depth: null, accepted: expected });
+    expect(budget.scopes).toMatchObject([{ kind: 'expression', nodes: null, nodeLimit: 128, nodeAccounting: 'unavailable' }]);
   });
   it('keeps standalone look rules above 32 AST nodes in the document-predicate context', () => {
     const ast: Json = { type: 'conditional', cases: [{ when: comparisons(17), then: { type: 'literal-look', color: 'red' } }], otherwise: { type: 'literal-look', color: 'blue' } };
     const result = lower(lift(ast, { kind: 'slot', anchor }).graph);
     expect(result.ok).toBe(true);
-    expect(measureBudget(ast, anchor, { kind: 'slot' }).scopes).toMatchObject([{ kind: 'expression', nodes: 49, nodeLimit: 64 }]);
+    expect(measureBudget(ast, anchor, { kind: 'slot' })).toMatchObject({ accepted: true, accounting: 'unavailable' });
   });
   it.each([[64, true], [65, false]] as const)('field expression %i nodes accepted=%s', (nodes, expected) => {
     const ast: Operand = { type: 'list', items: Array.from({ length: nodes - 1 }, () => scalar()) };
-    expect(measureBudget(ast, anchor).nodes).toBe(nodes);
+    expect(measureBudget(ast, anchor)).toMatchObject({ nodes: null, accepted: expected });
     expect(allowed(ast, 'operand')).toBe(expected);
   });
   it.each([[8, true], [9, false]] as const)('standalone predicate depth %i accepted=%s', (depth, expected) => {
-    expect(measureBudget(nots(depth), anchor, { kind: 'condition' }).depth).toBe(depth);
+    expect(measureBudget(nots(depth), anchor, { kind: 'condition' })).toMatchObject({ depth: null, accepted: expected });
     expect(allowed(nots(depth), 'condition')).toBe(expected);
   });
   it('keeps standalone predicates at 64/8 instead of globally imposing 32/6', () => {
@@ -163,7 +165,7 @@ describe('G-limits exact existing boundaries', () => {
     ] as const) {
       const mutable: Json = JSON.parse(JSON.stringify(ast));
       expect(allowed(mutable, 'operand')).toBe(expected);
-      expect(measureBudget(mutable, anchor).conditions[0].nodes).toBe(nodes);
+      expect(measureBudget(mutable, anchor).accepted).toBe(expected);
     }
   });
   it.each([[6, true], [7, false]] as const)('embedded condition depth %i accepted=%s', (depth, expected) => {
@@ -172,32 +174,41 @@ describe('G-limits exact existing boundaries', () => {
   it.each([[16, true], [17, false]] as const)('choose cases %i accepted=%s', (count, expected) => {
     expect(allowed({ type: 'choose', cases: Array.from({ length: count }, () => ({ when: state(), then: scalar() })), otherwise: scalar() }, 'operand')).toBe(expected);
   });
+  it.each([[16, true], [17, false]] as const)('conditional slot cases %i use the native schema accepted=%s', (count, accepted) => {
+    const ast = { type: 'conditional', cases: Array.from({ length: count }, () => ({ when: state(), then: { type: 'literal-look', color: 'red' } })), otherwise: { type: 'literal-look', color: 'blue' } };
+    expect(lower(lift(ast, { kind: 'slot' }).graph).ok).toBe(accepted);
+    expect(measureBudget(ast, anchor, { kind: 'slot' }).accepted).toBe(accepted);
+  });
   it.each([[32, true], [33, false]] as const)('count entries %i accepted=%s', (count, expected) => {
     expect(allowed({ type: 'count', of: Array.from({ length: count }, () => ({ test: state() })) }, 'operand')).toBe(expected);
   });
   it.each([[32, true], [33, false]] as const)('flow steps %i accepted=%s', (count, expected) => {
     expect(allowed(flow(count), 'flow')).toBe(expected);
-    expect(measureBudget(flow(count), anchor, { kind: 'flow' }).meters.find(meter => meter.kind === 'steps')?.used).toBe(count);
+    expect(measureBudget(flow(count), anchor, { kind: 'flow' }).accepted).toBe(expected);
   });
   it.each([[64, true], [65, false]] as const)('entities %i accepted=%s', (count, expected) => {
     expect(allowed(flow(1, count), 'flow')).toBe(expected);
-    expect(measureBudget(flow(1, count), anchor, { kind: 'flow' }).meters.find(meter => meter.kind === 'entities')?.used).toBe(count);
+    expect(measureBudget(flow(1, count), anchor, { kind: 'flow' }).accepted).toBe(expected);
   });
   it.each([[8, true], [9, false]] as const)('flow parameters %i accepted=%s', (count, expected) => {
     const source = pipelineSourceSchema.parse(flow());
     source.inputs.parameters = Array.from({ length: count }, (_, i) => ({ name: `param_${i}`, type: 'number', value: scalar(i) }));
     expect(allowed(source, 'flow')).toBe(expected);
-    expect(measureBudget(source, anchor, { kind: 'flow' }).meters.find(meter => meter.kind === 'parameters')).toMatchObject({ used: count, limit: 8 });
+    expect(measureBudget(source, anchor, { kind: 'flow' }).accepted).toBe(expected);
   });
   it.each([[16, true], [17, false]] as const)('All/Any inputs %i accepted=%s', (count, expected) => {
     for (const type of ['all', 'any'] as const) expect(allowed({ type, of: Array.from({ length: count }, state) }, 'condition')).toBe(expected);
   });
-  it.each([128, 129])('counts %i materialized flow sources against their separate limit', count => {
-    const document = { dataSources: Array.from({ length: count }, (_, i) => ({ ...flow(), id: `flow-${i}` })) };
-    expect(measureBudget(document, anchor, { kind: 'document' }).meters.find(meter => meter.kind === 'flow-sources')).toMatchObject({ used: count, limit: 128, exceeded: count > 128 });
-  });
   it.each([[48, 64, false], [49, 64, true], [96, 128, false], [97, 128, true], [24, 32, false], [25, 32, true], [6, 8, false], [7, 8, true], [4, 6, false], [5, 6, true], [12, 16, false], [13, 16, true]] as const)('meter %i/%i visible=%s', (used, limit, visible) => {
     expect(budgetMeter('test', used, limit)).toMatchObject({ used, limit, ratio: used / limit, visible, exceeded: used > limit });
+  });
+  it.each([[48, false], [49, true]] as const)('derives the %i/64 flow meter directly from the checker counter', (nodes, visible) => {
+    const source = pipelineSourceSchema.parse(flow());
+    source.inputs.request = { type: 'none', value: { type: 'list', items: Array.from({ length: nodes - 1 }, () => scalar()) } };
+    const budget = measureBudget(source, anchor, { kind: 'flow' });
+    expect(budget.accepted).toBe(true);
+    expect(budget.scopes[0]).toMatchObject({ nodes, depth: null, nodeAccounting: 'compiler' });
+    expect(budget.meters[0]).toMatchObject({ used: nodes, limit: 64, ratio: nodes / 64, visible });
   });
   it('exposes exact first exceeding node pointers', () => {
     const budget = measureBudget({ type: 'list', items: Array.from({ length: 64 }, () => scalar()) }, anchor);
@@ -249,7 +260,7 @@ describe('typed connections, structural refusals and fan-out', () => {
     const result = lower(changed);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.budgets[0]).toMatchObject({ nodes: 7, depth: 3, duplicatedUseCost: 3 });
+      expect(result.budgets[0]).toMatchObject({ nodes: null, depth: null, duplicatedUseCost: null, accepted: true });
       expect(result.sourceMap.filter(origin => origin.nodeId === first.from.nodeId && (origin.pointer === '/args/0' || origin.pointer === '/args/1'))).toHaveLength(2);
     }
   });

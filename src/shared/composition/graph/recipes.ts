@@ -32,7 +32,7 @@ function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], c
   if (issues.length) return { ok: false, errors: issues.map(issue => ({ severity: 'error', code: issue.code, pointer: issue.pointer, anchor: recipeAnchor, message: `Recipe does not fit the existing grammar: ${issue.code}.` })) };
   const required = [...new Set([...capabilities, ...[...facts.needs].map(name => `sh.${name}@1`), ...(facts.usedOperands ? ['sh.operands@1'] : [])])].sort();
   const budgets = [
-    measureBudget(ast, recipeAnchor, { capabilities: required, generatedFlowCount: sources.length }),
+    measureBudget(ast, recipeAnchor, { capabilities: required }),
     ...sources.map(source => measureBudget(source, { kind: 'flow', id: source.id, field: '' }, { kind: 'flow', capabilities: checkGraphPipeline(source, '').capabilities })),
   ];
   const sourceMap: GraphSourceLocation[] = [];

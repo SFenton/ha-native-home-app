@@ -1,8 +1,10 @@
 import type { Json } from '../../types';
+import { z } from 'zod/v4';
 import { compileCompositionDocument, parseCompositionShape } from '../compiler';
 import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, type CompositionIssue } from '../json';
 import { expandLogic, type LogicEntry } from '../logic-library';
+import { conditional } from '../slots';
 import { AVERAGE_CAPABILITY, checkGraphPipeline, graphInputsSchema, graphSourceSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record, replaceAt, withoutCanvasMetadata } from './json';
@@ -66,6 +68,7 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
     let expanded = value;
     const report = (issue: CompositionIssue) => errors.push(diagnostic(issue, root, sourceMap));
     const check = (candidate: Json, kind: FragmentKind, at = '', itemScope = options.itemScope): void => {
+      if (kind === 'slot' && record(candidate) && candidate.type === 'conditional') parseCompositionShape(conditional(z.json()), candidate);
       if (kind === 'operand') {
         const facts = checkOperand(parseCompositionShape(operandBase, candidate), at, root.destination.allowControl, false, itemScope);
         facts.issues.forEach(report); facts.needs.forEach(name => capabilities.add(`sh.${name}@1`));
@@ -131,7 +134,7 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
     }
     const budget = measureBudget(expanded, root.anchor, {
       kind: root.destination.kind === 'flow' && record(expanded) && expanded.model !== 'pipeline@1' ? 'flow-inputs' : root.destination.kind,
-      capabilities: [...capabilities], duplicatedUseCost: duplicateCost(graph), generatedFlowCount: 0,
+      capabilities: [...capabilities], itemScope: options.itemScope, allowControl: root.destination.allowControl,
     });
     for (const dependency of dependencies) {
       const pending = [dependency.to], seen = new Set<string>();
@@ -145,8 +148,6 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
       }
     }
     budgets.push(budget);
-    const structural = budget.meters.find(meter => meter.exceeded && !/^(expression|predicate)-/.test(meter.kind));
-    if (structural && !errors.some(error => error.anchor === root.anchor && error.code === 'limit_exceeded')) report({ code: 'limit_exceeded', pointer: structural.pointer });
   });
   if (errors.length) return { ok: false, original: graph.original, errors, budgets };
   return {
@@ -162,13 +163,4 @@ export function semanticFingerprint(graph: LogicGraph): string {
 function diagnostic(issue: CompositionIssue, root: GraphRoot, sourceMap: readonly GraphSourceLocation[] = []): GraphDiagnostic {
   const origin = sourceMap.find(location => location.anchor === root.anchor && location.pointer === issue.pointer);
   return { severity: 'error', code: issue.code, message: `Graph lowering refused: ${issue.code}.`, anchor: root.anchor, pointer: issue.pointer, ...(origin ? { nodeId: origin.nodeId, portId: origin.portId } : {}), ...(issue.capability ? { capability: issue.capability } : {}) };
-}
-function duplicateCost(graph: LogicGraph): number {
-  const occurrences = new Map<string, number>();
-  const visit = (id: string) => {
-    occurrences.set(id, (occurrences.get(id) ?? 0) + 1);
-    graph.edges.filter(edge => edge.to.nodeId === id).forEach(edge => visit(edge.from.nodeId));
-  };
-  graph.roots.forEach(root => visit(root.nodeId));
-  return graph.nodes.reduce((total, node) => total + (node.payload.kind === 'operand' || node.payload.kind === 'condition' ? Math.max(0, (occurrences.get(node.id) ?? 0) - 1) : 0), 0);
 }

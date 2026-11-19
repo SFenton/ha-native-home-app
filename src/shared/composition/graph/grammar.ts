@@ -152,7 +152,7 @@ export function describeGrammar(value: Json, hint: FragmentKind = 'auto'): Gramm
     if (record(value.target)) Object.keys(value.target).forEach(key => take(join('', 'target', key), 'operand'));
     take('/confirmation/when', 'condition');
     let skeleton: Json = value;
-    for (const child of children) skeleton = replaceAt(skeleton, child.binding, child.kind === 'condition' ? condition : child.binding === '/data' ? { type: 'object', fields: {} } : { type: 'literal', value: 'light.graph' });
+    for (const child of children) skeleton = replaceAt(skeleton, child.binding, child.kind === 'condition' ? condition : child.binding === '/data' ? { type: 'object', fields: {} } : { type: 'literal', value: 'light.demo_graph' });
     const parsed = callServiceSchema.safeParse(skeleton);
     return parsed.success ? { payload: { kind, value: parsed.data }, key: 'call', children } : opaque("Can't show this as blocks: invalid service call.");
   }

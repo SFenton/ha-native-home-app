@@ -1,214 +1,146 @@
 import type { Json } from '../../types';
-import { MAX_CALL_NODES, MAX_CONDITION_DEPTH, MAX_CONDITION_NODES, MAX_COUNT_ENTRIES, MAX_EXPRESSION_DEPTH, MAX_EXPRESSION_NODES, MAX_RULE_CASES, operandBase, predicateBase } from '../expression';
+import { z } from 'zod/v4';
+import { compileCompositionDocument, parseCompositionShape } from '../compiler';
+import { MAX_CALL_NODES, MAX_CONDITION_DEPTH, MAX_CONDITION_NODES, MAX_EXPRESSION_DEPTH, MAX_EXPRESSION_NODES, callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
+import { assertCompositionBounds, CompositionValidationError, type CompositionIssue } from '../json';
+import { expandLogic, type LogicEntry } from '../logic-library';
 import { PIPELINE_BUDGET } from '../pipeline/evaluate';
 import { PIPELINE_LIMITS } from '../pipeline/schema';
-import { assertCompositionBounds } from '../json';
 import { newFacts, typeOperand, typeWhere } from '../pipeline/typing';
+import { conditional } from '../slots';
+import { checkGraphPipeline, graphInputsSchema, graphSourceSchema } from './capabilities';
 import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
-import { join, record } from './json';
+import { record, withoutCanvasMetadata } from './json';
 import type { BudgetMeter, GraphBudget, LogicAnchor } from './types';
 
 export function budgetMeter(kind: string, used: number, limit: number, pointer = ''): BudgetMeter {
   const ratio = used / limit;
   return { kind, pointer, used, limit, ratio, visible: ratio > 0.75, exceeded: used > limit };
 }
-export interface BudgetOptions { readonly kind?: FragmentKind; readonly capabilities?: readonly string[]; readonly duplicatedUseCost?: number; readonly generatedFlowCount?: number }
-type ExpressionKind = 'operand' | 'condition';
-type Entry = { value: Json; pointer: string; kind: ExpressionKind };
+export interface BudgetOptions {
+  readonly kind?: FragmentKind;
+  readonly capabilities?: readonly string[];
+  readonly itemScope?: ItemScope;
+  readonly allowControl?: boolean;
+  readonly library?: readonly LogicEntry[];
+}
+export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: expose read-only expression/call and flow accounting from the actual checker, including totals, depths, counter scopes/resets, structural limits and expansion provenance; preserve CHK-nested-choose-budget unchanged.';
 
 export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOptions = {}): GraphBudget {
   assertCompositionBounds(ast);
-  const meters: BudgetMeter[] = [], conditions: GraphBudget['conditions'][number][] = [], scopes: GraphBudget['scopes'][number][] = [];
-  const counterResets: GraphBudget['counterResets'][number][] = [];
-  let totalNodes = 0, maxDepth = 0, cases = 0, steps = 0;
-  let firstExceedingPointer: string | undefined;
-  const meter = (kind: string, used: number, limit: number, at: string, exceeding = at) => {
-    const metric = budgetMeter(kind, used, limit, at);
-    meters.push(metric);
-    if (metric.exceeded && firstExceedingPointer === undefined) firstExceedingPointer = exceeding;
+  const compilerIssues: CompositionIssue[] = [], scopes: GraphBudget['scopes'][number][] = [];
+  const conditions: GraphBudget['conditions'][number][] = [], meters: BudgetMeter[] = [];
+  const capabilities = new Set(options.capabilities ?? []);
+  const report = (issues: readonly CompositionIssue[]) => compilerIssues.push(...issues);
+  const unknownScope = (at: string, limit: number) => {
+    scopes.push({ id: `expression:${at}`, kind: 'expression', pointer: at, nodes: null, depth: null, nodeLimit: limit, depthLimit: MAX_EXPRESSION_DEPTH, entries: [at], nodeAccounting: 'unavailable' });
   };
-  const children = (value: Json, kind: ExpressionKind) => {
-    if (!record(value)) return [];
-    const result = expressionChildren(value, kind);
-    if (value.type === 'object' || value.type === 'format') result.sort((a, b) => a.binding < b.binding ? -1 : a.binding > b.binding ? 1 : 0);
-    if (value.type === 'map') result.sort((a, b) => (a.binding === '/of' ? 0 : a.binding === '/otherwise' ? 1 : 2) - (b.binding === '/of' ? 0 : b.binding === '/otherwise' ? 1 : 2));
-    if (flowTraversal && value.type === 'choose') result.sort((a, b) => Number(b.binding === '/otherwise') - Number(a.binding === '/otherwise'));
-    return result;
-  };
-  let flowTraversal = false;
-  const astCost = (value: Json, kind: ExpressionKind): { nodes: number; depth: number } => {
-    const costs = children(value, kind).map(child => astCost(child.value, child.kind === 'condition' ? 'condition' : 'operand'));
-    return { nodes: 1 + costs.reduce((sum, cost) => sum + cost.nodes, 0), depth: 1 + Math.max(0, ...costs.map(cost => cost.depth)) };
-  };
-  const scopeCost = (entries: readonly Entry[], scopeKind: 'expression' | 'predicate', flow: boolean, nodeLimit: number, depthLimit: number, at: string) => {
-    let nodes = 0, depth = 0, firstNode: string | undefined, firstDepth: string | undefined;
-    const walk = (value: Json, own: string, kind: ExpressionKind, level: number): void => {
-      nodes++; depth = Math.max(depth, level);
-      if (nodes > nodeLimit && firstNode === undefined) firstNode = own;
-      if (level > depthLimit && firstDepth === undefined) firstDepth = own;
-      for (const child of children(value, kind)) {
-        if (scopeKind === 'predicate' && child.kind !== 'condition') continue;
-        if (scopeKind === 'expression' && flow && child.kind === 'condition') continue;
-        walk(child.value, own + child.binding, child.kind === 'condition' ? 'condition' : 'operand', level + 1);
-      }
-    };
-    entries.forEach(entry => walk(entry.value, entry.pointer, entry.kind, 1));
-    let nodeAccounting: 'compiler' | 'contextual-walk' = 'contextual-walk';
-    if (flow && entries.length === 1) {
-      const entry = entries[0], counter = { nodes: nodeLimit }, facts = newFacts();
-      const typing = { params: new Map(), item: { kind: 'any' as const }, allowRead: true, allowViewer: true };
-      const operand = operandBase.safeParse(entry.value), predicate = predicateBase.safeParse(entry.value);
-      if (scopeKind === 'expression' && operand.success) { typeOperand(operand.data, typing, entry.pointer, facts, counter); nodeAccounting = 'compiler'; }
-      if (scopeKind === 'predicate' && predicate.success) {
-        const predicateCounter: NonNullable<Parameters<typeof typeWhere>[4]> = { nodes: PIPELINE_LIMITS.whereNodes };
-        typeWhere(predicate.data, typing, entry.pointer, facts, predicateCounter);
-        counter.nodes = predicateCounter.nodes; nodeAccounting = 'compiler';
-      }
-      if (nodeAccounting === 'compiler') nodes = nodeLimit - counter.nodes + (firstNode === undefined ? 0 : 1);
-    }
-    const scope = { id: `${scopeKind}:${at}`, kind: scopeKind, pointer: at, nodes, depth, nodeLimit, depthLimit, entries: entries.map(entry => entry.pointer), nodeAccounting };
-    scopes.push(scope);
-    meter(`${scopeKind}-nodes`, nodes, nodeLimit, at, firstNode);
-    meter(`${scopeKind}-depth`, depth, depthLimit, at, firstDepth);
-    return scope;
-  };
-  const predicateScope = (value: Json, at: string, flow: boolean) => {
-    const cost = scopeCost([{ value, pointer: at, kind: 'condition' }], 'predicate', flow, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH, at);
-    const ast = astCost(value, 'condition');
-    conditions.push({ pointer: at, nodes: cost.nodes, depth: cost.depth, astNodes: ast.nodes, astDepth: ast.depth });
-  };
-  const documentPredicates = (entries: readonly Entry[], confirmation?: string, nodeLimit = MAX_EXPRESSION_NODES) => {
-    type Counter = { pointer: string; nodes: number; depth: number; firstNode?: string; firstDepth?: string; entries: string[] };
-    const counters: Counter[] = [];
-    let active: Counter | undefined;
-    let remaining = nodeLimit;
-    const begin = (value: Json, at: string, kind: 'choose' | 'count' | 'confirmation') => {
-      active = { pointer: at, nodes: 0, depth: 0, entries: [at] };
-      counters.push(active);
-      counterResets.push({ pointer: at, kind, scopeId: `predicate:${at}` });
-      const ast = astCost(value, 'condition');
-      conditions.push({ pointer: at, nodes: 0, depth: 0, astNodes: ast.nodes, astDepth: ast.depth });
-    };
-    const walk = (value: Json, at: string, kind: ExpressionKind, depth: number, astDepth: number) => {
-      if (!record(value)) return;
-      if (remaining <= 0 || astDepth > MAX_EXPRESSION_DEPTH) return;
-      remaining--;
-      if (kind === 'condition' && active) {
-        active.nodes++; active.depth = Math.max(active.depth, depth);
-        if (!active.entries.some(entry => at === entry || at.startsWith(entry + '/'))) active.entries.push(at);
-        if (active.nodes > MAX_CONDITION_NODES && active.firstNode === undefined) active.firstNode = at;
-        if (depth > MAX_CONDITION_DEPTH && active.firstDepth === undefined) active.firstDepth = at;
-        if (active.nodes > MAX_CONDITION_NODES || depth > MAX_CONDITION_DEPTH) return;
-      }
-      const outer = active;
-      for (const child of children(value, kind)) {
-        const pointer = at + child.binding, condition = child.kind === 'condition';
-        if (condition && (value.type === 'choose' || value.type === 'count')) begin(child.value, pointer, value.type);
-        walk(child.value, pointer, condition ? 'condition' : 'operand', condition ? kind === 'condition' ? depth + 1 : 1 : 0, astDepth + 1);
-      }
-      if (value.type === 'count') {
-        active = outer;
-        counterResets.push({ pointer: at, kind: 'restore', ...(outer ? { scopeId: `predicate:${outer.pointer}` } : {}) });
-      }
-    };
-    for (const entry of entries) {
-      if (entry.kind === 'condition' && entry.pointer === confirmation) begin(entry.value, entry.pointer, 'confirmation');
-      walk(entry.value, entry.pointer, entry.kind, entry.kind === 'condition' ? 1 : 0, 1);
-    }
-    for (const counter of counters) {
-      const info = conditions.find(condition => condition.pointer === counter.pointer);
-      if (info) {
-        const index = conditions.indexOf(info);
-        conditions[index] = { ...info, nodes: counter.nodes, depth: counter.depth };
-      }
-      scopes.push({ id: `predicate:${counter.pointer}`, kind: 'predicate', pointer: counter.pointer, nodes: counter.nodes, depth: counter.depth, nodeLimit: MAX_CONDITION_NODES, depthLimit: MAX_CONDITION_DEPTH, entries: counter.entries, nodeAccounting: 'contextual-walk' });
-      meter('predicate-nodes', counter.nodes, MAX_CONDITION_NODES, counter.pointer, counter.firstNode);
-      meter('predicate-depth', counter.depth, MAX_CONDITION_DEPTH, counter.pointer, counter.firstDepth);
-    }
-  };
-  const limits = (value: Json, at: string) => {
+  // This only locates fresh checker entry points. No node/depth counters are maintained here.
+  const flowScopes = (value: Json, kind: 'operand' | 'condition', at: string, entry = true): void => {
     if (!record(value)) return;
-    if ((value.type === 'choose' || value.type === 'map') && Array.isArray(value.cases)) {
-      cases = Math.max(cases, value.cases.length);
-      meter(value.type === 'map' ? 'map-cases' : 'cases', value.cases.length, value.type === 'map' ? 32 : MAX_RULE_CASES, join(at, 'cases'));
-    }
-    if (value.type === 'count' && Array.isArray(value.of)) meter('count-entries', value.of.length, MAX_COUNT_ENTRIES, join(at, 'of'));
-    if ((value.type === 'all' || value.type === 'any') && Array.isArray(value.of)) meter('condition-inputs', value.of.length, 16, join(at, 'of'));
-    if (value.type === 'list' && Array.isArray(value.items)) meter('list-items', value.items.length, 64, join(at, 'items'));
-    if (value.type === 'object' && record(value.fields)) meter('object-fields', Object.keys(value.fields).length, 64, join(at, 'fields'));
-    if (value.type === 'format' && record(value.args)) meter('format-arguments', Object.keys(value.args).length, 16, join(at, 'args'));
-  };
-  const inspect = (value: Json, at: string, kind: ExpressionKind, flow: boolean): void => {
-    limits(value, at);
-    for (const child of children(value, kind)) {
-      const pointer = at + child.binding, condition = child.kind === 'condition';
-      if (flow) {
-        if (kind === 'operand' && condition) predicateScope(child.value, pointer, true);
-        if (kind === 'condition' && !condition) scopeCost([{ value: child.value, pointer, kind: 'operand' }], 'expression', true, MAX_EXPRESSION_NODES, MAX_EXPRESSION_DEPTH, pointer);
+    if (entry) {
+      const facts = newFacts(), counter = { nodes: MAX_EXPRESSION_NODES };
+      const typing = { params: new Map(), item: { kind: 'any' as const }, allowRead: true, allowViewer: true };
+      let nodes: number | null = null;
+      if (kind === 'operand') {
+        const parsed = operandBase.safeParse(value);
+        if (parsed.success) { typeOperand(parsed.data, typing, at, facts, counter); nodes = MAX_EXPRESSION_NODES - counter.nodes; }
+      } else {
+        const parsed = predicateBase.safeParse(value);
+        if (parsed.success) {
+          const counter: NonNullable<Parameters<typeof typeWhere>[4]> = { nodes: PIPELINE_LIMITS.whereNodes };
+          typeWhere(parsed.data, typing, at, facts, counter);
+          nodes = PIPELINE_LIMITS.whereNodes - counter.nodes;
+        }
       }
-      inspect(child.value, pointer, condition ? 'condition' : 'operand', flow);
+      const scopeKind = kind === 'condition' ? 'predicate' : 'expression';
+      const nodeLimit = kind === 'condition' ? MAX_CONDITION_NODES : MAX_EXPRESSION_NODES;
+      scopes.push({ id: `${scopeKind}:${at}`, kind: scopeKind, pointer: at, nodes, depth: null, nodeLimit, depthLimit: kind === 'condition' ? MAX_CONDITION_DEPTH : MAX_EXPRESSION_DEPTH, entries: [at], nodeAccounting: nodes === null ? 'unavailable' : 'compiler' });
+      if (nodes !== null) meters.push(budgetMeter(`${scopeKind}-nodes`, nodes, nodeLimit, at));
+      if (kind === 'condition') conditions.push({ pointer: at, nodes, depth: null, astNodes: null, astDepth: null });
+    }
+    for (const child of expressionChildren(value, kind)) {
+      const childKind = child.kind === 'condition' ? 'condition' : 'operand';
+      flowScopes(child.value, childKind, at + child.binding, childKind !== kind);
     }
   };
-  const expression = (value: Json, at: string, kind: ExpressionKind, flow: boolean, flowWhere = false) => {
-    const ast = astCost(value, kind);
-    totalNodes += ast.nodes; maxDepth = Math.max(maxDepth, ast.depth);
-    if (flowWhere) predicateScope(value, at, true);
-    else scopeCost([{ value, pointer: at, kind }], 'expression', flow, MAX_EXPRESSION_NODES, MAX_EXPRESSION_DEPTH, at);
-    if (!flow) documentPredicates([{ value, pointer: at, kind }]);
-    inspect(value, at, kind, flow);
-  };
-  const visit = (value: Json, at: string, hint: FragmentKind, flow = false): void => {
-    flowTraversal = flow;
+  const walk = (value: Json, hint: FragmentKind, at: string, validate: boolean, flow = false): void => {
     const kind = inferFragment(value, hint);
-    if (kind === 'operand' || kind === 'condition') { expression(value, at, kind, flow, flow && kind === 'condition'); return; }
-    if (kind === 'call' && record(value)) {
-      const entries: Entry[] = [];
-      if (value.data !== undefined) entries.push({ value: value.data, pointer: join(at, 'data'), kind: 'operand' });
-      const target = value.target;
-      if (record(target)) Object.keys(target).sort().forEach(key => entries.push({ value: target[key], pointer: join(at, 'target', key), kind: 'operand' }));
-      if (record(value.confirmation) && value.confirmation.when !== undefined) {
-        const own = join(at, 'confirmation', 'when');
-        entries.push({ value: value.confirmation.when, pointer: own, kind: 'condition' });
+    try {
+      if (validate && kind === 'slot' && record(value) && value.type === 'conditional') parseCompositionShape(conditional(z.json()), value);
+      if (kind === 'operand' || kind === 'condition') {
+        if (flow) { flowScopes(value, kind, at); return; }
+        unknownScope(at, MAX_EXPRESSION_NODES);
+        if (validate) {
+          const facts = kind === 'operand'
+            ? checkOperand(parseCompositionShape(operandBase, value), at, options.allowControl, false, options.itemScope)
+            : checkPredicate(parseCompositionShape(predicateBase, value), at, false, options.itemScope);
+          report(facts.issues); facts.needs.forEach(need => capabilities.add(`sh.${need}@1`));
+        }
+        return;
       }
-      scopeCost(entries, 'expression', false, MAX_CALL_NODES, MAX_EXPRESSION_DEPTH, at);
-      documentPredicates(entries, entries.find(entry => entry.kind === 'condition')?.pointer, MAX_CALL_NODES);
-      for (const entry of entries) {
-        const cost = astCost(entry.value, entry.kind);
-        totalNodes += cost.nodes; maxDepth = Math.max(maxDepth, cost.depth);
-        inspect(entry.value, entry.pointer, entry.kind, false);
+      if (kind === 'call') {
+        unknownScope(at, MAX_CALL_NODES);
+        if (validate) {
+          const facts = checkCallService(parseCompositionShape(callServiceSchema, value), at, options.allowControl ?? false, options.itemScope);
+          report(facts.issues); facts.needs.forEach(need => capabilities.add(`sh.${need}@1`));
+        }
+        return;
       }
-      return;
+      if (kind === 'flow' || kind === 'flow-inputs') {
+        if (validate) {
+          const source = kind === 'flow' ? parseCompositionShape(graphSourceSchema, value)
+            : { id: 'budget-flow', kind: 'model' as const, model: 'pipeline@1' as const, inputs: parseCompositionShape(graphInputsSchema, value) };
+          const facts = checkGraphPipeline(source, at);
+          report(facts.issues); facts.capabilities.forEach(capability => capabilities.add(capability));
+          if (facts.issues.length) return;
+        }
+        flow = true;
+      }
+      if (kind === 'slot' && record(value) && value.type === 'read') {
+        const { fallback: _fallback, whenUnavailable: _policy, ...operand } = value;
+        walk(operand, 'operand', at, validate);
+        return;
+      }
+      const description = describeGrammar(value, kind);
+      if (validate && description.payload.kind === 'opaque') { report([{ code: 'unknown_variant', pointer: at }]); return; }
+      for (const child of description.children) walk(child.value, child.kind, at + child.binding, validate && !flow, flow);
+    } catch (error) {
+      if (!(error instanceof CompositionValidationError)) throw error;
+      report(error.issues.map(issue => ({ ...issue, pointer: at + issue.pointer })));
     }
-    if (kind === 'flow' && record(value) && value.inputs !== undefined) { visit(value.inputs, join(at, 'inputs'), 'flow-inputs', true); return; }
-    if (kind === 'flow-inputs' && record(value)) {
-      const count = Array.isArray(value.steps) ? value.steps.length : 0;
-      steps = Math.max(steps, count);
-      meter('steps', count, PIPELINE_LIMITS.steps, join(at, 'steps'));
-      meter('parameters', Array.isArray(value.parameters) ? value.parameters.length : 0, PIPELINE_LIMITS.parameters, join(at, 'parameters'));
-      if (Array.isArray(value.parameters)) value.parameters.forEach((parameter, i) => { if (record(parameter) && parameter.value !== undefined) visit(parameter.value, join(at, 'parameters', i, 'value'), 'operand', true); });
-      if (value.request !== undefined) visit(value.request, join(at, 'request'), 'request', true);
-      if (Array.isArray(value.steps)) value.steps.forEach((step, i) => visit(step, join(at, 'steps', i), 'step', true));
-      if (value.output !== undefined) visit(value.output, join(at, 'output'), 'output', true);
-      return;
-    }
-    if (kind === 'request' && record(value) && value.type === 'entities') {
-      meter('entities', Array.isArray(value.entityIds) ? value.entityIds.length : 0, PIPELINE_LIMITS.entities, join(at, 'entityIds'));
-      meter('entity-attributes', Array.isArray(value.attributes) ? value.attributes.length : 0, PIPELINE_LIMITS.entityAttributes, join(at, 'attributes'));
-    }
-    if (kind === 'slot' && record(value) && value.type === 'conditional' && Array.isArray(value.cases)) meter('cases', value.cases.length, MAX_RULE_CASES, join(at, 'cases'));
-    if (kind === 'slot' && record(value) && value.type === 'read') {
-      const { fallback: _fallback, whenUnavailable: _policy, ...operand } = value;
-      expression(operand, at, 'operand', false);
-      return;
-    }
-    if (kind === 'document' && record(value) && Array.isArray(value.dataSources)) meter('flow-sources', value.dataSources.filter(source => record(source) && source.model === 'pipeline@1').length, PIPELINE_LIMITS.pipelines, join(at, 'dataSources'));
-    for (const child of describeGrammar(value, kind).children) visit(child.value, at + child.binding, child.kind, flow);
   };
-  visit(ast, '', options.kind ?? 'auto');
+  try {
+    const kind = inferFragment(ast, options.kind);
+    if (kind === 'document' && record(ast) && Object.hasOwn(ast, 'schemaVersion')) {
+      try {
+        const compiled = compileCompositionDocument(withoutCanvasMetadata(ast));
+        compiled.capabilities.forEach(capability => capabilities.add(capability));
+        walk(compiled.expanded, 'document', '', false);
+      } catch (error) {
+        if (!(error instanceof CompositionValidationError)) throw error;
+        report(error.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/document(?=\/|$)/, '') })));
+      }
+    } else if (kind === 'document') {
+      const expanded = expandLogic(ast).document;
+      assertCompositionBounds(expanded);
+      walk(parseCompositionShape(z.json(), expanded), kind, '', true);
+    } else {
+      const expanded = expandLogic({ logicLibrary: options.library ?? [], value: ast }).document;
+      assertCompositionBounds(expanded);
+      if (!record(expanded)) throw new Error('Logic expansion did not return an object.');
+      walk(expanded.value, kind, '', true);
+    }
+  } catch (error) {
+    if (!(error instanceof CompositionValidationError)) throw error;
+    report(error.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/value(?=\/|$)/, '') })));
+  }
+  const firstExceedingPointer = compilerIssues.find(issue => issue.code === 'limit_exceeded')?.pointer;
   return {
-    anchor, nodes: totalNodes, depth: maxDepth, conditions, scopes, counterResets, cases, steps, capabilities: [...new Set(options.capabilities ?? [])].sort(),
-    duplicatedUseCost: options.duplicatedUseCost ?? 0, generatedFlowCount: options.generatedFlowCount ?? 0, runtimeLimit: PIPELINE_BUDGET,
-    // All/any arity is detail-only; 16 comparisons use 17/32 predicates, not a full condition budget.
-    meters, compactVisible: meters.some(meter => meter.visible && meter.kind !== 'condition-inputs'), ...(firstExceedingPointer === undefined ? {} : { firstExceedingPointer }),
+    anchor, nodes: null, depth: null, conditions, scopes, counterResets: null, cases: null, steps: null,
+    capabilities: [...capabilities].sort(), duplicatedUseCost: null, generatedFlowCount: null, runtimeLimit: PIPELINE_BUDGET,
+    accepted: compilerIssues.length === 0, compilerIssues, accounting: meters.length ? 'partial' : 'unavailable', accountingUnavailableReason: ACCOUNTING_FOLLOW_UP,
+    meters, compactVisible: meters.some(meter => meter.visible) || firstExceedingPointer !== undefined,
+    ...(firstExceedingPointer === undefined ? {} : { firstExceedingPointer }),
   };
 }

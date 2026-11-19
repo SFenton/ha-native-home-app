@@ -1,10 +1,9 @@
 # Flows canvas graph core
 
 Pure projection APIs for `docs/flows-canvas.md` in PR #21, reviewed at
-`fce634db4aaf8deb3c680b97ab67802312c87804`, with the orchestrator's subsequent
-correction permitting contextual accounting where compiler exports are absent.
-There are no stores,
-network calls, device actions, or UI dependencies.
+`fce634d`, with the orchestrator's round-2
+compiler-only accounting addendum. There are no stores, network calls, device
+actions, or UI dependencies.
 
 - `lift(json, {kind, anchor, metadata, scope})` retains all original fragments.
   `liftJSON(bytes)` also runs the existing bounded, duplicate-key-aware parser.
@@ -21,21 +20,19 @@ network calls, device actions, or UI dependencies.
 - `validateGraph`, `portsCompatible`, `autoLayout`, `measureBudget`, and
   `budgetMeter` are usable independently. Meters appear strictly above 75%.
   Runtime budget is a separate bound, not an estimate from step count.
-  `GraphBudget.nodes/depth` are informational combined AST totals.
-  `scopes` distinguishes shared document expression counters (64/8), shared
-  service-call counters (128/8), predicate-only counters (32/6), and fresh flow
-  operand counters (64/8). `conditions.nodes/depth` are predicate-only, with
-  separate `astNodes/astDepth`. A flow filter never gets a synthetic aggregate
-  32- or 64-AST-node limit. Structural all/any arity is detail-only, not a
-  compact predicate-budget warning.
+  `GraphBudget.accepted`, `compilerIssues`, and `firstExceedingPointer` come
+  from running the compiler/checker on the lowered fragment. In particular,
+  CHK-nested-choose-budget is neither fixed nor simulated with a parallel counter.
   Flow node meters consume the public `typeOperand`/`typeWhere` counters.
-  The document checker does not expose accounting; its meter uses a contextual
-  traversal, explicitly marked `nodeAccounting: "contextual-walk"`. Depth and
-  informational AST totals also need traversal until an accounting export exists.
-  Acceptance always comes from the existing checkers/compiler, not those walks.
-  `counterResets` preserves the baseline nested-Choose counter leak and count's
-  save/restore; a live predicate counter can continue outside its initial `when`.
-  This reproduces the known checker behavior, not a native-parser fix.
+  No graph code increments AST counters, walks depths, or predicts resets.
+  Counts that are not exported by the checker are **null**, never zero or an
+  estimate: document/call counts, depths, totals, cases/steps, duplication costs,
+  generated-flow accounting and reset events. Document scopes explicitly report
+  `nodeAccounting: "unavailable"`; overall accounting is `partial` or `unavailable`.
+  Consumers must surface `accountingUnavailableReason`, not invent missing
+  percentages. Missing meters do not mean zero usage or unlimited capacity.
+  A native counter stops at its limit: consumers must use the compiler outcome
+  and first exceeding pointer, not infer acceptance from the remaining count.
   `semanticFingerprint` excludes positions and root layout metadata, retaining
   behavior-bearing bindings and equally named properties inside literal data.
 - `lowerForEach` takes an explicit fixed-count or entity-flow mode. Fixed tests
@@ -61,3 +58,15 @@ specific prerequisite and compiler pointer; no cast or fabricated shape exists.
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
 expansion, draft layout extraction, persistence/conflicts, and publication.
 Never install a recipe's generated sources separately from its root replacement.
+
+## Owner follow-up: compiler accounting
+
+Lane A reserves `expression.ts`; this lane does not edit it. Request an additive,
+read-only accounting export on the actual Checker (`enter`, predicate checks,
+condition resets/restores and shared call budgets), preserving traversal,
+short-circuiting, diagnostics and CHK-nested-choose-budget exactly. Also expose
+depth/scope accounting from `pipeline/typing.ts`, propagate it through pipeline
+and document compilation, and include structural limits and expansion
+provenance. Once supplied, the graph can consume complete figures without an
+independent formula. This is observation only, not authorization to reconcile
+the checker with native behavior or change any limit.

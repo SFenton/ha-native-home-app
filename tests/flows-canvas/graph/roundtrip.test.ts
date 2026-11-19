@@ -6,7 +6,7 @@ import { evaluateOperand, evaluatePredicate, type Environment } from '../../../s
 import { operandBase, predicateBase, type Operand, type Predicate } from '../../../src/shared/composition/expression';
 import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
 import { expandLogic } from '../../../src/shared/composition/logic-library';
-import { autoLayout, lift, liftJSON, lower, portType, projectGraph, semanticFingerprint, type LogicGraph } from '../../../src/shared/composition/graph';
+import { autoLayout, lift, liftJSON, lower, measureBudget, portType, projectGraph, semanticFingerprint, type LogicGraph } from '../../../src/shared/composition/graph';
 import type { Json } from '../../../src/shared/types';
 import { exampleA, exampleB, immutable, predicateBudgetFixtures, sourceParameterTemplate, tooWarmWarning } from './fixtures';
 import { expressionChildren } from '../../../src/shared/composition/graph/grammar';
@@ -41,7 +41,7 @@ describe('G-roundtrip worked examples, templates and opaque buffers', () => {
   });
   it('has exact example costs and uses the existing evaluator', () => {
     const result = roundtrip(clone(tooWarmWarning), 'condition');
-    expect(result.budgets[0]).toMatchObject({ nodes: 11, depth: 5 });
+    expect(result.budgets[0]).toMatchObject({ nodes: null, depth: null, accepted: true });
     const reads: Record<string, Json> = { 'living-temperature': 23.6, 'bedroom-temperature': 21.9, thermostat: 22, window: 'off' };
     const env: Environment = { read: id => Object.hasOwn(reads, id) ? { status: 'value', value: reads[id] } : { status: 'unavailable' } };
     const condition = predicateBase.parse(result.ast);
@@ -121,7 +121,7 @@ describe('G-roundtrip worked examples, templates and opaque buffers', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.replacements).toHaveLength(2);
-      expect(result.budgets.map(budget => budget.nodes)).toEqual([1, 1]);
+      expect(result.budgets.map(budget => budget.accepted)).toEqual([true, true]);
     }
   });
 });
@@ -185,6 +185,20 @@ describe('G-roundtrip shared contract corpus', () => {
   const read = (file: string): Json => JSON.parse(readFileSync(path.join(directory, file), 'utf8'));
   const index: { cases: { file: string; outcome: string; pending?: boolean; studioIssue?: unknown }[] } = JSON.parse(readFileSync(path.join(directory, 'index.json'), 'utf8'));
   const cases = index.cases.filter(entry => entry.outcome === 'accept' || entry.pending && !entry.studioIssue);
+  it.each([[128, true], [129, false]] as const)('uses the document compiler for %i flow sources, accepted=%s', (count, accepted) => {
+    const envelope = read('accept/tile-look-all.json');
+    if (!record(envelope) || !record(envelope.document) || !Array.isArray(envelope.document.dataSources)) throw new Error('Expected document sources.');
+    const document = {
+      ...envelope.document, dataSources: [...envelope.document.dataSources, ...Array.from({ length: count }, (_, i) => ({
+        id: `counter-${i}`, kind: 'model', model: 'pipeline@1',
+        inputs: { title: 'Counter', parameters: [], request: { type: 'none', value: { type: 'literal', value: [] } }, steps: [{ id: 'count', op: 'count' }], output: { kind: 'scalar' }, schema: { kind: 'number' } },
+      }))],
+    };
+    const budget = measureBudget(document, { kind: 'document', id: 'document', field: '', fingerprint: '' }, { kind: 'document' });
+    expect(budget.accepted).toBe(accepted);
+    expect(budget.nodes).toBeNull();
+    if (!accepted) expect(budget.firstExceedingPointer).toBe('/dataSources/133');
+  });
   it.each(['visibleWhen', 'activeWhen', 'filledWhen', 'errorWhen', 'conditional-look'] as const)('meter matches compiler nested-Choose behavior in %s', field => {
     for (const name of ['base', 'early'] as const) {
       const envelope = read(field === 'conditional-look' ? 'accept/rules-conditional-look.json' : 'accept/tile-look-all.json');
@@ -202,6 +216,8 @@ describe('G-roundtrip shared contract corpus', () => {
       expect(native === undefined).toBe(name === 'base');
       const first = native?.issues.find(issue => issue.code === 'limit_exceeded')?.pointer.replace(/^\/document(?=\/|$)/, '');
       expect(result.budgets[0].firstExceedingPointer).toBe(first);
+      expect(result.budgets[0].accepted).toBe(name === 'base');
+      expect(result.budgets[0].compilerIssues).toEqual(native?.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/document(?=\/|$)/, '') })) ?? []);
       if (!result.ok) expect(result.errors).toContainEqual(expect.objectContaining({ code: 'limit_exceeded', pointer: first }));
     }
   });
