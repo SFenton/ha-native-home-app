@@ -1,10 +1,12 @@
-import { z } from 'zod/v4';
+import type { z } from 'zod/v4';
 import { identifierSchema } from '../validation';
 import { operandBase, parameterName, predicateBase, type BudgetAccountingObserver } from './expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, reject, type CompositionIssue } from './json';
 import { observeStructuralRefusals } from './studio-logic/accounting';
 import { prepareStudioDocument } from './studio-logic/prepare';
 import type { ResolvedUseBinding } from './studio-logic/bindings';
+import { logicLibrarySchema, type LogicEntry, type LogicParamKind } from './studio-logic/library-schema';
+export * from './studio-logic/library-schema';
 
 /**
  * Reusable named logic, for the Studio only. A document's draft holds a `logicLibrary` and `logic-ref` uses; {@link expandLogic} works every use out
@@ -19,47 +21,12 @@ import type { ResolvedUseBinding } from './studio-logic/bindings';
 
 // MARK: Limits
 
-/** Entries a library holds. */
-export const MAX_LOGIC_ENTRIES = 100;
-/** Parameters an entry declares. */
-export const MAX_LOGIC_PARAMS = 8;
 /** How deep entries may use entries: a use in a document is depth 1, a use inside its body depth 2, and so on. */
 export const MAX_LOGIC_DEPTH = 4;
 /** The values one expansion may produce from bodies, so a library cannot grow a document without bound. */
 export const MAX_LOGIC_EXPANDED_VALUES = 100_000;
 /** The bindings an entry of the component library may hold (`COMPONENT_ENTRY_LIMITS.bindings`); a test keeps the two equal. */
 export const MAX_COMPONENT_BINDINGS = 128;
-
-// MARK: Schema
-
-/** What a parameter takes: an id of a data source, a text, a number, an operand, or a condition. */
-export const logicParamKinds = ['source-id', 'text', 'number', 'operand', 'condition'] as const;
-export type LogicParamKind = typeof logicParamKinds[number];
-const object = z.strictObject;
-const label = z.string().min(1).max(80).refine(value => Boolean(value.trim()) && !/[\p{Cc}\p{Cf}]/u.test(value));
-
-/**
- * `sample` is an example argument of the parameter's kind, for an editor's preview; it also stands in for the argument when the library checks the entry's body.
- * `display` is a hint for the editor only (a `number` that the Studio draws as a time of day, or a `text` that holds a person's entity id and is drawn as a person picker); it changes nothing a use or an expansion does.
- */
-export const logicParamSchema = object({ name: parameterName, kind: z.enum(logicParamKinds), label: label.optional(), sample: z.json().optional(), display: z.enum(['time', 'person']).optional() });
-export const logicEntrySchema = object({
-  id: identifierSchema,
-  name: label,
-  kind: z.enum(['operand', 'condition']),
-  params: z.array(logicParamSchema).max(MAX_LOGIC_PARAMS),
-  /** An operand or a condition, with holes where the arguments go. */
-  body: z.record(z.string(), z.json()),
-});
-export const logicLibrarySchema = z.array(logicEntrySchema).max(MAX_LOGIC_ENTRIES);
-/** A use: stands where an operand or a condition stands, in a draft. */
-export const logicRefSchema = object({ type: z.literal('logic-ref'), logicId: identifierSchema, args: z.record(z.string(), z.json()) });
-/** A hole: stands for one argument inside an entry's body. */
-export const logicHoleSchema = object({ type: z.literal('hole'), name: parameterName });
-export type LogicEntry = z.infer<typeof logicEntrySchema>;
-export type LogicLibrary = z.infer<typeof logicLibrarySchema>;
-export type LogicRef = z.infer<typeof logicRefSchema>;
-export type LogicHole = z.infer<typeof logicHoleSchema>;
 
 // MARK: Result
 

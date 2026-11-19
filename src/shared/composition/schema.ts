@@ -1,4 +1,4 @@
-import { logicLibrarySchema } from './logic-library';
+import { logicLibrarySchema } from './studio-logic/library-schema';
 import { appStateSourceSchema } from './app-state';
 import { MAX_RULE_CASES, operandBase, predicateBase } from './expression';
 import { pipelineSourceSchema } from './pipeline/schema';

@@ -11,20 +11,25 @@ import type { prepareDraft } from '../../../server/studio-logic/prepare';
 import type { CompositionDraft } from '../../../src/shared/composition/workspace';
 import type { CompositionPublication } from '../../../src/shared/composition/schema';
 import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
-import { atPointer, replacePointer } from '../../../src/shared/composition/studio-logic';
+import { expandDocument } from '../../../src/shared/composition/components';
+import { liftJSON, type LiftOptions } from '../../../src/shared/composition/graph/lift';
+import { atPointer, readStudioCanvas, replacePointer } from '../../../src/shared/composition/studio-logic';
 import { fakeHomeAssistant } from '../../fake-ha-publication';
-import { draftDocument } from './fixtures';
+import { componentDocument, draftDocument, labelTemplate, read } from './fixtures';
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
-const port = 4821, mount = '/api/hassio_ingress/w2-d/';
-const dataRoot = path.resolve('./test-results/studio-data/w2-d');
+const port = Number(process.env.STUDIO_E2E_PORT ?? 4821), mount = '/api/hassio_ingress/w2-d/';
+const dataRoot = path.resolve(process.env.STUDIO_E2E_DATA_DIR ?? './test-results/studio-data/w2-d');
 const authToken = 'synthetic-w2-d-studio-token', haToken = 'synthetic-w2-d-ha-token';
 const hash = (document: unknown) => createHash('sha256').update(canonicalCompositionJSON(document)).digest('hex');
+const tileReads = (publication: CompositionPublication) => expandDocument(publication.document).pages[0].components.map(node => ({
+  tileSource: atPointer(node, '/props/titleProviderId'),
+  logicSource: atPointer(node, '/props/subtitle/value/from/sourceId'),
+}));
+const expectedTileReads = [{ tileSource: 'source-a', logicSource: 'source-a' }, { tileSource: 'source-b', logicSource: 'source-b' }];
 
 async function lab() {
-  if (process.env.STUDIO_E2E_PORT && process.env.STUDIO_E2E_PORT !== String(port)) throw new Error('W2-D requires port 4821');
-  if (process.env.STUDIO_E2E_DATA_DIR && path.resolve(process.env.STUDIO_E2E_DATA_DIR) !== dataRoot) throw new Error('W2-D requires its isolated data directory');
   await mkdir(dataRoot, { recursive: true });
   const directory = await mkdtemp(path.join(dataRoot, 'server-'));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
@@ -70,6 +75,93 @@ async function lab() {
 }
 
 describe('D-layout / D-binding / D-strip: mounted real draft and publication routes', () => {
+  it('serves HTTP and persists state in the configured port and data root', async () => {
+    const f = await lab(), response = await f.request('native/api/draft');
+    expect(response.status).toBe(200);
+    expect(new URL(response.url).port).toBe(String(Number(process.env.STUDIO_E2E_PORT ?? 4821)));
+    expect(path.dirname(f.directory)).toBe(path.resolve(process.env.STUDIO_E2E_DATA_DIR ?? './test-results/studio-data/w2-d'));
+    expect(await readFile(path.join(f.directory, 'native-v2/state.json'), 'utf8')).toContain('"draft"');
+  });
+
+  it.each(['props//titleProviderId', '/props/titleProviderId/'])('publishes the correct source read for every component use with field %s', async field => {
+    const f = await lab(), initial = await f.draft(), document = componentDocument(initial.document.id, field);
+    const savedResponse = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document });
+    expect(savedResponse.status).toBe(200);
+    const saved: CompositionDraft = await savedResponse.json();
+    const publicationResponse = await f.request('native/api/publish', 'POST', { expectedRevision: saved.revision });
+    expect(publicationResponse.status).toBe(200);
+    const publication: CompositionPublication = await publicationResponse.json();
+    expect(tileReads(publication)).toEqual(expectedTileReads);
+    expect(atPointer(publication.document, '/componentLibrary/0/bindings/0/field')).toBe(field);
+    expect(tileReads(await (await f.request('native/api/published')).json())).toEqual(expectedTileReads);
+  });
+
+  it('refuses a changed reference with the same source argument before it can replace the published tile reads', async () => {
+    const f = await lab(), initial = await f.draft(), document = draftDocument(initial.document.id);
+    const savedResponse = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document });
+    expect(savedResponse.status).toBe(200);
+    const saved: CompositionDraft = await savedResponse.json();
+    const first = await f.request('native/api/publish', 'POST', { expectedRevision: saved.revision });
+    expect(first.status).toBe(200);
+    const published: CompositionPublication = await first.json();
+    expect(tileReads(published)).toEqual(expectedTileReads);
+    const different = {
+      ...labelTemplate, id: 'different-template',
+      body: { type: 'format', pattern: 'DIFFERENT {value}', args: { value: labelTemplate.body } },
+    };
+    const changed = replacePointer({ ...document, logicLibrary: [...document.logicLibrary, different] }, '/pages/0/components/0/props/subtitle/value/logicId', different.id);
+    for (const [endpoint, method, body] of [
+      ['native/api/draft/prepare', 'POST', { document: changed }],
+      ['native/api/draft', 'PUT', { document: changed, expectedRevision: saved.revision }],
+    ] as const) {
+      const response = await f.request(endpoint, method, body);
+      expect(response.status).toBe(422);
+      expect((await response.json()).issues).toEqual([{ code: 'invalid_reference', pointer: '/document/logicUseBindings/0/logicId' }]);
+    }
+    expect(await f.draft()).toEqual(saved);
+    expect(await (await f.request('native/api/published')).json()).toEqual(published);
+    const republishedResponse = await f.request('native/api/publish', 'POST', { expectedRevision: saved.revision });
+    expect(republishedResponse.status).toBe(200);
+    const republished: CompositionPublication = await republishedResponse.json();
+    expect(tileReads(republished)).toEqual(expectedTileReads);
+    expect(republished.document).toEqual(published.document);
+    expect(JSON.stringify(republished.document)).not.toContain('DIFFERENT');
+  });
+
+  it.each([['document', 'relative'], ['nested fragment', 'relative'], ['nested fragment', 'absolute']] as const)('round-trips saved %s positions with %s origins through reopen and lift', async (scope, encoding) => {
+    const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
+    const nested = {
+      ...labelTemplate, id: 'nested-label', params: [],
+      body: { type: 'format', pattern: '{value}', args: { value: read('source-a') } },
+    };
+    const document = { ...base, logicLibrary: [...base.logicLibrary, nested] };
+    const field = '/logicLibrary/1/body/args/value', kind = scope === 'document' ? 'document' : 'operand';
+    const options: LiftOptions = { kind, ...(scope === 'document' ? {} : { anchor: { kind: 'logic', id: nested.id, field: '/body/args/value' } }) };
+    const before = liftJSON(Buffer.from(canonicalCompositionJSON(scope === 'document' ? document : atPointer(document, field))), options);
+    const studioCanvas = {
+      version: 1, canvases: [{
+        id: 'round-trip', roots: before.graph.roots.map(root => root.anchor),
+        nodes: before.graph.nodes.map((node, index) => ({
+          id: node.id, origins: node.origins.map(origin => encoding === 'absolute' ? `${field}${origin}` : origin),
+          x: 384 + index * 17, y: 240 + index * 11,
+        })),
+      }],
+    };
+    const saved = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
+    expect(saved.status).toBe(200);
+    await f.close();
+    await f.store.close();
+    const reopened = await StudioStore.open(f.directory);
+    cleanups.push(() => reopened.close());
+    const restored = reopened.native.getDraft().document, layout = readStudioCanvas(restored);
+    expect(layout.raw).toEqual(studioCanvas);
+    expect(layout.warnings).toEqual([]);
+    const after = liftJSON(Buffer.from(canonicalCompositionJSON(scope === 'document' ? restored : atPointer(restored, field))), { ...options, metadata: layout.metadata });
+    expect(after.warnings.filter(warning => warning.code === 'invalid_layout')).toEqual([]);
+    expect(after.graph.nodes.map(node => node.position)).toEqual(studioCanvas.canvases[0].nodes.map(({ x, y }) => ({ x, y })));
+    expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
+  });
+
   it('saves/reopens raw layout and bindings, exports the draft losslessly, and strips every publication/download/HA entry point', async () => {
     const f = await lab(), initial = await f.draft();
     const document = { ...draftDocument(initial.document.id), studioCanvas: { version: 400, future: ['retained', { x: 90 }] } };

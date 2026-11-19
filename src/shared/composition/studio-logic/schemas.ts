@@ -11,11 +11,16 @@ export const logicAnchorSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...owner, kind: z.enum(['page', 'modal', 'component', 'logic', 'flow']) }),
   z.strictObject({ id: identifierSchema, field: jsonPointerSchema, kind: z.literal('document'), fingerprint: z.string().min(1) }),
 ]) satisfies z.ZodType<LogicAnchor>;
+/** Automatic fill stays tied to the reference selected when authored. */
+export interface StoredLogicUseBinding extends LogicUseBinding {
+  readonly logicId: string;
+}
 export const logicUseBindingSchema = z.strictObject({
   use: logicAnchorSchema,
+  logicId: identifierSchema,
   argument: parameterName,
   from: z.strictObject({ kind: z.literal('use-tile'), field: jsonPointerSchema }),
-}) satisfies z.ZodType<LogicUseBinding>;
+}) satisfies z.ZodType<StoredLogicUseBinding>;
 export const logicUseBindingsSchema = z.array(logicUseBindingSchema).max(MAX_LOGIC_USE_BINDINGS);
 
 export const studioCanvasMetadataSchema = z.strictObject({

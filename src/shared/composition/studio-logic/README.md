@@ -11,8 +11,13 @@ published.
   Invalid versions/shapes, stale owners/origins and ambiguous associations warn
   `"Saved layout can't be used."` without invalidating the AST or deleting raw
   metadata. Pass usable metadata to graph `lift`; its content-and-origin IDs
-  check individual associations and auto-layout unmatched nodes. Layout reset
-  must be an explicit authoring transaction.
+  check individual associations and auto-layout unmatched nodes. Stored origins
+  may be document-relative or relative to their canvas root. The reader resolves
+  each root anchor and returns fragment-relative origins for `lift`, without
+  changing `raw`. Whole-document origins remain document-relative, and the
+  whole-document fingerprint excludes root layout, as in `lift`. Ambiguous
+  coordinate frames warn instead of guessing. Layout reset must be an explicit
+  authoring transaction.
 - `resolveLogicAnchor` resolves stable owner/node IDs at access time and refuses
   ambiguity. Document-only anchors require the exact canonical subtree
   fingerprint, matching the graph API. Fields use RFC 6901 pointers.
@@ -24,13 +29,33 @@ published.
 - `bindLogicUse` and `unbindLogicUse` return one immutable authoring edit,
   including the currently resolved explicit argument. The host applies that
   result through its normal validation/undo transaction. Removing automatic
-  fill does not remove a shared template or change other uses.
+  fill does not remove a shared template or change other uses. `bindLogicUse`
+  also captures the current reference's `logicId`. Persisted entries are
+  `StoredLogicUseBinding` (the graph selector plus required `logicId`):
+
+  ```json
+  {
+    "use": {"kind": "page", "id": "page-home", "nodeId": "tile-a", "field": "/props/subtitle/value"},
+    "logicId": "tile-label",
+    "argument": "source",
+    "from": {"kind": "use-tile", "field": "/props/titleProviderId"}
+  }
+  ```
+
+  Missing reference identity is refused, not inferred from a reopened draft.
+  A changed reference is a semantic `invalid_reference` at the binding's
+  `/logicId`, even when the new template declares the same argument. Choosing
+  automatic fill again is an explicit authoring transaction.
 - `expandLogic` / `publishedDocument` use `prepareStudioDocument` before template
   expansion. Every use is resolved afresh; missing/wrong/stale/duplicate
   bindings are semantic errors, never layout warnings. Component-local fills
   propagate through the existing string-binding and private-source machinery,
   after template expansion and before component instantiation. The authored
-  component bindings are not mutated.
+  component bindings are not mutated. Component field comparisons use the
+  compiler's `fieldSteps`, including repeated and trailing separators. The
+  unchanged logic schemas live in `library-schema.ts` so importing that helper
+  does not create a schema/expander/component initialization cycle; the existing
+  `logic-library` schema exports are preserved.
 - `compileCompositionDocumentWithOrigins` additionally returns `sourceMap`,
   `useBindings` and `layout`. Source-map pointers are document-relative.
   Locations identify the authored template/argument, responsible use, and (for
@@ -88,10 +113,14 @@ native data, unchanged.
 ## Evidence
 
 `tests/flows-canvas/draft` covers D-layout, D-binding, D-strip and D-conflict with
-pure checks and mounted real HTTP routes. Server harnesses exclusively use
-port 4821 and isolated `test-results/studio-data/w2-d` subdirectories; only HA
-transport is faked. Browser save/reopen, canvas-buffer conflict UX and mounted
-browser publication evidence remain W2-I's integration work.
+pure checks and mounted real HTTP routes. Server harnesses honour
+`STUDIO_E2E_PORT` and `STUDIO_E2E_DATA_DIR`, defaulting to port 4821 and isolated
+`test-results/studio-data/w2-d` subdirectories; only HA transport is faked.
+Regression coverage publishes both component uses through the real routes and
+checks their expanded source reads, refuses changed references without replacing
+the saved publication, and saves/reopens/lifts whole-document and nested-fragment
+positions in both origin formats. Browser save/reopen, canvas-buffer conflict UX
+and mounted browser publication evidence remain W2-I's integration work.
 
 The compatibility test pins the before/after compiler result and publication
 decode digest for all 1,797 existing corpus documents and publication fixtures

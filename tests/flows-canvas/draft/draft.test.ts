@@ -5,7 +5,7 @@ import { lift } from '../../../src/shared/composition/graph/lift';
 import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
 import { assertNoLogic, publishedDocument, usesLogic } from '../../../src/shared/composition/logic-library';
 import { atPointer, bindLogicUse, MAX_LOGIC_USE_BINDINGS, readStudioCanvas, replacePointer, unbindLogicUse } from '../../../src/shared/composition/studio-logic';
-import { binding, draftDocument, labelTemplate, read, tile, useField } from './fixtures';
+import { binding, componentDocument, draftDocument, labelTemplate, read, tile } from './fixtures';
 
 const prepared = (document: unknown) => compileCompositionDocument(document).expanded;
 const get = (document: unknown, pointer: string) => atPointer(document, pointer);
@@ -31,10 +31,12 @@ describe('D-layout: presentation is expendable, authored JSON is not', () => {
     const studioCanvas = {
       version: 1, canvases: [{ id: 'layout', roots: [anchor], nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 384, y: 240 })) }],
     };
-    // A standalone graph uses fragment-relative origins. Whole-document extraction uses absolute origins.
     const stored = { ...studioCanvas, canvases: studioCanvas.canvases.map(canvas => ({ ...canvas, nodes: canvas.nodes.map(node => ({ ...node, origins: node.origins.map(origin => `/logicLibrary/0/body${origin}`) })) })) };
-    expect(readStudioCanvas({ ...document, studioCanvas: stored }).metadata).toEqual(stored);
-    expect(lift(labelTemplate.body, { kind: 'operand', anchor, metadata: studioCanvas }).graph.nodes[0].position).toEqual({ x: 384, y: 240 });
+    for (const raw of [studioCanvas, stored]) {
+      const layout = readStudioCanvas({ ...document, studioCanvas: raw });
+      expect(layout).toMatchObject({ raw, metadata: studioCanvas, warnings: [] });
+      expect(lift(labelTemplate.body, { kind: 'operand', anchor, metadata: layout.metadata }).graph.nodes[0].position).toEqual({ x: 384, y: 240 });
+    }
     for (const metadata of [
       { ...stored, canvases: [stored.canvases[0], stored.canvases[0]] },
       { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...anchor, id: 'removed' }] }] },
@@ -82,14 +84,30 @@ describe('D-binding: each use resolves only its source-valued tile field', () =>
 
   it('adds and removes automatic fill in one immutable edit with a current explicit argument', () => {
     const document = { ...draftDocument(), logicUseBindings: [] };
-    const bound = bindLogicUse(document, binding('tile-b'));
+    const { logicId: _expected, ...selector } = binding('tile-b');
+    const bound = bindLogicUse(document, selector);
     expect(get(bound, '/pages/0/components/1/props/subtitle/value/args/source')).toBe('source-b');
+    expect(get(bound, '/logicUseBindings/0/logicId')).toBe('tile-label');
     const moved = replacePointer(bound, '/pages/0/components/1/props/titleProviderId', 'source-a');
     const unbound = unbindLogicUse(moved, 0);
     expect(get(unbound, '/pages/0/components/1/props/subtitle/value/args/source')).toBe('source-a');
     expect(get(unbound, '/logicUseBindings')).toEqual([]);
     expect(document.logicUseBindings).toEqual([]);
     expect(prepared(unbound)).toBeDefined();
+  });
+
+  it('refuses a changed reference even when its replacement declares the same source argument', () => {
+    const original = draftDocument(), other = { ...labelTemplate, id: 'different-template' };
+    const document = { ...original, logicLibrary: [...original.logicLibrary, other] };
+    const changed = replacePointer(document, '/pages/0/components/0/props/subtitle/value/logicId', other.id);
+    expect(failure(changed)).toEqual([{ code: 'invalid_reference', pointer: '/document/logicUseBindings/0/logicId' }]);
+    const explicit = replacePointer(changed, '/logicUseBindings', [binding('tile-b')]);
+    const { logicId: _expected, ...selector } = binding('tile-a');
+    const rebound = bindLogicUse(explicit, selector);
+    expect(get(rebound, '/logicUseBindings/1/logicId')).toBe(other.id);
+    expect(get(prepared(rebound), '/pages/0/components/0/props/subtitle/value/from/sourceId')).toBe('source-a');
+    const { logicId: _missing, ...missing } = binding('tile-a');
+    expect(failure({ ...original, logicUseBindings: [missing] })).toEqual([{ code: 'invalid_value', pointer: '/document/logicUseBindings/0/logicId' }]);
   });
 
   it.each([
@@ -100,7 +118,7 @@ describe('D-binding: each use resolves only its source-valued tile field', () =>
     ['/logicUseBindings/0/from/field', '/action/pageId', '/document/logicUseBindings/0/from/field'],
     ['/pages/0/components/0/props/titleProviderId', 12, '/document/logicUseBindings/0/from/field'],
     ['/pages/0/components/0/props/subtitle/value', { type: 'literal', value: 'no longer a ref' }, '/document/logicUseBindings/0/use'],
-    ['/pages/0/components/0/props/subtitle/value/logicId', 'removed', '/document/logicUseBindings/0/argument'],
+    ['/pages/0/components/0/props/subtitle/value/logicId', 'removed', '/document/logicUseBindings/0/logicId'],
     ['/pages/0/components/0/props/subtitle/value/args/source', 7, '/document/pages/0/components/0/props/subtitle/value/args/source'],
   ])('refuses stale/invalid binding %s', (path, value, pointer) => {
     expect(failure(replacePointer(draftDocument(), path, value))).toEqual([expect.objectContaining({ pointer })]);
@@ -125,15 +143,9 @@ describe('D-binding: each use resolves only its source-valued tile field', () =>
     expect(failure(fakeTile)[0].pointer).toBe('/document/logicUseBindings/0/from/field');
   });
 
-  it('carries tile settings through component argument expansion and private-source remapping', () => {
-    const document = draftDocument(), node = tile('inner-tile', 'source-a');
-    const componentBinding = { ...binding('inner-tile'), use: { kind: 'component', id: 'saved-tile', nodeId: 'inner-tile', field: useField } };
-    const component = {
-      id: 'saved-tile', name: 'Saved tile', params: [{ name: 'source', kind: 'source-id', label: 'Entity' }],
-      bindings: [{ param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }], node,
-    };
-    const uses = ['source-a', 'source-b'].map((source, index) => ({ id: `place-${index}`, type: 'component-ref', componentId: component.id, layout: { span: 1 }, args: { source } }));
-    const doc = { ...document, componentLibrary: [component], logicUseBindings: [componentBinding], pages: [{ ...document.pages[0], components: uses }] };
+  it.each(['props/titleProviderId', 'props//titleProviderId', '/props/titleProviderId/', '//props///titleProviderId//'])('carries tile settings through component field %s and private-source remapping', field => {
+    const document = draftDocument(), doc = componentDocument(document.id, field);
+    const component = doc.componentLibrary[0], uses = doc.pages[0].components;
     const compiled = compileCompositionDocument(doc), drawn = expandDocument(compiled.expanded);
     expect(drawn.pages[0].components.map(node => get(node, '/props/subtitle/value/from/sourceId'))).toEqual(['source-a', 'source-b']);
     expect(get(compiled.expanded, '/componentLibrary/0/bindings')).toEqual([

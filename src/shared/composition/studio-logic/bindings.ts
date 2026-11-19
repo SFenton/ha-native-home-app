@@ -2,10 +2,11 @@ import type { CompositionNode } from '../schema';
 import type { LogicUseBinding } from '../graph/types';
 import { segments } from '../graph/json';
 import { CompositionValidationError, pointer, reject, type CompositionIssue } from '../json';
-import { logicLibrarySchema } from '../logic-library';
+import { logicLibrarySchema } from './library-schema';
+import { fieldSteps } from '../components';
 import { identifierSchema } from '../../validation';
 import { atPointer, record, replacePointer, resolveLogicAnchor } from './anchors';
-import { logicUseBindingsSchema } from './schemas';
+import { logicUseBindingsSchema, type StoredLogicUseBinding } from './schemas';
 
 /** Only source-valued tile fields from the existing component definitions participate. */
 export const tileSourceFields: Readonly<Partial<Record<CompositionNode['type'], readonly string[]>>> = {
@@ -34,7 +35,7 @@ export interface UseBindingResolution {
   readonly bindings: readonly ResolvedUseBinding[];
 }
 
-function parseBindings(value: unknown): LogicUseBinding[] {
+function parseBindings(value: unknown): StoredLogicUseBinding[] {
   const parsed = logicUseBindingsSchema.safeParse(value);
   if (parsed.success) return parsed.data;
   throw new CompositionValidationError(parsed.error.issues.flatMap((issue): CompositionIssue[] => {
@@ -56,6 +57,7 @@ export function resolveLogicUseBindings(input: unknown): UseBindingResolution {
     const at = `/logicUseBindings/${index}`, target = resolveLogicAnchor(document, binding.use);
     if (!target?.node || !record(target.value) || target.value.type !== 'logic-ref') reject('invalid_reference', `${at}/use`);
     const use = target.value, node = target.node;
+    if (use.logicId !== binding.logicId) reject('invalid_reference', `${at}/logicId`);
     // A tile can only supply its own fields; a pointer through children is not a tile context.
     if (segments(binding.use.field).some(part => ['children', 'tabs', 'blocks'].includes(part))) reject('invalid_reference', `${at}/use`);
     const key = `${target.pointer}/args/${binding.argument}`;
@@ -75,7 +77,7 @@ export function resolveLogicUseBindings(input: unknown): UseBindingResolution {
       const raw = atPointer(document, `${target.owner.pointer}/bindings`);
       if (raw !== undefined && !Array.isArray(raw)) reject('binding_type', `${target.owner.pointer}/bindings`);
       const existing: unknown[] = Array.isArray(raw) ? raw : [];
-      const sameField = (field: unknown, expected: string) => typeof field === 'string' && `/${field.replace(/^\/+/, '')}` === expected;
+      const sameField = (field: unknown, expected: string) => typeof field === 'string' && fieldSteps(field).join('/') === fieldSteps(expected).join('/');
       const sourceBindings = existing.filter(item => record(item) && item.nodeId === node.value.id && sameField(item.field, binding.from.field));
       if (sourceBindings.length > 1) reject('invalid_combination', `${at}/from/field`);
       const field = `${binding.use.field}/args/${binding.argument}`;
@@ -108,7 +110,9 @@ export function resolveLogicUseBindings(input: unknown): UseBindingResolution {
 export function bindLogicUse(document: unknown, binding: LogicUseBinding): unknown {
   if (!record(document)) reject('invalid_value', '');
   const bindings = Object.hasOwn(document, 'logicUseBindings') ? parseBindings(document.logicUseBindings) : [];
-  const next = { ...document, logicUseBindings: [...bindings, binding] };
+  const target = resolveLogicAnchor(document, binding.use);
+  if (!target || !record(target.value) || target.value.type !== 'logic-ref') reject('invalid_reference', '/logicUseBindings/use');
+  const next = { ...document, logicUseBindings: [...bindings, { ...binding, logicId: target.value.logicId }] };
   const resolved = resolveLogicUseBindings(next).bindings.at(-1);
   if (!resolved) throw new Error('Missing checked use binding');
   return replacePointer(next, `${resolved.usePointer}/args/${resolved.argument}`, resolved.sourceId);
