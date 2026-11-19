@@ -11,7 +11,7 @@ import { measureBudget } from './budgets';
 import { copy, fingerprint, record } from './json';
 import type { GraphBudget, GraphDiagnostic, GraphPipelineInputs, GraphPipelineSource, GraphSourceLocation, Immutable, LogicAnchor, TemplateAst } from './types';
 
-export interface RecipeValue { readonly ast: Operand | Predicate; readonly sources: readonly GraphPipelineSource[]; readonly sourceMap: readonly GraphSourceLocation[]; readonly budgets: readonly GraphBudget[]; readonly capabilities: readonly string[] }
+export interface RecipeValue { readonly ast: Operand | Predicate; readonly sources: readonly GraphPipelineSource[]; readonly sourceMap: readonly GraphSourceLocation[]; readonly budgets: readonly GraphBudget[]; readonly capabilities: readonly string[]; readonly diagnostics: readonly GraphDiagnostic[] }
 export type RecipeResult = { readonly ok: true; readonly value: RecipeValue } | { readonly ok: false; readonly errors: readonly GraphDiagnostic[] };
 const recipeAnchor: LogicAnchor = { kind: 'logic', id: 'recipe', field: '/body' };
 const error = (code: GraphDiagnostic['code'], message: string, pointer = ''): Extract<RecipeResult, { ok: false }> => ({ ok: false, errors: [{ severity: 'error', code, message, anchor: recipeAnchor, pointer }] });
@@ -24,7 +24,7 @@ export function allocateGraphId(prefix: string, existing: ReadonlySet<string>): 
   do { id = createId(prefix); } while (existing.has(id));
   return id;
 }
-function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], capabilities: readonly string[] = []): RecipeResult {
+function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], capabilities: readonly string[] = [], diagnostics: readonly GraphDiagnostic[] = []): RecipeResult {
   const condition = predicateBase.safeParse(ast);
   const facts = condition.success ? checkPredicate(condition.data, '') : checkOperand(operandBase.parse(ast), '');
   const issues: CompositionIssue[] = [...facts.issues];
@@ -41,7 +41,7 @@ function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], c
     if (value !== null && typeof value === 'object') Object.entries(value).forEach(([key, inner]) => map(inner, `${pointer}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`));
   };
   map(ast, ''); sources.forEach((source, i) => map(source, `/dataSources/${i}`));
-  return { ok: true, value: { ast, sources, sourceMap, budgets, capabilities: required } };
+  return { ok: true, value: { ast, sources, sourceMap, budgets, capabilities: required, diagnostics } };
 }
 
 export function averageFixed(values: readonly Immutable<Operand>[]): RecipeResult {
@@ -180,7 +180,10 @@ export function lowerListAverage(recipe: ListAverageRecipe): RecipeResult {
   const requirements = [...new Set(sources.flatMap(source => checkGraphPipeline(source, '').capabilities))];
   const missing = requirements.find(capability => !recipe.targetCapabilities.includes(capability));
   if (missing) return error('unsupported_capability', `Target does not support ${missing}.`, '/targetCapabilities');
-  const result = finish(ast, sources, requirements);
+  const result = finish(ast, sources, requirements, strategy === 'two-flow' ? [{
+    severity: 'warning', code: 'average_fallback_overflow', anchor: recipeAnchor, pointer: `/dataSources/0/inputs/steps/${prefix.steps.length}`,
+    message: "On apps without the average step, running totals beyond the finite number range (about +/-1.8e308) cannot be told. An overflowing fallback gives Can't tell, even when the average step could answer. Parity requires every running total to stay finite.",
+  }] : []);
   if (result.ok) {
     const missing = result.value.capabilities.find(capability => !recipe.targetCapabilities.includes(capability));
     if (missing) return error('unsupported_capability', `Target does not support ${missing}.`, '/targetCapabilities');

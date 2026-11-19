@@ -48,6 +48,10 @@ actions, or UI dependencies.
 - `averageFixed` is strict arithmetic. `lowerListAverage` creates an explicit
   average-step or sum/filter-count edit; it never migrates an authored average
   during publish. `lowerFlowBranches` materializes each terminal flow separately.
+  The sum/filter-count fallback is equivalent only while all running totals stay
+  finite. Overflow gives unavailable (Can't tell), even if the supported average
+  step can answer, including cancellation after an overflow. Fallback recipes
+  expose an `average_fallback_overflow` warning for older-app UI.
 - Call `allocateGraphId` once in the authoring transaction and retain the result.
   It uses the repository LAN-HTTP-compatible helper and checks collisions.
   Lifting uses content-and-origin IDs so reordered array positions cannot reuse

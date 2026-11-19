@@ -61,12 +61,13 @@ describe('explicit For Each and strict arithmetic recipes', () => {
   });
 });
 
-describe('G-average target-gated step and exact two-flow fallback', () => {
+describe('G-average target-gated step and finite-total two-flow fallback', () => {
   const recipe = (strategy: 'step' | 'two-flow') => value(lowerListAverage({ id: 'brightness', prefix: brightnessPrefix, value: item, targetCapabilities: capabilities, strategy }));
   it('emits the supported step without silently migrating an authored average', () => {
     const result = recipe('step');
     expect(result.sources).toHaveLength(1);
     expect(result.sources[0].inputs.steps.at(-1)).toEqual({ id: 'average', op: 'average', value: item });
+    expect(result.diagnostics).toEqual([]);
     expect(checkGraphPipeline(result.sources[0], '').issues).toEqual([]);
     expect(lowerListAverage({ id: 'brightness', prefix: brightnessPrefix, value: item, targetCapabilities: [], strategy: 'step' })).toMatchObject({ ok: false });
     const graph = lift(graphSourceSchema.parse(result.sources[0]), { kind: 'flow' }).graph;
@@ -98,13 +99,14 @@ describe('G-average target-gated step and exact two-flow fallback', () => {
     expect(result.sources.map(source => source.inputs.steps.length)).toEqual([2, 3]);
     expect(result.sources[1].inputs.steps.slice(-2)).toEqual([{ id: 'valid', op: 'filter', where: { type: 'exists', value: item } }, { id: 'count', op: 'count' }]);
     expect(result.budgets[0].generatedFlowCount).toBeNull();
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ severity: 'warning', code: 'average_fallback_overflow', message: expect.stringContaining('Parity requires every running total to stay finite.') }));
   });
   it.each<{ rows: Json[]; expected: number | null }>([
     { rows: [], expected: null },
     { rows: [{ brightness: null }, {}], expected: null },
     { rows: [{ brightness: 255 }, {}, { brightness: 0 }], expected: 50 },
     { rows: [{ brightness: 204 }, { brightness: 140 }, { brightness: 130 }, { brightness: null }, {}], expected: (204 + 140 + 130) / 255 * 100 / 3 },
-  ])('matches the supported Average contract for $rows', ({ rows, expected }) => {
+  ])('matches Average when normalized running totals stay finite for $rows', ({ rows, expected }) => {
     const fallback = recipe('two-flow'), reads = new Map<string, Json>();
     for (const source of fallback.sources) {
       const baseline = pipelineSourceSchema.parse(source);
@@ -122,6 +124,27 @@ describe('G-average target-gated step and exact two-flow fallback', () => {
       if (expected === null) expect(run.value).toBeNull();
       else expect(run.value).toBeCloseTo(expected, 12);
     }
+  });
+  it.each([
+    { numbers: [1e308, 1e308], mean: 1e308 },
+    { numbers: [1e308, 1e308, -1e308], mean: 1e308 / 3 },
+    { numbers: [-1e308, -1e308], mean: -1e308 },
+  ])('discloses that an overflowing running total gives unavailable for $numbers', ({ numbers, mean }) => {
+    const prefix = pipelineSourceSchema.parse(recipe('step').sources[0]).inputs;
+    prefix.request = { type: 'none', value: { type: 'literal', value: numbers } };
+    prefix.steps = [];
+    const build = (strategy: 'step' | 'two-flow') => value(lowerListAverage({ id: 'large', prefix, value: { type: 'item', path: [] }, targetCapabilities: capabilities, strategy }));
+    const step = build('step'), fallback = build('two-flow'), reads = new Map<string, Json>();
+    for (const source of fallback.sources) {
+      const run = evaluatePipeline(pipelineSourceSchema.parse(source).inputs, null, {});
+      expect(run.status).toBe('ok');
+      if (run.status === 'ok') reads.set(source.id, run.value);
+    }
+    expect(evaluateOperand(operandBase.parse(fallback.ast), { read: id => ({ status: 'value', value: reads.get(id)! }) })).toEqual({ status: 'unavailable' });
+    expect(fallback.diagnostics).toContainEqual(expect.objectContaining({ code: 'average_fallback_overflow', severity: 'warning' }));
+    const run = evaluatePipeline(pipelineSourceSchema.parse(step.sources[0]).inputs, null, {});
+    expect(run.status).toBe('ok');
+    if (run.status === 'ok') expect(run.value).toBe(mean);
   });
   it('surfaces A-number-state refusal and rejects untyped/text averages', () => {
     expect(lowerListAverage({ id: 'temp', prefix: brightnessPrefix, value: item, targetCapabilities: capabilities, inputKind: 'entity-state' })).toMatchObject({

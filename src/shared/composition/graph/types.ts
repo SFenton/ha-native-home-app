@@ -107,7 +107,7 @@ export interface LogicGraph {
 }
 export interface GraphDiagnostic {
   readonly severity: 'error' | 'warning';
-  readonly code: CompositionIssue['code'] | 'opaque_region' | 'invalid_layout' | 'scope_mismatch' | 'occupied_input' | 'cycle' | 'recipe_disabled';
+  readonly code: CompositionIssue['code'] | 'opaque_region' | 'invalid_layout' | 'scope_mismatch' | 'occupied_input' | 'cycle' | 'recipe_disabled' | 'average_fallback_overflow';
   readonly message: string;
   readonly anchor: LogicAnchor;
   readonly nodeId?: string;
