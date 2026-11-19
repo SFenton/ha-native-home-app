@@ -35,6 +35,7 @@ import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
 import { emitSchemaAccounting, expandSchemaIssues, isAccountingObserverFailure, observeSchemaRefusal, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
+import { readStudioCanvas, type DraftCanvasLayout } from './studio-logic/layout';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
 
@@ -317,6 +318,7 @@ export class CompositionExpansionError extends CompositionValidationError {
     expandedIssues: readonly CompositionIssue[],
     readonly expanded: unknown,
     readonly origins: ReturnType<typeof expandBounded>['origins'],
+    readonly sourceMap: ReturnType<typeof expandBounded>['sourceMap'] = [],
   ) {
     const landings = new Map(issues.map((issue, index) => [issue, expandedIssues[index]]));
     super(issues);
@@ -338,6 +340,9 @@ function compileRecording(input: unknown, options: CompileOptions, references?: 
 /** The same compile with its own expansion landings, for source maps without a second expansion pass. */
 export function compileCompositionDocumentWithOrigins(input: unknown, options: CompileOptions = {}, references?: CompositionDependencies): {
   compiled: CompiledComposition; origins: ReturnType<typeof expandBounded>['origins'];
+  sourceMap: ReturnType<typeof expandBounded>['sourceMap'];
+  useBindings: ReturnType<typeof expandBounded>['useBindings'];
+  layout: DraftCanvasLayout;
 } {
   assertCompositionBounds(input);
   let expansion: ReturnType<typeof expandBounded>;
@@ -347,20 +352,21 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
     if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionValidationError(error.issues.map(issue => ({ ...issue, pointer: `/document${issue.pointer}` })));
     throw error;
   }
+  const provenance = { origins: expansion.origins, sourceMap: expansion.sourceMap, useBindings: expansion.useBindings, layout: readStudioCanvas(input) };
   if (expansion.document === input) {
     const compiled = compilePlain(input, options, true, references);
     // A draft with Show at Most or Spoken As is handed back as authored; `expanded` is what a publication holds.
-    return { compiled: { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
+    return { compiled: { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document }, ...provenance };
   }
   // The draft holds named logic: every use is worked out first, so capabilities, budgets and every other check read plain operands and conditions.
   // An issue inside a worked-out use is reported where the use stands in the draft.
   try {
     const compiled = compilePlain(expansion.document, options, false, references);
-    return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
+    return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, ...provenance };
   } catch (error) {
     if (error instanceof CompositionValidationError && !isAccountingObserverFailure(error)) throw new CompositionExpansionError(
-      remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings),
-      error.issues, expansion.document, expansion.origins,
+      remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings, expansion.useBindings),
+      error.issues, expansion.document, expansion.origins, expansion.sourceMap,
     );
     throw error;
   }

@@ -1,7 +1,8 @@
 import { publishedDocument } from '../src/shared/composition/logic-library';
 import type { CompositionPublication } from '../src/shared/composition/schema';
-import { canonicalCompositionJSON } from '../src/shared/composition/json';
+import { canonicalCompositionJSON, CompositionValidationError } from '../src/shared/composition/json';
 import { HttpError } from './store';
+import { validateCompositionPublication } from './composition';
 
 /** Contract: `fenton_home` integration 1.4.0+, `custom_components/fenton_home/ui_publication.py`. */
 export const MAX_HA_MESSAGE_BYTES = 8 * 1024 * 1024;
@@ -170,7 +171,8 @@ export class HaPublicationClient {
     if (draft === undefined) return summary;
     // The app serves the draft's logic worked out, so that is what is compared; a draft whose logic does not work out is not comparable.
     let served: unknown;
-    try { served = publishedDocument(draft.document); } catch { served = undefined; }
+    try { served = publishedDocument(draft.document); }
+    catch (error) { if (!(error instanceof CompositionValidationError)) throw error; served = undefined; }
     const comparable = summary.current !== null && liveDocument !== undefined && served !== undefined;
     return { ...summary, draftRevision: draft.revision, draftIsLive: comparable ? canonicalCompositionJSON(liveDocument) === canonicalCompositionJSON(served) : null };
   }
@@ -190,7 +192,8 @@ export class HaPublicationClient {
   publish(publication: CompositionPublication): Promise<HaPublishResult> {
     return this.serialize(async () => {
       if (!this.configured) throw new HttpError(503, 'Home Assistant is not configured');
-      const result = await command(this.transport, 'publish', { envelope: publication }, this.shutdown.signal);
+      const prepared = validateCompositionPublication({ ...publication, document: publishedDocument(publication.document) });
+      const result = await command(this.transport, 'publish', { envelope: prepared }, this.shutdown.signal);
       if (!isRecord(result) || typeof result.epoch !== 'string' || typeof result.revision !== 'number' || typeof result.envelopeSha256 !== 'string')
         throw new HttpError(502, 'Home Assistant returned an unreadable publish result');
       return { epoch: result.epoch, revision: result.revision, envelopeSha256: result.envelopeSha256 };

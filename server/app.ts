@@ -16,6 +16,7 @@ import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_E
 import { compositionDocumentSchema } from '../src/shared/composition/schema';
 import { importHouseLayout } from '../src/shared/composition/house-import';
 import { formatCompositionIssue } from '../src/shared/composition/workspace';
+import { prepareDraft } from './studio-logic/prepare';
 
 const revision = z.number().int().positive();
 const writeSchema = z.object({ document: z.unknown(), expectedRevision: revision }).strict();
@@ -150,6 +151,10 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const { capabilities } = compileCompositionDocument(body.document);
     res.json({ valid: true, capabilities });
   });
+  app.post('/native/api/draft/prepare', (req, res) => {
+    const body = z.strictObject({ document: z.unknown() }).parse(req.body);
+    res.json(prepareDraft(body.document));
+  });
   app.post('/native/api/publish', async (req, res) => {
     res.json(await store.native.publish(publishSchema.parse(req.body).expectedRevision));
   });
@@ -184,7 +189,8 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const withoutId = (document: unknown) => canonicalCompositionJSON(document !== null && typeof document === 'object' ? { ...(document as Record<string, unknown>), id: '' } : document);
     // The app serves the draft's logic worked out, so the draft is compared in that form.
     let served: unknown;
-    try { served = publishedDocument(draft.document); } catch { served = draft.document; }
+    try { served = publishedDocument(draft.document); }
+    catch (error) { if (!(error instanceof CompositionValidationError)) throw error; answer('ask', 'invalid-draft', liveLayout.revision); return; }
     if (withoutId(liveLayout.document) === withoutId(served)) { answer('keep', 'already-published', liveLayout.revision); return; }
     const revision = liveLayout.revision;
     // The draft differs from what the app serves. It has edits of its own unless it is what this Studio last published

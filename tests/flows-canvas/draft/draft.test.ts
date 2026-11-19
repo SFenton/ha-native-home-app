@@ -1,0 +1,220 @@
+import { describe, expect, it } from 'vitest';
+import { compileCompositionDocument, compileCompositionDocumentWithOrigins, compositionDependencies, CompositionExpansionError } from '../../../src/shared/composition/compiler';
+import { expandDocument } from '../../../src/shared/composition/components';
+import { lift } from '../../../src/shared/composition/graph/lift';
+import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
+import { assertNoLogic, publishedDocument, usesLogic } from '../../../src/shared/composition/logic-library';
+import { atPointer, bindLogicUse, MAX_LOGIC_USE_BINDINGS, readStudioCanvas, replacePointer, unbindLogicUse } from '../../../src/shared/composition/studio-logic';
+import { binding, draftDocument, labelTemplate, read, tile, useField } from './fixtures';
+
+const prepared = (document: unknown) => compileCompositionDocument(document).expanded;
+const get = (document: unknown, pointer: string) => atPointer(document, pointer);
+const failure = (document: unknown) => {
+  try { compileCompositionDocument(document); throw new Error('Expected refusal'); }
+  catch (error) { if (!(error instanceof CompositionValidationError)) throw error; return error.issues; }
+};
+
+describe('D-layout: presentation is expendable, authored JSON is not', () => {
+  it.each([null, 'unusable', { version: 22, future: ['keep me'] }, { version: 1, canvases: [{ nodes: 'bad' }] }])('retains invalid/unknown layout %j without changing compilation', studioCanvas => {
+    const document = { ...draftDocument(), studioCanvas };
+    const result = compileCompositionDocumentWithOrigins(document);
+    expect(result.compiled.document).toEqual(document);
+    expect(result.compiled.expanded).toEqual(prepared(draftDocument()));
+    expect(result.compiled.capabilities).toEqual(compileCompositionDocument(draftDocument()).capabilities);
+    expect(result.layout).toMatchObject({ raw: studioCanvas, warnings: [{ code: 'invalid_layout', message: "Saved layout can't be used." }] });
+  });
+
+  it('retains valid anchored positions; stale owners/origins and ambiguous associations warn and fall back', () => {
+    const document = draftDocument();
+    const anchor = { kind: 'logic', id: 'tile-label', field: '/body' } as const;
+    const graph = lift(labelTemplate.body, { kind: 'operand', anchor }).graph;
+    const studioCanvas = {
+      version: 1, canvases: [{ id: 'layout', roots: [anchor], nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 384, y: 240 })) }],
+    };
+    // A standalone graph uses fragment-relative origins. Whole-document extraction uses absolute origins.
+    const stored = { ...studioCanvas, canvases: studioCanvas.canvases.map(canvas => ({ ...canvas, nodes: canvas.nodes.map(node => ({ ...node, origins: node.origins.map(origin => `/logicLibrary/0/body${origin}`) })) })) };
+    expect(readStudioCanvas({ ...document, studioCanvas: stored }).metadata).toEqual(stored);
+    expect(lift(labelTemplate.body, { kind: 'operand', anchor, metadata: studioCanvas }).graph.nodes[0].position).toEqual({ x: 384, y: 240 });
+    for (const metadata of [
+      { ...stored, canvases: [stored.canvases[0], stored.canvases[0]] },
+      { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...anchor, id: 'removed' }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ id: 'stale', origins: ['/logicLibrary/99/body'], x: 10, y: 20 }] }] },
+    ]) {
+      expect(readStudioCanvas({ ...document, studioCanvas: metadata })).toMatchObject({ raw: metadata, warnings: [{ code: 'invalid_layout' }] });
+      expect(prepared({ ...document, studioCanvas: metadata })).toEqual(prepared(document));
+    }
+  });
+
+  it('never applies an old array position to a different lifted node', () => {
+    const original = { type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] };
+    const anchor = { kind: 'logic', id: 'sum', field: '/body' } as const;
+    const first = lift(original, { kind: 'operand', anchor });
+    const metadata = { version: 1, canvases: [{ id: 'sum', roots: [anchor], nodes: first.graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 999, y: 999 })) }] };
+    const reordered = lift({ ...original, args: [...original.args].reverse() }, { kind: 'operand', anchor, metadata });
+    expect(reordered.warnings.some(warning => warning.code === 'invalid_layout')).toBe(true);
+    expect(reordered.graph.nodes.every(node => node.position?.x !== 999)).toBe(true);
+  });
+
+  it('still refuses invalid AST and unsafe/oversized outer JSON', () => {
+    expect(failure({ ...draftDocument(), studioCanvas: { version: 99 }, name: 7 })).toContainEqual({ code: 'invalid_value', pointer: '/document/name' });
+    expect(failure({ ...draftDocument(), studioCanvas: { unsafe: Number.POSITIVE_INFINITY } })).toContainEqual({ code: 'invalid_value', pointer: '/studioCanvas/unsafe' });
+    expect(failure({ ...draftDocument(), studioCanvas: { large: 'x'.repeat(2_097_152) } })).toContainEqual({ code: 'limit_exceeded', pointer: '/document' });
+  });
+});
+
+describe('D-binding: each use resolves only its source-valued tile field', () => {
+  it('resolves two different tiles afresh without mutating their stale cached args', () => {
+    const document = draftDocument(), before = structuredClone(document);
+    const expanded = prepared(document);
+    expect(get(expanded, '/pages/0/components/0/props/subtitle/value/from/sourceId')).toBe('source-a');
+    expect(get(expanded, '/pages/0/components/1/props/subtitle/value/from/sourceId')).toBe('source-b');
+    expect(document).toEqual(before);
+    const reversed = { ...document, pages: document.pages.map(page => ({ ...page, components: [...page.components].reverse() })) };
+    expect(get(prepared(reversed), '/pages/0/components/0/props/subtitle/value/from/sourceId')).toBe('source-b');
+    const dependencies = compositionDependencies(compileCompositionDocument(document).document);
+    expect(dependencies.complete).toBe(true);
+    expect(dependencies.issues).toEqual([]);
+    expect(dependencies.edges).toContainEqual(expect.objectContaining({
+      target: { type: 'source', id: 'source-b' },
+      path: ['pages', 0, 'components', 1, 'props', 'subtitle', 'value', 'from', 'sourceId'],
+    }));
+  });
+
+  it('adds and removes automatic fill in one immutable edit with a current explicit argument', () => {
+    const document = { ...draftDocument(), logicUseBindings: [] };
+    const bound = bindLogicUse(document, binding('tile-b'));
+    expect(get(bound, '/pages/0/components/1/props/subtitle/value/args/source')).toBe('source-b');
+    const moved = replacePointer(bound, '/pages/0/components/1/props/titleProviderId', 'source-a');
+    const unbound = unbindLogicUse(moved, 0);
+    expect(get(unbound, '/pages/0/components/1/props/subtitle/value/args/source')).toBe('source-a');
+    expect(get(unbound, '/logicUseBindings')).toEqual([]);
+    expect(document.logicUseBindings).toEqual([]);
+    expect(prepared(unbound)).toBeDefined();
+  });
+
+  it.each([
+    ['/logicUseBindings/0/use/nodeId', 'removed', '/document/logicUseBindings/0/use'],
+    ['/logicUseBindings/0/use/id', 'removed', '/document/logicUseBindings/0/use'],
+    ['/logicUseBindings/0/argument', 'missing', '/document/logicUseBindings/0/argument'],
+    ['/logicLibrary/0/params/0/kind', 'text', '/document/logicUseBindings/0/argument'],
+    ['/logicUseBindings/0/from/field', '/action/pageId', '/document/logicUseBindings/0/from/field'],
+    ['/pages/0/components/0/props/titleProviderId', 12, '/document/logicUseBindings/0/from/field'],
+    ['/pages/0/components/0/props/subtitle/value', { type: 'literal', value: 'no longer a ref' }, '/document/logicUseBindings/0/use'],
+    ['/pages/0/components/0/props/subtitle/value/logicId', 'removed', '/document/logicUseBindings/0/argument'],
+    ['/pages/0/components/0/props/subtitle/value/args/source', 7, '/document/pages/0/components/0/props/subtitle/value/args/source'],
+  ])('refuses stale/invalid binding %s', (path, value, pointer) => {
+    expect(failure(replacePointer(draftDocument(), path, value))).toEqual([expect.objectContaining({ pointer })]);
+  });
+
+  it('refuses duplicate targets, unknown fields, unsupported selectors, ambiguous IDs and the 129th binding', () => {
+    const document = draftDocument();
+    expect(failure({ ...document, logicUseBindings: [binding('tile-a'), binding('tile-a')] })).toContainEqual({ code: 'invalid_combination', pointer: '/document/logicUseBindings/1' });
+    expect(failure({ ...document, logicUseBindings: [{ ...binding('tile-a'), unexpected: true }] })).toContainEqual({ code: 'unknown_field', pointer: '/document/logicUseBindings/0/unexpected' });
+    expect(failure({ ...document, logicUseBindings: [{ ...binding('tile-a'), from: { kind: 'ancestor', field: '/props/titleProviderId' } }] })[0].pointer).toBe('/document/logicUseBindings/0/from/kind');
+    expect(failure({ ...document, logicUseBindings: Array.from({ length: MAX_LOGIC_USE_BINDINGS + 1 }, () => binding('tile-a')) })).toContainEqual({ code: 'limit_exceeded', pointer: '/document/logicUseBindings' });
+    const duplicate = { ...document, pages: [{ ...document.pages[0], components: [tile('tile-a', 'source-a'), tile('tile-a', 'source-b')] }] };
+    expect(failure(duplicate)[0].pointer).toBe('/document/logicUseBindings/0/use');
+  });
+
+  it('does not infer a tile from a document pointer, ancestor or literal data', () => {
+    const document = draftDocument();
+    const field = '/pages/0/components/0/props/subtitle/value';
+    const use = { kind: 'document', id: document.id, field, fingerprint: canonicalCompositionJSON(get(document, field)) };
+    expect(failure({ ...document, logicUseBindings: [{ ...binding('tile-a'), use }] })[0].pointer).toBe('/document/logicUseBindings/0/use');
+    const fakeTile = replacePointer(document, '/pages/0/components/0/type', 'text');
+    expect(failure(fakeTile)[0].pointer).toBe('/document/logicUseBindings/0/from/field');
+  });
+
+  it('carries tile settings through component argument expansion and private-source remapping', () => {
+    const document = draftDocument(), node = tile('inner-tile', 'source-a');
+    const componentBinding = { ...binding('inner-tile'), use: { kind: 'component', id: 'saved-tile', nodeId: 'inner-tile', field: useField } };
+    const component = {
+      id: 'saved-tile', name: 'Saved tile', params: [{ name: 'source', kind: 'source-id', label: 'Entity' }],
+      bindings: [{ param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }], node,
+    };
+    const uses = ['source-a', 'source-b'].map((source, index) => ({ id: `place-${index}`, type: 'component-ref', componentId: component.id, layout: { span: 1 }, args: { source } }));
+    const doc = { ...document, componentLibrary: [component], logicUseBindings: [componentBinding], pages: [{ ...document.pages[0], components: uses }] };
+    const compiled = compileCompositionDocument(doc), drawn = expandDocument(compiled.expanded);
+    expect(drawn.pages[0].components.map(node => get(node, '/props/subtitle/value/from/sourceId'))).toEqual(['source-a', 'source-b']);
+    expect(get(compiled.expanded, '/componentLibrary/0/bindings')).toEqual([
+      component.bindings[0], { param: 'source', nodeId: 'inner-tile', field: 'props/subtitle/value/from/sourceId' },
+    ]);
+    const privateDoc = {
+      ...doc,
+      componentLibrary: [{ ...component, node: tile('inner-tile', 'private'), params: [], bindings: [], sources: [{ id: 'private', kind: 'ha-entity', entityId: { type: 'literal', value: 'sensor.demo_private' } }] }],
+      pages: [{ ...document.pages[0], components: uses.map(({ args: _args, ...use }) => use) }],
+    };
+    const privateDrawn = expandDocument(compileCompositionDocument(privateDoc).expanded);
+    expect(privateDrawn.pages[0].components.map(node => get(node, '/props/subtitle/value/from/sourceId'))).toEqual(['place-0~private', 'place-1~private']);
+    expect(privateDrawn.dataSources.map(source => source.id)).toEqual(expect.arrayContaining(['place-0~private', 'place-1~private']));
+    expect(doc.componentLibrary[0].bindings).toEqual(component.bindings);
+    const defaults = {
+      ...doc,
+      componentLibrary: [{ ...component, node: tile('inner-tile', 'source-b') }],
+    };
+    expect(get(compileCompositionDocument(defaults).expanded, '/componentLibrary/0/node/props/subtitle/value/from/sourceId')).toBe('source-b');
+    expect(compileCompositionDocumentWithOrigins(defaults).sourceMap).toContainEqual(expect.objectContaining({
+      pointer: '/componentLibrary/0/bindings/1', authoredPointer: '/logicUseBindings/0', usePointer: '/componentLibrary/0/node/props/subtitle/value',
+    }));
+    const invalidLanding = replacePointer(defaults, '/logicLibrary/0/body', { type: 'literal', value: { type: 'hole', name: 'source' } });
+    expect(failure(invalidLanding)).toContainEqual({ code: 'binding_type', pointer: '/document/logicUseBindings/0' });
+  });
+});
+
+describe('D-strip and compiler provenance', () => {
+  it('strips root Studio fields without deleting equally named literal properties', () => {
+    const literal = { type: 'literal', value: { studioCanvas: { version: 40 }, logicUseBindings: [], logicLibrary: 'literal data' } };
+    const document = { ...draftDocument(), studioCanvas: { version: 50 }, data: literal };
+    // The expander is usable for fragments; native document validation still rejects unrelated root fields.
+    const stripped = publishedDocument(document);
+    expect(get(stripped, '/data')).toEqual(literal);
+    expect(get(stripped, '/studioCanvas')).toBeUndefined();
+    expect(get(stripped, '/logicUseBindings')).toBeUndefined();
+    expect(get(stripped, '/logicLibrary')).toBeUndefined();
+    expect(usesLogic({ studioCanvas: { type: 'logic-ref', args: {} } })).toBe(false);
+    expect(JSON.stringify(prepared({ ...draftDocument(), studioCanvas: { version: 50 } }))).not.toMatch(/logic-ref|"hole"|logicLibrary|studioCanvas|logicUseBindings/);
+    for (const key of ['studioCanvas', 'logicUseBindings']) {
+      expect(() => assertNoLogic({ ...prepared(draftDocument()), [key]: [] })).toThrow(CompositionValidationError);
+    }
+  });
+
+  it('maps every template landing and bound source to the authored use, argument and tile', () => {
+    const document = draftDocument();
+    const result = compileCompositionDocumentWithOrigins(document);
+    const root = '/pages/0/components/1/props/subtitle/value';
+    expect(result.sourceMap).toContainEqual({
+      pointer: `${root}/from/sourceId`, authoredPointer: `${root}/args/source`, usePointer: root,
+      bindingPointer: '/logicUseBindings/1', sourcePointer: '/pages/0/components/1/props/titleProviderId',
+    });
+    expect(result.sourceMap).toContainEqual({ pointer: root, authoredPointer: '/logicLibrary/0/body', usePointer: root });
+    const walk = (value: unknown, path: string) => {
+      expect(result.sourceMap.some(location => location.pointer === path)).toBe(true);
+      if (value !== null && typeof value === 'object') Object.entries(value).forEach(([key, inner]) => walk(inner, `${path}/${key}`));
+    };
+    walk(get(result.compiled.expanded, root), root);
+  });
+
+  it('retains copied-argument origins through nested references and failure landings', () => {
+    const document = draftDocument();
+    const identity = { id: 'identity', name: 'Identity', kind: 'operand', params: [{ name: 'value', kind: 'operand' }], body: { type: 'math', op: 'add', args: [{ type: 'hole', name: 'value' }, { type: 'hole', name: 'value' }] } };
+    const nested = { id: 'nested', name: 'Nested', kind: 'operand', params: [{ name: 'value', kind: 'operand' }], body: { type: 'logic-ref', logicId: 'identity', args: { value: { type: 'hole', name: 'value' } } } };
+    const root = '/pages/0/components/0/props/subtitle/value';
+    const ref = { type: 'logic-ref', logicId: 'nested', args: { value: { type: 'literal', value: 3 } } };
+    const doc = replacePointer({ ...document, logicLibrary: [identity, nested], logicUseBindings: [] }, root, ref);
+    // The other use is removed so this fixture only exercises nested argument copies.
+    const one = replacePointer(doc, '/pages/0/components/1/props/subtitle/value', { type: 'literal', value: 'unchanged' });
+    const result = compileCompositionDocumentWithOrigins(one);
+    for (const index of [0, 1]) expect(result.sourceMap).toContainEqual({
+      pointer: `${root}/args/${index}/value`, authoredPointer: `${root}/args/value/value`, usePointer: root,
+    });
+    const invalid = replacePointer(one, `${root}/args/value`, read('removed-source'));
+    try { compileCompositionDocumentWithOrigins(invalid); throw new Error('Expected refusal'); }
+    catch (error) {
+      expect(error).toBeInstanceOf(CompositionExpansionError);
+      if (!(error instanceof CompositionExpansionError)) throw error;
+      expect(error.issues[0].pointer).toBe(`/document${root}/args`);
+      expect(error.sourceMap.some(location => location.authoredPointer === `${root}/args/value`)).toBe(true);
+      expect(error.expandedIssues[0].pointer).toContain(`/document${root}/args/`);
+    }
+  });
+});

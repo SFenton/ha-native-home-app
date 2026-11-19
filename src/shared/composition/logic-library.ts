@@ -3,6 +3,8 @@ import { identifierSchema } from '../validation';
 import { operandBase, parameterName, predicateBase, type BudgetAccountingObserver } from './expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, reject, type CompositionIssue } from './json';
 import { observeStructuralRefusals } from './studio-logic/accounting';
+import { prepareStudioDocument } from './studio-logic/prepare';
+import type { ResolvedUseBinding } from './studio-logic/bindings';
 
 /**
  * Reusable named logic, for the Studio only. A document's draft holds a `logicLibrary` and `logic-ref` uses; {@link expandLogic} works every use out
@@ -63,6 +65,13 @@ export type LogicHole = z.infer<typeof logicHoleSchema>;
 
 /** One use in the draft that expansion replaced. `pointer` is the use's place in the draft, and equals its place in the expanded document. */
 export interface LogicOrigin { pointer: string; logicId: string }
+export interface LogicSourceLocation {
+  pointer: string;
+  authoredPointer: string;
+  usePointer: string;
+  bindingPointer?: string;
+  sourcePointer?: string;
+}
 export interface LogicExpansion {
   /** The document with every use worked out and `logicLibrary` removed; the same object when the document holds no logic. */
   document: unknown;
@@ -72,6 +81,8 @@ export interface LogicExpansion {
    * so an issue about a worked-out binding can be reported at the binding the author wrote.
    */
   bindings: Record<number, number[]>;
+  sourceMap: LogicSourceLocation[];
+  useBindings: readonly ResolvedUseBinding[];
 }
 
 // MARK: Helpers
@@ -82,14 +93,14 @@ const own = (value: Rec, key: string): unknown => Object.hasOwn(value, key) ? va
 
 /** Whether the document holds a `logicLibrary`, a `logic-ref` or a `hole` anywhere. */
 export function usesLogic(document: unknown): boolean {
-  if (isRecord(document) && Object.hasOwn(document, 'logicLibrary')) return true;
+  if (isRecord(document) && (Object.hasOwn(document, 'logicLibrary') || document.type === 'logic-ref' || document.type === 'hole')) return true;
   const visit = (value: unknown): boolean => {
     if (Array.isArray(value)) return value.some(visit);
     if (!isRecord(value)) return false;
     if (value.type === 'logic-ref' || value.type === 'hole') return true;
     return Object.values(value).some(visit);
   };
-  return visit(document);
+  return isRecord(document) ? Object.entries(document).some(([key, value]) => !['studioCanvas', 'logicUseBindings'].includes(key) && visit(value)) : visit(document);
 }
 
 /**
@@ -97,7 +108,9 @@ export function usesLogic(document: unknown): boolean {
  * document in whatever envelope the caller checks.
  */
 export function assertNoLogic(document: unknown, base = '/document'): void {
-  if (isRecord(document) && Object.hasOwn(document, 'logicLibrary')) reject('unknown_field', pointer(base, 'logicLibrary'));
+  if (isRecord(document)) for (const key of ['logicLibrary', 'studioCanvas', 'logicUseBindings']) {
+    if (Object.hasOwn(document, key)) reject('unknown_field', pointer(base, key));
+  }
   const visit = (value: unknown, at: string): void => {
     if (Array.isArray(value)) { value.forEach((item, index) => visit(item, pointer(at, index))); return; }
     if (!isRecord(value)) return;
@@ -163,6 +176,7 @@ interface Frame {
   sizes?: Record<string, number>;
   /** Where every issue found under this frame is reported: the use's `args` pointer (or the library body). */
   collapse?: string;
+  argumentOrigins?: Record<string, { pointer: string; locations: LogicSourceLocation[] }>;
 }
 
 interface LogicAccounting { observer: BudgetAccountingObserver; at: string }
@@ -171,6 +185,7 @@ let expansionAccounting: WeakMap<Expander, LogicAccounting> | undefined;
 class Expander {
   readonly issues: CompositionIssue[] = [];
   readonly origins: LogicOrigin[] = [];
+  readonly sourceMap: LogicSourceLocation[] = [];
   private produced = 0;
   /** Whether the budget has run out. */
   exhausted = false;
@@ -191,18 +206,22 @@ class Expander {
     return false;
   }
 
-  walk(value: unknown, at: string, frame: Frame, hooks?: ReadonlyMap<object, Hook[]>): unknown {
+  walk(value: unknown, at: string, frame: Frame, hooks?: ReadonlyMap<object, Hook[]>, location?: LogicSourceLocation): unknown {
     if (frame.stack.length > 0 && !this.charge(1, at, frame)) return value;
-    if (Array.isArray(value)) return value.map((item, index) => this.walk(item, pointer(at, index), frame, hooks));
+    if (isRecord(value) && value.type === 'hole') return this.hole(value, at, frame, location);
+    if (isRecord(value) && value.type === 'logic-ref') return this.use(value, at, frame, hooks, location);
+    if (location) this.sourceMap.push(location);
+    const child = (key: string | number): LogicSourceLocation | undefined => location && {
+      ...location, pointer: pointer(location.pointer, key), authoredPointer: pointer(location.authoredPointer, key),
+    };
+    if (Array.isArray(value)) return value.map((item, index) => this.walk(item, pointer(at, index), frame, hooks, child(index)));
     if (!isRecord(value)) return value;
-    if (value.type === 'hole') return this.hole(value, at, frame);
-    if (value.type === 'logic-ref') return this.use(value, at, frame, hooks);
     const out: Rec = {};
-    for (const [key, inner] of Object.entries(value)) out[key] = this.walk(inner, pointer(at, key), frame, hooks);
+    for (const [key, inner] of Object.entries(value)) out[key] = this.walk(inner, pointer(at, key), frame, hooks, child(key));
     return out;
   }
 
-  private hole(value: Rec, at: string, frame: Frame): unknown {
+  private hole(value: Rec, at: string, frame: Frame, location?: LogicSourceLocation): unknown {
     const extra = Object.keys(value).filter(key => key !== 'type' && key !== 'name');
     for (const key of extra) this.report('unknown_field', pointer(at, key), frame);
     const name = value.name;
@@ -211,10 +230,17 @@ class Expander {
     if (!frame.env || !Object.hasOwn(frame.env, name)) { this.report('invalid_reference', at, frame); return value; }
     // A hole copies its whole argument: charge it before copying, so a body with many holes and a large argument cannot grow past the budget.
     if (!this.charge(frame.sizes?.[name] ?? 1, at, frame)) return value;
+    if (location) {
+      const source = frame.argumentOrigins?.[name];
+      if (source) this.sourceMap.push(...source.locations.map(item => ({
+        ...item, pointer: `${location.pointer}${item.pointer.slice(source.pointer.length)}`,
+      })));
+      else this.sourceMap.push(location);
+    }
     return structuredClone(frame.env[name]);
   }
 
-  private use(value: Rec, at: string, frame: Frame, hooks: ReadonlyMap<object, Hook[]> | undefined): unknown {
+  private use(value: Rec, at: string, frame: Frame, hooks: ReadonlyMap<object, Hook[]> | undefined, location?: LogicSourceLocation): unknown {
     const topLevel = frame.stack.length === 0 && frame.collapse === undefined;
     let ok = true;
     for (const key of Object.keys(value).filter(key => !['type', 'logicId', 'args'].includes(key))) { this.report('unknown_field', pointer(at, key), frame); ok = false; }
@@ -229,11 +255,17 @@ class Expander {
     for (const name of Object.keys(rawArgs)) if (!declared.has(name)) { this.report('unknown_field', pointer(pointer(at, 'args'), name), frame); ok = false; }
     // The arguments are worked out in the place of the use: a hole in one is the enclosing entry's, a use in one is a use of its own.
     const env: Rec = {}, real: Rec = {}, sizes: Record<string, number> = {};
+    const argumentOrigins: NonNullable<Frame['argumentOrigins']> = {};
     const bound = hooks?.get(value) ?? [];
     for (const param of entry.params) {
       const slot = pointer(pointer(at, 'args'), param.name);
       if (!Object.hasOwn(rawArgs, param.name)) { this.report('missing_required', slot, frame); ok = false; continue; }
-      const arg = this.walk(rawArgs[param.name], slot, frame);
+      const start = this.sourceMap.length;
+      const arg = this.walk(rawArgs[param.name], slot, frame, undefined, {
+        pointer: slot, authoredPointer: pointer(pointer(location?.authoredPointer ?? at, 'args'), param.name),
+        usePointer: location?.usePointer ?? at,
+      });
+      argumentOrigins[param.name] = { pointer: slot, locations: this.sourceMap.splice(start) };
       // While a template's own body is worked out, an argument that is one of its settings (a kept hole) is checked when the template is used.
       const accounting = expansionAccounting?.get(this);
       if (!(this.keep && holdsKeptHole(arg, this.keep)) && !argFits(param.kind, arg, accounting?.observer, accounting ? `${accounting.at}${slot}` : undefined)) { this.report('invalid_value', slot, frame); ok = false; continue; }
@@ -256,8 +288,11 @@ class Expander {
       }
       known.hooks.push(hook);
     }
-    const inner: Frame = { env, sizes, stack: [...frame.stack, logicId], collapse: frame.collapse ?? pointer(at, 'args') };
-    let result = this.walk(entry.body, pointer(at, 'body'), inner);
+    const inner: Frame = { env, sizes, argumentOrigins, stack: [...frame.stack, logicId], collapse: frame.collapse ?? pointer(at, 'args') };
+    const libraryIndex = [...this.library.keys()].indexOf(logicId);
+    let result = this.walk(entry.body, pointer(at, 'body'), inner, undefined, {
+      pointer: location?.pointer ?? at, authoredPointer: `/logicLibrary/${libraryIndex}/body`, usePointer: location?.usePointer ?? at,
+    });
     for (const { mark, original, hooks: marked } of marks.values()) {
       const landings = findMark(result, mark);
       for (const hook of marked) hook.landings = landings;
@@ -412,10 +447,13 @@ export function expandKeepingHoles(library: readonly LogicEntry[], value: unknow
 
 /** {@link expandLogic} for a document whose bounds were already asserted. */
 export function expandBounded(document: unknown, observer?: BudgetAccountingObserver, accountingAt = ''): LogicExpansion {
-  if (!isRecord(document) || !usesLogic(document)) return { document, origins: [], bindings: {} };
+  const prepared = prepareStudioDocument(document);
+  document = prepared.document;
+  if (!isRecord(document) || !usesLogic(document)) return { document, origins: [], bindings: {}, sourceMap: [], useBindings: prepared.bindings };
   const checked = checkLibrary(document.logicLibrary === undefined ? [] : document.logicLibrary, observer, accountingAt);
   if (checked.issues.length) throw new CompositionValidationError(checked.issues);
   const expander = checked.expander ?? new Expander(new Map());
+  expander.sourceMap.length = 0;
   const top: Frame = { stack: [] };
   const out: Rec = {}, bindings: Record<number, number[]> = {};
   for (const [key, value] of Object.entries(document)) {
@@ -424,7 +462,21 @@ export function expandBounded(document: unknown, observer?: BudgetAccountingObse
     else out[key] = expander.walk(value, pointer('', key), top);
   }
   if (expander.issues.length) throw new CompositionValidationError(expander.issues);
-  return { document: out, origins: expander.origins, bindings };
+  const sourceMap = expander.sourceMap.map(location => {
+    const binding = prepared.bindings.find(item => location.authoredPointer === `${item.usePointer}/args/${item.argument}`);
+    return binding ? { ...location, bindingPointer: binding.pointer, sourcePointer: binding.sourcePointer } : location;
+  });
+  for (const binding of prepared.bindings) {
+    const generated = /^\/componentLibrary\/(\d+)\/bindings\/(\d+)$/.exec(binding.componentBindingPointer ?? '');
+    if (!generated) continue;
+    bindings[Number(generated[1])]?.forEach((original, index) => {
+      if (original === Number(generated[2])) sourceMap.push({
+        pointer: `/componentLibrary/${generated[1]}/bindings/${index}`,
+        authoredPointer: binding.pointer, usePointer: binding.usePointer, bindingPointer: binding.pointer, sourcePointer: binding.sourcePointer,
+      });
+    });
+  }
+  return { document: out, origins: expander.origins, bindings, sourceMap, useBindings: prepared.bindings };
 }
 
 function expandComponent(expander: Expander, entry: unknown, at: string, mapped: (draftIndexes: number[]) => void): unknown {
@@ -458,7 +510,7 @@ function expandComponent(expander: Expander, entry: unknown, at: string, mapped:
  * it stands), one inside the worked-out text (the budgets: depth, nodes, condition nodes) moves to the use's `args` pointer. `prefix` is what the
  * compiler puts before a pointer (`/document`).
  */
-export function remapLogicIssues(issues: readonly CompositionIssue[], origins: readonly LogicOrigin[], prefix = '/document', bindings: Record<number, number[]> = {}): CompositionIssue[] {
+export function remapLogicIssues(issues: readonly CompositionIssue[], origins: readonly LogicOrigin[], prefix = '/document', bindings: Record<number, number[]> = {}, useBindings: readonly ResolvedUseBinding[] = []): CompositionIssue[] {
   if (origins.length === 0 && Object.keys(bindings).length === 0) return [...issues];
   return issues.map(issue => {
     if (!issue.pointer.startsWith(prefix)) return issue;
@@ -467,7 +519,10 @@ export function remapLogicIssues(issues: readonly CompositionIssue[], origins: r
     const binding = /^\/componentLibrary\/(\d+)\/bindings\/(\d+)(\/.*)?$/.exec(local);
     if (binding && bindings[Number(binding[1])]) {
       const draftIndex = bindings[Number(binding[1])][Number(binding[2])];
-      if (draftIndex !== undefined) return { ...issue, pointer: `${prefix}/componentLibrary/${binding[1]}/bindings/${draftIndex}${binding[3] ?? ''}` };
+      if (draftIndex !== undefined) {
+        const generated = useBindings.find(item => item.componentBindingPointer === `/componentLibrary/${binding[1]}/bindings/${draftIndex}`);
+        return { ...issue, pointer: generated ? `${prefix}${generated.pointer}` : `${prefix}/componentLibrary/${binding[1]}/bindings/${draftIndex}${binding[3] ?? ''}` };
+      }
     }
     const hit = origins.find(origin => local === origin.pointer || local.startsWith(`${origin.pointer}/`));
     if (!hit) return issue;
