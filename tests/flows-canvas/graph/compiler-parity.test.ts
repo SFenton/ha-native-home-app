@@ -396,6 +396,17 @@ describe('adversarial flow-input compiler comparison', () => {
 });
 
 describe('synthetic fragment native pipeline limits', () => {
+  it('retains compiler-recorded entity endpoints across a checked source bundle', () => {
+    const source = flow('entity-count', {
+      request: { type: 'entities', entityIds: [{ type: 'literal', value: 'light.demo_one' }], attributes: [] },
+      steps: [{ id: 'reduce', op: 'count' }],
+    });
+    const facts = compiler.checkCompositionPipelineBundle([source]);
+    expect(facts.issues).toEqual([]);
+    expect(facts.entities).toEqual([{ id: 'light.demo_one', path: '/dataSources/0/inputs/request/entityIds/0' }]);
+    expect(facts.entities).toEqual(facts.sources[0].entities);
+  });
+
   it.each([128, 129])('accounts for %i pipelines across recursion without checking any source twice', count => {
     const sources = Array.from({ length: count }, (_, i) => flow(`fragment-${i}`));
     const baseline = compileCompositionDocument(emptyDocument()), native = nativeRun(withSources(emptyDocument(), sources));

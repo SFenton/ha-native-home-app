@@ -73,14 +73,14 @@ export function checkCompositionPipelineBundle(sources: readonly PipelineSource[
     try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1); }
     catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
-      return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), reads: [], dependencies: [], capabilities: [] };
+      return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), entities: [], reads: [], dependencies: [], capabilities: [] };
     }
   });
   const dependencies = facts.flatMap(fact => fact.dependencies);
   const issues = [...facts.flatMap(fact => fact.issues), ...compositionDependencyIssues(dependencies)];
   return {
     sources: facts, issues: issues.length ? new CompositionValidationError(issues).issues : [],
-    reads: facts.flatMap(fact => fact.reads), dependencies,
+    entities: facts.flatMap(fact => fact.entities), reads: facts.flatMap(fact => fact.reads), dependencies,
     capabilities: [...new Set(facts.flatMap(fact => fact.capabilities))].sort(),
   };
 }

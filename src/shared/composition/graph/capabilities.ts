@@ -13,7 +13,7 @@ export function checkGraphPipeline(source: GraphPipelineSource, at: string): Pip
   try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), at); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
-    return { issues: error.issues.map(issue => ({ ...issue, pointer: at + issue.pointer })), reads: [], dependencies: [], capabilities: [] };
+    return { issues: error.issues.map(issue => ({ ...issue, pointer: at + issue.pointer })), entities: [], reads: [], dependencies: [], capabilities: [] };
   }
 }
 export function typingSteps(steps: GraphPipelineSource['inputs']['steps']) {
