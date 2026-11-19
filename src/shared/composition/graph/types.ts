@@ -1,5 +1,5 @@
 import type { Json } from '../../types';
-import type { Operand, Predicate } from '../expression';
+import type { CallService, Operand, Predicate } from '../expression';
 import type { ReadResult, Tri, Viewer } from '../evaluator';
 import type { CompositionIssue } from '../json';
 import type { LogicEntry, LogicHole, LogicRef } from '../logic-library';
@@ -10,6 +10,10 @@ export type Immutable<T> = T extends (...args: never[]) => unknown ? T
   : T extends readonly (infer U)[] ? readonly Immutable<U>[]
     : T extends object ? { readonly [K in keyof T]: Immutable<T[K]> } : T;
 export type GraphJSON = Immutable<Json>;
+/** Stable structural boundary while PR #20's exports are pending. */
+export type GraphPipelineStep = PipelineStep | { id: string; op: 'average'; value: Operand };
+export type GraphPipelineInputs = Omit<PipelineInputs, 'steps'> & { steps: GraphPipelineStep[] };
+export type GraphPipelineSource = Omit<PipelineSource, 'inputs'> & { inputs: GraphPipelineInputs };
 
 export type LogicAnchor =
   | { readonly kind: 'page' | 'modal' | 'component' | 'logic' | 'flow'; readonly id: string; readonly nodeId?: string; readonly field: string }
@@ -40,14 +44,16 @@ export type TemplateAst<T> = T extends readonly (infer U)[] ? TemplateAst<U>[]
 
 export type GraphPayload =
   | { readonly kind: 'operand'; readonly value: Immutable<Operand> }
+  | { readonly kind: 'source-selection'; readonly value: string }
   | { readonly kind: 'condition'; readonly value: Immutable<Predicate> }
+  | { readonly kind: 'call'; readonly value: Immutable<CallService> }
   | { readonly kind: 'template'; readonly value: Immutable<TemplateAst<Operand | Predicate>>; readonly representation: 'operand' | 'condition' }
   | { readonly kind: 'logic-ref'; readonly value: Immutable<LogicRef>; readonly representation: 'operand' | 'condition' }
   | { readonly kind: 'hole'; readonly value: Immutable<LogicHole> }
-  | { readonly kind: 'flow'; readonly value: Immutable<PipelineSource> }
-  | { readonly kind: 'flow-inputs'; readonly value: Immutable<PipelineInputs> }
+  | { readonly kind: 'flow'; readonly value: Immutable<GraphPipelineSource> }
+  | { readonly kind: 'flow-inputs'; readonly value: Immutable<GraphPipelineInputs> }
   | { readonly kind: 'request'; readonly value: Immutable<PipelineRequest> }
-  | { readonly kind: 'step'; readonly value: Immutable<PipelineStep> }
+  | { readonly kind: 'step'; readonly value: Immutable<GraphPipelineStep> }
   | { readonly kind: 'output'; readonly value: Immutable<PipelineOutput> }
   | { readonly kind: 'logic-entry'; readonly value: Immutable<LogicEntry> }
   | { readonly kind: 'slot'; readonly value: GraphJSON }
@@ -72,7 +78,7 @@ export interface GraphEdge {
   readonly to: { readonly nodeId: string; readonly portId: string };
   readonly binding: string;
 }
-export type GraphScopeKind = 'document' | 'template' | 'flow-parameter' | 'flow-request' | 'flow-step' | 'flow-output' | 'repeat' | 'placeholder' | 'for-each';
+export type GraphScopeKind = 'document' | 'template' | 'flow' | 'flow-parameter' | 'flow-request' | 'flow-step' | 'flow-output' | 'repeat' | 'placeholder' | 'for-each';
 export interface GraphScope {
   readonly id: string;
   readonly kind: GraphScopeKind;
@@ -81,7 +87,7 @@ export interface GraphScope {
   readonly itemShape?: Immutable<Shape>;
 }
 export interface GraphDestination {
-  readonly kind: 'operand' | 'condition' | 'flow' | 'document' | 'slot';
+  readonly kind: 'operand' | 'condition' | 'call' | 'flow' | 'document' | 'slot';
   readonly type?: PortType;
   readonly allowControl?: boolean;
 }
@@ -123,7 +129,19 @@ export interface GraphBudget {
   readonly anchor: LogicAnchor;
   readonly nodes: number;
   readonly depth: number;
-  readonly conditions: readonly { readonly pointer: string; readonly nodes: number; readonly depth: number }[];
+  readonly conditions: readonly { readonly pointer: string; readonly nodes: number; readonly depth: number; readonly astNodes: number; readonly astDepth: number }[];
+  readonly scopes: readonly {
+    readonly id: string;
+    readonly kind: 'expression' | 'predicate';
+    readonly pointer: string;
+    readonly nodes: number;
+    readonly depth: number;
+    readonly nodeLimit: number;
+    readonly depthLimit: number;
+    readonly entries: readonly string[];
+    readonly nodeAccounting: 'compiler' | 'contextual-walk';
+  }[];
+  readonly counterResets: readonly { readonly pointer: string; readonly kind: 'choose' | 'count' | 'confirmation' | 'restore'; readonly scopeId?: string }[];
   readonly cases: number;
   readonly steps: number;
   readonly capabilities: readonly string[];
@@ -148,7 +166,7 @@ export type LoweringResult =
     readonly ok: true;
     readonly ast: Json;
     readonly replacements: readonly ASTReplacement[];
-    readonly generatedSources: readonly PipelineSource[];
+    readonly generatedSources: readonly GraphPipelineSource[];
     readonly generatedLibrary: readonly LogicEntry[];
     readonly sourceMap: GraphSourceMap;
     readonly budgets: readonly GraphBudget[];
@@ -248,7 +266,7 @@ export interface CanvasHost {
   open(anchor: LogicAnchor): void;
   openOutput(output: CanvasOutput): void;
   snapshot(): CanvasSnapshot;
-  apply(transaction: { readonly revision: string; readonly label: string; readonly replacements: readonly ASTReplacement[]; readonly generatedSources: readonly Immutable<PipelineSource>[]; readonly generatedLibrary: readonly Immutable<LogicEntry>[] }): Promise<CanvasWriteResult>;
+  apply(transaction: { readonly revision: string; readonly label: string; readonly replacements: readonly ASTReplacement[]; readonly generatedSources: readonly Immutable<GraphPipelineSource>[]; readonly generatedLibrary: readonly Immutable<LogicEntry>[] }): Promise<CanvasWriteResult>;
   save(revision: string): Promise<CanvasWriteResult>;
   compareConflict(local: CanvasSnapshot, remote: CanvasSnapshot): void;
   readonly data: { readonly sources: readonly { readonly id: string; readonly name: string; readonly shape?: Immutable<Shape> }[] };

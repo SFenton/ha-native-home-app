@@ -110,3 +110,26 @@ export const sourceParameterTemplate = immutable<LogicEntry>({
   params: [{ name: 'source', kind: 'source-id', sample: 'light-a' }],
   body: { type: 'state', sourceId: { type: 'hole', name: 'source' }, path: ['state'], in: ['on'] },
 });
+
+const budgetLeaf = (): Predicate => ({ type: 'viewer', isAdmin: true });
+const budgetBase = {
+  type: 'all' as const,
+  of: Array.from({ length: 2 }, () => ({ type: 'all' as const, of: Array.from({ length: 16 }, budgetLeaf) })),
+};
+const budgetReplacement: Predicate = {
+  type: 'compare', op: 'eq',
+  left: { type: 'choose', cases: [{ when: budgetLeaf(), then: { type: 'literal', value: 1 } }], otherwise: { type: 'literal', value: 0 } },
+  right: { type: 'literal', value: 1 },
+};
+const withBudgetReset = (branch: number): Predicate => ({
+  ...budgetBase, of: budgetBase.of.map((child, i) => i !== branch ? child : { ...child, of: [budgetReplacement, ...child.of.slice(1)] }),
+});
+const outerChoose = (when: Predicate): Operand => ({
+  type: 'choose', cases: [{ when, then: { type: 'literal', value: 1 } }], otherwise: { type: 'literal', value: 0 },
+});
+export const predicateBudgetFixtures = immutable({
+  base: budgetBase,
+  early: withBudgetReset(0),
+  outerBase: outerChoose(budgetBase),
+  outerLater: outerChoose(withBudgetReset(1)),
+});
