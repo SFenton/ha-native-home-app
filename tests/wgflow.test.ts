@@ -19,7 +19,7 @@ type J = Record<string, any>;
 const corpus = path.resolve(__dirname, '../contract/corpus');
 const read = (file: string) => JSON.parse(readFileSync(path.join(corpus, file), 'utf8')) as { document: J; capabilities: string[] };
 const ids = ['sh.repeat@1', 'sh.flow-extras@1'];
-const horizontal = read('reject/pending-repeat-horizontal.json');
+const horizontal = read('accept/repeat-horizontal.json');
 
 /** Compiles a copy of the horizontal case with the page's components replaced. */
 function compileWith(components: J[]) {
@@ -33,15 +33,15 @@ const lit = (value: unknown): J => ({ type: 'literal', value });
 const item = (...segments: string[]): J => ({ type: 'item', path: segments });
 
 describe('the two WG-S2 ids', () => {
-  it('are pending and sorted, and the Studio supports them', () => {
-    for (const id of ids) expect(pendingCompositionCapabilities).toContain(id);
+  it('are shipped and sorted, and the Studio supports them', () => {
+    for (const id of ids) expect(pendingCompositionCapabilities).not.toContain(id);
     expect(JSON.parse(readFileSync(path.join(corpus, 'capabilities.pending.json'), 'utf8'))).toEqual([...pendingCompositionCapabilities]);
     expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
   });
   it('are declared by a repeat and by a records flow, and only then', () => {
     expect(compileCompositionDocument(horizontal.document as never).capabilities).toContain('sh.repeat@1');
     expect(compileCompositionDocument(horizontal.document as never).capabilities).not.toContain('sh.flow-extras@1');
-    const extras = read('reject/pending-flow-extras-running-sum.json');
+    const extras = read('accept/flow-extras-running-sum.json');
     expect(compileCompositionDocument(extras.document as never).capabilities).toEqual(expect.arrayContaining(ids));
   });
   it('are declared by none of the documents that use none of the new fields', () => {

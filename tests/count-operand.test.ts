@@ -28,8 +28,8 @@ function compile(components: J[], sourceNames: string[] = names(32)) {
 const reading = (states: Record<string, string>): Environment => ({ read: (sourceId, segments) => states[`${sourceId}/${segments.join('/')}`] === undefined ? unavailable : value(states[`${sourceId}/${segments.join('/')}`]) });
 
 describe('count: cost and limits', () => {
-  it('is listed as pending, so a phone without it refuses the document', () => {
-    expect(pendingCompositionCapabilities).toContain('sh.count@1');
+  it('is shipped, so it no longer needs a pending capability', () => {
+    expect(pendingCompositionCapabilities).not.toContain('sh.count@1');
   });
   it('costs one node plus its tests: 32 entries are 33 nodes of the 64', () => {
     expect(MAX_COUNT_ENTRIES).toBe(32);

@@ -15,27 +15,25 @@ const bytes = (file: string) => readFileSync(path.join(corpus, file));
 const envelope = (file: string) => JSON.parse(bytes(file).toString('utf8'));
 
 describe('sh.tile-swipe@1 corpus', () => {
-  it('is pending and sorted, and holds the cases of the design: 13 compile and 33 are refused', () => {
-    expect(pendingCompositionCapabilities).toContain('sh.tile-swipe@1');
+  it('is shipped and sorted, and holds the cases of the design: 13 compile and 34 are refused', () => {
+    expect(pendingCompositionCapabilities).not.toContain('sh.tile-swipe@1');
     expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
     expect(ours.filter(item => item.outcome === 'accept' || (item.pending && !item.studioIssue)).length).toBe(13);
-    expect(ours.filter(item => item.studioIssue).length).toBe(33);
+    expect(ours.filter(item => item.outcome === 'reject').length).toBe(34);
   });
-  it.each(ours.filter(item => item.pending && !item.studioIssue))('compiles $file and declares the id', item => {
+  it.each(ours.filter(item => item.outcome === 'accept' && !item.file.includes('no-swipe')))('compiles $file and declares the id', item => {
     const document = envelope(item.file);
     expect(() => decodeCompositionPublication(bytes(item.file))).not.toThrow();
     expect(document.capabilities).toContain('sh.tile-swipe@1');
     expect(legacyManifest(compileCompositionDocument(document.document).capabilities)).toEqual(legacyManifest(document.capabilities));
   });
-  it.each(ours.filter(item => item.studioIssue))('refuses $file with its own code at its own pointer', item => {
+  it.each(ours.filter(item => item.outcome === 'reject'))('refuses $file with its own code at its own pointer', item => {
     let first: { code: string; pointer: string } | undefined;
     try { decodeCompositionPublication(bytes(item.file)); } catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
       first = error.issues[0];
     }
-    expect({ code: first?.code, pointer: first?.pointer }).toEqual({ code: item.studioIssue!.code, pointer: item.studioIssue!.pointer });
-    // The shipped list refuses it first, at the capability it does not list; a refusal that cannot name the id (manifest mismatch) is plain.
-    if (item.pending) expect(item.issue?.code).toBe('unsupported_capability');
+    expect({ code: first?.code, pointer: first?.pointer }).toEqual({ code: item.issue!.code, pointer: item.issue!.pointer });
   });
   it('gives every refusal an expect: the corpus holds the code and the pointer', () => {
     for (const item of ours.filter(entry => entry.outcome === 'reject' && !entry.pending || entry.studioIssue)) expect(item.studioIssue ?? item.issue).toMatchObject({ code: expect.any(String), pointer: expect.any(String) });
@@ -43,7 +41,7 @@ describe('sh.tile-swipe@1 corpus', () => {
   it('declares the id only on a document that has a swipe', () => {
     const plain = envelope('accept/tile-swipe-light-with-no-swipe-needs-no-id.json');
     expect(plain.capabilities).not.toContain('sh.tile-swipe@1');
-    const swiped = envelope('reject/pending-tile-swipe-light-minimal.json');
+    const swiped = envelope('accept/tile-swipe-light-minimal.json');
     swiped.document.pages[2].components[0].props = { sourceId: 'light-main' };
     expect(compileCompositionDocument(swiped.document).capabilities).not.toContain('sh.tile-swipe@1');
     // Turning the swipe off removes the object, and the document equals one that never had it.
@@ -52,7 +50,7 @@ describe('sh.tile-swipe@1 corpus', () => {
 });
 
 describe('Swipe to Adjust presets', () => {
-  const base = envelope('reject/pending-tile-swipe-cover-position.json');
+  const base = envelope('accept/tile-swipe-cover-position.json');
   const compileWith = (entityId: string, swipe: TileSwipe) => {
     const document = structuredClone(base.document);
     const tile = document.pages[2].components[0];

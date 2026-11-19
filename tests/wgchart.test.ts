@@ -37,8 +37,8 @@ const issue = (components: J[], tweak?: (document: J) => void) => {
 const ids = ['sh.chart@1', 'sh.linear-gauge@1'];
 
 describe('the two WG-S3 ids', () => {
-  it('are pending and sorted, and the Studio supports them', () => {
-    for (const id of ids) expect(pendingCompositionCapabilities).toContain(id);
+  it('are shipped and sorted, and the Studio supports them', () => {
+    for (const id of ids) expect(pendingCompositionCapabilities).not.toContain(id);
     expect(JSON.parse(readFileSync(path.join(corpus, 'capabilities.pending.json'), 'utf8'))).toEqual([...pendingCompositionCapabilities]);
     expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
   });

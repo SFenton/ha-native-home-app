@@ -16,14 +16,14 @@ const bytes = (file: string) => readFileSync(path.join(corpus, file));
 const envelope = (file: string) => JSON.parse(bytes(file).toString('utf8'));
 
 describe('sh.grid-state-groups@1 corpus', () => {
-  it('is pending and sorted, with the accept and refuse cases of the design, each refusal with an expect', () => {
-    expect(pendingCompositionCapabilities).toContain('sh.grid-state-groups@1');
+  it('is shipped and sorted, with the accept and refuse cases of the design, each refusal with an expect', () => {
+    expect(pendingCompositionCapabilities).not.toContain('sh.grid-state-groups@1');
     expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
     expect(ours.length - refused.length).toBe(6);
     expect(refused.length).toBe(15);
     for (const item of refused) expect(item.studioIssue).toMatchObject({ code: expect.any(String), pointer: expect.any(String) });
   });
-  it.each(ours.filter(item => item.pending && !item.studioIssue))('compiles $file', item => {
+  it.each(ours.filter(item => item.outcome === 'accept'))('compiles $file', item => {
     const document = envelope(item.file);
     expect(() => decodeCompositionPublication(bytes(item.file))).not.toThrow();
     expect(compileCompositionDocument(document.document).capabilities).toEqual(document.capabilities);
@@ -37,7 +37,7 @@ describe('sh.grid-state-groups@1 corpus', () => {
     expect({ code: first?.code, pointer: first?.pointer }).toEqual({ code: item.studioIssue!.code, pointer: item.studioIssue!.pointer });
   });
   it('declares the id exactly when a grid has groups', () => {
-    const grouped = envelope('reject/pending-grid-groups-two-groups.json');
+    const grouped = envelope('accept/grid-groups-two-groups.json');
     expect(grouped.capabilities).toContain('sh.grid-state-groups@1');
     expect(envelope('accept/grid-groups-without-groups-needs-no-id.json').capabilities).not.toContain('sh.grid-state-groups@1');
     const plain = envelope('accept/grid-groups-without-groups-needs-no-id.json');
