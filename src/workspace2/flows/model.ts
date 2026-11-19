@@ -1,10 +1,10 @@
 import { buildDocumentIndex, type SelectionKey } from '../../preview2/model';
-import type { CompositionDocument } from '../../shared/composition/schema';
+import type { ComponentRefNode, CompositionDocument } from '../../shared/composition/schema';
 import type { LogicEntry } from '../../shared/composition/logic-library';
 import { operandBase, operandKind, predicateBase } from '../../shared/composition/expression';
 import { labelText } from '../labels';
 import { operandName, sentence, type NameContext } from '../expr/condition';
-import { expandDocument, ownedSources, readField } from '../../shared/composition/components';
+import { expandRef, expandSources, ownedSources } from '../../shared/composition/components';
 import { dataReferences, type Source } from '../dialogs/sources';
 import { workedOut } from '../data/logic/logicModel';
 import { plainDocument } from '../data/logic/logicPlain';
@@ -100,7 +100,7 @@ export function fieldSummary(value: unknown, document: CompositionDocument, enti
 /** Named readers, including transitive source dependencies and saved templates. Entity sources alone aren't readers. */
 export function entityReaders(document: CompositionDocument): Map<string, Set<string>> {
   const plain = plainDocument(document);
-  const sources = new Map(expandDocument(plain).dataSources.map(source => [source.id, source]));
+  const sources = new Map(plain.dataSources.map(source => [source.id, source]));
   const result = new Map<string, Set<string>>();
   const entitiesIn = (value: unknown, found: Set<string>, available: ReadonlyMap<string, Source>, seen = new Set<string>()): void => {
     const refs = dataReferences(document, value);
@@ -116,19 +116,30 @@ export function entityReaders(document: CompositionDocument): Map<string, Set<st
     const found = new Set<string>(); entitiesIn(value, found, available);
     for (const id of found) { const readers = result.get(id) ?? new Set<string>(); readers.add(name); result.set(id, readers); }
   };
-  const index = buildDocumentIndex(plain);
-  for (const key of index.keys) {
-    const entry = index.get(key);
-    if (!entry || entry.kind === 'source' || entry.kind === 'chrome-group') continue;
-    const value = entry.node ?? readField(plain, entry.path.join('/'));
-    if (!record(value)) continue;
+  const visit = (value: unknown, fallback: string): void => {
+    if (Array.isArray(value)) { value.forEach(child => visit(child, fallback)); return; }
+    if (!record(value)) return;
+    if (value.type === 'component-ref') {
+      const entry = plain.componentLibrary?.find(entry => entry.id === value.componentId);
+      if (entry) {
+        const ref = value as ComponentRefNode;
+        for (const source of expandSources(ref, entry)) sources.set(source.id, source);
+        visit(expandRef(ref, entry), fallback);
+      }
+      return;
+    }
+    const name = typeof value.title === 'string' ? value.title : typeof value.label === 'string' ? value.label : fallback;
     const own = Object.fromEntries(Object.entries(value).filter(([key]) => !['components', 'children', 'tabs', 'blocks', 'toolbar'].includes(key)));
-    const surface = entry.surface && index.get(entry.surface);
-    const surfaceValue = surface && readField(plain, surface.path.join('/'));
-    const name = typeof value.title === 'string' ? value.title : typeof value.label === 'string' ? value.label
-      : record(surfaceValue) && typeof surfaceValue.title === 'string' ? `${surfaceValue.title} toolbar` : 'App toolbar';
     add(name, own);
-  }
+    for (const key of ['components', 'children', 'tabs', 'blocks']) visit(value[key], name);
+    if (record(value.toolbar) && value.toolbar.type === 'replace' && Array.isArray(value.toolbar.groups)) {
+      for (const group of value.toolbar.groups) if (record(group)) visit(group.items, `${name} toolbar`);
+    }
+  };
+  // The compiler visits all three surface kinds, including levels the preview selection index doesn't expose.
+  for (const surface of [...plain.pages, ...plain.modals, ...(plain.levels ?? [])]) visit(surface, surface.title);
+  visit(plain.navigation.tabs, 'App navigation');
+  for (const group of plain.navigation.chrome.groups) visit(group.items, 'App toolbar');
   for (const source of plain.dataSources) if (source.kind === 'model' && source.model === 'pipeline@1') {
     const { id: _id, ...body } = source;
     add(source.inputs.title, body);

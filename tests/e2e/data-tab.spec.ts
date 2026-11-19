@@ -77,7 +77,7 @@ test('App and Models remain editable and Source creation opens its fields', asyn
   await expect(value).toHaveValue('weather.demo_forecast');
 });
 
-test('In Use includes a placed private source passed through a logic argument', async ({ page, request }) => {
+for (const surface of ['page', 'sheet level']) test(`In Use includes a placed private source passed through logic on a ${surface}`, async ({ page, request }) => {
   const base = panelDocument();
   const document: CompositionDocument = {
     ...base,
@@ -97,6 +97,11 @@ test('In Use includes a placed private source passed through a logic argument', 
     pages: [{ ...base.pages[0], components: [{ id: 'placed-lamp', type: 'component-ref', componentId: 'saved-lamp', layout: { span: 1 }, args: { entity: 'switch.demo_light_1' } }] }],
     modals: [],
   };
+  if (surface === 'sheet level') {
+    const { navigation: _navigation, ...level } = document.pages[0];
+    document.levels = [{ ...level, id: 'lamp-level', toolbar: { type: 'replace', groups: [] } }];
+    document.pages = [{ ...document.pages[0], components: [] }];
+  }
   await seed(request, replaceAt(document, ['componentLibrary', 0, 'node', 'props', 'value'], { type: 'expr', value: { type: 'logic-ref', logicId: 'private-value', args: { src: 'private-lamp' } } }));
   await openWorkspace(page);
   await openData(page);
