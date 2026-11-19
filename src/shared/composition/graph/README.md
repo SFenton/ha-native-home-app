@@ -5,7 +5,7 @@ Pure projection APIs for `docs/flows-canvas.md`, merged in PR #21 at
 compiler-only accounting addendum. There are no stores, network calls, device
 actions, or UI dependencies.
 
-- `lift(json, {kind, anchor, metadata, scope, context})` retains all original fragments.
+- `lift(json, {kind, anchor, metadata, scope, context, sourceId})` retains all original fragments.
   `liftJSON(bytes)` also runs the existing bounded, duplicate-key-aware parser.
   Grammar descriptors are projection/catalog hints, not native validation.
   Each ordered input binding replaces its payload child. Template references remain references. Opaque blocks retain
@@ -43,6 +43,16 @@ actions, or UI dependencies.
   capability absorption, source limits and dependency-cycle checks are
   shared with the document compiler. `capabilities` on successful lowering and
   every budget come from those native results, never a caller-provided seed.
+  Standalone flow inputs take their owning `sourceId` explicitly or from a flow
+  anchor. Without an owner, native input/parameter checks still run, but source
+  dependency closure remains unresolved; no legal source ID is invented.
+  Use the consuming document context for complete reference/cycle validation.
+  Input diagnostics and dependencies omit the source envelope's `/inputs`
+  prefix before source-map and budget handling. Synthetic fragment recursion
+  shares the compiler's pipeline ordinal, so its own 129th pipeline is refused
+  without recompiling sources or counting non-pipeline IDs.
+  Call fragments reuse the native call shape without its attached lenient
+  semantic pre-pass, then run the native checker once with actual permissions.
   Source maps retain authored entries and add `stage: "expanded"` entries for
   native template landings. Whole-document landings come from the compiler's
   own expansion pass, not a second expansion. `authoredPointer` and `usePointer` keep each copied
@@ -66,13 +76,17 @@ actions, or UI dependencies.
   `GraphBudget.accepted`, `compilerIssues`, and `firstExceedingPointer` come
   from running the compiler/checker on the lowered fragment. In particular,
   CHK-nested-choose-budget is neither fixed nor simulated with a parallel counter.
-  Flow node meters consume the public `typeOperand`/`typeWhere` counters.
-  No graph code increments AST counters, walks depths, or predicts resets.
+  Budget construction never repeats native operand/predicate typing to
+  recover counters. No graph code increments AST counters, walks depths,
+  or predicts resets.
   Counts not yet consumed from the checker are **null**, never zero or an
-  estimate: document/call counts, depths, totals, cases/steps, duplication costs,
-  generated-flow accounting and reset events.   Whole-document and consuming-field scopes remain unavailable until the native
-  observer is consumed, rather than inventing fresh entry points for arbitrary
-  subtrees. Overall accounting is `partial` or `unavailable`.
+  estimate: expression/flow/call counts, depths, totals, cases/steps, duplication
+  costs, generated-flow accounting and reset events. Scope entry points may be
+  listed with null usage, but no percentage meter is fabricated. Whole-document
+  and consuming-field scopes remain unavailable until the native observer is
+  consumed, rather than inventing fresh entry points for arbitrary subtrees.
+  Accounting is currently `unavailable`; the contract also permits `partial`
+  when native accounting is integrated.
   Consumers must surface `accountingUnavailableReason`, not invent missing
   percentages. Missing meters do not mean zero usage or unlimited capacity.
   A native counter stops at its limit: consumers must use the compiler outcome
@@ -121,11 +135,16 @@ shared average evaluator for finite-total parity and explicit overflow
 divergence. A-number-state remains
 disabled with its specific prerequisite and compiler pointer; no cast or
 fabricated shape exists.
-The deterministic compiler comparison includes seed `0xa43d91e7` and covers native
+The deterministic compiler comparison includes seeds `0xa43d91e7` and
+`0x5e19b6c3`, including the 256-case adversarial semantic flow-input family.
+It covers native
 acceptance/refusal, exact manifests, first diagnostics, field limits, edited graphs,
 standalone source/flow inputs, recipe bundles and cycles, mixed-source native limits,
 success/failure expansion provenance and lift round trips. The 32-step, 2,341-node
 edited-flow fixture also checks that lowering invokes its native checker once.
+Structural roots do not assemble their descendants merely to return an existing
+port type. Regression checks also forbid checker replays during budget
+construction and the lenient call-schema pass during scoped call compilation.
 
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
 expansion, draft layout extraction, persistence/conflicts, and publication.

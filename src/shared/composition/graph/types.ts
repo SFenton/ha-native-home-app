@@ -89,6 +89,8 @@ export interface GraphDestination {
   readonly kind: 'operand' | 'condition' | 'call' | 'flow' | 'document' | 'fragment' | 'slot';
   readonly type?: PortType;
   readonly allowControl?: boolean;
+  /** The owning source of standalone flow inputs; absent means source dependency closure is unresolved. */
+  readonly sourceId?: string;
   /** The actual consuming field; required for standalone slots, whose native rules vary by destination. */
   readonly context?: { readonly document: GraphJSON; readonly pointer: string };
 }

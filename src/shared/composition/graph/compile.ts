@@ -1,19 +1,20 @@
 import { z } from 'zod/v4';
 import type { Json } from '../../types';
-import { absorbCompositionExpressionCapabilities, checkCompositionPipelineSource, compileCompositionDocumentWithOrigins, CompositionExpansionError, compositionDependencyIssues, parseCompositionShape } from '../compiler';
-import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
+import { absorbCompositionExpressionCapabilities, checkCompositionPipelineSource, compileCompositionDocumentWithOrigins, compositionCallShape, CompositionExpansionError, compositionDependencyIssues, parseCompositionShape } from '../compiler';
+import { checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, type CompositionIssue } from '../json';
 import { expandBounded, type LogicEntry, type LogicOrigin } from '../logic-library';
 import { graphInputsSchema, graphSourceSchema } from './capabilities';
-import { describeGrammar, inferFragment, type FragmentKind } from './grammar';
+import { grammarChildren, inferFragment, type FragmentKind } from './grammar';
 import { atPointer, copy, join, record, replaceAt, segments, withoutCanvasMetadata } from './json';
-import type { GraphDestination } from './types';
+import type { GraphDestination, GraphJSON } from './types';
 
 export interface FragmentOptions {
   readonly kind?: FragmentKind;
   readonly context?: GraphDestination['context'];
   readonly itemScope?: ItemScope;
   readonly allowControl?: boolean;
+  readonly sourceId?: string;
   readonly library?: readonly LogicEntry[];
 }
 export interface FragmentCompilation {
@@ -91,7 +92,8 @@ export function compileGraphValue(ast: Json, options: FragmentOptions = {}): Fra
         expanded = result.value;
         origins = expansion.origins.map(origin => ({ ...origin, pointer: origin.pointer.replace(/^\/value(?=\/|$)/, '') }));
       }
-      const check = (value: Json, hint: FragmentKind, at = ''): void => {
+      let pipelines = 0;
+      const check = (value: GraphJSON, hint: FragmentKind, at = ''): void => {
         const found = inferFragment(value, hint);
         const parse = <T>(schema: z.ZodType<T>): T => {
           try { return parseCompositionShape(schema, value); }
@@ -105,19 +107,23 @@ export function compileGraphValue(ast: Json, options: FragmentOptions = {}): Fra
             ? checkOperand(parse(operandBase), at, options.allowControl, false, options.itemScope)
             : found === 'condition'
               ? checkPredicate(parse(predicateBase), at, false, options.itemScope)
-              : checkCallService(parse(callServiceSchema), at, options.allowControl ?? false, options.itemScope);
+              : checkCallService(parse(compositionCallShape), at, options.allowControl ?? false, options.itemScope);
           issues.push(...facts.issues);
           absorbCompositionExpressionCapabilities(facts, capabilities, found === 'call' ? 'call' : 'expression');
         } else if (found === 'flow' || found === 'flow-inputs') {
           const source = found === 'flow' ? parse(graphSourceSchema)
-            : { id: 'graph-flow', kind: 'model' as const, model: 'pipeline@1' as const, inputs: parse(graphInputsSchema) };
-          const facts = checkCompositionPipelineSource(source, at);
-          issues.push(...facts.issues); dependencies.push(...facts.dependencies);
+            : { id: options.sourceId ?? '', kind: 'model' as const, model: 'pipeline@1' as const, inputs: parse(graphInputsSchema) };
+          const facts = checkCompositionPipelineSource(source, at, ++pipelines);
+          const rebase = (path: string) => found === 'flow-inputs' && (path === `${at}/inputs` || path.startsWith(`${at}/inputs/`))
+            ? at + path.slice(`${at}/inputs`.length) : path;
+          issues.push(...facts.issues.map(issue => ({ ...issue, pointer: rebase(issue.pointer) })));
+          // Inputs without an owner have no source identity to close dependencies against.
+          if (found === 'flow' || options.sourceId !== undefined) dependencies.push(...facts.dependencies.map(dependency => ({ ...dependency, path: rebase(dependency.path) })));
           facts.capabilities.forEach(capability => capabilities.add(capability));
         } else if (found === 'slot') {
           issues.push({ code: 'missing_required', pointer: `${at}/destination/context` });
         } else {
-          for (const child of describeGrammar(value, found).children) check(child.value, child.kind, at + child.binding);
+          for (const child of grammarChildren(value, found)) check(child.value, child.kind, at + child.binding);
         }
       };
       checking = true;
@@ -139,7 +145,7 @@ export function compileGraphValue(ast: Json, options: FragmentOptions = {}): Fra
     })));
   }
   return {
-    expanded, origins, issues, documentIssues, expandedDocumentIssues, dependencies, capabilities: [...capabilities].sort(),
+    expanded, origins, issues: kind !== 'document' && issues.length ? new CompositionValidationError(issues).issues : issues, documentIssues, expandedDocumentIssues, dependencies, capabilities: [...capabilities].sort(),
     expandedIssues: expandedDocumentIssues?.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/document(?=\/|$)/, '') })),
   };
 }

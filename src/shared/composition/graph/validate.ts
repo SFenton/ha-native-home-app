@@ -87,7 +87,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
   const typedFlows = new Map<string, { params: TypeScope['params']; initial: Shape; steps: Shape[]; stepCount: number } | undefined>();
   const actualOutput = (node: GraphNode) => {
     const output = node.outputs[0]?.type;
-    if (!output) return undefined;
+    if (!output || node.payload.kind !== 'operand' && node.payload.kind !== 'condition') return output;
     const current = assemble(node.id), scope = scopes.get(node.scopeId);
     const owner = scope?.ownerNodeId ? nodes.get(scope.ownerNodeId) : undefined;
     let params: TypeScope['params'] = new Map();
@@ -122,7 +122,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
         if (shape) item = elementOf(shape) ?? shape;
       }
     }
-    return current !== undefined && (node.payload.kind === 'operand' || node.payload.kind === 'condition')
+    return current !== undefined
       ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(item ? { item } : {}) }, expressionScope(current, node.scopeId, graph.scopes)) : output;
   };
   if (scopes.size !== graph.scopes.length) report('duplicate_id', 'Scope IDs must be unique.', undefined, undefined, true);

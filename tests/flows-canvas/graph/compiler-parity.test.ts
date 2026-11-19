@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as compiler from '../../../src/shared/composition/compiler';
+import * as expression from '../../../src/shared/composition/expression';
+import * as typing from '../../../src/shared/composition/pipeline/typing';
+import * as graphJSON from '../../../src/shared/composition/graph/json';
 import { compileCompositionDocument, supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
 import { operandBase } from '../../../src/shared/composition/expression';
 import { CompositionValidationError, canonicalCompositionJSON } from '../../../src/shared/composition/json';
@@ -8,6 +11,8 @@ import { atPointer, copy, record, replaceAt } from '../../../src/shared/composit
 import type { Json } from '../../../src/shared/types';
 import { emptyDocument, largeGraphFlow, nativeContext, shortTextPointer, symbol } from './fixtures/native';
 import { predicateBudgetFixtures } from './fixtures';
+import { compileGraphValue } from '../../../src/shared/composition/graph/compile';
+import { budgetFromCompilation } from '../../../src/shared/composition/graph/budgets';
 
 type Context = NonNullable<GraphDestination['context']>;
 interface Case {
@@ -296,6 +301,175 @@ describe('standalone source and flow-input document comparison', () => {
         expect(result.budgets[0].compilerIssues[0]).toEqual({ ...issue, pointer });
       }
     }
+  });
+});
+
+const adversarialFlowInputs = [0xa43d91e7, 0x5e19b6c3].flatMap(seed => {
+  const next = random(seed);
+  return Array.from({ length: 128 }, (_, i) => {
+    const producer = flow(i % 7 === 0 ? 'graph-flow' : `upstream-${i}`);
+    const consumer = flow(`consumer-${i}`, {
+      parameters: [{ name: 'upstream', type: 'number', value: sourceRead(producer.id) }],
+      request: { type: 'none', value: { type: 'literal', value: next(100) } },
+      ...(i % 3 === 0 ? { refresh: { on: ['manual'], staleAfterSeconds: 30 } } : {}),
+      ...(i % 5 === 0 ? { schema: { kind: 'boolean' } } : {}),
+    });
+    return { seed: seed.toString(16), i, producer, consumer };
+  });
+});
+
+describe('adversarial flow-input compiler comparison', () => {
+  it.each(adversarialFlowInputs)('seed $seed case $i agrees on acceptance, capabilities and diagnostic coordinates', ({ producer, consumer }) => {
+    const document = withSources(emptyDocument(), [producer, consumer]), native = nativeRun(document);
+    const baseline = compileCompositionDocument(emptyDocument()).capabilities;
+    for (const options of [{}, { sourceId: consumer.id }, { context: { document, pointer: '/dataSources/1/inputs' } }]) {
+      const graph = lift(consumer.inputs, { kind: 'flow-inputs', ...options }).graph;
+      expect(validateGraph(graph).filter(issue => issue.severity === 'error')).toEqual([]);
+      for (const current of [graph, lift(projectGraph(graph).ast, { kind: 'flow-inputs', ...options }).graph]) {
+        const result = lower(current);
+        expect(result.ok).toBe(native.ok);
+        expect(result.budgets[0].accepted).toBe(native.ok);
+        if (result.ok && native.ok) {
+          const capabilities = 'context' in options ? native.capabilities : native.capabilities.filter(capability => !baseline.includes(capability));
+          expect(result.capabilities).toEqual(capabilities);
+          expect(result.ast).toEqual(consumer.inputs);
+          expect(result.budgets[0].capabilities).toEqual(result.capabilities);
+        } else {
+          if (result.ok || native.ok) throw new Error('Expected semantic flow-input refusal.');
+          const issues = native.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace('/document/dataSources/1/inputs', '') }));
+          expect(result.errors[0]).toMatchObject(issues[0]);
+          expect(result.errors).toEqual(issues.map(issue => expect.objectContaining(issue)));
+          expect(result.budgets[0].compilerIssues).toEqual(issues);
+        }
+      }
+    }
+  });
+
+  it.each([
+    ['output', { output: { kind: 'records', max: 10 } }, '/output/kind', '/output'],
+    ['refresh', { refresh: { on: ['manual'], staleAfterSeconds: 60 } }, '/refresh', ''],
+    ['budget', { request: { type: 'none', value: { type: 'list', items: Array.from({ length: 64 }, () => literal(1)) } }, steps: [{ id: 'reduce', op: 'count' }] }, '/request/value/items/63', '/request/value/items/63'],
+  ] as const)('maps a semantic %s refusal to the responsible input block', (name, patch, pointer, owner) => {
+    const source = graphSourceSchema.parse({ ...flow('consumer'), inputs: { ...flow('consumer').inputs, ...patch } });
+    const native = nativeRun(withSources(emptyDocument(), [source]));
+    if (native.ok) throw new Error('Expected native semantic refusal.');
+    expect(native.issues[0].pointer).toBe(`/document/dataSources/0/inputs${pointer}`);
+    const graph = lift(source.inputs, { kind: 'flow-inputs', sourceId: source.id }).graph;
+    const nodeId = graph.nodes.find(node => node.origins[0] === owner)!.id;
+    expect(lower(graph)).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ pointer, nodeId })]) });
+    const budget = measureBudget(source.inputs, graph.roots[0].anchor, { kind: 'flow-inputs', sourceId: source.id });
+    expect(budget.compilerIssues).toEqual(native.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace('/document/dataSources/0/inputs', '') })));
+    if (name === 'budget') expect(budget.firstExceedingPointer).toBe(pointer);
+  });
+
+  it('closes source dependencies only under a real source identity, with input-relative paths', () => {
+    const source = flow('consumer', { parameters: [{ name: 'self', type: 'number', value: sourceRead('consumer') }] });
+    const options = { kind: 'flow-inputs' as const };
+    expect(lower(lift(source.inputs, options).graph).ok).toBe(true);
+    expect(compileGraphValue(source.inputs, options).dependencies).toEqual([]);
+    const identified = compileGraphValue(source.inputs, { ...options, sourceId: source.id });
+    expect(identified.dependencies).toEqual([{ from: 'consumer', to: 'consumer', path: '/parameters/0/value/from/sourceId' }]);
+    const native = nativeRun(withSources(emptyDocument(), [source]));
+    if (native.ok) throw new Error('Expected native self-cycle.');
+    for (const identity of [{ sourceId: source.id }, { anchor: { kind: 'flow' as const, id: source.id, field: '/inputs' } }]) {
+      const result = lower(lift(source.inputs, { ...options, ...identity }).graph);
+      expect(result).toMatchObject({ ok: false, errors: [expect.objectContaining({ code: native.issues[0].code, pointer: '/parameters/0/value/from/sourceId' })] });
+      expect(result.budgets[0].accepted).toBe(false);
+    }
+  });
+
+  it('retains real ownership and rebased dependency landings across input roots', () => {
+    const sources = ['a', 'b'].map((id, i) => flow(id, { parameters: [{ name: 'other', type: 'number', value: sourceRead(i === 0 ? 'b' : 'a') }] }));
+    const graph = lift({ dataSources: sources }, { kind: 'fragment' }).graph;
+    const roots = sources.map((source, i) => ({
+      nodeId: graph.nodes.find(node => node.origins[0] === `/dataSources/${i}/inputs`)!.id, portId: 'value',
+      anchor: { kind: 'flow' as const, id: source.id, field: '/inputs' },
+      destination: { kind: 'flow' as const, sourceId: source.id },
+    }));
+    const result = lower({ ...graph, roots });
+    expect(result).toMatchObject({
+      ok: false,
+      errors: roots.map(root => expect.objectContaining({ anchor: root.anchor, code: 'invalid_combination', pointer: '/parameters/0/value/from/sourceId' })),
+      budgets: roots.map(() => expect.objectContaining({ accepted: false, compilerIssues: [{ code: 'invalid_combination', pointer: '/parameters/0/value/from/sourceId' }] })),
+    });
+  });
+});
+
+describe('synthetic fragment native pipeline limits', () => {
+  it.each([128, 129])('accounts for %i pipelines across recursion without checking any source twice', count => {
+    const sources = Array.from({ length: count }, (_, i) => flow(`fragment-${i}`));
+    const baseline = compileCompositionDocument(emptyDocument()), native = nativeRun(withSources(emptyDocument(), sources));
+    const check = vi.spyOn(compiler, 'checkCompositionPipelineSource');
+    let result: ReturnType<typeof lower>;
+    try {
+      result = lower(lift({ dataSources: sources }, { kind: 'fragment' }).graph);
+      expect(check).toHaveBeenCalledTimes(count);
+      expect(check.mock.calls.map(call => call[2])).toEqual(Array.from({ length: count }, (_, i) => i + 1));
+    } finally { check.mockRestore(); }
+    expect(result.ok).toBe(native.ok);
+    expect(result.budgets[0].accepted).toBe(native.ok);
+    if (result.ok && native.ok) expect(result.capabilities).toEqual(native.capabilities.filter(capability => !baseline.capabilities.includes(capability)));
+    else {
+      if (result.ok || native.ok) throw new Error('Expected native pipeline-limit refusal.');
+      const issue = { ...native.issues[0], pointer: native.issues[0].pointer.replace(/^\/document/, '') };
+      expect(result.errors[0]).toMatchObject(issue);
+      expect(result.budgets[0]).toMatchObject({ compilerIssues: [issue], firstExceedingPointer: '/dataSources/128' });
+    }
+    const nested = compileGraphValue({ dataSources: sources.slice(0, 64), group: { dataSources: sources.slice(64) } }, { kind: 'fragment' });
+    expect(nested.issues).toEqual(count === 129 ? [{ code: 'limit_exceeded', pointer: '/group/dataSources/64' }] : []);
+  });
+});
+
+describe('single-pass graph checker reuse', () => {
+  it('does not assemble a structural root to return its existing output type', () => {
+    const graph = lift(largeGraphFlow(), { kind: 'flow' }).graph;
+    const copied = vi.spyOn(graphJSON, 'copy');
+    try {
+      expect(validateGraph(graph).filter(issue => issue.severity === 'error')).toEqual([]);
+      expect(copied).not.toHaveBeenCalled();
+    } finally { copied.mockRestore(); }
+  });
+
+  it('does not retype flow operands or predicates to build a budget from native output', () => {
+    const source = flow('filtered', {
+      request: { type: 'none', value: { type: 'literal', value: [1, 2] } },
+      steps: [{ id: 'keep', op: 'filter', where: { type: 'exists', value: { type: 'item', path: [] } } }, { id: 'reduce', op: 'count' }],
+    });
+    const compiled = compileGraphValue(source, { kind: 'flow' });
+    expect(compiled.issues).toEqual([]);
+    const operands = vi.spyOn(typing, 'typeOperand'), predicates = vi.spyOn(typing, 'typeWhere');
+    try {
+      const budget = budgetFromCompilation(source, { kind: 'flow', id: source.id, field: '' }, compiled, { kind: 'flow' });
+      expect(budget).toMatchObject({ accepted: true, accounting: 'unavailable', meters: [], conditions: [{ nodes: null }] });
+      expect(operands).not.toHaveBeenCalled();
+      expect(predicates).not.toHaveBeenCalled();
+    } finally { operands.mockRestore(); predicates.mockRestore(); }
+  });
+
+  it('checks a standalone call once with actual permissions, not through the lenient schema too', () => {
+    const graph = lift(truncatedCall, { kind: 'call' }).graph;
+    const lenient = vi.spyOn(expression.callServiceSchema, 'safeParse'), scoped = vi.spyOn(expression, 'checkCallService');
+    try {
+      expect(lower(graph).ok).toBe(true);
+      expect(scoped).toHaveBeenCalledTimes(1);
+      expect(lenient).not.toHaveBeenCalled();
+      expect(measureBudget(truncatedCall, graph.roots[0].anchor, { kind: 'call' }).accepted).toBe(true);
+      expect(scoped).toHaveBeenCalledTimes(2);
+      expect(lenient).not.toHaveBeenCalled();
+    } finally { lenient.mockRestore(); scoped.mockRestore(); }
+  });
+
+  it.each<Json>([
+    { ...truncatedCall, domain: 'bad-domain' },
+    { ...truncatedCall, unknown: true },
+    { ...truncatedCall, target: {} },
+    { ...truncatedCall, target: { entity_id: literal(null) } },
+  ])('retains the native call shape and first semantic refusal for $domain', call => {
+    const context = nativeContext('action'), native = nativeRun(replaceAt(copy(context.document), context.pointer, call));
+    if (native.ok) throw new Error('Expected native call refusal.');
+    const result = lower(lift(call, { kind: 'call' }).graph);
+    if (result.ok) throw new Error('Expected standalone call refusal.');
+    expect(result.errors[0]).toMatchObject({ ...native.issues[0], pointer: native.issues[0].pointer.replace(`/document${context.pointer}`, '') });
   });
 });
 

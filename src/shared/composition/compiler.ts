@@ -14,7 +14,7 @@ import { deviceControlModel, isRoomDeviceSource, validateDeviceControl, validate
 import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroom';
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
-import { checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
+import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
 import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesStateFills } from './state-styles';
 import { identifierSchema } from '../validation';
 import { APP_STATE_CAPABILITY } from './app-state';
@@ -36,6 +36,9 @@ import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl,
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
+
+/** Reuse the native shape without its lenient semantic pass; adapters run the scoped checker once. */
+export const compositionCallShape = callServiceSchema.clone({ ...callServiceSchema.def, checks: [] });
 
 export function absorbCompositionExpressionCapabilities(facts: ExpressionFacts, into: Set<string>, kind: 'expression' | 'call' = 'expression'): void {
   if (facts.usedOperands) into.add('sh.operands@1');

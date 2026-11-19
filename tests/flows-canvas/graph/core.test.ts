@@ -164,8 +164,8 @@ describe('G-limits exact existing boundaries', () => {
       const budget = measureBudget(ast, anchor, { kind });
       expect(budget).toMatchObject({ accepted: true, nodes: null, depth: null, compactVisible: false });
       if (kind === 'flow') {
-        expect(budget.conditions[0]).toMatchObject({ nodes: 17, depth: null, astNodes: null, astDepth: null });
-        expect(budget.scopes.find(scope => scope.kind === 'predicate')).toMatchObject({ nodes: 17, nodeLimit: 32, nodeAccounting: 'compiler' });
+        expect(budget.conditions[0]).toMatchObject({ nodes: null, depth: null, astNodes: null, astDepth: null });
+        expect(budget.scopes.find(scope => scope.kind === 'predicate')).toMatchObject({ nodes: null, nodeLimit: 32, nodeAccounting: 'unavailable' });
       } else expect(budget.accounting).toBe('unavailable');
     }
   });
@@ -194,9 +194,9 @@ describe('G-limits exact existing boundaries', () => {
     const budget = measureBudget(source, anchor, { kind: 'flow' });
     expect(allowed(source, 'flow')).toBe(expected);
     expect(budget.accepted).toBe(expected);
-    if (expected) expect(budget.conditions[0].nodes).toBe(nodes);
+    if (expected) expect(budget.conditions[0].nodes).toBeNull();
     else expect(budget.conditions).toEqual([]);
-    expect(budget.scopes.filter(scope => scope.kind === 'expression').every(scope => scope.nodes === 1)).toBe(true);
+    expect(budget.scopes.every(scope => scope.nodes === null)).toBe(true);
   });
   it.each([[6, true], [7, false]] as const)('flow predicate depth %i uses a separate depth accepted=%s', (depth, expected) => {
     let where = comparisons(1);
@@ -209,7 +209,7 @@ describe('G-limits exact existing boundaries', () => {
     const filtered = filterFlow(when);
     expect(allowed(filtered, 'flow')).toBe(true);
     const budget = measureBudget(filtered, anchor, { kind: 'flow' });
-    expect(budget).toMatchObject({ nodes: null, accepted: true, accounting: 'partial' });
+    expect(budget).toMatchObject({ nodes: null, accepted: true, accounting: 'unavailable' });
     expect(budget.firstExceedingPointer).toBeUndefined();
     expect(allowed({ type: 'choose', cases: [{ when, then: scalar() }], otherwise: scalar() }, 'operand')).toBe(false);
   });
@@ -291,13 +291,14 @@ describe('G-limits exact existing boundaries', () => {
   it.each([[48, 64, false], [49, 64, true], [96, 128, false], [97, 128, true], [24, 32, false], [25, 32, true], [6, 8, false], [7, 8, true], [4, 6, false], [5, 6, true], [12, 16, false], [13, 16, true]] as const)('meter %i/%i visible=%s', (used, limit, visible) => {
     expect(budgetMeter('test', used, limit)).toMatchObject({ used, limit, ratio: used / limit, visible, exceeded: used > limit });
   });
-  it.each([[48, false], [49, true]] as const)('derives the %i/64 flow meter directly from the checker counter', (nodes, visible) => {
+  it.each([48, 49])('keeps %i/64 flow usage unavailable without a second checker walk', nodes => {
     const source = pipelineSourceSchema.parse(flow());
     source.inputs.request = { type: 'none', value: { type: 'list', items: Array.from({ length: nodes - 1 }, () => scalar()) } };
     const budget = measureBudget(source, anchor, { kind: 'flow' });
     expect(budget.accepted).toBe(true);
-    expect(budget.scopes[0]).toMatchObject({ nodes, depth: null, nodeAccounting: 'compiler' });
-    expect(budget.meters[0]).toMatchObject({ used: nodes, limit: 64, ratio: nodes / 64, visible });
+    expect(budget.scopes[0]).toMatchObject({ nodes: null, depth: null, nodeLimit: 64, nodeAccounting: 'unavailable' });
+    expect(budget.meters).toEqual([]);
+    expect(budget.accountingUnavailableReason).toContain('observer');
   });
   it('represents uncapped node and depth limits without a percentage or an exceeded meter', () => {
     const scope: GraphBudget['scopes'][number] = {

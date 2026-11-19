@@ -84,6 +84,7 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
   const compileOptions: FragmentOptions[] = graph.roots.map((root, index) => ({
     kind: root.destination.kind === 'flow' && record(values[index]) && values[index].model !== 'pipeline@1' ? 'flow-inputs' as const : root.destination.kind,
     context: root.destination.context, library: options.library, itemScope: options.itemScope, allowControl: root.destination.allowControl,
+    sourceId: root.destination.sourceId ?? (root.anchor.kind === 'flow' ? root.anchor.id : undefined),
   }));
   const compilations = graph.roots.map((root, index) => {
     const context = root.destination.context, key = contextKeys.get(index);

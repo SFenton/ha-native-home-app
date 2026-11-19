@@ -1,5 +1,6 @@
 import type { Json } from '../../types';
-import { callServiceSchema, operandBase, predicateBase, type Operand } from '../expression';
+import { operandBase, predicateBase, type Operand } from '../expression';
+import { compositionCallShape } from '../compiler';
 import { logicEntrySchema, logicHoleSchema, logicRefSchema } from '../logic-library';
 import { outputSchema, pipelineInputsSchema, pipelineSourceSchema, requestSchema, stepSchema } from '../pipeline/schema';
 import type { GraphJSON, GraphPayload } from './types';
@@ -207,7 +208,7 @@ export function describeGrammar(value: Json, hint: FragmentKind = 'auto'): Gramm
   if (kind === 'call' && record(value)) {
     let skeleton: Json = value;
     for (const child of children) skeleton = replaceAt(skeleton, child.binding, child.kind === 'condition' ? condition : child.binding === '/data' ? { type: 'object', fields: {} } : { type: 'literal', value: 'light.demo_graph' });
-    const parsed = callServiceSchema.safeParse(skeleton);
+    const parsed = compositionCallShape.safeParse(skeleton);
     return parsed.success ? { payload: { kind, value: parsed.data }, key: 'call', children } : opaque("Can't show this as blocks: invalid service call.");
   }
   if (kind === 'flow-inputs' && record(value)) {
