@@ -12,6 +12,9 @@ import type { CSSProperties } from 'react';
 import type { Json } from '../../../src/shared/types';
 import type { CanvasHostWithObservations } from '../../../src/workspace2/canvas/observations';
 import { observationFixture } from './observation-fixture';
+import { largeGraphFlow } from '../graph/fixtures/large-flow';
+import { indexGraph } from '../../../src/workspace2/canvas/graph-index';
+import { portLabel } from '../../../src/workspace2/canvas/blocks';
 
 const params = new URLSearchParams(location.search);
 const fixture = params.get('fixture');
@@ -28,7 +31,8 @@ const warmPositions: Readonly<Record<string, { x: number; y: number }>> = {
   '/cases/0/when/of/1': { x: 714, y: 430 }, '/cases/0/when/of/1/left': { x: 484, y: 430 }, '/cases/0/when/of/1/right': { x: 484, y: 540 },
   '/cases/0/then': { x: 944, y: 500 }, '/otherwise': { x: 944, y: 620 },
 };
-const ast: Json = fixture === 'summary' ? { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['home'] }] }
+const ast: Json = fixture === 'large' ? largeGraphFlow()
+  : fixture === 'summary' ? { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['home'] }, { type: 'not', of: { type: 'viewer', isAdmin: false } }] }
   : fixture === 'warm' || fixture === 'observations' ? warm
   : fixture === 'meter' ? choose
   : { type: 'math', op: 'add', args: [{ type: 'literal', value: 21 }, { type: 'literal', value: 3 }] };
@@ -40,13 +44,22 @@ function Harness() {
   }, false) : followed;
   const [closed, setClosed] = useState(false), [writes, setWrites] = useState(0);
   const graph = useMemo(() => {
-    const graph = arrangeCanvas(lift(ast, { kind: fixture === 'summary' ? 'condition' : 'operand', anchor }).graph);
+    const graph = arrangeCanvas(lift(ast, { kind: fixture === 'large' ? 'flow' : fixture === 'summary' ? 'condition' : 'operand', anchor }).graph);
     return fixture !== 'warm' && fixture !== 'observations' ? graph : { ...graph, nodes: graph.nodes.map(node => {
       const position = warmPositions[node.origins[0]];
       if (!position) throw new Error(`Missing authored fixture position: ${node.origins[0]}`);
       return { ...node, position };
     }) };
   }, []);
+  const lookup = useMemo(() => {
+    if (fixture !== 'large') return undefined;
+    const start = performance.now(), index = indexGraph(graph);
+    let ports = 0;
+    for (const node of graph.nodes) for (const port of node.inputs) {
+      index.source(node.id, port.id); index.edges(node.id, port.id, 'input'); portLabel(port.id, node, graph, index); ports++;
+    }
+    return { milliseconds: performance.now() - start, ports };
+  }, [graph]);
   const host = useMemo<CanvasHostWithObservations>(() => {
     let snapshot: CanvasSnapshot = { document: ast, revision: '1' };
     return {
@@ -69,6 +82,7 @@ function Harness() {
       {window.matchMedia('(max-width: 599px)').matches ? <CanvasDialog title="Block inspector" sheet theme={theme} close={() => setClosed(true)}>{meterInspector}</CanvasDialog> : meterInspector}
     </div>
   </div>;
-  return <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'summary' ? 'Hallway Light' : fixture === 'observations' ? 'Too Warm Warning (observation fixture)' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={['Subtitle']} onClose={() => setClosed(true)}/>;
+  return <>{lookup && <output hidden aria-label="Large canvas lookup performance" data-milliseconds={lookup.milliseconds} data-ports={lookup.ports} data-nodes={graph.nodes.length}/>}
+    <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'large' ? 'Large graph: 2,341 blocks' : fixture === 'summary' ? 'Hallway Light' : fixture === 'observations' ? 'Too Warm Warning (observation fixture)' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={[fixture === 'summary' ? 'Visible When' : 'Subtitle']} onClose={() => setClosed(true)}/></>;
 }
 createRoot(document.getElementById('root')!).render(<Harness/>);

@@ -1,14 +1,15 @@
-import { blockCatalog, catalogAvailability, type BlockCatalogEntry, type CanvasHost, type GraphNode, type GraphScopeKind, type LogicGraph } from '../../shared/composition/graph';
+import { averageFixed, catalogByKey, catalogAvailability, lift, type BlockCatalogEntry, type CanvasHost, type GraphJSON, type GraphNode, type GraphScopeKind, type LogicGraph, type PortType } from '../../shared/composition/graph';
 import { mathArity, type Operand, type Predicate } from '../../shared/composition/expression';
 import type { Json } from '../../shared/types';
 import type { FragmentKind } from '../../shared/composition/graph/grammar';
 import { newStep, stepNames } from '../data/flow';
 import type { PipelineStep } from '../../shared/composition/pipeline/schema';
 import { copy, record } from '../../shared/composition/graph/json';
+import { indexGraph, type CanvasGraphIndex } from './graph-index';
 
 const words: Record<string, string> = {
   'boolean': 'Yes / No', 'entity-id': 'Entity ID', 'structured': 'Structured Value', 'source': 'Entity',
-  'read': 'Attribute', 'raw-state': 'Entity State', 'last-changed': 'Last Changed', 'list-count': 'List Size', 'list-includes': 'List Contains',
+  'read': 'Attribute', 'raw-state': 'Raw State', 'last-changed': 'Last Changed', 'list-count': 'List Size', 'list-includes': 'List Contains',
   'viewer': 'Viewer Value', 'control': 'Control Value', 'item': 'This Item', 'index': 'Item Position', 'param': 'Flow Setting',
   'today': 'Today', 'now': 'Now', 'now-second': 'Now Each Second', 'days-between': 'Days Between', 'seconds-between': 'Seconds Between',
   'progress': 'Progress Between', 'map': 'Match Value', 'choose': 'If / Otherwise', 'list': 'Make List', 'object': 'Make Record',
@@ -19,47 +20,52 @@ const words: Record<string, string> = {
   'bound-symbol': 'Bound Symbol', 'field': 'Field', 'for-each': 'For Each', 'bundle-outputs': 'Output Bundle', 'group': 'Group',
 };
 const title = (text: string) => text.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+export function blockFields(value: GraphJSON | undefined): Readonly<Record<string, GraphJSON>> | undefined {
+  return record(value) ? value : undefined;
+}
 export function blockName(key: string): string {
-  const entry = blockCatalog.find(entry => entry.key === key);
+  const entry = catalogByKey.get(key);
   if (!entry) return key === 'opaque' ? 'Preserved JSON' : title(key.replaceAll('.', ' '));
   if (entry.grammar === 'step') return stepNames[entry.variant as PipelineStep['op']];
   if (entry.grammar === 'operand.viewer') return 'Viewer Value';
   if (entry.grammar === 'predicate.viewer') return 'Viewer Matches';
+  if (entry.key === 'recipe.average-fixed') return 'Average Fixed Values';
   if (entry.grammar.startsWith('destination')) return words[entry.variant] ?? title(entry.variant);
   const keyName = ['value', 'operand', 'condition'].includes(entry.variant) ? entry.grammar.split('.').at(-1)! : entry.variant;
   if (entry.grammar === 'operand.literal' && entry.variant === 'text') return 'Text';
   return words[keyName] ?? title(keyName);
 }
-export function fixedAverage(graph: LogicGraph, node: GraphNode): boolean {
+export function fixedAverage(graph: LogicGraph, node: GraphNode, index?: CanvasGraphIndex): boolean {
   if (node.catalogKey !== 'operand.math.divide') return false;
-  const from = (id: string, port: string) => graph.nodes.find(held => held.id === graph.edges.find(edge => edge.to.nodeId === id && edge.to.portId === port)?.from.nodeId);
-  const sum = from(node.id, '/args/0'), divisor = from(node.id, '/args/1');
-  const value = divisor && copy(divisor.payload.value);
+  const indexed = index ?? indexGraph(graph);
+  const sum = indexed.source(node.id, '/args/0'), divisor = indexed.source(node.id, '/args/1');
+  const value = blockFields(divisor?.payload.value);
   return sum?.catalogKey === 'operand.math.add' && sum.inputs.length >= 2 && sum.inputs.length <= 8
-    && record(value) && value.type === 'literal' && value.value === sum.inputs.length;
+    && value !== undefined && value.type === 'literal' && value.value === sum.inputs.length;
 }
-export function nodeName(node: GraphNode, graph?: LogicGraph): string { return graph && fixedAverage(graph, node) ? 'Average' : blockName(node.catalogKey); }
-export function portLabel(binding: string, node?: GraphNode, graph?: LogicGraph): string {
+export function nodeName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string { return graph && fixedAverage(graph, node, index) ? 'Average' : blockName(node.catalogKey); }
+export function portLabel(binding: string, node?: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string {
   if (node) {
     if (binding === 'value') return 'Result';
-    if (graph && fixedAverage(graph, node)) return binding === '/args/0' ? 'Total' : 'Count';
+    if (graph && fixedAverage(graph, node, index)) return binding === '/args/0' ? 'Total' : 'Count';
     if (['predicate.all.value', 'predicate.any.value'].includes(node.catalogKey) && binding.startsWith('/of/')) {
-      const source = graph?.nodes.find(held => held.id === graph.edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === binding)?.from.nodeId);
-      return source ? nodeName(source, graph) : `Check ${Number(binding.split('/').at(-1)) + 1}`;
+      const source = graph && (index ?? indexGraph(graph)).source(node.id, binding);
+      return source ? nodeName(source, graph, index) : `Check ${Number(binding.split('/').at(-1)) + 1}`;
     }
-    const value = copy(node.payload.value);
-    if (record(value) && value.type === 'math') {
+    const value = blockFields(node.payload.value);
+    if (value?.type === 'math') {
       const index = Number(binding.split('/').at(-1));
       const labels: Record<string, string[]> = { add: ['Value', 'Plus'], subtract: ['Value', 'Minus'], multiply: ['Value', 'Times'], divide: ['Value', 'By'], clamp: ['Value', 'Minimum', 'Maximum'], scale: ['Value', 'From minimum', 'From maximum', 'To minimum', 'To maximum'] };
       return labels[String(value.op)]?.[index] ?? (index ? `Value ${index + 1}` : 'Value');
     }
-    if (record(value) && value.type === 'compare') return binding === '/left' ? 'Value' : ['above', 'below', 'before', 'after'].includes(String(value.op)) ? 'Than' : 'Equals';
+    if (value?.type === 'compare') return binding === '/left' ? 'Value' : ['above', 'below', 'before', 'after'].includes(String(value.op)) ? 'Than' : 'Equals';
     if (binding === '/cases/0/when') return 'If';
     if (binding === '/cases/0/then') return 'Then';
   }
   const parts = binding.split('/').filter(Boolean);
   if (parts[0] === 'cases') return `Rule ${Number(parts[1]) + 1} ${parts[2] === 'when' ? 'If' : 'Then'}`;
-  if (parts[0] === 'of' || parts[0] === 'args' && /^\d+$/.test(parts[1] ?? '')) return `Value ${Number(parts[1]) + 1}`;
+  if (parts[0] === 'of' && parts.length === 1) return 'Check';
+  if (['of', 'args'].includes(parts[0]) && /^\d+$/.test(parts[1] ?? '')) return `Value ${Number(parts[1]) + 1}`;
   if (binding.endsWith('/sourceId')) return 'Entity';
   return parts.map(part => title(part.replaceAll('~1', '/').replaceAll('~0', '~'))).join(' ');
 }
@@ -75,19 +81,19 @@ export function blockGroup(entry: BlockCatalogEntry): string {
   return 'Values';
 }
 export const paletteGroups = ['In This Flow', 'From Home', 'Compare', 'Combine', 'Math', 'Choose', 'Lists & Repeats', 'Text & Time', 'App', 'Values', 'Templates'] as const;
-export function blockResult(entry: BlockCatalogEntry): string {
-  if (entry.grammar.startsWith('predicate') || entry.variant === 'boolean' || entry.grammar === 'operand.list-includes') return 'condition';
-  if (entry.variant === 'number' || entry.grammar === 'operand.math' || entry.grammar === 'recipe' && entry.variant.startsWith('average') || ['operand.read', 'operand.count', 'operand.list-count', 'operand.index'].includes(entry.grammar)) return 'number';
-  if (entry.variant === 'text' || ['operand.format', 'operand.raw-state'].includes(entry.grammar)) return 'text';
-  if (entry.grammar === 'operand.clock' || entry.grammar === 'operand.last-changed' || entry.grammar === 'operand.date') return 'time';
-  if (entry.grammar === 'sourceId' || entry.variant === 'entity-id') return 'entity';
-  if (['operand.list', 'step', 'request', 'request.ha-subscription', 'renderer.repeat'].includes(entry.grammar)) return 'list';
-  return 'record';
+export function blockResult(entry: BlockCatalogEntry, sourceId?: string): PortType | undefined {
+  const seed = blockSeed(entry, sourceId);
+  return seed ? lift(seed.value, { kind: seed.kind }).graph.nodes[0]?.outputs[0]?.type : undefined;
 }
 const literal = (value: Json = 0): Operand => ({ type: 'literal', value });
 const check = (): Predicate => ({ type: 'compare', op: 'eq', left: literal(1), right: literal(1) });
-export interface BlockSeed { value: Json; kind: FragmentKind }
+export interface BlockSeed { value: Json; kind: FragmentKind; readonly recipe?: 'average-fixed' }
 export function blockSeed(entry: BlockCatalogEntry, sourceId = 'entity'): BlockSeed | undefined {
+  if (entry.key === 'recipe.average-fixed') {
+    const recipe = averageFixed([literal(0), literal(0)]);
+    if (!recipe.ok) throw new Error(recipe.errors.map(error => error.message).join('; '));
+    return { value: copy(recipe.value.ast), kind: 'operand', recipe: 'average-fixed' };
+  }
   const name = entry.grammar.split('.').at(-1)!;
   if (entry.grammar === 'selection.source' || entry.key === 'selection.source') return { value: sourceId, kind: 'source-selection' };
   if (entry.grammar.startsWith('operand.')) {
@@ -139,16 +145,23 @@ export function paletteAvailability(entry: BlockCatalogEntry, scope: GraphScopeK
   if (!available.enabled) return available;
   return blockSeed(entry, sourceId) ? available : { enabled: false, reason: 'Requires a destination or template supplied by the workspace host. Existing blocks remain preserved and editable in the canvas.' };
 }
-export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources'] = [], graph?: LogicGraph): string {
-  const value = copy(node.payload.value);
-  if (node.payload.kind === 'source-selection') return String(value);
-  if (!record(value)) return '';
-  if (graph && fixedAverage(graph, node)) return 'Fixed values · total divided by count';
+export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources'] = [], graph?: LogicGraph, index?: CanvasGraphIndex): string {
+  const value = blockFields(node.payload.value);
+  if (node.payload.kind === 'source-selection') return sources.find(source => source.id === node.payload.value)?.name ?? String(node.payload.value);
+  if (!value) return '';
+  if (graph && fixedAverage(graph, node, index)) return 'Fixed values · total divided by count';
   if (value.type === 'literal') return '';
   if (value.type === 'state') return `State is ${Array.isArray(value.in) ? value.in.join(' or ') : ''}`;
   const from = value.from;
-  if (record(from) && typeof from.sourceId === 'string') return [sources.find(source => source.id === from.sourceId)?.name, Array.isArray(from.path) ? from.path.join(' · ') : ''].filter(Boolean).join(' · ');
-  if (typeof value.sourceId === 'string') return sources.find(source => source.id === value.sourceId)?.name ?? value.sourceId;
+  const fromFields = blockFields(from);
+  if (fromFields && typeof fromFields.sourceId === 'string') {
+    const sourceId = index ? index.source(node.id, '/from/sourceId')?.payload.value : fromFields.sourceId;
+    return [sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity'), Array.isArray(fromFields.path) ? fromFields.path.join(' · ') : ''].filter(Boolean).join(' · ');
+  }
+  if (typeof value.sourceId === 'string') {
+    const sourceId = index ? index.source(node.id, '/sourceId')?.payload.value : value.sourceId;
+    return sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity');
+  }
   if (value.type === 'math' || value.type === 'compare' || value.type === 'all' || value.type === 'any') return '';
   return String(value.part ?? value.field ?? value.pattern ?? '');
 }

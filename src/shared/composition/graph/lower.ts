@@ -7,7 +7,7 @@ import { compileGraphValue, consumingDocument, contextualCompilation, type Fragm
 import { budgetFromCompilation } from './budgets';
 import { fingerprint, record, withoutCanvasMetadata } from './json';
 import type { GraphBudget, GraphDiagnostic, GraphEdge, GraphJSON, GraphRoot, GraphSourceLocation, LogicGraph, LoweringResult } from './types';
-import { validateGraph } from './validate';
+import { validateForLowering, validateGraph, type GraphValidation } from './validate';
 import { expansionSourceMap } from './provenance';
 
 export interface LowerOptions {
@@ -51,7 +51,12 @@ function projectValidatedGraph(graph: LogicGraph): { readonly ast: Json; readonl
   return { ast: values.length === 1 ? values[0] : values, sourceMap };
 }
 export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringResult {
-  const validation = validateGraph(graph), errors: GraphDiagnostic[] = validation.filter(diagnostic => diagnostic.severity === 'error');
+  return lowerValidated(validateForLowering(graph), options);
+}
+/** Uses the explicitly validated immutable revision, with exactly the same refusal path as lower. */
+export function lowerValidated(validated: GraphValidation, options: LowerOptions = {}): LoweringResult {
+  const { graph, diagnostics: validation } = validated;
+  const errors: GraphDiagnostic[] = validation.filter(diagnostic => diagnostic.severity === 'error');
   const hints = validation.filter(diagnostic => diagnostic.severity === 'warning');
   if (errors.length || !graph.roots.length) return { ok: false, original: graph.original, errors, budgets: [] };
   let ast: Json, sourceMap: readonly GraphSourceLocation[];

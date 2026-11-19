@@ -1,9 +1,20 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 const harness = '/tests/flows-canvas/canvas/harness.html';
 const evidence = path.resolve('docs/evidence/w2-c');
-test.skip(process.env.STUDIO_E2E_PORT !== '4822', 'Run with the isolated tests/flows-canvas/canvas/playwright.config.ts configuration.');
+test.beforeEach(async ({ page }) => {
+  await page.route(`**${harness}*`, async route => {
+    const response = await route.fetch(), html = await response.text();
+    if (html.includes('src="/src/main.tsx"')) {
+      await route.fulfill({ response, body: html.replace('src="/src/main.tsx"', 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}button,input,select{font:inherit}</style></head>') });
+    } else {
+      if (!html.includes('harness.tsx')) throw new Error('The canvas harness requires the Vite development server or the standard Studio development test server.');
+      await route.fulfill({ response });
+    }
+  });
+});
 async function tabTo(page: Page, target: Locator) {
   for (let i = 0; i < 160; i++) {
     if (await target.evaluateAll(elements => elements.some(element => element === document.activeElement))) return;
@@ -130,7 +141,8 @@ test('C-themes: light, dark, custom HA tokens and narrow palette/canvas/summary 
     await activate(page, page.getByRole('button', { name: 'Close block palette' }));
     await selectBlock(page, 'Select All Of 1'); await page.keyboard.press('Enter');
     await nodeControl(page, 'Inspect All Of'); await page.keyboard.press('Enter');
-    await expect(page.getByRole('complementary', { name: 'Block inspector' })).toContainText('And / Or are edited on the canvas');
+    await expect(page.getByRole('figure', { name: 'All Of, 3 checks' })).toContainText("Viewer's person is home");
+    await expect(page.getByRole('figure', { name: 'All Of, 3 checks' }).locator('.w2-canvas-summary-branch')).toHaveCount(3);
     await expect(page.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeVisible();
     await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-summary.png`, fullPage: true });
   }
@@ -199,4 +211,59 @@ test('C-observation: supplied values, pins, unavailable, unknown wires, kept out
     await activate(page, page.getByRole('button', { name: 'Outline', exact: true }));
     await expect(page.getByRole('region', { name: 'Connections', exact: true })).toContainText("Can't tell");
   }
+});
+for (const view of ['Graph', 'Outline'] as const) test(`C-focus ${view}: undo restores Plus after Enter, ArrowDown and Delete`, async ({ page }) => {
+  await page.goto(harness);
+  await activate(page, page.getByRole('button', { name: 'Close block palette' }));
+  if (view === 'Outline') await activate(page, page.getByRole('button', { name: 'Outline', exact: true }));
+  await selectBlock(page, 'Select Add 1');
+  await page.keyboard.press('Enter'); await page.keyboard.press('ArrowDown');
+  const plus = page.getByRole('button', { name: /^Add, Plus input/ });
+  await expect(plus).toBeFocused();
+  await page.keyboard.press('Delete'); await expect(plus).toHaveAttribute('aria-label', /required, unconnected/);
+  await page.keyboard.press('ControlOrMeta+z'); await expect(plus).toBeFocused();
+  await expect(plus).toHaveAttribute('aria-label', /connected to Number/);
+});
+test('C-recipe: keyboard adds and undoes the complete Average Fixed Values graph', async ({ page }) => {
+  await page.goto(harness);
+  await tabTo(page, page.getByRole('searchbox', { name: 'Find a block' }));
+  await page.keyboard.type('Average Fixed Values');
+  await expect(page.getByRole('button', { name: 'Add Average Fixed Values, number', exact: true })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.w2-canvas-node')).toHaveCount(8);
+  await expect(page.locator('.w2-canvas-wire')).toHaveCount(6);
+  await expect(page.getByRole('button', { name: 'Select Average 4', exact: true })).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(page.locator('.w2-canvas-node')).toHaveCount(3);
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(page.getByRole('button', { name: 'Select Average 4', exact: true })).toBeFocused();
+});
+test('C-large: 2341 blocks mount, resolve ports, focus and edit within interactive budgets', async ({ page }, testInfo) => {
+  const paint = () => page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const start = performance.now();
+  await page.goto(`${harness}?fixture=large`);
+  await expect(page.locator('.w2-canvas-node')).toHaveCount(2341);
+  await expect(page.locator('.w2-canvas-wire')).toHaveCount(2340);
+  await paint();
+  const mount = performance.now() - start;
+  const lookup = Number(await page.getByLabel('Large canvas lookup performance').getAttribute('data-milliseconds'));
+  expect(Number(await page.getByLabel('Large canvas lookup performance').getAttribute('data-ports'))).toBe(2340);
+  await page.getByRole('button', { name: 'Close block palette' }).click();
+  const header = page.getByRole('button', { name: /^Select Number / }).first();
+  const focusStart = performance.now();
+  await header.focus(); await page.keyboard.press('Enter'); await paint();
+  const focus = performance.now() - focusStart;
+  await expect(page.getByRole('button', { name: /^Number, Result output/ }).first()).toBeFocused();
+  await header.click();
+  await page.getByRole('spinbutton', { name: 'Value', exact: true }).fill('2');
+  const editStart = performance.now();
+  await page.getByRole('button', { name: 'Update value', exact: true }).click(); await paint();
+  const edit = performance.now() - editStart;
+  await expect(page.getByRole('spinbutton', { name: 'Value', exact: true })).toHaveValue('2');
+  const metrics = { nodes: 2341, steps: 32, mount, lookup, focus, edit, budgets: { mount: 5000, lookup: 50, focus: 1000, edit: 1500 } };
+  console.info(`C-large ${testInfo.project.name}: ${JSON.stringify(metrics)}`);
+  writeFileSync(`${evidence}/${testInfo.project.name}-large-performance.json`, JSON.stringify(metrics, null, 2) + '\n');
+  await testInfo.attach('large-canvas-performance', { body: JSON.stringify(metrics), contentType: 'application/json' });
+  expect(mount).toBeLessThan(5000); expect(lookup).toBeLessThan(50);
+  expect(focus).toBeLessThan(1000); expect(edit).toBeLessThan(1500);
 });

@@ -37,11 +37,16 @@ silently dropping or repairing user content.
   originating port/header. Inspector rule moves preserve If/Then wiring and
   Otherwise; new rule inputs remain visibly disconnected until authored.
 - And/Or always edit on canvas. The inspector supplies a noninteractive summary
-  and **Edit in Canvas**, not nested condition cards.
+  and **Edit in Canvas**, not nested condition cards. Its branches, settings,
+  entity names and output label come from the selected graph's real connections.
+- **Average Fixed Values** inserts the native Add / Divide / count recipe with
+  two editable numbers and all its wires in one undoable transaction.
 
 Styling uses existing workspace/HA tokens. Distinct Lucide block icons, named
-ports, accessible type descriptions and the Outline connection list supplement
-colored sockets/wires. The socket of an unresolved input uses its connected
+ports, type-specific socket glyphs/shapes, accessible type descriptions and the
+Outline connection list supplement colored sockets/wires. Numbers use a hash in
+a circle, text a T in a square and conditions a check in a diamond; time, entity,
+list and record sockets also have distinct glyphs. The socket of an unresolved input uses its connected
 source's static port type for color, never a sampled value; compatibility still
 uses the original graph descriptor. Port values come only from optional host
 observations; there is no literal, connected-source or calculated-value fallback.
@@ -59,6 +64,20 @@ icons; the existing theme and graph helpers supply tokens, shapes and LAN-safe
 `getRandomValues` IDs. No graph-layout/editor dependency was added and no OSS
 license/notices changed. SVG wires are decorative; native HTML controls and the
 outline provide the full editing interface.
+
+Node, edge and incoming-port indexes are built once per immutable graph
+revision. Memoized block components preserve interactivity when selection or
+port focus changes; focusing a port also updates the focus saved in undo history.
+Palette type hints and accessible names use the graph-core output descriptor,
+including numeric date differences/progress, rather than a second type map.
+
+The performance-only core handoff is `validateForLowering(graph)` followed by
+`lowerValidated(validation)`. The branded token holds the exact immutable
+revision and its ordered diagnostics. Calling `lower(graph)` directly still
+validates and takes the same refusal path. All core indexes are call-local;
+there is no cross-call cache. The performance guard retains its 50 ms median.
+Before/after corpus hashes were captured at the pre-optimization head and cover
+ordered diagnostics and every output field, including source maps and budgets.
 
 ## Optional observation input
 
@@ -101,7 +120,7 @@ Missing input observations remain empty even when their connected output has a
 known value. The host owns snapshot freshness and sanitization and must update or
 withdraw stale observations when the graph/simulation changes.
 
-PR #30 was checked at `845c8b670f1dc658807efc2f96a3836970672df7`: it is still open,
+PR #30 was checked at head `845c8b6`: it is still open,
 and its documented contracts do not yet define this per-block/per-port display
 DTO. This local extension avoids editing W2-S or shared graph paths; W2-I/W2-S
 can align the exact field names above. The `observations` harness fixture is a
@@ -135,7 +154,7 @@ explicitly labelled as a fixture, not evidence that production counters work.
 ## Isolated acceptance harness
 
 ```sh
-npm test -- --maxWorkers=2
+npm test
 npm run build
 STUDIO_E2E_PORT=4822 STUDIO_E2E_DATA_DIR=./test-results/studio-data/w2-c \
   npx playwright test tests/e2e/workspace2-flows-canvas.spec.ts \
@@ -143,9 +162,17 @@ STUDIO_E2E_PORT=4822 STUDIO_E2E_DATA_DIR=./test-results/studio-data/w2-c \
 ```
 
 The dedicated config serves `tests/flows-canvas/canvas/harness.html` with Vite
-only. This avoids changing the real shell/server, whose HTML fallback always
-mounts the workspace. It starts no HA/persistence backend and uses no development
-data. The config rejects other port/data settings and Playwright stops its
-server. Curated screenshots and measured results live in `docs/evidence/w2-c/`.
+only. It defaults to 4822 and honors `STUDIO_E2E_PORT`,
+`STUDIO_E2E_DATA_DIR` and the older `STUDIO_E2E_DATA`. It starts no HA/persistence
+backend and uses no development data. Playwright stops its temporary server.
+
+The same spec runs under the standard CI config without a port-specific skip:
+omit `--config` from the command above. Its test-owned HTML interception preserves
+Vite's refresh preamble and swaps the workspace entry for the isolated harness;
+the real shell/server is unchanged. The standard runner's test backend remains
+isolated in the overridden test data directory. `fixture=large` mounts all 2,341
+blocks and asserts lookup, mount, focus and valid-edit budgets, retaining its
+actual measurements as a test attachment.
+Curated screenshots and measured results live in `docs/evidence/w2-c/`.
 Browser geometry is an interaction preview, not unchanged iOS SDUI or physical
 device/runtime evidence.

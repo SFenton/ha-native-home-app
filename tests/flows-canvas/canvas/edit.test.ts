@@ -49,6 +49,20 @@ describe('C-wire and atomic editing transactions', () => {
     expect(lower(combined.graph).ok).toBe(false); // The second check must be explicitly connected.
     expect(edit(combined, { type: 'undo' }).graph).toBe(original);
   });
+  it('inserts the complete native Average Fixed Values recipe as one transaction, without ID collisions', () => {
+    const original = graph(), seed = blockSeed(blockCatalog.find(entry => entry.key === 'recipe.average-fixed')!)!;
+    const added = edit(initialEditState(original), { type: 'add', seed, scopeId: original.scopes[0].id });
+    expect(added.graph.nodes).toHaveLength(original.nodes.length + 5);
+    expect(added.graph.edges).toHaveLength(original.edges.length + 4);
+    expect(new Set(added.graph.nodes.map(node => node.id)).size).toBe(added.graph.nodes.length);
+    const average = added.graph.nodes.find(node => node.id === added.focus?.nodeId)!;
+    const projected = lower({ ...added.graph, roots: [{ ...original.roots[0], nodeId: average.id }] });
+    expect(projected).toMatchObject({ ok: true, ast: { type: 'math', op: 'divide', args: [{ type: 'math', op: 'add', args: [number(0), number(0)] }, number(2)] } });
+    expect(added.past).toHaveLength(1);
+    expect(edit(added, { type: 'undo' }).graph).toBe(original);
+    expect(edit(edit(added, { type: 'undo' }), { type: 'redo' }).graph).toBe(added.graph);
+    expect(paletteAvailability(blockCatalog.find(entry => entry.key === 'recipe.average-fixed')!, 'document', [])).toEqual({ enabled: true });
+  });
   it.each(['number', 'text'])('preserves %s Choose branch wiring, output type and Otherwise across rule editing', kind => {
     const literal = (index: number) => ({ type: 'literal' as const, value: kind === 'number' ? index : `Text ${index}` });
     const cases = [true, false].map((isAdmin, index) => ({ when: { type: 'viewer' as const, isAdmin }, then: literal(index + 1) }));

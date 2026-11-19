@@ -3,6 +3,7 @@ import { copy } from '../../shared/composition/graph/json';
 import { operandBase } from '../../shared/composition/expression';
 import type { BlockSeed } from './blocks';
 import { nodeName } from './blocks';
+import { indexGraph, type CanvasGraphIndex } from './graph-index';
 
 export interface Socket { readonly nodeId: string; readonly portId: string }
 export interface CanvasFocus { readonly nodeId: string; readonly portId?: string; readonly direction?: 'input' | 'output' }
@@ -65,8 +66,23 @@ export function edit(state: EditState, command: EditCommand): EditState {
   if (command.type === 'add') {
     const scope = graph.scopes.find(scope => scope.id === command.scopeId);
     if (!scope) return refuse('The insertion scope no longer exists.');
-    const seed = lift(command.seed.value, { kind: command.seed.kind, scope }).graph.nodes[0];
+    const lifted = lift(command.seed.value, { kind: command.seed.kind, scope }).graph;
+    const seed = lifted.nodes[0];
     if (!seed || seed.payload.kind === 'opaque') return refuse('This block needs workspace settings before it can be added.');
+    if (command.seed.recipe === 'average-fixed') {
+      const ids = new Set(graph.nodes.map(node => node.id)), wires = new Set(graph.edges.map(edge => edge.id));
+      const remapped = new Map(lifted.nodes.map(node => { const id = allocateGraphId('block', ids); ids.add(id); return [node.id, id]; }));
+      const y = graph.nodes.reduce((maximum, node) => Math.max(maximum, (node.position?.y ?? 0) + 240), 24);
+      updated = { ...graph, nodes: [...graph.nodes, ...lifted.nodes.map(node => ({
+        ...node, id: remapped.get(node.id)!, scopeId: scope.id, origins: [], provenance: 'authored' as const,
+        position: { x: 32 + (node.position?.x ?? 0), y: y + (node.position?.y ?? 0) },
+      }))], edges: [...graph.edges, ...lifted.edges.map(edge => {
+        const id = allocateGraphId('wire', wires); wires.add(id);
+        return { ...edge, id, from: { ...edge.from, nodeId: remapped.get(edge.from.nodeId)! }, to: { ...edge.to, nodeId: remapped.get(edge.to.nodeId)! } };
+      })] };
+      return { graph: updated, focus: { nodeId: remapped.get(seed.id)! }, past: [...state.past, { graph, focus: state.focus }], future: [],
+        message: 'Average Fixed Values added with two editable numbers and its complete Add / Divide recipe. Undo removes the whole recipe.' };
+    }
     const id = allocateGraphId('block', new Set(graph.nodes.map(node => node.id)));
     const authored: GraphNode = { ...seed, id, scopeId: scope.id, origins: [], provenance: 'authored',
       position: { x: 32, y: graph.nodes.reduce((maximum, node) => Math.max(maximum, (node.position?.y ?? 0) + 240), 24) } };
@@ -157,27 +173,22 @@ export function edit(state: EditState, command: EditCommand): EditState {
   return { graph: updated, focus, past: [...state.past, { graph, focus: state.focus }], future: [], message };
 }
 
-export function orderedNodes(graph: LogicGraph): readonly GraphNode[] {
-  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
-  const incoming = new Map<string, string[]>();
-  for (const edge of graph.edges) incoming.set(edge.to.nodeId, [...incoming.get(edge.to.nodeId) ?? [], edge.from.nodeId]);
+export function orderedNodes(graph: LogicGraph, index: CanvasGraphIndex = indexGraph(graph)): readonly GraphNode[] {
   const seen = new Set<string>(), result: GraphNode[] = [];
   const visit = (id: string) => {
     if (seen.has(id)) return;
     seen.add(id);
-    incoming.get(id)?.forEach(visit);
-    const node = nodes.get(id); if (node) result.push(node);
+    index.incoming.get(id)?.forEach(edge => visit(edge.from.nodeId));
+    const node = index.nodes.get(id); if (node) result.push(node);
   };
   graph.nodes.forEach(node => visit(node.id));
   return result;
 }
-export function detachedNodes(graph: LogicGraph): readonly GraphNode[] {
+export function detachedNodes(graph: LogicGraph, index: CanvasGraphIndex = indexGraph(graph)): readonly GraphNode[] {
   const needed = new Set<string>(), pending = graph.roots.map(root => root.nodeId);
-  const dependencies = new Map<string, string[]>();
-  for (const edge of graph.edges) dependencies.set(edge.to.nodeId, [...dependencies.get(edge.to.nodeId) ?? [], edge.from.nodeId]);
   while (pending.length) {
     const id = pending.pop()!;
-    if (!needed.has(id)) { needed.add(id); pending.push(...dependencies.get(id) ?? []); }
+    if (!needed.has(id)) { needed.add(id); for (const edge of index.incoming.get(id) ?? []) pending.push(edge.from.nodeId); }
   }
   return graph.nodes.filter(node => !needed.has(node.id));
 }

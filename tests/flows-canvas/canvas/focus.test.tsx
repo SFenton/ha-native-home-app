@@ -48,6 +48,22 @@ it('restores DOM focus and selection after add, connect/replace, undo and redo',
   expect(document.activeElement).toBe(input);
   expect(screen.getByRole('button', { name: 'Select Add 1' }).getAttribute('aria-pressed')).toBe('true');
 });
+it('restores Plus after Select Add, Enter, ArrowDown, Delete and Undo', () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Close block palette' }));
+  const header = screen.getByRole('button', { name: 'Select Add 1' });
+  fireEvent.keyDown(header, { key: 'Enter' });
+  const value = screen.getByRole('button', { name: /^Add, Value input/ });
+  expect(document.activeElement).toBe(value);
+  fireEvent.keyDown(value, { key: 'ArrowDown' });
+  const plus = screen.getByRole('button', { name: /^Add, Plus input/ });
+  expect(document.activeElement).toBe(plus);
+  fireEvent.keyDown(plus, { key: 'Delete' });
+  expect(plus.getAttribute('aria-label')).toContain('required, unconnected');
+  fireEvent.keyDown(plus, { key: 'z', ctrlKey: true });
+  expect(document.activeElement).toBe(plus);
+  expect(plus.getAttribute('aria-label')).toContain('connected to Number');
+});
 it('does not steal editing keys, preserves local edits on conflict, and keeps save separate', async () => {
   const host = mount(true);
   fireEvent.click(screen.getByRole('button', { name: 'Close block palette' }));
