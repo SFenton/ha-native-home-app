@@ -1,5 +1,7 @@
 import { compositionEditorSchema, defaultField, fieldVariants, resolveField, variantName } from '../../composition-editor';
 import type { CompositionDocument } from '../../shared/composition/schema';
+import { checkedBody, expandRef, expandSources, isSourceKey, ownedSources, privateNames, renameSources } from '../../shared/composition/components';
+import type { ComponentRefNode } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
 
 /** A data source of the document. */
@@ -36,42 +38,78 @@ export function sourceName(source: Source, entityNames?: ReadonlyMap<string, str
   return detail ? `${model} · ${detail}` : model;
 }
 
-/** Source references and typed Source settings count; entity ids, labels and service targets do not. */
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/** Source fields after the compiler's component binding/namespace expansion, including value parameters. */
+export function sourceReferences(document: CompositionDocument, value: unknown): string[] {
+  const found: string[] = [];
+  const fill = (value: unknown, args: Record<string, unknown>): unknown => {
+    if (Array.isArray(value)) return value.map(item => fill(item, args));
+    if (!record(value)) return value;
+    if (value.type === 'hole' && typeof value.name === 'string') return args[value.name] ?? value;
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, fill(child, args)]));
+  };
+  const walk = (value: unknown, args: Record<string, unknown> = {}, stack = new Set<string>()) => {
+    if (Array.isArray(value)) { value.forEach(item => walk(item, args, stack)); return; }
+    if (!record(value)) return;
+    if (value.type === 'component-ref') {
+      const entry = document.componentLibrary?.find(item => item.id === value.componentId);
+      if (entry) {
+        const ref = value as ComponentRefNode;
+        walk(expandRef(ref, entry), args, stack);
+        walk(expandSources(ref, entry), args, stack);
+      }
+      return;
+    }
+    if (value.type === 'logic-ref') {
+      const entry = document.logicLibrary?.find(item => item.id === value.logicId);
+      if (entry && !stack.has(entry.id)) {
+        walk(entry.body, record(value.args) ? fill(value.args, args) as Record<string, unknown> : {}, new Set([...stack, entry.id]));
+      }
+      return;
+    }
+    if (value.type === 'hole') {
+      if (typeof value.name === 'string' && args[value.name] !== undefined) walk(args[value.name], {}, stack);
+      return;
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const resolved = fill(child, args);
+      if (isSourceKey(key) && typeof resolved === 'string') found.push(resolved);
+      else if (/(?:source|provider)Ids$/i.test(key) && Array.isArray(resolved)) {
+        for (const id of resolved) if (typeof id === 'string') found.push(id);
+      }
+      walk(child, args, stack);
+    }
+  };
+  walk(value);
+  return found;
+}
+
+/** The compiler checks library defaults as well as placed expansions; neither may lose a referenced global source. */
 export function sourceUses(document: CompositionDocument): Map<string, number> {
   const uses = new Map<string, number>(document.dataSources.map(source => [source.id, 0]));
-  const add = (value: unknown, local: ReadonlySet<string>) => {
-    if (typeof value === 'string' && !local.has(value) && uses.has(value)) uses.set(value, uses.get(value)! + 1);
+  const add = (value: unknown) => {
+    for (const id of sourceReferences(document, value)) if (uses.has(id)) uses.set(id, uses.get(id)! + 1);
   };
-  const walk = (value: unknown, local: ReadonlySet<string>) => {
-    if (Array.isArray(value)) { for (const item of value) walk(item, local); return; }
-    if (!value || typeof value !== 'object') return;
-    const row = value as Record<string, unknown>;
-    const entry = row.type === 'logic-ref' ? document.logicLibrary?.find(item => item.id === row.logicId)
-      : row.type === 'component-ref' ? document.componentLibrary?.find(item => item.id === row.componentId) : undefined;
-    if (row.args && typeof row.args === 'object') {
-      for (const param of entry?.params ?? []) if (param.kind === 'source-id') add((row.args as Record<string, unknown>)[param.name], local);
-    }
-    if (row.kind === 'source-id') add(row.sample, local);
-    for (const [key, child] of Object.entries(row)) {
-      if (/^(sourceId|providerId)$|SourceId$/.test(key)) add(child, local);
-      else if (/SourceIds$/.test(key) && Array.isArray(child)) child.forEach(item => add(item, local));
-      walk(child, local);
-    }
-  };
-  const { componentLibrary, ...rest } = document;
-  walk(rest, new Set());
+  const { componentLibrary, logicLibrary, ...rest } = document;
+  add(rest);
   for (const entry of componentLibrary ?? []) {
-    walk(entry, new Set([...(entry.sources ?? []), ...(entry.flows ?? [])].map(source => source.id)));
+    add(checkedBody(entry));
+    add(renameSources(ownedSources(entry), privateNames(entry.id, entry)));
+  }
+  for (const entry of logicLibrary ?? []) {
+    add({ type: 'logic-ref', logicId: entry.id, args: Object.fromEntries(entry.params.filter(param => param.sample !== undefined).map(param => [param.name, param.sample])) });
   }
   return uses;
 }
 
 /** Entity sources are Studio-managed. Pruning and the edit that orphaned them share one history entry. Models stay editable. */
-export function pruneEntitySources(document: CompositionDocument): CompositionDocument {
+export function pruneEntitySources(before: CompositionDocument, document: CompositionDocument): CompositionDocument {
+  const previous = sourceUses(before);
   let next = document;
   for (;;) {
     const uses = sourceUses(next);
-    const dataSources = next.dataSources.filter(source => source.kind !== 'ha-entity' || (uses.get(source.id) ?? 0) > 0);
+    const dataSources = next.dataSources.filter(source => source.kind !== 'ha-entity' || !previous.get(source.id) || (uses.get(source.id) ?? 0) > 0);
     if (dataSources.length === next.dataSources.length) return next;
     next = { ...next, dataSources };
   }

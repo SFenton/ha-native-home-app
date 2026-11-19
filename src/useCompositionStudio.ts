@@ -93,9 +93,10 @@ export function useCompositionStudio() {
    * system picker), however long the drag lasts; any other edit, or leaving the field, ends the group.
    */
   const apply = useCallback((edit: CompositionDocument, group?: string) => {
+    if (!current.current || sameJson(edit, current.current)) return;
     // A side of the hinge lives only on a page's top-level components: whatever the edit nested, moved or copied, it leaves none elsewhere (`sh.fold-sides@1`).
-    const next = pruneEntitySources(normaliseFoldSides(edit));
-    if (!current.current || sameJson(next, current.current)) return;
+    const next = pruneEntitySources(current.current, normaliseFoldSides(edit));
+    if (sameJson(next, current.current)) return;
     const path = group ? `group:${group}` : textEditPath(current.current, next), at = Date.now();
     const joins = path !== undefined && typing.current?.path === path && (group !== undefined || at - typing.current.at < UNDO_COALESCE_MS) && past.current.length > 0;
     if (!joins) past.current = [...past.current.slice(-(UNDO_DEPTH - 1)), current.current];

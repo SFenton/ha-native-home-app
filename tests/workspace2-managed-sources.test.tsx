@@ -8,6 +8,7 @@ import { ensureSource } from '../src/workspace2/add/sources';
 import { replaceAt } from '../src/composition-editor';
 import { pruneEntitySources, sourceUses } from '../src/workspace2/dialogs/sources';
 import type { CompositionDocument } from '../src/shared/composition/schema';
+import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import fixture from '../src/preview2/fixtures/logic-gallery.json';
 
 vi.mock('../src/api', async original => ({ ...await original<typeof import('../src/api')>(), request: vi.fn() }));
@@ -35,7 +36,7 @@ describe('Studio-managed entity sources', () => {
     const legacy = doc('entity-kitchen');
     expect(ensureSource(legacy, 'light.demo_kitchen')).toEqual({ document: legacy, sourceId: 'entity-kitchen' });
     expect(tileType('bound-control')!.make({ document: legacy, entityId: 'light.demo_kitchen' }).sources).toEqual([]);
-    expect(pruneEntitySources(legacy)).toBe(legacy);
+    expect(pruneEntitySources(legacy, legacy)).toBe(legacy);
   });
 
   it('does not mistake an entity id, label or service target for a source read; keeps model sources', () => {
@@ -43,11 +44,11 @@ describe('Studio-managed entity sources', () => {
     const source = base.dataSources.find(item => item.kind === 'model')!;
     const unused = { ...before, name: 'light.demo_kitchen', pages: [{ ...before.pages[0], components: [] }], dataSources: [...before.dataSources, source] };
     expect(sourceUses(unused).get('light.demo_kitchen')).toBe(0);
-    expect(pruneEntitySources(unused).dataSources).toEqual([source]);
+    expect(pruneEntitySources(before, unused).dataSources).toEqual([source]);
     expect(sourceUses(before).get('light.demo_kitchen')).toBe(1);
-    expect(pruneEntitySources(before)).toBe(before);
+    expect(pruneEntitySources(before, before)).toBe(before);
     const onlyServiceTargets = replaceAt(before, ['pages', 0, 'components', 0, 'props', 'isOn'], { type: 'compare', op: 'eq', left: { type: 'literal', value: true }, right: { type: 'literal', value: true } });
-    expect(pruneEntitySources(onlyServiceTargets).dataSources).toEqual([]);
+    expect(pruneEntitySources(before, onlyServiceTargets).dataSources).toEqual([]);
   });
 
   it('keeps sources used through template samples and arguments, and removes orphaned dependency chains', () => {
@@ -57,9 +58,89 @@ describe('Studio-managed entity sources', () => {
       params: [{ name: 'lamp', kind: 'source-id', label: 'Lamp', sample: 'entity-legacy' }],
       body: { type: 'state', sourceId: 'entity-legacy', path: ['state'], in: ['on'] },
     };
-    expect(pruneEntitySources({ ...withoutTile, logicLibrary: [template] }).dataSources).toEqual(before.dataSources);
+    expect(pruneEntitySources(before, { ...withoutTile, logicLibrary: [template] }).dataSources).toEqual(before.dataSources);
     const dependent: CompositionDocument['dataSources'][number] = { id: 'dependent', kind: 'ha-entity', entityId: { type: 'read', from: { type: 'source', sourceId: 'entity-legacy', path: ['state'] }, as: 'entity-id', missing: 'unavailable' } };
-    expect(pruneEntitySources({ ...withoutTile, dataSources: [...before.dataSources, dependent] }).dataSources).toEqual([]);
+    const chain = { ...before, dataSources: [...before.dataSources, dependent] };
+    const usedChain = replaceAt(chain, ['pages', 0, 'components', 0, 'props', 'isOn', 'sourceId'], dependent.id);
+    expect(pruneEntitySources(usedChain, { ...withoutTile, dataSources: chain.dataSources }).dataSources).toEqual([]);
+  });
+
+  it('resolves plain-string value bindings before pruning, retaining validity through undo and redo', async () => {
+    const initial = doc('legacy-actual');
+    const node: CompositionDocument['pages'][number]['components'][number] = {
+      id: 'value-text', title: 'Value', type: 'text', layout: { span: 1 },
+      props: { value: { type: 'read', from: { type: 'source', sourceId: 'legacy-default', path: ['state'] }, as: 'string', missing: 'unavailable' }, style: 'body', unavailableText: 'Unavailable' },
+    };
+    const before: CompositionDocument = {
+      ...initial, dataSources: [...initial.dataSources, entity('legacy-default')],
+      componentLibrary: [{ id: 'value-component', name: 'Value component', node, params: [{ name: 'which', kind: 'value' }], bindings: [{ param: 'which', nodeId: node.id, field: 'props/value/from/sourceId' }] }],
+      pages: [{ ...initial.pages[0], components: [{ id: 'value-place', type: 'component-ref', componentId: 'value-component', layout: { span: 1 }, values: { which: 'legacy-actual' } }] }],
+    };
+    expect(() => compileCompositionDocument(before)).not.toThrow();
+    expect(sourceUses(before).get('legacy-actual')).toBeGreaterThan(0);
+    vi.mocked(request).mockResolvedValueOnce({ envelopeVersion: '2.0', document: before, revision: 1 });
+    const { result } = renderHook(useCompositionStudio);
+    await waitFor(() => expect(result.current.document).toBeDefined());
+    act(() => result.current.apply({ ...before, name: 'Renamed' }));
+    expect(result.current.document!.dataSources).toEqual(before.dataSources);
+    expect(() => compileCompositionDocument(result.current.document)).not.toThrow();
+    act(() => result.current.undo());
+    expect(result.current.document).toBe(before);
+    act(() => result.current.redo());
+    expect(() => compileCompositionDocument(result.current.document)).not.toThrow();
+    expect(result.current.document!.dataSources).toEqual(before.dataSources);
+  });
+
+  it('resolves string parameters and private namespaces without mistaking private ids or entity targets for global reads', () => {
+    const initial = doc('legacy-actual');
+    const node = initial.pages[0].components[0];
+    const definition: NonNullable<CompositionDocument['componentLibrary']>[number] = {
+      id: 'private-component', name: 'Private component', node,
+      sources: [{ id: 'legacy-actual', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.demo_private' } }],
+      params: [{ name: 'which', kind: 'source-id' }],
+      bindings: [{ param: 'which', nodeId: node.id, field: 'props/isOn/sourceId' }],
+    };
+    const without = { ...initial, pages: [{ ...initial.pages[0], components: [] }], componentLibrary: [definition] };
+    expect(sourceUses(without).get('legacy-actual')).toBe(0);
+    const placed = replaceAt(without, ['pages', 0, 'components'], [{ id: 'place', type: 'component-ref', componentId: definition.id, layout: { span: 1 }, args: { which: 'legacy-actual' } }]);
+    expect(sourceUses(placed).get('legacy-actual')).toBeGreaterThan(0);
+    expect(pruneEntitySources(placed, without).dataSources).toEqual([]);
+    const literalTarget = replaceAt(without, ['pages', 0, 'components'], [{ ...node, props: { copySourceId: 'legacy-actual' } }]);
+    expect(sourceUses(literalTarget).get('legacy-actual')).toBe(0);
+  });
+
+  it.each([
+    ['navigation visibility', ['navigation', 'tabs', 0, 'visibleWhen']],
+    ['chrome', ['navigation', 'chrome', 'groups']],
+    ['surface toolbar', ['pages', 0, 'toolbar']],
+    ['models and flow parameter reads', ['dataSources', 1]],
+    ['rules, looks and controls', ['pages', 0, 'components']],
+  ])('counts references throughout %s', (_name, path) => {
+    const initial = doc('legacy-actual');
+    const empty = { ...initial, pages: [{ ...initial.pages[0], components: [] }] };
+    const edited = replaceAt(empty, path as (string | number)[], { from: { sourceId: 'legacy-actual' }, subtitleSourceIds: ['legacy-actual'], scopeProviderId: 'legacy-actual' });
+    expect(sourceUses(edited).get('legacy-actual')).toBe(3);
+    expect(pruneEntitySources(initial, edited).dataSources).toContainEqual(initial.dataSources[0]);
+  });
+
+  it('leaves loaded orphans and no-op edits alone, but prunes the source this edit orphaned', async () => {
+    const initial = doc('legacy-used');
+    const before = { ...initial, dataSources: [...initial.dataSources, entity('legacy-orphan')] };
+    vi.mocked(request).mockResolvedValueOnce({ envelopeVersion: '2.0', document: before, revision: 1 });
+    const { result } = renderHook(useCompositionStudio);
+    await waitFor(() => expect(result.current.document).toBeDefined());
+    for (const edit of [before, structuredClone(before)]) act(() => result.current.apply(edit));
+    expect(result.current.document).toBe(before);
+    expect(result.current.dirty).toBe(false);
+    expect(result.current.canUndo).toBe(false);
+    act(() => result.current.apply({ ...before, name: 'Renamed' }));
+    expect(result.current.document!.dataSources).toEqual(before.dataSources);
+    act(() => result.current.apply({ ...result.current.document!, pages: [{ ...before.pages[0], components: [] }] }));
+    expect(result.current.document!.dataSources.map(source => source.id)).toEqual(['legacy-orphan']);
+    act(() => result.current.undo());
+    expect(result.current.document!.dataSources).toEqual(before.dataSources);
+    act(() => result.current.redo());
+    expect(result.current.document!.dataSources.map(source => source.id)).toEqual(['legacy-orphan']);
   });
 
   it('prunes the last read in the same undo step and restores both on undo/redo; stale drops cannot revert it', async () => {
