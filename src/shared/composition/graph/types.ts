@@ -86,7 +86,7 @@ export interface GraphScope {
   readonly itemShape?: Immutable<Shape>;
 }
 export interface GraphDestination {
-  readonly kind: 'operand' | 'condition' | 'call' | 'flow' | 'document' | 'slot';
+  readonly kind: 'operand' | 'condition' | 'call' | 'flow' | 'document' | 'fragment' | 'slot';
   readonly type?: PortType;
   readonly allowControl?: boolean;
 }

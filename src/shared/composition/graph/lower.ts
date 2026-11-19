@@ -53,7 +53,7 @@ export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly 
 }
 export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringResult {
   const errors: GraphDiagnostic[] = [...validateGraph(graph)];
-  if (!graph.roots.length || errors.length) return { ok: false, original: graph.original, errors, budgets: [] };
+  if (!graph.roots.length) return { ok: false, original: graph.original, errors, budgets: [] };
   let ast: Json, sourceMap: readonly GraphSourceLocation[];
   try { ({ ast, sourceMap } = projectGraph(graph)); assertCompositionBounds(ast); }
   catch (error) {
@@ -98,12 +98,11 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
       if (record(candidate) && Object.hasOwn(candidate, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
     };
     try {
-      if (root.destination.kind === 'document' && record(value) && Object.hasOwn(value, 'schemaVersion')) {
-        const { studioCanvas: _layout, ...semantic } = value;
-        const compiled = compileCompositionDocument(semantic);
+      if (root.destination.kind === 'document') {
+        const compiled = compileCompositionDocument(withoutCanvasMetadata(value));
         compiled.capabilities.forEach(capability => capabilities.add(capability));
         expanded = compiled.expanded;
-      } else if (root.destination.kind === 'document') {
+      } else if (root.destination.kind === 'fragment') {
         const result = expandLogic(value).document;
         assertCompositionBounds(result);
         expanded = result as Json;
@@ -116,11 +115,13 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
       }
     } catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
-      error.issues.forEach(issue => report({
+      const diagnostics = error.issues.map(issue => diagnostic({
         ...issue,
-        pointer: root.destination.kind !== 'document' ? issue.pointer.replace(/^\/value(?=\/|$)/, '')
-          : record(value) && Object.hasOwn(value, 'schemaVersion') ? issue.pointer.replace(/^\/document(?=\/|$)/, '') : issue.pointer,
-      }));
+        pointer: root.destination.kind === 'document' ? issue.pointer.replace(/^\/document(?=\/|$)/, '')
+          : root.destination.kind === 'fragment' ? issue.pointer : issue.pointer.replace(/^\/value(?=\/|$)/, ''),
+      }, root, sourceMap));
+      if (root.destination.kind === 'document') errors.unshift(...diagnostics);
+      else errors.push(...diagnostics);
     }
     if (root.destination.type && (root.destination.kind === 'operand' || root.destination.kind === 'condition')) {
       const actual = expressionPort(expanded, root.destination.kind === 'condition', {

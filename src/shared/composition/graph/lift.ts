@@ -123,7 +123,7 @@ export function lift(ast: Json, options: LiftOptions = {}): LiftResult {
     return node;
   };
   const root = visit(ast, kind, '', scopes[0].id, { params: new Map(), allowRead: true, allowViewer: true, ...(scopes[0].itemShape ? { item: copyShape(scopes[0].itemShape) } : {}) });
-  const destination = kind === 'call' ? 'call' : kind === 'condition' ? 'condition' : kind === 'operand' ? 'operand' : kind === 'flow' || kind === 'flow-inputs' ? 'flow' : kind === 'slot' ? 'slot' : 'document';
+  const destination = kind === 'call' ? 'call' : kind === 'condition' ? 'condition' : kind === 'operand' ? 'operand' : kind === 'flow' || kind === 'flow-inputs' ? 'flow' : kind === 'slot' ? 'slot' : kind === 'fragment' ? 'fragment' : 'document';
   let graph: LogicGraph = { version: 1, nodes, edges, roots: [{ nodeId: root.id, portId: 'value', anchor, destination: { kind: destination } }], scopes, frames: [], original };
   const rawMetadata = options.metadata !== undefined ? options.metadata : record(ast) ? ast.studioCanvas : undefined;
   if (rawMetadata !== undefined) {

@@ -15,6 +15,9 @@ actions, or UI dependencies.
   a partially modified document. Complete documents use the existing compiler.
   Root `studioCanvas` is excluded only from semantic validation/capabilities and
   retained losslessly in authored replacements; this API is not publication.
+  Document destinations always run the document compiler, including documents
+  missing required fields. Synthetic multi-field examples must explicitly use
+  `kind: "fragment"`; fragment checks are not whole-document validation.
 - `projectGraph(graph)` only projects a working buffer, including opaque JSON.
   It is **not** validation or permission to apply/save/publish an invalid import.
 - `validateGraph`, `portsCompatible`, `autoLayout`, `measureBudget`, and

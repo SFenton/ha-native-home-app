@@ -301,7 +301,7 @@ describe('typed connections, structural refusals and fan-out', () => {
       value: { type: 'read' as const, from: { type: 'source' as const, sourceId, path: ['value'] }, as: 'number' as const, missing: 'unavailable' as const },
     });
     first.inputs.parameters = [parameter('second')]; second.inputs.parameters = [parameter('first')];
-    expect(lower(lift({ dataSources: [first, second] }, { kind: 'document' }).graph)).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'invalid_combination' })]) });
+    expect(lower(lift({ dataSources: [first, second] }, { kind: 'fragment' }).graph)).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'invalid_combination' })]) });
     expect(lower(lift({ ...first, inputs: { ...first.inputs, parameters: [parameter('first')] } }, { kind: 'flow' }).graph).ok).toBe(false);
   });
 });

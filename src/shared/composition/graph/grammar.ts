@@ -8,7 +8,7 @@ import { atPointer, copy, join, record, replaceAt } from './json';
 import { graphInputsSchema, graphSourceSchema, graphStepSchema, graphTextSlotSchema } from './capabilities';
 import { identifierSchema } from '../../validation';
 
-export type FragmentKind = 'operand' | 'condition' | 'call' | 'source-selection' | 'flow' | 'flow-inputs' | 'request' | 'step' | 'output' | 'logic-entry' | 'slot' | 'document' | 'auto';
+export type FragmentKind = 'operand' | 'condition' | 'call' | 'source-selection' | 'flow' | 'flow-inputs' | 'request' | 'step' | 'output' | 'logic-entry' | 'slot' | 'document' | 'fragment' | 'auto';
 export interface ChildBinding { readonly binding: string; readonly kind: FragmentKind; readonly value: Json }
 export interface GrammarDescription { readonly payload: GraphPayload; readonly key: string; readonly children: readonly ChildBinding[] }
 const operandNames = new Set(['literal', 'read', 'control', 'viewer', 'format', 'raw-state', 'last-changed', 'list-count', 'list-includes', 'count', 'map', 'math', 'object', 'list', 'item', 'param', 'clock', 'date', 'index', 'choose']);
@@ -210,7 +210,7 @@ export function describeGrammar(value: Json, hint: FragmentKind = 'auto'): Gramm
     const parsed = slotSchema.safeParse(skeleton);
     return parsed.success ? { payload: { kind, value: skeleton }, key: value.type === 'conditional' ? 'destination.look-rules' : value.type === 'bound-symbol' ? 'destination.bound-symbol' : 'destination.text', children } : opaque("Can't show this as blocks: unknown slot variant or field.");
   }
-  if (kind !== 'document') return opaque("Can't show this as blocks: unsupported fragment.");
+  if (kind !== 'document' && kind !== 'fragment') return opaque("Can't show this as blocks: unsupported fragment.");
   const scan = (candidate: Json, path: string): void => {
     if (Array.isArray(candidate)) { candidate.forEach((inner, i) => scan(inner, join(path, i))); return; }
     if (!record(candidate)) return;

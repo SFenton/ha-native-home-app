@@ -113,7 +113,7 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
   };
   try {
     const kind = inferFragment(ast, options.kind);
-    if (kind === 'document' && record(ast) && Object.hasOwn(ast, 'schemaVersion')) {
+    if (kind === 'document') {
       try {
         const compiled = compileCompositionDocument(withoutCanvasMetadata(ast));
         compiled.capabilities.forEach(capability => capabilities.add(capability));
@@ -122,7 +122,7 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
         if (!(error instanceof CompositionValidationError)) throw error;
         report(error.issues.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/document(?=\/|$)/, '') })));
       }
-    } else if (kind === 'document') {
+    } else if (kind === 'fragment') {
       const expanded = expandLogic(ast).document;
       assertCompositionBounds(expanded);
       walk(parseCompositionShape(z.json(), expanded), kind, '', true);

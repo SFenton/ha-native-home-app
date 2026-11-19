@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
 import { evaluateOperand, evaluatePredicate, type Environment } from '../../../src/shared/composition/evaluator';
 import { operandBase, predicateBase, type Operand, type Predicate } from '../../../src/shared/composition/expression';
-import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
+import { canonicalCompositionJSON, CompositionValidationError, parseCompositionJSON } from '../../../src/shared/composition/json';
+import { decodeCompositionPublication } from '../../../server/composition';
 import { expandLogic } from '../../../src/shared/composition/logic-library';
 import { autoLayout, lift, liftJSON, lower, measureBudget, portType, projectGraph, semanticFingerprint, type LogicGraph } from '../../../src/shared/composition/graph';
 import type { Json } from '../../../src/shared/types';
@@ -15,7 +16,7 @@ import { checkPipelineSource } from '../../../src/shared/composition/pipeline/co
 import { pipelineSourceSchema } from '../../../src/shared/composition/pipeline/schema';
 
 const clone = (value: unknown): Json => JSON.parse(JSON.stringify(value));
-function roundtrip(value: Json, kind?: 'operand' | 'condition' | 'flow' | 'document', scope?: NonNullable<Parameters<typeof lift>[1]>['scope']) {
+function roundtrip(value: Json, kind?: 'operand' | 'condition' | 'flow' | 'document' | 'fragment', scope?: NonNullable<Parameters<typeof lift>[1]>['scope']) {
   const before = canonicalCompositionJSON(value);
   const lifted = lift(value, { kind, scope });
   const result = lower(lifted.graph);
@@ -37,9 +38,9 @@ function roundtrip(value: Json, kind?: 'operand' | 'condition' | 'flow' | 'docum
 
 describe('G-roundtrip worked examples, templates and opaque buffers', () => {
   it('retains A and B including refs, flow prefixes, format options and missing properties', () => {
-    roundtrip(clone(exampleA), 'document');
-    roundtrip(clone(exampleB), 'document');
-    roundtrip(clone({ logicLibrary: [sourceParameterTemplate], output: { type: 'logic-ref', logicId: 'is-on', args: { source: 'light-a' } } }), 'document');
+    roundtrip(clone(exampleA), 'fragment');
+    roundtrip(clone(exampleB), 'fragment');
+    roundtrip(clone({ logicLibrary: [sourceParameterTemplate], output: { type: 'logic-ref', logicId: 'is-on', args: { source: 'light-a' } } }), 'fragment');
   });
   it('has exact example costs and uses the existing evaluator', () => {
     const result = roundtrip(clone(tooWarmWarning), 'condition');
@@ -178,7 +179,7 @@ describe('G-roundtrip deterministic bounded grammar properties', () => {
           { id: 'nested', name: 'Nested', kind: 'operand', params: [{ name: 'input', kind: 'operand' }], body: { type: 'logic-ref', logicId: 'base', args: { input: { type: 'hole', name: 'input' } } } },
         ],
         result: { type: 'logic-ref', logicId: 'nested', args: { input: { type: 'literal', value: index } } },
-      }, 'document');
+      }, 'fragment');
   });
 });
 
@@ -187,6 +188,49 @@ describe('G-roundtrip shared contract corpus', () => {
   const read = (file: string): Json => JSON.parse(readFileSync(path.join(directory, file), 'utf8'));
   const index: { cases: { file: string; outcome: string; pending?: boolean; studioIssue?: unknown }[] } = JSON.parse(readFileSync(path.join(directory, 'index.json'), 'utf8'));
   const cases = index.cases.filter(entry => entry.outcome === 'accept' || entry.pending && !entry.studioIssue);
+  it.each(index.cases.filter(entry => entry.outcome === 'reject' && (!entry.pending || entry.studioIssue)))('retains the compiler rejection boundary for $file', entry => {
+    const bytes = readFileSync(path.join(directory, entry.file));
+    let envelope: unknown;
+    try { envelope = parseCompositionJSON(bytes); }
+    catch (error) {
+      if (!(error instanceof CompositionValidationError)) throw error;
+      try { liftJSON(bytes); throw new Error('Rejected bytes were accepted.'); }
+      catch (actual) {
+        if (!(actual instanceof CompositionValidationError)) throw actual;
+        expect(actual.issues[0]).toEqual(error.issues[0]);
+      }
+      return;
+    }
+    if (!record(envelope)) throw new Error('Expected publication envelope.');
+    let native: CompositionValidationError | undefined;
+    try { compileCompositionDocument(envelope.document); }
+    catch (error) { if (!(error instanceof CompositionValidationError)) throw error; native = error; }
+    if (!native) {
+      // Envelope versions, manifests and capability declarations are publication checks, not document grammar.
+      expect(() => decodeCompositionPublication(bytes)).toThrow(CompositionValidationError);
+      return;
+    }
+    const document = envelope.document, result = lower(lift(document, { kind: 'document' }).graph);
+    const expected = { ...native.issues[0], pointer: native.issues[0].pointer.replace(/^\/document(?=\/|$)/, '') };
+    expect(result.ok, entry.file).toBe(false);
+    if (result.ok) throw new Error('Rejected document was accepted.');
+    expect(result.errors[0]).toMatchObject(expected);
+    const budget = measureBudget(document, { kind: 'document', id: 'document', field: '', fingerprint: '' }, { kind: 'document' });
+    expect(budget.accepted).toBe(false);
+    expect(budget.compilerIssues[0]).toEqual(expected);
+  });
+  it('cannot bypass document validation by removing a required discriminator', () => {
+    const envelope = read('accept/tile-look-all.json');
+    if (!record(envelope) || !record(envelope.document)) throw new Error('Expected document.');
+    const { schemaVersion: _version, ...document } = envelope.document;
+    const result = lower(lift(document, { kind: 'document' }).graph);
+    expect(result).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'missing_required', pointer: '/schemaVersion' })]) });
+    expect(measureBudget(document, { kind: 'document', id: 'document', field: '', fingerprint: '' }, { kind: 'document' })).toMatchObject({
+      accepted: false, compilerIssues: expect.arrayContaining([expect.objectContaining({ code: 'missing_required', pointer: '/schemaVersion' })]),
+    });
+    expect(lower(lift({ output: { type: 'literal', value: 1 } }, { kind: 'fragment' }).graph).ok).toBe(true);
+    expect(lower(lift({ output: { type: 'literal', value: 1 } }, { kind: 'document' }).graph).ok).toBe(false);
+  });
   it.each([[128, true], [129, false]] as const)('uses the document compiler for %i flow sources, accepted=%s', (count, accepted) => {
     const envelope = read('accept/tile-look-all.json');
     if (!record(envelope) || !record(envelope.document) || !Array.isArray(envelope.document.dataSources)) throw new Error('Expected document sources.');
