@@ -300,7 +300,8 @@ export function expandDocument(document: CompositionDocument): CompositionDocume
   const surfaces = <T extends { components: CompositionNode[] }>(list: T[]): T[] => list.map(surface => ({ ...surface, components: surface.components.map(visit) }));
   const { componentLibrary: _library, ...rest } = document;
   const pages = surfaces(document.pages), modals = surfaces(document.modals);
-  const expanded = { ...rest, dataSources: added.length ? [...document.dataSources, ...added] : document.dataSources, pages, modals } as CompositionDocument;
+  const expanded = { ...rest, dataSources: added.length ? [...document.dataSources, ...added] : document.dataSources, pages, modals,
+    ...(document.levels ? { levels: surfaces(document.levels) } : {}) } as CompositionDocument;
   expandedDocuments.set(document, expanded);
   return expanded;
 }
