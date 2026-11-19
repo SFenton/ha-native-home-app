@@ -4,14 +4,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fidtilesStory } from '../src/preview2/fixtures/fidtiles-story';
 import { emptyOverlay } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props } from '../src/preview2/Preview2';
+import { PreviewInkContext, type PreviewInk } from '../src/preview2/ink';
 
 afterEach(cleanup);
 
 const story = fidtilesStory();
-function mount(over: Partial<Preview2Props> = {}) {
+function mount(over: Partial<Preview2Props> = {}, ink?: PreviewInk) {
   const props: Preview2Props = { document: story.document, mode: 'use', surface: { kind: 'page', id: story.document.navigation.initialPageId }, onSurfaceChange: vi.fn(), onSelect: vi.fn(),
     window: previewWindows[0], bezel: false, house: story.house, overlay: emptyOverlay, onOverlayChange: vi.fn(), ...over };
-  return render(<Preview2 {...props}/>).container.querySelector<HTMLElement>('[data-preview-root]')!;
+  const preview = <Preview2 {...props}/>;
+  return render(ink ? <PreviewInkContext.Provider value={ink}>{preview}</PreviewInkContext.Provider> : preview).container.querySelector<HTMLElement>('[data-preview-root]')!;
 }
 
 describe('the tile ink gate in the simulator (sh.tile-ink-default@1)', () => {
@@ -23,5 +25,11 @@ describe('the tile ink gate in the simulator (sh.tile-ink-default@1)', () => {
   });
   it('lets a caller ask for the grey explicitly', () => {
     expect(mount({ ink: 'muted' }).dataset.ink).toBe('muted');
+  });
+  it('inherits the saved workspace ink', () => {
+    expect(mount({}, 'muted').dataset.ink).toBe('muted');
+  });
+  it('keeps an explicit harness override ahead of the workspace ink', () => {
+    expect(mount({ ink: 'primary' }, 'muted').dataset.ink).toBe('primary');
   });
 });

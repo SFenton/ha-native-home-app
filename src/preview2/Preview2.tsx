@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { CompositionActionSlot, CompositionDocument } from '../shared/composition/schema';
 import type { Json } from '../shared/types';
 import { planAction } from './actions';
@@ -24,7 +24,7 @@ import { footprintOf } from './rig-geometry';
 import { useFoldToken, useReducedMotion } from './fold-motion';
 import { markTitle, useUseMarker } from './use-marker';
 import { useRepeatMark } from './repeat-marker';
-import { tileInkDefault } from '../shared/composition/tile-ink-gate';
+import { PreviewInkContext, type PreviewInk } from './ink';
 import { markPerson } from './grid-groups';
 import './preview2.css';
 import './duo-rig.css';
@@ -76,8 +76,8 @@ export interface Preview2Props {
   textScale?: number;
   /** The Studio's Appearance setting when it is Light or Dark: a sheet that declares `system` is drawn in it. Absent when the Studio follows the system. */
   appearance?: 'light' | 'dark';
-  /** The tile ink drawn: `primary` is the ink of `sh.tile-ink-default@1`, `muted` the grey of an app that predates it. Absent: the shipped primary default (`tile-ink-gate.ts`). */
-  ink?: 'primary' | 'muted';
+  /** Overrides the shared workspace ink. Without a provider, the shipped primary default is used (`tile-ink-gate.ts`). */
+  ink?: PreviewInk;
   /** Runs the flow of a source and gives its records, for `repeat` (`sh.repeat@1`). Absent: a repeat draws its placeholder. A hook, so it must not change between renders. */
   records?: UseRecords;
   /** An alert to draw over the screen as a preview (Edit): the words of the Ask First page while a field has focus. */
@@ -103,6 +103,7 @@ function scrollTo(scroller: HTMLElement, top: number) {
  * real service. It never fetches: data arrives through `house` and `overlay`.
  */
 export default function Preview2(props: Preview2Props) {
+  const ink = useContext(PreviewInkContext);
   const { document, mode, surface, window: win, bezel, live, overlay, selection, revealKey, bottomInset = 0 } = props;
   const house = live ? live.house : props.house;
   const index = useMemo(() => buildDocumentIndex(document), [document]);
@@ -234,7 +235,7 @@ export default function Preview2(props: Preview2Props) {
     <AlertOverlay alert={mode === 'use' ? pending?.alert : props.alert} live={mode === 'use' && Boolean(pending)} onCancel={() => answer(false)} onConfirm={() => answer(true)}/>
   </SelectionLayer>;
   const style = { '--sh-inset': `${bottomInset / zoom}px`, '--sh-zoom': zoom, ...(props.textScale && props.textScale !== 1 ? { '--sh-text-scale': props.textScale } : {}) } as CSSProperties;
-  return <div ref={host} className="sh-preview2" data-preview-root data-ink={props.ink ?? (tileInkDefault ? 'primary' : 'muted')} data-mode={mode} data-text-scale={props.textScale && props.textScale !== 1 ? props.textScale : undefined} data-bezel={bezel ? '' : undefined} style={style}>
+  return <div ref={host} className="sh-preview2" data-preview-root data-ink={props.ink ?? ink} data-mode={mode} data-text-scale={props.textScale && props.textScale !== 1 ? props.textScale : undefined} data-bezel={bezel ? '' : undefined} style={style}>
     <RenderCtx.Provider value={context}><ComponentLibraryContext.Provider value={library}><OpenTemplateContext.Provider value={props.onOpenTemplate}>
       <DeviceFrame width={modelWidth} height={height} zoom={zoom} pan={mode === 'use'} padding={bezel ? STAGE_PADDING : { x: 0, y: 0 }}
         stageClassName={pose ? 'sh-rig-stage' : ''} stageProps={pose ? { style: { '--sh-fold-ms': `${token.ms}ms`, '--sh-fold-ease': token.ease } as CSSProperties } : undefined}

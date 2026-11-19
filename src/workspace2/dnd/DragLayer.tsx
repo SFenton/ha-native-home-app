@@ -2,6 +2,7 @@ import { createContext, startTransition, useCallback, useContext, useEffect, use
 import { createPortal } from 'react-dom';
 import { MobileTouchSensor } from './mobile-drag';
 import type { SelectionKey } from '../../preview2/model';
+import { PreviewInkContext } from '../../preview2/ink';
 import type { Destination } from '../add/insert';
 import type { Workspace2 } from '../useWorkspace2';
 import { cueFor, locateOnCanvas, type Cue, type Hit } from './geometry';
@@ -76,6 +77,7 @@ function makeGhost(source: HTMLElement): { element: HTMLElement; width: number; 
  * `stage` is the preview's host; mouse and touch (the existing long-press sensor) start on a node there.
  */
 export default function DragLayer({ ws, stage, narrow, onError, children }: { ws: Workspace2; stage: HTMLElement | null; narrow: boolean; onError: (message: string) => void; children: ReactNode }) {
+  const ink = useContext(PreviewInkContext);
   const [session, setSession] = useState<Session>();
   const [announcement, setAnnouncement] = useState('');
   const live = useRef<Session | undefined>(undefined);
@@ -310,7 +312,7 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
     stage.addEventListener('transitionend', settled);
     return () => stage.removeEventListener('transitionend', settled);
   }, [stage, dragging, find, update]);
-  useEffect(() => { const host = ghostHost.current; if (host && session?.ghost) { host.replaceChildren(session.ghost); } else host?.replaceChildren(); }, [session?.ghost]);
+  useEffect(() => { const host = ghostHost.current; if (host && session?.ghost) { session.ghost.dataset.ink = ink; host.replaceChildren(session.ghost); } else host?.replaceChildren(); }, [session?.ghost, ink]);
 
   const locateNew = useCallback((type: string): Locator => (x, y) => stage && latest.current.ws.document ? locateOnCanvas(stage, latest.current.ws.document, 'node:__new__' as SelectionKey, x, y, type) : undefined, [stage]);
   const api = useMemo<DragApi>(() => ({ begin, move, end, cancel, startKeyboard, locateNew, get active() { return Boolean(live.current); } }), [begin, move, end, cancel, startKeyboard, locateNew]);

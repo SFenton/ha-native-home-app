@@ -1289,6 +1289,7 @@ The first three are declared only by a document that uses their field. `sh.tile-
 - **Legacy publications.** `validateCompositionPublication` accepts a manifest with the id and one without it, because it compiles with the id
   on and accepts `legacyManifest` of that. Existing corpus envelopes keep their original manifests; the four promoted `accept/tile-ink-default-*` cases declare the id.
 - **Saved-draft preview.** A clean workspace draft draws the ink its saved revision declares: primary when its manifest lists the id, muted otherwise.
+  `PreviewInkContext` shares that resolution with the canvas and every auxiliary preview root: State Styles, drag images and Ask First pictures.
   Opening or publishing an untouched legacy draft neither adds the id nor creates a saved revision. Unsaved edits preview the current compiler default;
   after a save, the preview follows the new revision's manifest. Save and publish remain separate, and immutable publication retries are unchanged.
 - **Tests and overrides.** `compileCompositionDocument(document, { tileInkDefault })` overrides the default for one call; `<Preview2 ink="primary" | "muted"/>` and the harness query

@@ -3,6 +3,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState, typ
 import { Drawer } from '@base-ui/react/drawer';
 import { useRecords } from './data/useRecords';
 import { INK_DEFAULT_CAPABILITY } from '../shared/composition/compiler';
+import { defaultPreviewInk, PreviewInkContext } from '../preview2/ink';
 import Preview2, { previewWindows, type PreviewWindow } from './preview';
 import { useStudioTheme } from './useStudioTheme';
 import { useAppearance } from './appearance';
@@ -141,21 +142,22 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const bottomInset = narrow && (levelOpen || repeatsUp) ? coverage(SNAP_HALF) : narrow && target ? coverage(snap) : 0;
   const className = `w2 w2-scope ${narrow ? 'w2-narrow' : 'w2-wide'} ${theme.dark ? 'w2-dark' : 'w2-light'}`;
   // A clean draft publishes its saved manifest; unsaved edits are compiled before publishing.
-  const ink = !studio.dirty && studio.envelope ? studio.envelope.capabilities.includes(INK_DEFAULT_CAPABILITY) ? 'primary' : 'muted' : undefined;
+  const ink = !studio.dirty && studio.envelope ? studio.envelope.capabilities.includes(INK_DEFAULT_CAPABILITY) ? 'primary' : 'muted' : defaultPreviewInk;
   const stage = useMemo(() => document && ws.surface && ws.previewDocument ? <PreviewGuard document={ws.previewDocument} lastGood={ws.lastGoodDocument}>{shown => <Preview2
     document={shown} mode={ws.mode} surface={ws.surface!} onSurfaceChange={ws.setSurface} selection={ws.selection} onSelect={ws.select} onOpenTemplate={ws.openTemplate}
-    window={window_} textScale={textScales[textStep]} appearance={appearance === 'follow' ? undefined : appearance} ink={ink} bezel={!narrow} live={ws.houseStates.live} overlay={ws.houseStates.overlay}
+    window={window_} textScale={textScales[textStep]} appearance={appearance === 'follow' ? undefined : appearance} bezel={!narrow} live={ws.houseStates.live} overlay={ws.houseStates.overlay}
     onOverlayChange={ws.houseStates.setOverlay} onSimulatedCall={ws.simulated} revealKey={ws.revealKey} repeatMark={ws.repeats.mark} bottomInset={bottomInset} alert={ws.alertPreview}
     statePreview={ws.statePreview && ws.selection === `node:${ws.statePreview.nodeId}` ? ws.statePreview : undefined}
     mapPicture={ws.houseStates.streaming ? fetchPicture : undefined} records={useRecords}/>}</PreviewGuard> : undefined,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [ws.previewDocument, ws.lastGoodDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.live, ws.houseStates.streaming, ws.houseStates.overlay, window_, narrow, ws.revealKey, ws.repeats.mark, bottomInset, ws.alertPreview, ws.statePreview, textStep, appearance, ink, ws.setSurface, ws.select, ws.openTemplate, ws.houseStates.setOverlay, ws.simulated]);
+  [ws.previewDocument, ws.lastGoodDocument, ws.mode, ws.surface, ws.selection, ws.houseStates.live, ws.houseStates.streaming, ws.houseStates.overlay, window_, narrow, ws.revealKey, ws.repeats.mark, bottomInset, ws.alertPreview, ws.statePreview, textStep, appearance, ws.setSurface, ws.select, ws.openTemplate, ws.houseStates.setOverlay, ws.simulated]);
   const underPreview = railUnderPreview(narrow, window_);
   const under = !narrow && railUnder(layout.canvas);
   useDeviceGlide(stageElement, `${layout.left}/${layout.inspectorWidth}/${tier}`, panelMotion);
   const properties = target && document ? <PropertiesPanel ws={ws} onClose={close} onOpenProject={openProjectDialog} notice={notice} onError={showError}/> : null;
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
+    <PreviewInkContext.Provider value={ink}>
     <SelectMenusContext.Provider value>
     <SimulatorWindowContext.Provider value={simulator}>
     <ToastHost>
@@ -208,5 +210,6 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
     </ToastHost>
     </SimulatorWindowContext.Provider>
     </SelectMenusContext.Provider>
+    </PreviewInkContext.Provider>
   </div>;
 }

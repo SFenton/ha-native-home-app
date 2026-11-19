@@ -47,7 +47,15 @@ for (const legacy of [true, false]) {
     const initial = await CompositionStore.open(directory);
     const first = initial.getDraft();
     const tile = { ...newStateTile('cover.demo_blinds', 'Demo Blinds', 'blind', undefined)!, id: 'ink-default-blinds' };
-    const saved = await initial.save(addStateTile(first.document, first.document.pages[0].id, tile), first.revision);
+    const authored = addStateTile(first.document, first.document.pages[0].id, tile);
+    authored.pages[0].components.push({
+      id: 'confirm-blinds', title: 'Confirm Blinds', type: 'primary-button', layout: {}, props: {},
+      action: {
+        type: 'call-service', domain: 'cover', service: 'open_cover', target: { entity_id: { type: 'literal', value: 'cover.demo_blinds' } }, feedback: 'policy',
+        confirmation: { type: 'additional', style: 'alert', title: 'Open the blinds?', confirmLabel: 'Open', cancelLabel: 'Cancel', destructive: false },
+      },
+    });
+    const saved = await initial.save(authored, first.revision);
     if (legacy) {
       // Fixture for a draft saved by the compiler before the ink promotion.
       await writeFile(path.join(directory, 'native-v2/state.json'), JSON.stringify({
@@ -82,7 +90,37 @@ for (const legacy of [true, false]) {
     const expectedInk = legacy ? 'muted' : 'primary';
     await expect(previewRoot(page)).toHaveAttribute('data-ink', expectedInk);
     const glyph = node$(page, tile.id).locator('.sh-tile-glyph').first();
-    await expect(glyph).toHaveCSS('color', legacy ? 'rgb(142, 142, 147)' : 'rgb(255, 255, 255)');
+    const expectedColor = legacy ? 'rgb(142, 142, 147)' : 'rgb(255, 255, 255)';
+    await expect(glyph).toHaveCSS('color', expectedColor);
+    await page.getByRole('button', { name: 'Project', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'State Styles' }).or(page.getByRole('button', { name: 'State Styles' })).first().click();
+    const panel = page.getByLabel('Properties');
+    await panel.getByRole('button', { name: /^Blind/ }).click();
+    await expect(panel.getByTestId('style-tile').locator('.sh-tile-glyph')).toHaveCSS('color', expectedColor);
+    await expect(panel.locator('.w2-style-frame')).toHaveAttribute('data-ink', expectedInk);
+    await panel.getByRole('button', { name: 'State Styles', exact: true }).click();
+    await panel.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(panel).not.toBeVisible();
+
+    await node$(page, tile.id).hover();
+    const box = (await node$(page, tile.id).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 16, box.y + box.height / 2 + 16, { steps: 4 });
+    const ghost = page.locator('.w2-ghost-inner');
+    await expect(ghost).toHaveAttribute('data-ink', expectedInk);
+    await expect(ghost.locator('.sh-tile-glyph')).toHaveCSS('color', expectedColor);
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(ghost).toHaveCount(0);
+
+    await selectTile(page, 'Confirm Blinds');
+    await panel.getByRole('button', { name: /When tapped/ }).click();
+    await page.locator('[data-disclosure="ask-first"]').click();
+    await expect(panel.locator('.w2-alert-picture-frame')).toHaveAttribute('data-ink', expectedInk);
+    await panel.getByRole('button', { name: 'When tapped', exact: true }).click();
+    await panel.getByRole('button', { name: 'Done', exact: true }).click();
+    await panel.getByRole('button', { name: 'Close', exact: true }).click();
     expect(await readFile(path.join(directory, 'native-v2/state.json'), 'utf8')).toBe(stateBefore);
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Publish to the App?' });
