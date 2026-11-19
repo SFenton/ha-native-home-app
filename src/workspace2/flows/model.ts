@@ -6,6 +6,7 @@ import { labelText } from '../labels';
 import { operandName, sentence, type NameContext } from '../expr/condition';
 import { expandDocument, ownedSources, readField } from '../../shared/composition/components';
 import { dataReferences, type Source } from '../dialogs/sources';
+import { workedOut } from '../data/logic/logicModel';
 
 export type OutputKind = 'boolean' | 'number' | 'words' | 'list' | 'time';
 export const outputWords: Record<OutputKind, string> = { boolean: 'Yes or No', number: 'Number', words: 'Words', list: 'List', time: 'Time' };
@@ -29,7 +30,7 @@ export function outputKind(value: unknown, document: CompositionDocument, params
   if (['math', 'count', 'list-count', 'index'].includes(String(value.type))) return 'number';
   if (value.type === 'list' || value.type === 'object') return 'list';
   if (value.type === 'choose' || value.type === 'map') return outputKind(value.otherwise, document, params, seen);
-  if (predicateBase.safeParse(value).success) return 'boolean';
+  if (predicateBase.safeParse(value).success || predicateBase.safeParse(workedOut(document, value)).success) return 'boolean';
   const parsed = operandBase.safeParse(value);
   const kind = parsed.success ? operandKind(parsed.data) : undefined;
   return kind === 'boolean' ? 'boolean' : kind === 'number' ? 'number' : kind === 'structure' ? 'list' : 'words';
@@ -46,11 +47,12 @@ export function fieldsWithLogic(document: CompositionDocument): FieldLogic[] {
       if (!record(value) || nodeLike(value)) return;
       const predicate = predicateBase.safeParse(value);
       const single = predicate.success && (predicate.data.type === 'state' || predicate.data.type === 'numeric' && (!predicate.data.above || predicate.data.above.type === 'literal') && (!predicate.data.below || predicate.data.below.type === 'literal')
-        || (predicate.data.type === 'compare' && predicate.data.left.type === 'read' && predicate.data.right.type === 'literal'));
+        || (predicate.data.type === 'compare' && (predicate.data.left.type === 'read' && predicate.data.right.type === 'literal' || predicate.data.right.type === 'read' && predicate.data.left.type === 'literal')));
       const operand = operandBase.safeParse(value);
-      const hasLogic = !single && (predicate.success || value.type === 'logic-ref' || Array.isArray(value.cases)
+      const plain = predicate.success || operand.success ? value : workedOut(document, value);
+      const hasLogic = !single && (predicate.success || predicateBase.safeParse(plain).success || value.type === 'logic-ref' || Array.isArray(value.cases)
         || (value.type === 'expr' && record(value.value) && value.value.type !== 'literal') || value.type === 'read' && record(value.from)
-        || (operand.success && !['literal', 'control', 'item', 'param', 'index'].includes(operand.data.type)));
+        || ((operand.success || operandBase.safeParse(plain).success) && !['literal', 'control', 'item', 'param', 'index'].includes(String(value.type))));
       if (hasLogic) {
         const labelPath = path.at(-1) === 'condition' ? path.slice(0, -1) : path;
         const full = [...base, ...path].join('/');

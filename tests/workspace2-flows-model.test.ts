@@ -34,6 +34,29 @@ it('keeps output glyphs typed when a template body contains settings rather than
   expect(outputKind({ type: 'list', items: [{ type: 'hole', name: 'count' }] }, document, params)).toBe('list');
 });
 
+it('keeps compound template conditions at their owning field, including enabled conditions', () => {
+  const logicLibrary: NonNullable<CompositionDocument['logicLibrary']> = [
+    { id: 'check-one', name: 'First check', kind: 'condition', params: [], body: state },
+    { id: 'check-two', name: 'Second check', kind: 'condition', params: [], body: state },
+  ];
+  const compound = { type: 'all', of: logicLibrary.map(entry => ({ type: 'logic-ref', logicId: entry.id, args: {} })) };
+  let edited = replaceAt({ ...document, logicLibrary }, [...path, 'visibleWhen'], compound);
+  edited = replaceAt(edited, [...path, 'enabledWhen'], { condition: { type: 'not', of: compound }, whenUnknown: 'disabled' });
+  const fields = fieldsWithLogic(edited).filter(field => field.path.startsWith(path.join('/')));
+  expect(fields.filter(field => field.path.startsWith(`${path.join('/')}/visibleWhen`))).toMatchObject([{ field: 'Only show when', path: `${path.join('/')}/visibleWhen`, kind: 'boolean' }]);
+  expect(fields.filter(field => field.path.startsWith(`${path.join('/')}/enabledWhen`))).toMatchObject([{ field: 'Only enabled when', path: `${path.join('/')}/enabledWhen/condition`, kind: 'boolean' }]);
+  expect(fields.some(field => field.field === 'Of')).toBe(false);
+  const chime = fieldsWithLogic(document).filter(field => field.title === 'Doorbell Chime' && field.path.includes('enabledWhen'));
+  expect(chime).toHaveLength(1);
+  expect(chime[0].field).toBe('Only enabled when');
+});
+
+it.each([false, true])('excludes a single-entity equality regardless of operand order (reversed: %s)', reverse => {
+  const literal = { type: 'literal', value: 1 };
+  const edited = replaceAt(document, [...path, 'visibleWhen'], { type: 'compare', op: 'eq', left: reverse ? literal : read, right: reverse ? read : literal });
+  expect(fieldsWithLogic(edited).some(field => field.path.startsWith(`${path.join('/')}/visibleWhen`))).toBe(false);
+});
+
 it('finds named transitive readers, not service intent names or literal words that look like entity ids', () => {
   let edited = replaceAt(document, [...path, 'props', 'primary'], { type: 'literal', value: 'sensor.demo_not_a_read' });
   edited = replaceAt(edited, [...path, 'props', 'subtitle'], { type: 'expr', value: read });
