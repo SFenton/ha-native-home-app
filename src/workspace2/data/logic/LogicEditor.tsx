@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CompositionDocument } from '../../../shared/composition/schema';
 import type { Operand, Predicate } from '../../../shared/composition/expression';
@@ -18,7 +18,7 @@ import { UseRow } from './LogicRow';
 import { useLiveDraft } from './useLiveDraft';
 import { useLogicActions } from './useLogicActions';
 import { AddressedField } from '../../logic-fields/AddressedField';
-import { useLogicFields } from '../../logic-fields/LogicFields';
+import { operandBodyDraft, useFieldDraft, useLogicFields } from '../../logic-fields/LogicFields';
 import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
 import { LogicScopeProvider } from './logicScope';
 import EditorRow from '../../editors/EditorRow';
@@ -28,6 +28,10 @@ import { ThenSummary } from '../../expr/RulesList';
 import { operandSlot, slotOperand } from '../../expr/tokens';
 import { rulesOf, rulesProblem, type RulesDraft } from '../../expr/value';
 import type { Json } from '../../../shared/types';
+import { hasMultipleChecks } from '../../logic-fields/checks';
+import { liftField } from '../../logic-fields/registry';
+import { MiniMap } from '../../logic-fields/MiniMap';
+import { graphSentence } from '../../logic-fields/presentation';
 type Rec = Record<string, unknown>;
 
 /** The result line: the body worked out with each setting's Try With value, tagged Test (Live when nothing is set). */
@@ -49,22 +53,32 @@ function BodyResult({ document, entry }: { document: CompositionDocument; entry:
 /** The body's own field: a value opens the value editor (in Rules the first time), a condition the condition editor. Both are the built editors. */
 function Body({ document, entry, apply }: { document: CompositionDocument; entry: LogicEntry; apply: (next: CompositionDocument) => void }) {
   const rows = useRows(), canvas = useLogicFields();
+  const draft = useFieldDraft(document, apply);
   const path = ['logicLibrary', document.logicLibrary!.findIndex(item => item.id === entry.id), 'body'];
   return <LogicScopeProvider value={{ entryId: entry.id }}><RowsProvider value={{ ...rows, document, onChange: apply }}>
-    {!canvas ? entry.kind === 'condition'
+    {!canvas || entry.kind !== 'condition' || !hasMultipleChecks(entry.body) ? entry.kind === 'condition'
       ? <ConditionField label={logicWords.bodyCondition} title={logicWords.body} path={path} place="rule" itemName={entry.name}/>
       : <ValueBody document={document} entry={entry} path={path} onApply={apply}/>
       :
     <AddressedField label={entry.kind === 'condition' ? logicWords.bodyCondition : logicWords.bodyValue}
       path={path} kind={entry.kind}/>}
+    {canvas && (entry.kind !== 'condition' || !hasMultipleChecks(entry.body)) && <div className="w2-logic-commands">
+      <button type="button" onClick={() => canvas.open({ draft, path, kind: entry.kind, label: logicWords.body })}>Edit in Canvas</button>
+    </div>}
   </RowsProvider></LogicScopeProvider>;
 }
 function ValueBody({ document, entry, path, onApply }: { document: CompositionDocument; entry: LogicEntry; path: EditorPath; onApply: (next: CompositionDocument) => void }) {
   const body = entry.body as unknown as Operand, ctx = useNameContext(document);
+  const canvas = useLogicFields();
+  const preview = useMemo(() => {
+    if (!canvas) return undefined;
+    try { return { graph: liftField(document, path, 'operand').graph }; }
+    catch (reason) { return { error: reason instanceof Error ? reason.message : String(reason) }; }
+  }, [canvas, document, path.join('/')]);
   const view = replaceAt(document, path, operandSlot(body));
   const untouched = body.type === 'literal' && body.value === '';
   const rules = rulesOf(operandSlot(body), 'text') as RulesDraft<Operand | Json> | undefined;
-  return <EditorRow label={logicWords.bodyValue} title={logicWords.body} summary="" itemName={entry.name} document={view}
+  return <><EditorRow label={logicWords.bodyValue} title={logicWords.body} summary="" itemName={entry.name} document={view}
     onApply={next => {
       const slot = valueAt(next, path) as { type: string };
       const edited = slotOperand(slot);
@@ -77,8 +91,12 @@ function ValueBody({ document, entry, path, onApply }: { document: CompositionDo
       <button type="button" className="w2-expr-fieldbtn" data-testid="logic-body" data-two-line aria-label={`${logicWords.bodyValue}: ${rules ? `${rules.cases.length} rule${rules.cases.length === 1 ? '' : 's'}` : untouched ? logicWords.resultNothing : ''}`} onClick={start}>
         <span className="w2-expr-fieldtext"><span className="w2-expr-line1">{untouched ? logicWords.resultNothing : rules ? `${rules.cases.length} rule${rules.cases.length === 1 ? '' : 's'}` : <ThenSummary kind="text" then={body} ctx={ctx}/>}</span></span><ChevronRight size={16} aria-hidden/>
       </button></div>}>
-    {draft => <ValueEditor draft={draft} path={path} kind="text" modes={['fixed', 'entity', 'rules']} label={logicWords.bodyValue} initialMode={untouched ? 'rules' : undefined}/>}
-  </EditorRow>;
+    {draft => <ValueEditor draft={draft} path={path} kind="text" modes={['fixed', 'entity', 'rules']} label={logicWords.bodyValue} initialMode={untouched ? 'rules' : undefined}
+      canvasField={{ draft: operandBodyDraft(draft, path), path, kind: 'operand', label: logicWords.body }}/>}
+  </EditorRow>
+    {preview?.graph ? <MiniMap graph={preview.graph} ctx={ctx} description={graphSentence(preview.graph, ctx)}/>
+      : preview?.error ? <p role="alert" className="w2-error-text">{preview.error}</p> : null}
+  </>;
 }
 
 /** The uses of the template, two at first, each a button that shows its node. */

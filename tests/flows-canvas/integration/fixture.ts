@@ -5,16 +5,28 @@ import type { LogicFieldKind } from '../../../src/workspace2/logic-fields/regist
 import type { EditorPath } from '../../../src/composition-editor';
 import { draftDocument, tile } from '../draft/fixtures';
 import type { Operand } from '../../../src/shared/composition/expression';
+import type { NativeSnapshot } from '../../../src/shared/native-state';
+
+export const integrationSnapshot: NativeSnapshot = {
+  mode: 'live', houseConfig: { schema: 2, hash: 'configured-integration-fixture', config: {} },
+  states: [
+    { entityId: 'binary_sensor.demo_window', name: 'Window', state: 'closed', deviceClass: 'window' },
+    { entityId: 'sensor.demo_living_room_temperature', name: 'Living Room', state: '23.6', unit: 'C' },
+    { entityId: 'sensor.demo_bedroom_temperature', name: 'Bedroom', state: '22.4', unit: 'C' },
+  ],
+  currentUser: { id: 'fixture-owner', name: 'Alex', isOwner: true, isAdmin: true },
+};
 
 export function integrationDocument() {
   const raw = draftDocument('w2-i-fixture');
   const formula: Operand = { type: 'math', op: 'add', args: [{ type: 'literal', value: 2 }, { type: 'literal', value: 3 }] };
-  const check = { type: 'state', sourceId: 'source-a', path: ['state'], in: ['on'] };
+  const check = { type: 'state', sourceId: 'source-a', path: ['state'], in: ['open'] };
   const call = { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.example' } }, data: { type: 'object', fields: { brightness: formula } }, feedback: 'policy' };
   const icon = compositionSymbol();
   const document = compileCompositionDocument({
     ...raw,
     name: 'Flows integration',
+    dataSources: raw.dataSources.map((source, index) => ({ ...source, entityId: { type: 'literal', value: integrationSnapshot.states[index].entityId } })),
     logicLibrary: [
       { ...raw.logicLibrary[0], name: 'Room words', params: [{ name: 'source', label: 'Entity', kind: 'source-id', sample: 'source-a' }] },
       { id: 'samples', name: 'Sample settings', kind: 'operand', params: [{ name: 'test', kind: 'condition', sample: check }, { name: 'value', kind: 'operand', sample: formula }], body: formula },
@@ -44,7 +56,7 @@ export function integrationDocument() {
   }).document;
   const made = newFlow(document, 'none', { title: 'Existing formula' });
   const withFormula = updateFlow(made.document, made.id, inputs => ({ ...inputs, request: { type: 'none', value: formula } }));
-  const rows = newFlow(withFormula, 'group', { title: 'Row output', entityIds: ['sensor.demo_0'] });
+  const rows = newFlow(withFormula, 'group', { title: 'Row output', entityIds: ['sensor.demo_living_room_temperature'] });
   return updateFlow(rows.document, rows.id, inputs => ({ ...inputs, output: { kind: 'rows', max: 50, row: { id: { type: 'item', path: ['entityId'] }, title: { type: 'format', pattern: '{value}', args: { value: formula } } } } }));
 }
 export const reroutedFields: readonly [string, LogicFieldKind, EditorPath][] = [

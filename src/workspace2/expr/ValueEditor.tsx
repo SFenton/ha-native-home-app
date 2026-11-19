@@ -17,8 +17,9 @@ import { words } from './words';
 import SaveAsLogic from '../data/logic/SaveLogicDialog';
 import { SelectMenu } from '../SelectMenu';
 import { useLogicScope } from '../data/logic/logicScope';
-import { LogicField } from '../logic-fields/Field';
-import { useLogicFields } from '../logic-fields/LogicFields';
+import { useLogicFields, type CanvasFieldRequest } from '../logic-fields/LogicFields';
+import { TemplatePicker } from '../logic-fields/TemplatePicker';
+import { operandSlot } from './tokens';
 
 type Slot = { type: string } & Record<string, unknown>;
 /** The words a Fixed field shows for a slot: its own text, or the text of a literal operand; nothing for logic that is not a plain value (a use, a rule, a read). */
@@ -46,11 +47,12 @@ export type ValueMode = keyof typeof modeWords;
  * The value editor's body (spec "The value field"): Fixed | From Entity | Rules, then the mode's own controls. Changing mode keeps each
  * mode's last content and seeds the first time (Rules gets the current value as Otherwise and one empty rule). Done stores the mode on show.
  */
-export default function ValueEditor({ draft, path, kind, modes, look, label, initialMode, maxLength }: {
-  draft: Draft; path: EditorPath; kind: Kind; modes: readonly ValueMode[]; look?: LookKind; label: string; initialMode?: ValueMode; maxLength?: number;
+export default function ValueEditor({ draft, path, kind, modes, look, label, initialMode, maxLength, canvasField }: {
+  draft: Draft; path: EditorPath; kind: Kind; modes: readonly ValueMode[]; look?: LookKind; label: string; initialMode?: ValueMode; maxLength?: number; canvasField?: CanvasFieldRequest;
 }) {
   const document = useDraftDocument(draft);
   const canvas = useLogicFields();
+  const canvasRequest: CanvasFieldRequest = canvasField ?? { draft, path, kind: 'slot', label };
   const logicScope = useLogicScope();
   const slot = valueAt(document, path) as Slot | undefined;
   const key = path.join('/'), memo = memoOf(draft, key);
@@ -58,7 +60,6 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   const [mode, setModeState] = useState<ValueMode>(() => memo.mode ?? (derived === 'custom' ? 'fixed' : derived));
   const entered = useRef(false);
   const setMode = (next: ValueMode) => {
-    if (canvas && next === 'rules') { canvas.open({ draft, path, kind: 'slot', label }); return; }
     const current = draft.get(), now = valueAt(current, path) as Slot, was = memo.mode ?? mode;
     // What the mode on show holds now goes into memory.
     if (was === 'fixed') memo.fixed = fixedOf(now, kind);
@@ -89,7 +90,6 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
   };
   const inputs = mode === 'rules' ? (rulesOf(slot, kind)?.cases ?? []).flatMap(entry => inputsOf(entry.when)) : kind === 'text' && slot ? (() => { const operand = slotOperand(slot); return operand ? operandInputs(operand) : []; })() : mode === 'entity' && slot && 'value' in slot ? operandInputs(slot.value as Operand) : [];
   const unique = [...new Map(inputs.map(input => [`${input.sourceId}|${input.path.join('/')}`, input])).values()];
-  if (canvas && derived !== 'fixed') return <LogicField draft={draft} path={path} kind="slot" label={label}/>;
   return <div className="w2-editor-section w2-expr-editor" data-testid="value-editor" data-mode={mode}>
     {kind === 'text' && <SaveAsLogic draft={draft} path={path} kind="value" onSaved={() => { memo.mode = 'entity'; setModeState('entity'); }}/>}
     {modes.length > 1 && <Segmented label={`${label} value`} value={mode} options={modes.map(item => ({ value: item, label: modeWords[item] }))} onChange={setMode}/>}
@@ -121,5 +121,12 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
       </div>
     </div>}
     <TryValues document={document} inputs={unique}/>
+    {canvas && <div className="w2-logic-commands">
+      {kind === 'text' && <TemplatePicker document={document} kind="operand" onUse={use => {
+        draft.set(replaceAt(draft.get(), path, operandSlot(use as unknown as Operand, slot)));
+        memo.mode = 'entity'; setModeState('entity');
+      }}/>}
+      <button type="button" onClick={() => canvas.open(canvasRequest)}>Edit in Canvas</button>
+    </div>}
   </div>;
 }

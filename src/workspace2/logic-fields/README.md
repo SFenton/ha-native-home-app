@@ -12,7 +12,12 @@ that registry. The graph contract supplies the actual typed ports and the
 compiler validates the real consuming document. Literal controls and
 non-workspace expression editors retain their original paths.
 
-One simple check edits inline. And/Or open an already connected canvas containing
+All value expressions keep their value fields, tokens, formatting and Done
+transaction, including values containing nested checks. A template's value-body
+mini-map is a preview alongside its ordinary editor, not a replacement.
+A condition disclosure opens its compact one-check editor;
+only more than one authored check replaces that field with a summary.
+And/Or open an already connected canvas containing
 the authored check and a second copy to edit; closing without Apply changes
 nothing. Compound checks show a sentence, a graph mini-map and Edit in Canvas,
 not an in-panel condition-card editor. A field inside a pipeline opens its whole
@@ -71,3 +76,8 @@ runtime compatibility. The fixture's pending native-feature warning is retained.
 The six screenshot subjects under `docs/evidence/w2-i/` each have desktop/phone
 and light/dark variants. All entities and example content come from the isolated
 configuration fixture. No development data or physical devices are used.
+
+The presentation-only canvas CSS grant scopes interaction rules to the actual
+canvas root's existing `data-panel` attribute, retaining the canvas focus outline. The SimulationHost
+grant changes visible retained/demo provenance wording only, not its engine,
+observations, timers or retirement lifecycle.

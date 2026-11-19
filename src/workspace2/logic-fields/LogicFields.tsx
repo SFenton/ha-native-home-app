@@ -27,6 +27,11 @@ import { RetireWorkspaceFlows } from './live';
 import { previewGraph, templateUses } from './lenses';
 import { LensChooser } from './LensChooser';
 import { displayValue } from '../logic-simulation/presentation';
+import { useNameContext } from '../expr/useExpr';
+import { graphBlockLabel, sourceLabel } from './presentation';
+import { indexGraph } from '../canvas/graph-index';
+import { operandSlot, slotOperand } from '../expr/tokens';
+import type { Operand } from '../../shared/composition/expression';
 import './logic-fields.css';
 
 export interface CanvasFieldRequest {
@@ -43,6 +48,28 @@ interface OpenField extends CanvasFieldRequest {
 interface FieldsApi { readonly suspended: boolean; open(request: CanvasFieldRequest): void }
 const Fields = createContext<FieldsApi | undefined>(undefined);
 export const useLogicFields = () => useContext(Fields);
+
+/** The value editor uses a slot view; the canvas must see the real library body. */
+export function operandBodyDraft(draft: Draft, path: EditorPath): Draft {
+  let view: CompositionDocument | undefined, canonical: CompositionDocument;
+  return {
+    ...draft,
+    get() {
+      const current = draft.get();
+      if (current !== view) {
+        const body = slotOperand(valueAt(current, path) as { type: string });
+        if (!body) throw new Error('The template body must have a value.');
+        view = current;
+        canonical = replaceAt(current, path, body);
+      }
+      return canonical;
+    },
+    set(next, typing) {
+      const body = valueAt(next, path) as Operand;
+      draft.set(replaceAt(next, path, operandSlot(body, valueAt(draft.get(), path))), typing);
+    },
+  };
+}
 export function WhenCanvasClosed({ children }: { children: ReactNode }) {
   return useLogicFields()?.suspended ? null : children;
 }
@@ -96,7 +123,14 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
 }
 function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Workspace2; theme: DerivedTheme; onClose: () => void }) {
   const document = useDraftDocument(field.draft), data = useWorkspaceData();
+  const names = useNameContext(document);
+  const entry = field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined;
+  const nameContext = useMemo(() => entry ? { ...names, logic: { library: document.logicLibrary ?? [], settings: entry.params } } : names, [names, entry, document.logicLibrary]);
   const [working, setWorking] = useState(field.graph), [selected, setSelected] = useState<string | null>(null);
+  const blockNames = useMemo(() => {
+    const index = indexGraph(working);
+    return Object.fromEntries(working.nodes.map(node => [node.id, graphBlockLabel(node, working, nameContext, index).name]));
+  }, [working, nameContext]);
   const [observations, setObservations] = useState<CanvasObservations>(), [active, setActive] = useState(true);
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
@@ -153,9 +187,9 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
       return entry ? templateUses(document, entry).map(use => ({ anchor: use.anchor, output, arguments: use.value.args })) : [];
     },
     preview: setLens,
-    data: { sources: document.dataSources.map(source => ({ id: source.id, name: sourceName(source) })) },
+    data: { sources: document.dataSources.map(source => ({ id: source.id, name: source.kind === 'ha-entity' ? sourceLabel(source.id, nameContext) : sourceName(source) })) },
     targetCapabilities: supportedCompositionCapabilities,
-  }), [snapshot, apply, save, document]);
+  }), [snapshot, apply, save, document, nameContext]);
   const simulation = useMemo(() => {
     if (!['operand', 'condition', 'flow'].includes(field.kind) && !(field.kind === 'slot' && ['literal', 'read', 'expr'].includes(String((working.original as { type?: string })?.type)))) {
       return { error: 'Open a typed condition or value output to simulate this structure.' };
@@ -188,7 +222,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
           </article>}
           <details><summary>Simulation · Studio only</summary>
           {ready && simulation.program ? <SimulationHost program={simulation.program} document={document} canvasId={canonicalOfBounded(field.graph.roots[0].anchor)}
-            blockNames={Object.fromEntries(working.nodes.map(node => [node.id, node.catalogKey.split('.').at(-1)?.replace(/-/g, ' ') ?? 'Value']))}
+            blockNames={blockNames}
             selectedBlockId={selected ?? undefined} onSelectBlock={setSelected} onObservation={observe} active={active}
             freshness={{ stale: !data.live || !ws.houseStates.streaming }}/>
             : <p className="w2-caption" role="status">{simulation.error}</p>}

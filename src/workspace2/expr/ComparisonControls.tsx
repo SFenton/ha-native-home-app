@@ -3,6 +3,7 @@ import type { Operand } from '../../shared/composition/expression';
 import type { Json } from '../../shared/types';
 import { SelectMenu } from '../SelectMenu';
 import { TextInput } from '../editors/controls';
+import { PickerRow } from '../pickers/PickerField';
 import { comparisonsFor, closeLeaf, kindOf, readOf, timeWords, weekdayNames, type Leaf, type NameContext, type ValueKind } from './condition';
 import { comparisonWords, words, type Comparison } from './words';
 
@@ -39,9 +40,10 @@ export function withComparison(leaf: Leaf, comparison: Comparison): Leaf {
 }
 
 /** The comparison pop-up and the other side (chips of states, a number with its unit, a time, weekdays, yes or no), for one comparison. */
-export function ComparisonControls({ leaf, onChange, kind, states = [], unit, closed, label = 'Comparison', allowed, numeric }: {
+export function ComparisonControls({ leaf, onChange, kind, states = [], unit, closed, label = 'Comparison', allowed, numeric, compact = false }: {
   leaf: Leaf; onChange: (leaf: Leaf, typing?: string) => void; kind: ValueKind; /** Words the entity can be now, current first. */ states?: readonly string[]; unit?: string; closed?: readonly string[]; label?: string; allowed?: readonly Comparison[];
   /** The entity's state reads as a number now, so "is above" and "is below" are offered beside the words. */ numeric?: boolean;
+  compact?: boolean;
 }) {
   const base = comparisonsFor(kind, leaf.left), more: Comparison[] = numeric && kind === 'text' ? (['is above', 'is below'] as const).filter(item => !base.includes(item)) : [];
   const all = [...base.slice(0, 3), ...more, ...base.slice(3)];
@@ -51,11 +53,11 @@ export function ComparisonControls({ leaf, onChange, kind, states = [], unit, cl
   const multi = leaf.comparison === 'is one of' || leaf.comparison === 'is not one of';
   return <>
     <div className="w2-expr-control"><SelectMenu label={label} value={leaf.comparison} options={choices.map(item => ({ value: item, label: comparisonWords[item] }))} onChange={next => onChange(withComparison(leaf, next as Comparison))}/></div>
-    <OtherSide leaf={leaf} onChange={onChange} kind={kind} states={leaf.left.type === 'raw-state' ? ['unknown', 'unavailable', ...states] : states} unit={unit} closed={closed} multi={multi} field={field}/>
+    <OtherSide compact={compact} leaf={leaf} onChange={onChange} kind={kind} states={leaf.left.type === 'raw-state' ? ['unknown', 'unavailable', ...states] : states} unit={unit} closed={closed} multi={multi} field={field}/>
   </>;
 }
 
-function OtherSide({ leaf, onChange, kind, states, unit, closed, multi, field }: { leaf: Leaf; onChange: (leaf: Leaf, typing?: string) => void; kind: ValueKind; states: readonly string[]; unit?: string; closed?: readonly string[]; multi: boolean; field?: string }) {
+function OtherSide({ leaf, onChange, kind, states, unit, closed, multi, field, compact }: { leaf: Leaf; onChange: (leaf: Leaf, typing?: string) => void; kind: ValueKind; states: readonly string[]; unit?: string; closed?: readonly string[]; multi: boolean; field?: string; compact: boolean }) {
   const [typed, setTyped] = useState('');
   const set = (right: Operand[], typing?: string) => onChange({ ...leaf, right }, typing);
   if (leaf.comparison === 'has a value' || leaf.comparison === 'has no value') return null;
@@ -70,6 +72,7 @@ function OtherSide({ leaf, onChange, kind, states, unit, closed, multi, field }:
   }
   if (kind === 'yesno') {
     const chosen = valueOf(first);
+    if (compact) return <SelectMenu label="Value" value={String(chosen)} options={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} onChange={value => set([lit(value === 'true')])}/>;
     return <div className="w2-expr-chips" role="group" aria-label="Value">{[true, false].map(item => <button type="button" key={String(item)} className="w2-chip" aria-pressed={chosen === item} onClick={() => set([lit(item)])}>{item ? 'Yes' : 'No'}</button>)}</div>;
   }
   if (field === 'minuteOfDay') {
@@ -89,9 +92,25 @@ function OtherSide({ leaf, onChange, kind, states, unit, closed, multi, field }:
   const chosen = leaf.right.map(valueOf).filter((item): item is string => typeof item === 'string');
   const options = [...new Set([...(closed ?? [...states, ...COMMON_STATES]), ...chosen])];
   const toggle = (item: string) => { const next = multi ? chosen.includes(item) ? chosen.filter(part => part !== item) : [...chosen, item] : [item]; if (next.length) set(next.map(lit)); };
+  if (compact) return <PickerRow title="Value" primary={chosen.map(stateLabel).join(' or ') || 'Choose'}>
+    {close => <StateChoices options={options} chosen={chosen} custom={!closed} multi={multi} onChoose={item => { toggle(item); if (!multi) close(); }}/>}
+  </PickerRow>;
   return <div className="w2-expr-chips" role="group" aria-label="Value">
     {options.map(item => <button type="button" key={item} className="w2-chip" aria-pressed={chosen.includes(item)} onClick={() => toggle(item)}>{item}</button>)}
     {!closed && <input aria-label="Other value" placeholder={words.other} className="w2-chip-input" value={typed} onChange={event => setTyped(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter' && typed.trim()) { toggle(typed.trim()); setTyped(''); } }}/>}
+  </div>;
+}
+
+export const stateLabel = (value: string): string => value.replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase());
+
+function StateChoices({ options, chosen, custom, multi, onChoose }: {
+  options: string[]; chosen: string[]; custom: boolean; multi: boolean; onChoose: (value: string) => void;
+}) {
+  const [other, setOther] = useState(false);
+  return <div className="w2-logic-state-choices" role="group" aria-label="Value">
+    {options.map(item => <button type="button" className="w2-menu-item" key={item} aria-pressed={chosen.includes(item)} onClick={() => onChoose(item)}>{stateLabel(item)}</button>)}
+    {custom && <button type="button" className="w2-menu-item" aria-expanded={other} onClick={() => setOther(!other)}>{words.other}</button>}
+    {other && <TextInput label="Other value" value="" onCommit={value => { if (value.trim()) onChoose(value.trim()); }}/>}
   </div>;
 }

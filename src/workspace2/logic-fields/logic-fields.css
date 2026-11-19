@@ -12,24 +12,63 @@
 .w2-logic-simulation .kv2 { grid-template-columns: minmax(0, 1fr) auto; }
 .w2-logic-simulation .kv2 > .w2-tag { grid-column: 2; }
 .w2-sheet-viewport:has(.w2-simulation-surface), .w2-dialog-viewport:has(.w2-simulation-surface), .w2-sim-scenarios-viewport { z-index: 150; }
-.w2-positioner:has(.w2-simulation-surface) { z-index: 160; }
+.w2-positioner:has(.w2-simulation-surface), .w2-positioner:has(.w2-logic-lens-menu) { z-index: 160; }
 .w2-logic-lens { display: grid; gap: 8px; padding-block-end: 12px; }
 .w2-logic-lens select, .w2-logic-lens input { width: 100%; min-height: 36px; border: 1px solid var(--w2-line); border-radius: 8px; padding: 6px 8px; background: var(--w2-field); color: var(--w2-ink-card); font: inherit; }
 .w2-logic-field-preview { display: grid; gap: 8px; padding: 12px; margin-block: 12px; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-field); }
 .w2-logic-field-preview output { font-size: 18px; overflow-wrap: anywhere; }
-.w2-logic-field-preview small { color: var(--w2-label-card); }
+.w2-logic-field-preview small { color: var(--w2-muted); }
 .w2-logic-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
 .w2-logic-field { display: grid; gap: 10px; min-width: 0; padding-block: 8px; }
 .w2-logic-field > .w2-row-label { font-weight: 600; }
 .w2-logic-commands { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .w2-logic-commands button { min-height: 36px; border: 1px solid var(--w2-line); border-radius: 8px; background: var(--w2-field); color: var(--w2-ink-card); padding: 6px 10px; font: inherit; cursor: pointer; }
-.w2-logic-summary { display: grid; grid-template-columns: 1fr 90px; gap: 12px; align-items: center; margin: 0; }
-.w2-logic-summary svg { width: 90px; height: 56px; color: var(--w2-primary-fill); background: var(--w2-field); border-radius: 8px; }
+.w2-logic-summary { display: grid; gap: 12px; min-width: 0; margin: 0; }
+.w2-logic-map { max-width: 100%; max-height: 186px; overflow: auto; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-field); }
+.w2-logic-map svg { display: block; min-width: 100%; }
+.w2-logic-map [data-wire-kind] { --w2-map-wire: var(--w2-muted); }
+.w2-logic-map [data-wire-kind=number] { --w2-map-wire: var(--w2-primary-fill); }
+.w2-logic-map [data-wire-kind=condition] { --w2-map-wire: var(--w2-ok-text); }
+.w2-logic-map [data-wire-kind=text] { --w2-map-wire: var(--w2-warn-text); }
+.w2-logic-map [data-wire-kind=time] { --w2-map-wire: var(--w2-primary); }
+.w2-logic-map path { fill: none; stroke: var(--w2-map-wire); stroke-width: 2; }
+.w2-logic-map rect { fill: var(--w2-card); stroke: var(--w2-map-wire); stroke-width: 1.5; }
+.w2-logic-map-label { display: grid; align-content: center; height: 100%; color: var(--w2-ink-card); font: 10px/1.3 var(--w2-font); text-align: center; }
+.w2-logic-map-label strong, .w2-logic-map-label small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.w2-logic-map-label small { font-size: 9px; color: var(--w2-muted); }
 .w2-logic-summary figcaption { overflow-wrap: anywhere; }
+.w2-logic-status { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--w2-muted); font-size: 11px; }
+.w2-logic-template p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.w2-logic-field .w2-logic-primary { color: var(--w2-on-primary); background: var(--w2-primary-fill); border-color: transparent; }
+.w2-logic-field .w2-logic-secondary button { min-height: 30px; border: 0; padding: 2px 0; background: transparent; color: var(--w2-muted); font-size: 12px; }
+.w2-logic-secondary { gap: 8px 16px; }
+.w2-logic-field .w2-expr-simple[data-compact] { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 6px; }
+.w2-logic-field .w2-expr-simple[data-compact] > .w2-picker-row,
+.w2-logic-field .w2-expr-simple[data-compact] > .w2-expr-control { display: block; width: auto; min-width: 0; min-height: 32px; margin: 0; flex: 0 1 auto; }
+.w2-logic-field .w2-expr-simple[data-compact] .w2-picker-button,
+.w2-logic-field .w2-expr-simple[data-compact] .w2-select { min-height: 32px; padding: 5px 8px; background: var(--w2-field); }
+.w2-logic-field .w2-expr-simple[data-compact] .w2-picker-primary { white-space: normal; }
+.w2-logic-field .w2-expr-simple[data-compact] .w2-expr-number { flex: 1 1 70px; max-width: 110px; }
+.w2-logic-state-choices { display: grid; min-width: 150px; }
+.w2-logic-field > .w2-expr-result { margin: 0; }
+.w2-logic-simulation .w2-sim-toolbar { padding: 8px 0; }
+.w2-logic-simulation .w2-sim-toolbar-cluster { border: 0; border-radius: 0; padding: 0; background: none; box-shadow: none; justify-content: flex-start; }
+.w2-logic-simulation .w2-sim-heading > h2 { display: none; }
+.w2-logic-simulation .w2-sim-notice { margin-inline: 0; padding-inline: 0; background: none; }
+.w2-logic-simulation .w2-sim-values-area { padding-inline: 0; background: transparent; }
+.w2-logic-overlay .w2-logic-simulation button.w2-link-button { color: var(--w2-ink-card); text-decoration: none; font-weight: 500; text-align: start; white-space: normal; }
+.w2-logic-simulation .w2-logic-lens > .w2-caption { margin: 0; }
+.w2-logic-overlay .w2-canvas button:disabled { opacity: 1; background: var(--w2-field); color: var(--w2-ink-card); border-color: var(--w2-line); cursor: not-allowed; }
+[aria-label="Properties"]:has(.w2-logic-editor) .w2-props-titles p { white-space: normal; overflow: visible; text-overflow: clip; }
 .w2-logic-error { position: fixed; inset-block-end: 20px; inset-inline: 20px; z-index: 140; padding: 16px; background: var(--w2-card); color: var(--w2-ink-card); border: 1px solid var(--w2-line); border-radius: 10px; }
 .w2-body > main.w2-canvas { height: auto; display: block; font: inherit; background: none; }
 @media (pointer: coarse) {
   .w2-logic-commands button { min-width: 44px; min-height: 44px; }
+  .w2-logic-field .w2-logic-secondary button { min-width: 44px; min-height: 44px; }
+  .w2-logic-field .w2-expr-simple[data-compact] > .w2-picker-row,
+  .w2-logic-field .w2-expr-simple[data-compact] > .w2-expr-control,
+  .w2-logic-field .w2-expr-simple[data-compact] .w2-picker-button,
+  .w2-logic-field .w2-expr-simple[data-compact] .w2-select { min-width: 44px; min-height: 44px; }
 }
 @media (max-width: 699px) {
   .w2-logic-overlay { inset: 0; border-radius: 0; }

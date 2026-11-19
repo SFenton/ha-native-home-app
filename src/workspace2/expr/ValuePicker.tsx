@@ -137,14 +137,15 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
   return <div className="w2-expr-picker">
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder="Search values" aria-label="Search values" value={query} onChange={event => setQuery(event.target.value)}/></label>
     {first.map(section)}
-    {canvas && !flow && groups.includes('logic') && <TemplatePicker document={document} kind={conditions ? 'condition' : 'operand'} onUse={use => {
+    {canvas && !flow && groups.includes('logic') && <section aria-label={groupTitles.logic}><h3 className="w2-group-title">{groupTitles.logic}</h3>
+      {(document.logicLibrary ?? []).filter(entry => entry.kind === (conditions ? 'condition' : 'operand') && entry.id !== scope?.entryId && match(entry.name)).map(entry => <TemplatePicker key={entry.id} document={document} entryId={entry.id} label={entry.name} className="w2-expr-pickrow" kind={conditions ? 'condition' : 'operand'} onUse={use => {
       if (conditions) onPick({ document: draft.get(), operand: use as unknown as Operand, predicate: use as unknown as Predicate, kind: 'yesno' });
       else {
         const expanded = expandLogic({ logicLibrary: document.logicLibrary, value: use }).document as { value: Operand };
         const kind = operandKind(expanded.value);
         onPick({ document: draft.get(), operand: use as unknown as Operand, kind: kind === 'number' ? 'number' : kind === 'boolean' ? 'yesno' : 'text' });
       }
-    }}/>}
+    }}/>)}</section>}
     {groups.includes('entities') && <section aria-label={groupTitles.entities}><h3 className="w2-group-title">{groupTitles.entities}</h3>
       {!flow && <div className="w2-expr-control"><SelectMenu label={words.pickRead} value={mode} options={[{ value: 'state', label: words.state }, { value: 'changed', label: words.lastChangedValue }, { value: 'until', label: words.secondsUntil }, { value: 'since', label: words.secondsSince }]} onChange={next => setMode(next as typeof mode)}/></div>}
       {!flow && mode === 'until' && <TextInput label={words.untilAttribute} placeholder={words.untilAttributePlaceholder} value={untilAttribute} onCommit={text => setUntilAttribute(text.trim())}/>}
@@ -161,10 +162,10 @@ export default function ValuePicker({ draft, groups: asked, onPick, conditions, 
 }
 
 /** A picker row (48 px: the value's name, a second line under it) that opens {@link ValuePicker} as a popover, or a pushed page when narrow. */
-export function ValuePickerRow({ draft, label, title, primary, secondary, path, groups, onPick, conditions, stacked = true, glyph }: {
-  draft: Draft; label?: string; title: string; primary: React.ReactNode; secondary?: React.ReactNode; path?: string; groups?: readonly PickerGroup[]; onPick: (picked: Picked) => void; conditions?: boolean; stacked?: boolean; glyph?: React.ReactNode;
+export function ValuePickerRow({ draft, label, title, primary, secondary, path, groups, onPick, conditions, stacked = true, glyph, footer }: {
+  draft: Draft; label?: string; title: string; primary: React.ReactNode; secondary?: React.ReactNode; path?: string; groups?: readonly PickerGroup[]; onPick: (picked: Picked) => void; conditions?: boolean; stacked?: boolean; glyph?: React.ReactNode; footer?: React.ReactNode;
 }) {
   return <PickerRow label={label} title={title} path={path} stacked={stacked} glyph={glyph} primary={primary} secondary={secondary}>
-    {close => <ValuePicker draft={draft} groups={groups} conditions={conditions} onPick={picked => { onPick(picked); close(); }}/>}
+    {close => <><ValuePicker draft={draft} groups={groups} conditions={conditions} onPick={picked => { onPick(picked); close(); }}/>{footer}</>}
   </PickerRow>;
 }

@@ -16,6 +16,8 @@ import { words } from './words';
 import { useLogicFields } from '../logic-fields/LogicFields';
 import { DraftField } from '../logic-fields/AddressedField';
 import type { EditorPath } from '../../composition-editor';
+import { hasMultipleChecks } from '../logic-fields/checks';
+import { unlinkTemplate } from '../logic-fields/templates';
 
 function tokenPath(value: unknown, operand: Operand, path: EditorPath): EditorPath | undefined {
   if (value === operand) return path;
@@ -40,15 +42,19 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
   if (!parts || !part || !('token' in part)) return <p className="w2-caption">{words.customValue}</p>;
   const { token } = part;
   const storedPath = tokenPath(valueAt(document, address.path), token.operand, address.path);
-  const canvasField = canvas ? <DraftField draft={draft} path={storedPath ?? address.path} kind={storedPath || address.wrap === 'operand' ? 'operand' : 'slot'} label={words.value}/> : undefined;
+  const canvasField = canvas && hasMultipleChecks(token.operand) ? <DraftField draft={draft} path={storedPath ?? address.path} kind={storedPath || address.wrap === 'operand' ? 'operand' : 'slot'} label={words.value}/> : undefined;
   const asUse: unknown = token.operand;
   if (isUse(asUse)) {
     if (canvasField) return canvasField;
     const leaveUse = () => { onClose?.(); if (!onClose) push?.pop(); };
     const afterChange = () => { if (!inline) leaveUse(); };
-    return <LogicUseSettings draft={draft} use={asUse} kind="value" removeLabel={words.removeValue} onLeave={leaveUse}
+    return <LogicUseSettings draft={draft} path={storedPath} use={asUse} kind="value" removeLabel={words.removeValue} onLeave={leaveUse}
       onChange={(next, base) => { if (base) draft.set(base); writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: next as unknown as Operand } } : item), false); }}
-      onUnlink={() => { const plain = workedOut(draft.get(), asUse) as Operand | undefined; if (plain) writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: plain } } : item), false); afterChange(); }}
+      onUnlink={() => {
+        if (canvas && storedPath) draft.set(unlinkTemplate(draft.get(), storedPath));
+        else { const plain = workedOut(draft.get(), asUse) as Operand | undefined; if (plain) writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: plain } } : item), false); }
+        afterChange();
+      }}
       onRemove={() => { writeParts(draft, address, parts.filter((_, i) => i !== at), false); afterChange(); }}/>;
   }
   const set = (next: Part[]) => writeParts(draft, address, next, false);

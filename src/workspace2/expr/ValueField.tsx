@@ -16,8 +16,6 @@ import { ValueButton } from './ui';
 import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
 import { words } from './words';
 import { thenName } from './RulesList';
-import { LogicField } from '../logic-fields/Field';
-import { useFieldDraft, useLogicFields } from '../logic-fields/LogicFields';
 
 type Slot = { type: string } & Record<string, unknown>;
 
@@ -74,14 +72,12 @@ function ValueFace({ slot, kind, look, label, onOpen }: { slot: Slot; kind: Kind
  */
 export default function ValueField({ label, path, kind, look, itemName, modes = ['fixed', 'entity', 'rules'], maxLength }: ValueFieldProps) {
   const { document, onChange } = useRows();
-  const canvas = useLogicFields(), draft = useFieldDraft(document, onChange);
   const slot = valueAt(document, path) as Slot | undefined;
   const mode = modeOf(slot, kind);
   const pending = useRef<ValueMode | undefined>(undefined);
   const choices = menuChoices.filter(choice => modes.includes(choice.value));
   const key = path.join('/');
   const blocked = (doc: typeof document) => { const rules = rulesOf(valueAt(doc, path) as Slot | undefined, kind); return rules ? rulesProblem(rules as RulesDraft<Operand | Json>, kind) : undefined; };
-  if (canvas && slot && mode !== 'fixed') return <LogicField draft={draft} path={path} kind="slot" label={label}/>;
   return <EditorRow label={label} summary="" itemName={itemName} document={document} onApply={onChange} path={key} blocked={blocked}
     head={start => <div className="w2-expr-valuerow" data-field-path={key} data-mode={mode}>
       {mode === 'fixed' && slot && <>

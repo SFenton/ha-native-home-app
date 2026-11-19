@@ -221,7 +221,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
         <button type="button" className="w2-tonal" onClick={() => { setInspecting(false); setDrawer('scenarios'); }}><FlaskConical size={15} aria-hidden />Scenarios</button>
       </div>
     </header>
-    {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Held/stale. {snapshot.error ?? 'Waiting for a newer live response.'}</p>}
+    {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Waiting for Home Assistant.{snapshot.error && <> {snapshot.error}</>}</p>}
     {run.issues.length > 0 && <p role="alert" className="w2-sim-notice">{run.issues.map(issueText).join(' ')}</p>}
     <p role="status" aria-live="polite" className="w2-sim-status">{message}</p>
     {savedVersionDiffers && drawer !== 'scenarios' && <p role="note" className="w2-sim-notice">Saved version differs. Reselect to apply.</p>}
@@ -232,7 +232,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <p className="w2-caption">The preview is a lens. These are the actual outputs, not device actions.{scenario ? ' Unpinned Live values are frozen at capture.' : ''}</p>
           <div className="w2-sim-values">{run.outputs.map((output, index) => <article className="kv2" key={anchorKey(output.output)} aria-label={`Output ${outputLabel(index).name}`}>
             <span>{outputLabel(index).name}</span><output>{displayValue(output.result, outputLabel(index))}</output>
-            <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source}</Tag>
+            <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source === 'Held/stale' ? 'Last value kept' : output.source === 'Sample' ? 'Demo' : output.source}</Tag>
             {output.issues.length > 0 && <p className="w2-caption">{output.issues.map(issueText).join(' ')}</p>}
           </article>)}</div>
         </section>
@@ -241,7 +241,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <div className="w2-sim-values">{uniqueInputs.map(node => {
             const block = observation.blocks[node.id];
             return <div key={node.id} className="kv2"><button type="button" className="w2-link-button" aria-label={`Inspect ${blockLabel(node).name}`} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>
-              <span>{displayValue(block?.result, blockLabel(node))}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Held/stale' : block?.freshness === 'sample' ? 'Sample' : 'Live'}</Tag></div>;
+              <span>{displayValue(block?.result, blockLabel(node))}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Last value kept' : block?.freshness === 'sample' ? 'Demo' : 'Live'}</Tag></div>;
           })}</div>
           <details className="w2-sim-details"><summary>Other blocks</summary><div className="w2-sim-block-list">{nodes.filter(node => !sourceCaptureForNode(node, program)).map(node => <button type="button" key={node.id} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>)}</div></details>
           <p className="w2-caption">Select a value to inspect its source, pin it, or try a scenario.</p>

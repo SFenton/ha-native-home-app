@@ -38,8 +38,8 @@ function PolicyRow({ draft, path, policyKey, kind, place }: { draft: Draft; path
  * The condition editor's body (spec "The condition editor"): Simple or Logic over one stored condition (D3), the result line, the policy
  * row where the place has one, and Try Values. Switching between Simple and Logic never rewrites the condition.
  */
-export default function ConditionEditor({ draft, path, place, scope = 'document', policy, policyKey = 'whenUnknown', inlineDepth = 2 }: {
-  draft: Draft; path: EditorPath; place: Place; scope?: Scope; policy?: 'show' | 'enable'; policyKey?: string; inlineDepth?: number;
+export default function ConditionEditor({ draft, path, place, scope = 'document', policy, policyKey = 'whenUnknown', inlineDepth = 2, label }: {
+  draft: Draft; path: EditorPath; place: Place; scope?: Scope; policy?: 'show' | 'enable'; policyKey?: string; inlineDepth?: number; label?: string;
 }) {
   const { document, rule, write } = useRule(draft, path, policy ? policyKey : undefined);
   const ctx = useNameContext(document);
@@ -52,8 +52,9 @@ export default function ConditionEditor({ draft, path, place, scope = 'document'
   const parentPolicy = policy ? ((valueAt(document, path.slice(0, -1)) as Record<string, unknown> | undefined)?.[policyKey] as WhenUnknown | undefined) : undefined;
   const canvas = useLogicFields();
   if (canvas) return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">
-    <LogicField draft={draft} path={path} kind="condition" label={place === 'filter' ? 'Keep items when' : 'When'}/>
-    {policy && <PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/>}
+    <LogicField draft={draft} path={path} kind="condition" label={label ?? (place === 'filter' ? 'Keep items when' : 'When')} showLabel={label === undefined}/>
+    {policy && <details className="w2-data-fold"><summary>{words.ifUnknown}</summary><PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/></details>}
+    <TryValues document={document} inputs={inputsOf(rule)}/>
   </div>;
   return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">
     {rule && <SaveAsLogic draft={draft} path={path} kind="condition"/>}
