@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { LiveHouse } from '../../../src/preview2/live-house';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
-import { LogicFieldsProvider, useFieldDraft, useLogicFields } from '../../../src/workspace2/logic-fields/LogicFields';
+import { LogicFieldsProvider, operandBodyDraft, useFieldDraft, useLogicFields } from '../../../src/workspace2/logic-fields/LogicFields';
 import { useWorkspaceFlowData } from '../../../src/workspace2/logic-fields/live';
 import { newFlow, flowSources } from '../../../src/workspace2/data/flow';
 import { resetLiveRuns } from '../../../src/workspace2/data/liveRun';
@@ -11,6 +11,12 @@ import { deriveTheme } from '../../../src/workspace2/theme';
 import { Project } from '../../support/workspace2-surfaces';
 import { integrationDocument } from './fixture';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
+import { createDraft } from '../../../src/workspace2/editors/draft';
+import { replaceAt, valueAt } from '../../../src/composition-editor';
+import { operandSlot } from '../../../src/workspace2/expr/tokens';
+import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
+import { liftField } from '../../../src/workspace2/logic-fields/registry';
+import { prepareDraft } from '../../../server/studio-logic/prepare';
 
 beforeEach(() => {
   vi.useFakeTimers(); resetLiveRuns();
@@ -18,6 +24,36 @@ beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 afterEach(() => { cleanup(); resetLiveRuns(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it('keeps a template rule opened from its slot view at the canonical body anchor through Apply and reopen', async () => {
+  const path = ['logicLibrary', 1, 'body'];
+  const body = { type: 'choose' as const, cases: [{ when: { type: 'viewer' as const, isAdmin: true }, then: { type: 'literal' as const, value: 'Owner' } }], otherwise: { type: 'literal' as const, value: 'Guest' } };
+  const document = replaceAt(integrationDocument(), path, body);
+  const draft = createDraft(replaceAt(document, path, operandSlot(body)));
+  const prepare = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    expect(url).toBe('./native/api/draft/prepare');
+    return Response.json(prepareDraft(JSON.parse(String(init?.body)).document));
+  });
+  function Controls() {
+    const canvas = useLogicFields()!;
+    return <button type="button" onClick={() => canvas.open({ draft, path: [...path, 'value', 'cases', 0, 'when'], kind: 'condition', label: 'Template rule', combine: 'all' })}>Open template rule</button>;
+  }
+  render(<WorkspaceDataProvider document={document} house={new LiveHouse().house}>
+    <LogicFieldsProvider ws={Project.workspace(document)} theme={deriveTheme({}, false)}><Controls/></LogicFieldsProvider>
+  </WorkspaceDataProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Open template rule' }));
+  expect(screen.queryByRole('alert')).toBeNull();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' })));
+  expect(globalThis.document.querySelector('.w2-canvas-footer [role=status]')?.textContent).toContain('Edits applied to the draft');
+  const saved = operandBodyDraft(draft, path).get();
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(valueAt(saved, [...path, 'cases', 0, 'when'])).toEqual({ type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer', isAdmin: true }] });
+  expect(saved.logicUseBindings).toEqual(document.logicUseBindings);
+  const reopened = JSON.parse(JSON.stringify(saved)) as CompositionDocument;
+  expect(readStudioCanvas(reopened).warnings).toEqual([]);
+  expect(JSON.stringify(saved.studioCanvas)).not.toContain('/body/value');
+  expect(liftField(reopened, path, 'operand').graph.roots[0].anchor).toEqual({ kind: 'logic', id: 'samples', field: '/body' });
+});
 
 it('hands legacy readers to one grouped canvas owner, makes simulation fetch-free, and rejects late close responses', async () => {
   const first = newFlow(integrationDocument(), 'service', { title: 'First request', entityId: 'todo.example_chores' });

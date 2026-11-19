@@ -95,8 +95,19 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
   useEffect(() => { if (!opened && retiring) setRetiring(false); }, [opened, retiring]);
   const open = useCallback((field: CanvasFieldRequest) => {
     try {
-      const document = field.draft.get(), layout = readStudioCanvas(document);
+      let document = field.draft.get();
       let scoped = field;
+      if (field.path[0] === 'logicLibrary' && field.path[2] === 'body' && document.logicLibrary?.[Number(field.path[1])]?.kind === 'operand') {
+        const bodyPath = field.path.slice(0, 3), body = valueAt(document, bodyPath) as { type?: string; from?: unknown };
+        if (body?.type === 'expr' || body?.type === 'read' && !body.from) {
+          const draft = operandBodyDraft(field.draft, bodyPath);
+          const path = body.type === 'expr' && field.path[3] === 'value' ? [...bodyPath, ...field.path.slice(4)] : field.path;
+          field = { ...field, draft, path };
+          document = draft.get();
+          scoped = { ...field, path: bodyPath, kind: 'operand' };
+        }
+      }
+      const layout = readStudioCanvas(document);
       for (let depth = field.path.length; depth > 0; depth--) {
         const value = valueAt(document, field.path.slice(0, depth)) as { kind?: string; model?: string } | undefined;
         if (value?.kind === 'model' && value.model === 'pipeline@1') { scoped = { ...field, path: field.path.slice(0, depth), kind: 'flow' }; break; }

@@ -49,9 +49,9 @@ it.each([
   const document = integrationDocument(), draft = createDraft(document);
   const path = ['pages', 0, 'components', 2, 'visibleWhen'];
   const state = setup(<DraftReadRow draft={draft} readLeaf={current => openSimple(valueAt(current, path) as Predicate)} onChange={vi.fn()}/>, document);
-  expect(screen.getByRole('combobox', { name: 'Read', exact: true }).textContent).toBe('State');
+  expect(screen.getByRole('combobox', { name: 'Read' }).textContent).toBe('State');
   act(() => draft.set(replaceAt(draft.get(), path, { type: 'compare', op: left.type === 'last-changed' ? 'before' : 'eq', left, right: { type: 'literal', value } })));
-  expect(screen.getByRole('combobox', { name: 'Read', exact: true }).textContent).toBe(label);
+  expect(screen.getByRole('combobox', { name: 'Read' }).textContent).toBe(label);
   expect(screen.getByText(note)).toBeTruthy();
   state.unchanged();
 });

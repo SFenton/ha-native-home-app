@@ -95,6 +95,11 @@ it('renders every actual mini-map block with its name and typed wires, without c
   expect(view.container.querySelectorAll('path[data-wire-kind=number]').length).toBeGreaterThan(0);
   expect(view.container.querySelectorAll('path[data-wire-kind=condition]').length).toBeGreaterThan(0);
   expect(JSON.stringify(graph)).toBe(before);
+  const template = document.logicLibrary![0];
+  const templateGraph = liftField(document, ['logicLibrary', 0, 'body'], 'operand').graph;
+  const templateLabels = miniMapModel(templateGraph, { ...ctx, logic: { library: document.logicLibrary!, settings: template.params } }).nodes.map(node => `${node.name} ${node.detail}`).join(' ');
+  expect(templateLabels).toContain('Entity');
+  expect(templateLabels).not.toContain('graph-setting');
 });
 
 it('keeps unchanged inline condition bytes while the compact value picker opens and contains Other', async () => {
