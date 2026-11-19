@@ -25,7 +25,7 @@ export function lineOperand(value: unknown, wrap: LineAddress['wrap']): Operand 
 /** Writes parts to a line: one step, coalescing typing. */
 export function writeParts(draft: Draft, address: LineAddress, parts: readonly Part[], typing: boolean): void {
   const operand = writeLine(parts);
-  draft.set(replaceAt(draft.get(), address.path, address.wrap === 'slot' ? operandSlot(operand) : operand), typing ? `line:${address.path.join('/')}` : undefined);
+  draft.set(replaceAt(draft.get(), address.path, address.wrap === 'slot' ? operandSlot(operand, valueAt(draft.get(), address.path)) : operand), typing ? `line:${address.path.join('/')}` : undefined);
 }
 
 /**

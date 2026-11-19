@@ -68,6 +68,20 @@ describe('the token line', () => {
     expect(operandSlot({ type: 'format', pattern: '{a}', args: { a: read('a') } }).type).toBe('expr');
     expect(slotOperand({ type: 'expr', value: read('a') })).toEqual(read('a'));
   });
+  it.each(['read', 'expr'])('keeps %s slot settings at the slot root through token edits', kind => {
+    const operand = read('a');
+    const settings = { fallback: 'No reading', whenUnavailable: 'keep' };
+    const slot = kind === 'read' ? { ...operand, ...settings } : { type: 'expr', value: operand, ...settings };
+    const parts = parseLine(slotOperand(slot)!)!;
+    const edited = writeLine([...parts, { text: ' now' }]);
+    const updated = operandSlot(edited, slot);
+    expect(updated).toEqual({ type: 'expr', value: { type: 'format', pattern: '{a} now', args: { a: operand } }, ...settings });
+    expect(operandSlot(writeLine(parts), updated)).toEqual({ ...operand, ...settings });
+    expect(operandSlot(writeLine([{ text: 'Fixed' }]), updated)).toEqual({ type: 'literal', value: 'Fixed' });
+  });
+  it('does not silently repair an invalid unavailable policy during an edit', () => {
+    expect(operandSlot(read('b'), { ...read('a'), whenUnavailable: 'invalid' })).toMatchObject({ whenUnavailable: 'invalid' });
+  });
 });
 
 describe('Wording for 0 and 1…', () => {

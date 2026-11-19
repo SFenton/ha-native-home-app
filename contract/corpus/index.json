@@ -5295,6 +5295,135 @@
       }
     },
     {
+      "file": "reject/pending-text-keep-read-fallback.json",
+      "outcome": "reject",
+      "note": "A read text slot explicitly chooses fallback while unavailable.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/14",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-text-keep-read-keep.json",
+      "outcome": "reject",
+      "note": "A read text slot explicitly chooses keep while unavailable.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/14",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-text-keep-read-without-fallback.json",
+      "outcome": "reject",
+      "note": "A read slot may retain text without authored fallback text.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/13",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/text-keep-read-invalid-policy.json",
+      "outcome": "reject",
+      "note": "An unknown unavailable policy is refused, never repaired to fallback.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/13",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/value/whenUnavailable"
+      }
+    },
+    {
+      "file": "reject/text-keep-read-missing-capability.json",
+      "outcome": "reject",
+      "note": "The unavailable policy requires sh.text-keep@1 in the publication manifest.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/pending-text-keep-expr-fallback.json",
+      "outcome": "reject",
+      "note": "A expr text slot explicitly chooses fallback while unavailable.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/15",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-text-keep-expr-keep.json",
+      "outcome": "reject",
+      "note": "A expr text slot explicitly chooses keep while unavailable.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/15",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/pending-text-keep-expr-without-fallback.json",
+      "outcome": "reject",
+      "note": "A expr slot may retain text without authored fallback text.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/15",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true
+    },
+    {
+      "file": "reject/text-keep-expr-invalid-policy.json",
+      "outcome": "reject",
+      "note": "An unknown unavailable policy is refused, never repaired to fallback.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/13",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_variant",
+        "pointer": "/document/pages/2/components/0/props/value/whenUnavailable"
+      }
+    },
+    {
+      "file": "reject/text-keep-expr-missing-capability.json",
+      "outcome": "reject",
+      "note": "The unavailable policy requires sh.text-keep@1 in the publication manifest.",
+      "issue": {
+        "code": "capability_manifest_mismatch",
+        "pointer": "/capabilities"
+      }
+    },
+    {
+      "file": "reject/text-keep-on-literal.json",
+      "outcome": "reject",
+      "note": "A literal has no unavailable state and refuses whenUnavailable.",
+      "issue": {
+        "code": "unsupported_capability",
+        "pointer": "/capabilities/12",
+        "capability": "sh.text-keep@1"
+      },
+      "pending": true,
+      "studioIssue": {
+        "code": "unknown_field",
+        "pointer": "/document/pages/2/components/0/props/value/whenUnavailable"
+      }
+    },
+    {
       "file": "accept/badge-chip.json",
       "outcome": "accept",
       "note": "A chip with a count badge that reads a number."

@@ -1066,6 +1066,14 @@ Swift evaluator is later work and must pass `contract/corpus/pipelines`.
   below 1e15), a tie rounds away from zero, and dates are whole calendar days on the viewer's clock.
 
 
+### Keeping unavailable text (`sh.text-keep@1`, pending)
+
+A text slot's `read` or `expr` may carry `whenUnavailable: "fallback" | "keep"`. Omitted or `"fallback"` keeps today's behavior: an unavailable value draws the slot's `fallback`, or its usual empty/unknown text when none is authored. `"keep"` retains the last answered text while unavailable. Before any answer it still draws the fallback (or the usual empty/unknown text); drawing fallback does not count as an answer. Loading continues to retain the last shown text for both policies. An empty answered string is still an answer.
+
+Writing either policy declares pending `sh.text-keep@1`; omission declares nothing new. Unknown policies are refused (`unknown_variant` at `whenUnavailable`), and a publication that uses the field without declaring the capability is refused (`capability_manifest_mismatch` at `/capabilities`). Literals do not take the field. The shared schema, evaluator and Studio preview use the same policy.
+
+The text inspector places **While unavailable: Show fallback / Keep last** next to Fallback and marks Keep last as needing a newer app. Text and token edits preserve both slot-level settings; they never become fields of a nested operand. `scripts/asks-corpus.ts` generates the `text-keep-*` accept/refusal cases through `generate-expression-corpus.ts`.
+
 ### Average flow step (`sh.flow-average@1`, pending)
 
 `{ "id": "mean", "op": "average", "value": <operand> }` reduces a list to the mean of its finite numeric parts. Like `min` and `max`, it requires a numeric-compatible operand (`binding_type` for typed text) and gives a number or null. Null and non-number parts, including numeric text, are skipped; no numeric parts or an empty list gives null. The answer is not rounded and prints with the Data Flow number rules above. Cost is `1 + item count + operand nodes per item`, as for `sum`.
@@ -1108,7 +1116,7 @@ node's `visibleWhen` and other predicates, rule-based values and authored string
 - **Data Flow additions.** Two request kinds: `entities` (1 to 64 literal entity ids and up to 8 named attributes; rows are
   `{ entityId, state, ...attributes }`; no `refresh`, the flow runs when an observed entity changes) and `none` (no data; `value` is an operand over
   the parameters, the viewer and the clock). A document holds up to 128 flows.
-- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.flow-average@1`, `sh.fold-sides@1`, `sh.shell-profile@1` and `sh.tile-ink-default@1` remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09` are shipped in `capabilities.json` (verified against native-home main and that release tag). An id is
+- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.flow-average@1`, `sh.fold-sides@1`, `sh.shell-profile@1`, `sh.text-keep@1` and `sh.tile-ink-default@1` remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09` are shipped in `capabilities.json` (verified against native-home main and that release tag). An id is
   mutable until a publication that uses it has been served, so changes fold into `@1`; after that, a change of meaning is `@2` beside `@1`.
 
 ### Generic parts (lane TC3)

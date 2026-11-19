@@ -223,6 +223,39 @@ test('Tokens: Insert a Value opens the picker, a token opens its settings, and D
   }
 });
 
+test('While unavailable preserves Keep last and fallback through text and token edits', async ({ page, request }) => {
+  const { panel, line } = await openSubtitleLine(page, request);
+  await panel.getByRole('button', { name: 'Insert a Value' }).click();
+  await page.getByRole('option', { name: /Lights On/ }).click();
+  const fallback = panel.getByRole('textbox', { name: 'If unavailable', exact: true });
+  await fallback.fill('No reading');
+  const policy = panel.getByRole('combobox', { name: 'While unavailable' });
+  await expect(policy).toHaveText('Show fallback');
+  await policy.click();
+  await page.getByRole('option', { name: 'Keep last', exact: true }).click();
+  await expect(panel.getByText('Keep last needs a newer app. Until the first answer, the fallback is shown.')).toBeVisible();
+  await line.click();
+  await line.press('End');
+  await page.keyboard.type(' now');
+  await expect(fallback).toHaveValue('No reading');
+  await expect(policy).toHaveText('Keep last');
+  const showAs = panel.getByRole('combobox', { name: 'Show as', exact: true });
+  const changeTo = (await showAs.textContent())?.includes('Number') ? 'Text' : 'Number';
+  await showAs.click();
+  await page.getByRole('option', { name: changeTo, exact: true }).click();
+  await expect(fallback).toHaveValue('No reading');
+  await expect(policy).toHaveText('Keep last');
+  await expect(done(page)).toBeEnabled();
+  await done(page).click();
+  await panel.getByRole('button', { name: /^Subtitle:/ }).click();
+  await expect(panel.getByRole('textbox', { name: 'If unavailable', exact: true })).toHaveValue('No reading');
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await panel.getByRole('combobox', { name: 'While unavailable' }).click();
+  await page.getByRole('option', { name: 'Show fallback', exact: true }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Show fallback');
+  await done(page).click();
+});
+
 test('Try Values: an override changes the result line and tags it Test, Reset to Live undoes it, and closing the page clears it', async ({ page }) => {
   const panel = await openOnlyShowWhen(page);
   await panel.getByRole('button', { name: 'Entity' }).click();

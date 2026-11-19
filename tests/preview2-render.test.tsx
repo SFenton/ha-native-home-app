@@ -272,12 +272,12 @@ describe('Preview2 Use actions', () => {
   });
 
   it('writes a set-local control into the overlay and shows it', () => {
-    const hit = find('local-control')!;
-    const field = hit.document.localState?.find(item => item.type === 'boolean');
+    const document = corpusDocuments.find(item => item.localState?.some(field => field.type === 'boolean'))!;
+    const field = document.localState?.find(item => item.type === 'boolean');
     expect(field).toBeDefined();
     const node = { id: 'flag', title: 'Flag', type: 'local-control', layout: { span: 1 }, props: { stateId: field!.id, kind: 'toggle', placeholder: '' } } as CompositionNode;
     const onOverlayChange = vi.fn();
-    mount(pageOf(hit.document, [node]), { mode: 'use', onOverlayChange });
+    mount(pageOf(document, [node]), { mode: 'use', onOverlayChange });
     fireEvent.click(screen.getByRole('switch', { name: 'Flag' }));
     expect(onOverlayChange).toHaveBeenCalledWith({ entities: {}, local: { [field!.id]: { type: 'boolean', value: !(field as { initial: boolean }).initial } } });
   });

@@ -13,14 +13,18 @@ import path from 'node:path';
 type J = Record<string, any>;
 const root = path.resolve(import.meta.dirname, '../contract/corpus');
 
-export interface AskCase { name: string; note: string; components: J[]; tweak?: (envelope: J) => void; needs: string[]; reject: boolean }
+export interface AskCase {
+  name: string; note: string; components: J[]; tweak?: (envelope: J) => void; needs: string[]; reject: boolean;
+  finish?: (envelope: J) => void;
+  expect?: { code: string; pointer: string };
+}
 export interface AskEvaluation { name: string; note: string; subject: J; env: J; expected: J }
 /** The families this module owns: `reject/pending-<family>-*` and `reject/<family>-*`. */
-export const askFamilies = ['enabled-when', 'tile-look', 'bound-color', 'bound-symbol', 'text-fallback', 'badge', 'action-rules', 'confirm-when', 'tab-fallback', 'list-parts', 'date-format'];
+export const askFamilies = ['enabled-when', 'tile-look', 'bound-color', 'bound-symbol', 'text-fallback', 'text-keep', 'badge', 'action-rules', 'confirm-when', 'tab-fallback', 'list-parts', 'date-format'];
 /** Capability ids by the short names the cases use. */
 export const askNeeds: Record<string, string> = {
   'enabled-when': 'sh.enabled-when@1', 'tile-look': 'sh.tile-look@1', badges: 'sh.badges@1', 'action-rules': 'sh.action-rules@1', 'confirm-when': 'sh.confirm-when@1',
-  'tab-fallback': 'sh.tab-fallback@1', 'list-parts': 'sh.list-parts@1',
+  'tab-fallback': 'sh.tab-fallback@1', 'list-parts': 'sh.list-parts@1', 'text-keep': 'sh.text-keep@1',
 };
 
 // MARK: Builders
@@ -141,6 +145,34 @@ reject('text-fallback-blank-primary', 'A row title is never blank, so neither is
   [row('r', { props: { primary: { type: 'expr', value: read('temp', ['state']), fallback: '' }, secondary: lit(''), value: lit(''), accessory: 'none', loadingText: 'a', unavailableText: 'b' } })]);
 reject('text-fallback-too-long', 'A fallback keeps the slot\'s own length limit.', ['rules'],
   [node('t', 'text', { props: { value: { type: 'expr', value: read('temp', ['state']), fallback: 'x'.repeat(16385) }, style: 'body', unavailableText: 'None' } })]);
+
+// MARK: Text retention (`sh.text-keep@1`, pending)
+for (const kind of ['read', 'expr']) {
+  const content = kind === 'read' ? read('temp', ['state']) : { type: 'expr', value: read('temp', ['state']) };
+  const textSlot = (settings: J): J[] => [node('t', 'text', { props: { value: { ...content, ...settings }, style: 'body', unavailableText: 'None' } })];
+  for (const policy of ['fallback', 'keep']) {
+    accept(`text-keep-${kind}-${policy}`, `A ${kind} text slot explicitly chooses ${policy} while unavailable.`, ['text-keep', 'rules'],
+      textSlot({ whenUnavailable: policy, fallback: 'No reading' }));
+  }
+  accept(`text-keep-${kind}-without-fallback`, `A ${kind} slot may retain text without authored fallback text.`, ['text-keep'],
+    textSlot({ whenUnavailable: 'keep' }));
+  askCases.push({
+    name: `text-keep-${kind}-invalid-policy`, note: 'An unknown unavailable policy is refused, never repaired to fallback.',
+    components: textSlot({ whenUnavailable: 'retain' }), needs: ['text-keep', 'rules'], reject: true,
+    expect: { code: 'unknown_variant', pointer: '/document/pages/2/components/0/props/value/whenUnavailable' },
+  });
+  askCases.push({
+    name: `text-keep-${kind}-missing-capability`, note: 'The unavailable policy requires sh.text-keep@1 in the publication manifest.',
+    components: textSlot({ whenUnavailable: 'keep', fallback: 'No reading' }), needs: ['text-keep', 'rules'], reject: true,
+    finish: envelope => { envelope.capabilities = envelope.capabilities.filter((id: string) => id !== 'sh.text-keep@1'); },
+    expect: { code: 'capability_manifest_mismatch', pointer: '/capabilities' },
+  });
+}
+askCases.push({
+  name: 'text-keep-on-literal', note: 'A literal has no unavailable state and refuses whenUnavailable.',
+  components: [node('t', 'text', { props: { value: { type: 'literal', value: 'A', whenUnavailable: 'keep' }, style: 'body', unavailableText: 'None' } })],
+  needs: ['text-keep'], reject: true, expect: { code: 'unknown_field', pointer: '/document/pages/2/components/0/props/value/whenUnavailable' },
+});
 
 // MARK: Badges
 const value = (operand: J): J => ({ type: 'value', value: operand });

@@ -5,7 +5,7 @@ import { evaluateOperand, type ReadResult } from '../evaluate';
 import type { EnabledWhen, Operand } from '../../shared/composition/expression';
 import type { BadgeSlot } from '../../shared/composition/evaluator';
 import {
-  isEnabled, resolveBadge, resolveFill, resolveSymbol, resolveText, type BoundColor, type BoundSymbol, type Conditional, type Fill as FillLook, type SymbolLook, type TextSlot,
+  isEnabled, resolveBadge, resolveFill, resolveSymbol, resolveTextResult, scalarText, type BoundColor, type BoundSymbol, type Conditional, type Fill as FillLook, type SymbolLook, type TextSlot,
 } from '../../shared/composition/evaluator';
 import type { ColorRole } from '../../shared/composition/color';
 import { solidColor } from '../../shared/composition/fill-css';
@@ -58,19 +58,27 @@ export const points = (space: { type: 'token'; name: string } | { type: 'points'
 /** What a read or operand gave, for drawing. */
 export interface Shown { state: 'ready' | 'loading' | 'unavailable'; text: string }
 const shown = (result: ReadResult, unavailable: string): Shown => result.status === 'value'
-  ? { state: 'ready', text: typeof result.value === 'string' ? result.value : result.value === null || typeof result.value === 'object' ? unavailable : String(result.value) }
+  ? { state: 'ready', text: scalarText(result.value) ?? unavailable }
   : { state: result.status, text: result.status === 'loading' ? '' : unavailable };
 /**
  * Evaluates a text slot or an operand against the house. Unavailable draws the slot's own `fallback` (`sh.rules@1`), else the node's own text.
- * Loading keeps what the slot showed last when `keep` names it (a node and slot), else draws nothing yet.
+ * Loading keeps what the slot showed last when `keep` names it (a node and slot), else draws nothing yet. `whenUnavailable: keep`
+ * retains answered text, never a fallback mistaken for an answer.
  */
 export function useOperand(operand: Operand | TextSlot | undefined, unavailable = '', keep?: string): Shown {
   const { env, kept } = useRender();
   if (!operand) return { state: 'ready', text: '' };
-  const out = shown(resolveText(operand as TextSlot, env), unavailable);
+  const raw = evaluateOperand(operand.type === 'expr' ? operand.value : operand, env);
+  const holdsUnavailable = 'whenUnavailable' in operand && operand.whenUnavailable === 'keep';
+  const answeredKey = `answered-text:${keep}`;
+  const previous = keep && kept?.get(raw.status === 'unavailable' && holdsUnavailable ? answeredKey : keep);
+  const out = shown(resolveTextResult(operand as TextSlot, raw, typeof previous === 'string' ? previous : undefined), unavailable);
   if (keep && kept) {
     if (out.state === 'ready') kept.set(keep, out.text);
-    else if (out.state === 'loading' && kept.has(keep)) return { state: 'ready', text: kept.get(keep) as string };
+    if (raw.status === 'value') {
+      const answered = scalarText(raw.value);
+      if (answered !== undefined) kept.set(answeredKey, answered);
+    }
   }
   return out;
 }

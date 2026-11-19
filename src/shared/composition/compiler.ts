@@ -511,6 +511,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       return;
     }
     if ('fallback' in value && value.fallback !== undefined) require('rules');
+    if ('whenUnavailable' in value && value.whenUnavailable !== undefined) require('text-keep');
     if (value.type === 'expr') {
       // A string made by an operand: text, a number or a boolean, never a structure. The operand's own reads are checked with the other expression refs.
       if (expected !== 'string') add('binding_type', `${path}/type`);
