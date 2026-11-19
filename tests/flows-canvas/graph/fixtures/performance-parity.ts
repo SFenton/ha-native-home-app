@@ -40,5 +40,5 @@ function digest(value: unknown): string {
 }
 if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes('--record')) {
   const snapshots = Object.fromEntries([...corpusCases.map(test => test.file), 'large-flow', 'large-flow-edited'].map(file => [file, performanceParitySnapshot(file)]));
-  writeFileSync(new URL('performance-baseline.json', import.meta.url), JSON.stringify({ head: '196cac8653b0b9e910f5bc3fedd3b5829510eba7', snapshots }, null, 2) + '\n');
+  writeFileSync(new URL('performance-baseline.json', import.meta.url), JSON.stringify({ head: '196cac8', snapshots }, null, 2) + '\n');
 }
