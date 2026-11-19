@@ -270,6 +270,9 @@ export class BudgetAccountingScope {
   }
 }
 
+// Only observed checkers get side storage; unobserved instances keep the base layout.
+let checkerAccounting: WeakMap<Checker, { observer: BudgetAccountingObserver; expression?: BudgetAccountingScope; predicate?: BudgetAccountingScope }> | undefined;
+
 /** Walks operands, predicates and calls with the app parser's budget, depth, text and combination rules. */
 class Checker implements ExpressionFacts {
   issues: CompositionIssue[] = [];
@@ -281,39 +284,41 @@ class Checker implements ExpressionFacts {
   private budget = 0;
   /** Nodes left for the condition being walked; unlimited for a document predicate, whose shipped limits are the operand ones. */
   private conditionBudget = Number.POSITIVE_INFINITY;
-  #accounting?: { observer: BudgetAccountingObserver; expression?: BudgetAccountingScope; predicate?: BudgetAccountingScope };
   /** `flow` is true inside a Data Flow, where `item` and `param` may stand and `control` may not. */
   /**
    * `controlStoppers` is the stopper ids of a dial control's one call (`sh.dial-control@1`): there every `control` names one of them. `'any'` is the
    * schema's own pass, which leaves that to the compiler. Absent, a `control` names none (a bound control, a swipe, or a stopper's own call).
    */
   constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope, private readonly controlStoppers?: readonly string[] | 'any', observer?: BudgetAccountingObserver) {
-    if (observer) this.#accounting = { observer };
+    if (observer) (checkerAccounting ??= new WeakMap()).set(this, { observer });
   }
   add(code: CompositionIssue['code'], pointer: string) { this.issues.push({ code, pointer }); }
   start(nodes: number, pointer: string) {
     this.budget = nodes;
-    if (this.#accounting) {
-      this.#accounting.expression = new BudgetAccountingScope(this.#accounting.observer, 'expression', pointer, nodes, MAX_EXPRESSION_DEPTH);
-      this.#accounting.predicate = new BudgetAccountingScope(this.#accounting.observer, 'predicate', pointer, null, null, `predicate:${pointer}:initial`);
+    const accounting = checkerAccounting?.get(this);
+    if (accounting) {
+      accounting.expression = new BudgetAccountingScope(accounting.observer, 'expression', pointer, nodes, MAX_EXPRESSION_DEPTH);
+      accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, null, null, `predicate:${pointer}:initial`);
     }
   }
   beginCondition(pointer: string) {
-    if (this.#accounting) {
-      const previousScopeId = this.#accounting.predicate!.id;
-      this.#accounting.predicate = new BudgetAccountingScope(this.#accounting.observer, 'predicate', pointer, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH);
-      this.#accounting.observer({ type: 'condition-budget', action: 'reset', pointer, previousScopeId, scopeId: this.#accounting.predicate.id,
+    const accounting = checkerAccounting?.get(this);
+    if (accounting) {
+      const previousScopeId = accounting.predicate!.id;
+      accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH);
+      accounting.observer({ type: 'condition-budget', action: 'reset', pointer, previousScopeId, scopeId: accounting.predicate.id,
         previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: MAX_CONDITION_NODES });
     }
     this.conditionBudget = MAX_CONDITION_NODES;
   }
   private enter(pointer: string, depth: number): boolean {
+    const accounting = checkerAccounting?.get(this);
     if (depth > MAX_EXPRESSION_DEPTH || this.budget <= 0) {
-      this.#accounting?.expression!.enter(pointer, depth, false, this.budget);
+      accounting?.expression!.enter(pointer, depth, false, this.budget);
       this.add('limit_exceeded', pointer); return false;
     }
     this.budget -= 1;
-    this.#accounting?.expression!.enter(pointer, depth, true, this.budget);
+    accounting?.expression!.enter(pointer, depth, true, this.budget);
     return true;
   }
   operand(value: Operand, pointer: string, depth: number) {
@@ -404,19 +409,20 @@ class Checker implements ExpressionFacts {
         if (this.flow) this.add('invalid_combination', pointer);
         if (!value.of.length || value.of.length > MAX_COUNT_ENTRIES) this.add('limit_exceeded', at('of'));
         const outer = this.conditionBudget;
-        const outerScope = this.#accounting?.predicate;
+        const accounting = checkerAccounting?.get(this);
+        const outerScope = accounting?.predicate;
         value.of.forEach((entry, index) => {
           // Each test has the condition budget a rule's case has.
-          this.beginCondition(this.#accounting ? at('of', index, 'test') : '');
+          this.beginCondition(accounting ? at('of', index, 'test') : '');
           this.predicate(entry.test, at('of', index, 'test'), depth + 1, 1);
           entry.viewer?.personEntityIds.forEach((person, slot) => {
             if (!PERSON_ENTITY_ID.test(person)) this.add('invalid_value', at('of', index, 'viewer', 'personEntityIds', slot));
           });
         });
-        if (this.#accounting) {
-          this.#accounting.observer({ type: 'condition-budget', action: 'restore', pointer, previousScopeId: this.#accounting.predicate!.id,
+        if (accounting) {
+          accounting.observer({ type: 'condition-budget', action: 'restore', pointer, previousScopeId: accounting.predicate!.id,
             scopeId: outerScope!.id, previousRemaining: Number.isFinite(this.conditionBudget) ? this.conditionBudget : null, remaining: Number.isFinite(outer) ? outer : null });
-          this.#accounting.predicate = outerScope;
+          accounting.predicate = outerScope;
         }
         this.conditionBudget = outer;
         break;
@@ -479,10 +485,11 @@ class Checker implements ExpressionFacts {
         break;
       case 'choose': {
         this.needs.add('rules');
-        this.#accounting?.observer({ type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
+        const accounting = checkerAccounting?.get(this);
+        accounting?.observer({ type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
         if (!value.cases.length || value.cases.length > MAX_RULE_CASES) this.add('limit_exceeded', at('cases'));
         value.cases.forEach((entry, index) => {
-          this.beginCondition(this.#accounting ? at('cases', index, 'when') : '');
+          this.beginCondition(accounting ? at('cases', index, 'when') : '');
           this.predicate(entry.when, at('cases', index, 'when'), depth + 1, 1);
           this.operand(entry.then, at('cases', index, 'then'), depth + 1);
         });
@@ -513,12 +520,13 @@ class Checker implements ExpressionFacts {
   }
   predicate(value: Predicate, pointer: string, depth: number, conditionDepth = 1) {
     if (!this.enter(pointer, depth)) return;
+    const accounting = checkerAccounting?.get(this);
     if (this.conditionBudget !== Number.POSITIVE_INFINITY && (conditionDepth > MAX_CONDITION_DEPTH || this.conditionBudget <= 0)) {
-      this.#accounting?.predicate!.enter(pointer, conditionDepth, false, this.conditionBudget);
+      accounting?.predicate!.enter(pointer, conditionDepth, false, this.conditionBudget);
       this.add('limit_exceeded', pointer); return;
     }
     this.conditionBudget -= 1;
-    this.#accounting?.predicate!.enter(pointer, conditionDepth, true, this.conditionBudget);
+    accounting?.predicate!.enter(pointer, conditionDepth, true, this.conditionBudget);
     switch (value.type) {
       case 'state':
         this.path(value.path, `${pointer}/path`);
@@ -575,8 +583,9 @@ class Checker implements ExpressionFacts {
     if (value.confirmation?.type === 'additional' && !value.confirmation.cancelLabel) this.add('invalid_value', `${pointer}/confirmation/cancelLabel`);
     if (value.confirmation?.type === 'additional' && value.confirmation.when) {
       this.needs.add('confirm-when');
-      this.beginCondition(`${pointer}/confirmation/when`);
-      this.predicate(value.confirmation.when, `${pointer}/confirmation/when`, 1);
+      const at = `${pointer}/confirmation/when`;
+      this.beginCondition(at);
+      this.predicate(value.confirmation.when, at, 1);
     }
   }
 }
