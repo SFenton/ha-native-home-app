@@ -4,6 +4,7 @@ import { entityReaders, fieldsWithLogic, outputKind } from '../src/workspace2/fl
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { Operand, Predicate } from '../src/shared/composition/expression';
 import gallery from '../src/preview2/fixtures/logic-gallery.json';
+import { compileCompositionDocument } from '../src/shared/composition/compiler';
 
 const document = gallery.document as unknown as CompositionDocument;
 const path = ['pages', 0, 'components', 0, 'children', 0];
@@ -44,4 +45,35 @@ it('finds named transitive readers, not service intent names or literal words th
   const unusedModel: CompositionDocument['dataSources'][number] = { id: 'unused-model', kind: 'model', model: 'power-toggle@1', inputs: { entityId: { type: 'literal', value: 'switch.demo_not_read' } } };
   expect(entityReaders({ ...edited, dataSources: [...edited.dataSources, unusedModel] }).has('switch.demo_not_read')).toBe(false);
   expect(readers.get('switch.demo_light_1')).not.toContain('Power switch');
+});
+
+it('resolves each placed component private source with its entity argument, not only the library fallback', () => {
+  const node: NonNullable<CompositionDocument['componentLibrary']>[number]['node'] = {
+    id: 'private-text', type: 'text', title: 'Actual temperature', layout: { span: 1 },
+    props: { value: { type: 'read', from: { type: 'source', sourceId: 'private-source', path: ['state'] }, as: 'string', missing: 'unavailable' }, style: 'body', unavailableText: 'Unavailable' },
+  };
+  const edited: CompositionDocument = {
+    ...document, componentLibrary: [{
+      id: 'private-component', name: 'Temperature component', node,
+      sources: [{ id: 'private-source', kind: 'ha-entity', entityId: { type: 'literal', value: 'light.demo_fallback' } }],
+      params: [{ name: 'entity', kind: 'entity-id' }],
+      bindings: [{ param: 'entity', sourceId: 'private-source', field: 'entityId/value' }],
+    }],
+    pages: [{ ...document.pages[0], components: [{ id: 'private-place', type: 'component-ref', componentId: 'private-component', layout: { span: 1 }, args: { entity: 'light.demo_actual' } }] }],
+  };
+  expect(() => compileCompositionDocument(edited)).not.toThrow();
+  const readers = entityReaders(edited);
+  expect(readers.get('light.demo_actual')).toContain('Actual temperature');
+  expect(readers.get('light.demo_fallback')).toContain('Temperature component');
+  expect(readers.get('light.demo_fallback')).not.toContain('Actual temperature');
+});
+
+it('includes navigation visibility, chrome items, and surface-owned readers', () => {
+  let edited = replaceAt(document, ['navigation', 'tabs', 0, 'visibleWhen'], { type: 'not', of: state });
+  edited = replaceAt(edited, ['navigation', 'chrome', 'groups'], [{ id: 'chrome', items: [{ id: 'chrome-read', title: 'Status action', visibleWhen: state }] }]);
+  edited = replaceAt(edited, ['pages', 0, 'titleSourceId'], 'demo-light-1');
+  const readers = entityReaders(edited).get('switch.demo_light_1');
+  expect(readers).toContain(document.navigation.tabs[0].label);
+  expect(readers).toContain('Status action');
+  expect(readers).toContain(document.pages[0].title);
 });

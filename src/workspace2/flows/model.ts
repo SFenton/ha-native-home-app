@@ -3,8 +3,9 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import type { LogicEntry } from '../../shared/composition/logic-library';
 import { operandBase, operandKind, predicateBase } from '../../shared/composition/expression';
 import { labelText } from '../labels';
-import { sourceEntity } from '../add/sources';
 import { operandName, sentence, type NameContext } from '../expr/condition';
+import { expandDocument, ownedSources, readField } from '../../shared/composition/components';
+import { dataReferences, type Source } from '../dialogs/sources';
 
 export type OutputKind = 'boolean' | 'number' | 'words' | 'list' | 'time';
 export const outputWords: Record<OutputKind, string> = { boolean: 'Yes or No', number: 'Number', words: 'Words', list: 'List', time: 'Time' };
@@ -95,50 +96,40 @@ export function fieldSummary(value: unknown, document: CompositionDocument, enti
 
 /** Named readers, including transitive source dependencies and saved templates. Entity sources alone aren't readers. */
 export function entityReaders(document: CompositionDocument): Map<string, Set<string>> {
-  const sources = new Map(document.dataSources.map(source => [source.id, source]));
-  const logic = new Map(document.logicLibrary?.map(entry => [entry.id, entry]) ?? []);
+  const sources = new Map(expandDocument(document).dataSources.map(source => [source.id, source]));
   const result = new Map<string, Set<string>>();
-  const entitiesIn = (value: unknown, found: Set<string>, seen = new Set<string>(), field = ''): void => {
-    if (typeof value === 'string') {
-      const source = /^(sourceId|providerId)$|SourceIds?$/.test(field) ? sources.get(value) : undefined;
-      if (source && !seen.has(`source:${value}`)) {
-        seen.add(`source:${value}`);
-        const entity = sourceEntity(source);
-        if (entity) found.add(entity);
-        const { id: _id, ...body } = source;
-        entitiesIn(body, found, seen);
-      } else if (/entity_?ids?$/i.test(field) && /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/.test(value)) found.add(value);
-      return;
+  const entitiesIn = (value: unknown, found: Set<string>, available: ReadonlyMap<string, Source>, seen = new Set<string>()): void => {
+    const refs = dataReferences(document, value);
+    refs.entities.forEach(id => found.add(id));
+    for (const id of refs.sources) {
+      const source = available.get(id);
+      if (!source || seen.has(id)) continue;
+      seen.add(id);
+      entitiesIn(source, found, available, seen);
     }
-    if (Array.isArray(value)) { value.forEach(child => entitiesIn(child, found, seen, field)); return; }
-    if (!record(value)) return;
-    if (value.type === 'logic-ref' && typeof value.logicId === 'string' && !seen.has(`logic:${value.logicId}`)) {
-      seen.add(`logic:${value.logicId}`);
-      entitiesIn(logic.get(value.logicId), found, seen);
-    }
-    const entry = value.type === 'logic-ref' ? logic.get(String(value.logicId)) : value.type === 'component-ref' ? document.componentLibrary?.find(item => item.id === value.componentId) : undefined;
-    if (record(value.args)) for (const param of entry?.params ?? []) {
-      if (param.kind === 'source-id' || param.kind === 'entity-id') entitiesIn(value.args[param.name], found, seen, param.kind === 'source-id' ? 'sourceId' : 'entityId');
-    }
-    if (value.kind === 'source-id' || value.kind === 'entity-id') entitiesIn(value.sample, found, seen, value.kind === 'source-id' ? 'sourceId' : 'entityId');
-    for (const [key, child] of Object.entries(value)) if (key !== 'id' && key !== 'logicId') entitiesIn(child, found, seen, key === 'value' ? value.type === 'entity-id' ? 'entityId' : field : key);
   };
-  const add = (name: string, value: unknown) => {
-    const found = new Set<string>(); entitiesIn(value, found);
+  const add = (name: string, value: unknown, available: ReadonlyMap<string, Source> = sources) => {
+    const found = new Set<string>(); entitiesIn(value, found, available);
     for (const id of found) { const readers = result.get(id) ?? new Set<string>(); readers.add(name); result.set(id, readers); }
   };
   const index = buildDocumentIndex(document);
   for (const key of index.keys) {
     const entry = index.get(key);
-    if (entry?.kind !== 'node' || !entry.node) continue;
-    const own = Object.fromEntries(Object.entries(entry.node).filter(([, value]) => !nodeLike(value) && !(Array.isArray(value) && value.some(nodeLike))));
-    add(entry.node.title ?? 'Component', own);
+    if (!entry || entry.kind === 'source' || entry.kind === 'chrome-group') continue;
+    const value = entry.node ?? readField(document, entry.path.join('/'));
+    if (!record(value)) continue;
+    const own = Object.fromEntries(Object.entries(value).filter(([key]) => !['components', 'children', 'tabs', 'blocks', 'toolbar'].includes(key)));
+    const surface = entry.surface && index.get(entry.surface);
+    const surfaceValue = surface && readField(document, surface.path.join('/'));
+    const name = typeof value.title === 'string' ? value.title : typeof value.label === 'string' ? value.label
+      : record(surfaceValue) && typeof surfaceValue.title === 'string' ? `${surfaceValue.title} toolbar` : 'App toolbar';
+    add(name, own);
   }
   for (const source of document.dataSources) if (source.kind === 'model' && source.model === 'pipeline@1') {
     const { id: _id, ...body } = source;
     add(source.inputs.title, body);
   }
-  for (const entry of document.logicLibrary ?? []) add(entry.name, entry);
-  for (const entry of document.componentLibrary ?? []) add(entry.name, entry);
+  for (const entry of document.logicLibrary ?? []) add(entry.name, { type: 'logic-ref', logicId: entry.id, args: Object.fromEntries(entry.params.filter(param => param.sample !== undefined).map(param => [param.name, param.sample])) });
+  for (const entry of document.componentLibrary ?? []) add(entry.name, entry.node, new Map([...sources, ...ownedSources(entry).map(source => [source.id, source] as const)]));
   return result;
 }

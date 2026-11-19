@@ -41,16 +41,17 @@ export function sourceName(source: Source, entityNames?: ReadonlyMap<string, str
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /** Source fields after the compiler's component binding/namespace expansion, including value parameters. */
-export function sourceReferences(document: CompositionDocument, value: unknown): string[] {
-  const found: string[] = [];
+export function dataReferences(document: CompositionDocument, value: unknown): { sources: string[]; entities: string[] } {
+  const found: string[] = [], entities: string[] = [];
   const fill = (value: unknown, args: Record<string, unknown>): unknown => {
     if (Array.isArray(value)) return value.map(item => fill(item, args));
     if (!record(value)) return value;
     if (value.type === 'hole' && typeof value.name === 'string') return args[value.name] ?? value;
     return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, fill(child, args)]));
   };
-  const walk = (value: unknown, args: Record<string, unknown> = {}, stack = new Set<string>()) => {
-    if (Array.isArray(value)) { value.forEach(item => walk(item, args, stack)); return; }
+  const walk = (value: unknown, args: Record<string, unknown> = {}, stack = new Set<string>(), field = '') => {
+    if (typeof value === 'string' && (/entity_?ids?$/i.test(field) || field === 'copySourceId') && /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/.test(value)) entities.push(value);
+    if (Array.isArray(value)) { value.forEach(item => walk(item, args, stack, field)); return; }
     if (!record(value)) return;
     if (value.type === 'component-ref') {
       const entry = document.componentLibrary?.find(item => item.id === value.componentId);
@@ -64,32 +65,32 @@ export function sourceReferences(document: CompositionDocument, value: unknown):
     if (value.type === 'logic-ref') {
       const entry = document.logicLibrary?.find(item => item.id === value.logicId);
       if (entry && !stack.has(entry.id)) {
-        walk(entry.body, record(value.args) ? fill(value.args, args) as Record<string, unknown> : {}, new Set([...stack, entry.id]));
+        walk(entry.body, record(value.args) ? fill(value.args, args) as Record<string, unknown> : {}, new Set([...stack, entry.id]), field);
       }
       return;
     }
     if (value.type === 'hole') {
-      if (typeof value.name === 'string' && args[value.name] !== undefined) walk(args[value.name], {}, stack);
+      if (typeof value.name === 'string' && args[value.name] !== undefined) walk(args[value.name], {}, stack, field);
       return;
     }
     for (const [key, child] of Object.entries(value)) {
-      const resolved = fill(child, args);
+      const resolved = isSourceKey(key) || /(?:source|provider)Ids$/i.test(key) ? fill(child, args) : child;
       if (isSourceKey(key) && typeof resolved === 'string') found.push(resolved);
       else if (/(?:source|provider)Ids$/i.test(key) && Array.isArray(resolved)) {
         for (const id of resolved) if (typeof id === 'string') found.push(id);
       }
-      walk(child, args, stack);
+      walk(child, args, stack, key === 'value' ? value.type === 'entity-id' ? 'entityId' : field : key);
     }
   };
   walk(value);
-  return found;
+  return { sources: found, entities };
 }
 
 /** The compiler checks library defaults as well as placed expansions; neither may lose a referenced global source. */
 export function sourceUses(document: CompositionDocument): Map<string, number> {
   const uses = new Map<string, number>(document.dataSources.map(source => [source.id, 0]));
   const add = (value: unknown) => {
-    for (const id of sourceReferences(document, value)) if (uses.has(id)) uses.set(id, uses.get(id)! + 1);
+    for (const id of dataReferences(document, value).sources) if (uses.has(id)) uses.set(id, uses.get(id)! + 1);
   };
   const { componentLibrary, logicLibrary, ...rest } = document;
   add(rest);
