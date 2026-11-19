@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlaskConical, List, Play, X } from 'lucide-react';
 import type { CompositionDocument } from '../../shared/composition/schema';
+import { canonicalCompositionJSON } from '../../shared/composition/json';
 import type { GraphNode, SimulationCase, SimulationClock, SimulationPin } from '../../shared/composition/graph/types';
 import { allocateGraphId } from '../../shared/composition/graph/recipes';
 import { Field, TextField } from '../../ui';
@@ -57,7 +58,11 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const [capture, setCapture] = useState(''), [captureName, setCaptureName] = useState('');
   const [results, setResults] = useState<readonly ScenarioResult[]>([]), [exchange, setExchange] = useState('');
   const [drawer, setDrawer] = useState<'scenarios' | 'evidence'>();
-  const selected = scenarios.find(scenario => scenario.id === selectedCase?.id) ?? selectedCase;
+  const selected = selectedCase;
+  const savedVersionDiffers = useMemo(() => {
+    const saved = scenarios.find(scenario => scenario.id === selected?.id);
+    return Boolean(selected && saved && canonicalCompositionJSON(saved) !== canonicalCompositionJSON(selected));
+  }, [scenarios, selected]);
   const scenarioId = selected?.id ?? '';
   const scenario = useMemo(() => {
     const live = program.roots.flatMap(root => root.graph.nodes.filter(node => muted.has(node.id))).flatMap(node => {
@@ -121,7 +126,6 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const persist = (next: SimulationCase[], action = 'Scenario changes') => {
     const saved = saveScenarios(document.id, canvasId, next);
     if (saved.ok) {
-      setSelectedCase(selected);
       setScenarios(next);
       setResults([]);
     }
@@ -220,6 +224,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Held/stale. {snapshot.error ?? 'Waiting for a newer live response.'}</p>}
     {run.issues.length > 0 && <p role="alert" className="w2-sim-notice">{run.issues.map(issueText).join(' ')}</p>}
     <p role="status" aria-live="polite" className="w2-sim-status">{message}</p>
+    {savedVersionDiffers && drawer !== 'scenarios' && <p role="note" className="w2-sim-notice">Saved version differs. Reselect to apply.</p>}
     <div className="w2-sim-body">
       <main className="w2-sim-values-area">
         <section className="sec w2-group" aria-label="Just the Values">
@@ -247,7 +252,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     </div>
     {narrow && <Overlay narrow open={inspecting} onOpenChange={setInspecting} label="Simulation inspector" className="w2-simulation-surface w2-form">{inspector}</Overlay>}
     <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot}
-      selectedId={scenarioId} run={run} results={results} inputNodes={uniqueInputs.filter(node => !presentation?.scenarioInputs || presentation.scenarioInputs.includes(node.id))} blockLabel={blockLabel} outputLabel={outputLabel}
+      selectedId={scenarioId} savedVersionDiffers={savedVersionDiffers} run={run} results={results} inputNodes={uniqueInputs.filter(node => !presentation?.scenarioInputs || presentation.scenarioInputs.includes(node.id))} blockLabel={blockLabel} outputLabel={outputLabel}
       outputKeys={presentation?.scenarioOutputs}
       onSelect={selectScenario} onCapture={() => startCapture()} onCreate={() => startCapture(true)} blocked={stalePins.length > 0}
       onRunAll={() => { setPaused(true); setSimulating(true); setResults(runAll(program, scenarios, snapshot)); setMessage('Run All complete. No network reads or device writes.'); }}

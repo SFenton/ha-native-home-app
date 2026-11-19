@@ -42,3 +42,30 @@ export function simulationTextPairs() {
   }
   return pairs;
 }
+
+/** Samples the actual keyboard outline and its adjacent painted grounds, not a token proxy. */
+export function simulationFocusPair() {
+  const element = document.activeElement;
+  if (!(element instanceof HTMLElement)) throw new Error('No focused HTML control.');
+  const style = getComputedStyle(element);
+  const context = document.createElement('canvas').getContext('2d')!;
+  const color = (css: string): Rgb => {
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = css;
+    context.fillRect(0, 0, 1, 1);
+    const [r, g, b, alpha] = context.getImageData(0, 0, 1, 1).data;
+    return { r, g, b, a: alpha / 255 };
+  };
+  const backgrounds: Rgb[] = [];
+  let opacity = 1;
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    const computed = getComputedStyle(parent);
+    opacity *= Number(computed.opacity);
+    backgrounds.push(color(computed.backgroundColor));
+  }
+  return {
+    focusVisible: element.matches(':focus-visible'), outline: style.outlineStyle, width: Number.parseFloat(style.outlineWidth),
+    offset: Number.parseFloat(style.outlineOffset), foreground: color(style.outlineColor), backgrounds: backgrounds.reverse(),
+    controlBackground: color(style.backgroundColor), opacity: opacity * Number(style.opacity),
+  };
+}

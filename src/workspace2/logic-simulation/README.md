@@ -50,6 +50,12 @@ are scoped to simulation surfaces (including portalled sheets), not the
 workspace or canvas. The rendered contrast regression measures mixed grounds,
 selected rows, badges, fields, menus, hover, clock labels and evidence in both
 appearances, rather than testing tokens against white alone.
+Keyboard outlines use the scoped `--w2-ink-card` colour. The focus audit checks
+27 control/state types in both appearances, including portalled options and
+the adjacent inner/outer grounds of a zero-offset outline. The separately
+granted optional `SelectMenu.popupClassName` adds the simulation surface class
+only to the two simulation menus. Omitting it preserves the pre-grant field
+and popup DOM/classes; other Studio menus retain their existing focus style.
 
 `presentation.blocks` is keyed by block ID; `presentation.outputs` by
 `anchorKey(root.anchor)`. Supply authored display names, units, optional
@@ -124,7 +130,12 @@ and quota errors. The visible saved list changes only after storage succeeds;
 failed saves leave that list unchanged and retain the unsaved review/import
 JSON with an explicit warning. Import/delete never switch mode or resume the
 bridge. Removing the active saved row retains its in-session captured scenario
-until an explicit Live action or another scenario selection. Imports
+until an explicit Live action or another scenario selection. Replacing an
+active row, including a same-ID import, also leaves that captured object
+untouched. A differing saved copy says "Saved version differs. Reselect to
+apply." in the open drawer or canvas; it takes effect only on explicit
+selection. Until Run All or reselection, that changed saved row cannot borrow
+the running capture's outputs as its own evidence. Imports
 reject duplicate keys, conflicting pins and credential/connection fields.
 
 `runAll` clones its held argument once, then evaluates saved rows independently

@@ -1,7 +1,8 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CHORES_RESPONSE } from '../flows-canvas/simulation/data';
-import { simulationTextPairs } from '../flows-canvas/simulation/contrast';
+import { simulationFocusPair, simulationTextPairs } from '../flows-canvas/simulation/contrast';
+import type { SimulationCase } from '../../src/shared/composition/graph/types';
 import { contrast, over, type Rgb } from '../../src/workspace2/theme';
 
 const harness = './tests/flows-canvas/simulation/harness.html';
@@ -192,6 +193,49 @@ test('scenario import and deletion preserve simulated mode and make no requests'
   expect(network).toHaveLength(1);
   await attachNetwork(info, { initialReads: 1, simulationFetches: 0, requests: network });
 });
+for (const change of ['active', 'unchanged', 'inactive'] as const) {
+  test(`import preserves the captured active scenario: ${change}`, async ({ page }, info) => {
+    const network = await open(page);
+    await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+    const drawer = await scenarios(page);
+    await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
+    await drawer.getByText('Import or export scenarios', { exact: true }).click();
+    await drawer.getByRole('button', { name: 'Prepare export', exact: true }).click();
+    const exchange = drawer.getByLabel('Scenario exchange JSON', { exact: true });
+    const imported: { version: 1; scenarios: SimulationCase[] } = JSON.parse(await exchange.inputValue());
+    const changedId = change === 'inactive' ? 'offline' : 'hot';
+    const changed = imported.scenarios.find(scenario => scenario.id === changedId)!;
+    if (change !== 'unchanged') {
+      imported.scenarios = imported.scenarios.map(scenario => scenario.id !== changedId ? scenario : {
+        ...scenario, pins: scenario.pins.map(pin => pin.kind === 'source' && pin.sourceId === 'bedroom'
+          ? { ...pin, answer: { status: 'value', value: '19' } } : pin),
+      });
+    }
+    await exchange.fill(JSON.stringify(imported));
+    await page.clock.install();
+    await drawer.getByRole('button', { name: 'Import scenarios (replace browser list)', exact: true }).click();
+    await expect(output(page, 'Bedroom')).toHaveText('25.0 °C');
+    await expect(output(page, 'Subtitle')).toHaveText('Too Warm');
+    await expect(page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Simulated', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(drawer.getByRole('note').filter({ hasText: 'Saved version differs. Reselect to apply.' })).toHaveCount(change === 'active' ? 1 : 0);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(key => key.startsWith('sh-studio.logic-scenarios.v1:'))!)!));
+    expect(stored).toEqual(imported);
+    if (change === 'active') {
+      await expect(drawer.getByRole('row').filter({ has: page.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }) })).toContainText('19.0 °C');
+      await drawer.getByRole('button', { name: 'Close Scenarios', exact: true }).click();
+      await expect(page.getByRole('region', { name: 'Flow simulation', exact: true }).getByRole('note').filter({ hasText: 'Saved version differs. Reselect to apply.' })).toBeVisible();
+      await scenarios(page);
+    }
+    await page.clock.runFor(1000);
+    expect(network).toHaveLength(1);
+    await drawer.getByRole('button', { name: `Use scenario ${changed.name}`, exact: true }).click();
+    await expect(output(page, 'Bedroom')).toHaveText(change === 'unchanged' ? '25.0 °C' : '19.0 °C');
+    await expect(page.getByRole('note').filter({ hasText: 'Saved version differs. Reselect to apply.' })).toHaveCount(0);
+    await page.clock.runFor(1000);
+    expect(network).toHaveLength(1);
+    await attachNetwork(info, { change, activeCaptureUnchangedUntilSelection: true, persistedImport: true, simulationFetches: 0, requests: network });
+  });
+}
 for (const failure of ['SecurityError', 'QuotaExceededError']) {
   test(`failed import is transactional and visible: ${failure}`, async ({ page }, info) => {
     const network = await open(page);
@@ -314,4 +358,78 @@ test('bounded step evidence raises the trace-wide warning without changing the a
   await expect(evidence.getByRole('region', { name: 'Chores count items evidence', exact: true })).toContainText('60 before / 60 after');
   await page.screenshot({ path: info.outputPath('truncated-trace.png'), animations: 'disabled' });
   expect(network.every(request => request.url.endsWith('/native/api/ha/flow-run'))).toBe(true);
+});
+test('focus indicators exceed 3:1 for every simulation control type in both appearances', async ({ page }, info) => {
+  test.setTimeout(90_000);
+  const network = await open(page);
+  const records: { theme: string; control: string; foreground: Rgb; background: Rgb; ratio: number; width: number; offset: number }[] = [];
+  const audit = async (control: string, locator: Locator, screenshot?: string) => {
+    for (const theme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator('html')).toHaveCSS('color-scheme', theme);
+      await page.keyboard.press('Shift');
+      await locator.focus();
+      await expect(locator).toBeFocused();
+      const pair = await page.evaluate(simulationFocusPair);
+      expect(pair.focusVisible, control).toBe(true);
+      expect(pair.outline, control).toBe('solid');
+      expect(pair.width, control).toBeGreaterThanOrEqual(2);
+      expect(pair.opacity, control).toBe(1);
+      const parent = pair.backgrounds.reduce((ground, top) => over(top, ground), { r: 255, g: 255, b: 255, a: 1 });
+      const grounds = pair.offset > 0 ? [parent] : [parent, over(pair.controlBackground, parent)];
+      for (const background of grounds) records.push({ theme, control, foreground: pair.foreground, background, ratio: contrast(pair.foreground, background), width: pair.width, offset: pair.offset });
+      if (screenshot && theme === 'light') await page.screenshot({ path: info.outputPath(`${screenshot}.png`), animations: 'disabled' });
+    }
+  };
+  const mode = page.getByRole('group', { name: 'Simulation mode', exact: true });
+  await mode.getByRole('button', { name: 'Simulated', exact: true }).click();
+  await audit('Selected mode segment', mode.getByRole('button', { name: 'Simulated', exact: true }), 'focus-mode-light');
+  await audit('Unselected mode segment', mode.getByRole('button', { name: 'Live', exact: true }));
+  await audit('Tonal toolbar button', page.getByRole('button', { name: 'Scenarios', exact: true }));
+  await audit('Values-ground link button', page.getByRole('button', { name: 'Inspect Bedroom', exact: true }));
+  await audit('Values disclosure', page.getByText('Other blocks', { exact: true }));
+  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  const drawer = await scenarios(page);
+  const selectedRow = drawer.getByRole('button', { name: 'Use scenario Sensor offline', exact: true });
+  await selectedRow.click();
+  await audit('Selected scenario row', selectedRow, 'focus-scenario-light');
+  await audit('Unselected scenario row', drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }));
+  await audit('Primary action', drawer.getByRole('button', { name: 'Run All', exact: true }));
+  await audit('Default action', drawer.getByRole('button', { name: 'Save Live Values as Scenario', exact: true }));
+  await audit('Icon action on selected row', drawer.getByRole('button', { name: 'Edit Sensor offline', exact: true }));
+  await audit('Scrollable comparison region', drawer.getByRole('region', { name: 'Scenario comparison table', exact: true }));
+  await drawer.getByRole('button', { name: 'Save Live Values as Scenario', exact: true }).click();
+  await audit('Text field', drawer.getByLabel('Scenario name', { exact: true }));
+  await drawer.getByText('Captured values and expectations', { exact: true }).click();
+  await audit('JSON textarea', drawer.getByLabel('Scenario data (JSON)', { exact: true }));
+  await drawer.getByRole('button', { name: 'Close Scenarios', exact: true }).click();
+  const inspector = await inspectBedroom(page);
+  await audit('Source radio', inspector.getByRole('radio', { name: /^Pin a number/ }));
+  await inspector.getByRole('radio', { name: /^Pin a number/ }).check();
+  await audit('Selected source radio', inspector.getByRole('radio', { name: /^Pin a number/ }));
+  await audit('Number field', inspector.getByLabel('Number for Bedroom', { exact: true }));
+  await audit('Number slider', inspector.getByRole('slider', { name: 'Pin Bedroom number', exact: true }), 'focus-inspector-light');
+  await audit('Selected clock source segment', page.getByRole('group', { name: 'Source', exact: true }).getByRole('button', { name: 'Pinned', exact: true }));
+  await audit('Unselected clock source segment', page.getByRole('group', { name: 'Source', exact: true }).getByRole('button', { name: 'Live', exact: true }));
+  await audit('Time field', page.getByLabel('Pinned time', { exact: true }));
+  await audit('Clock slider', page.getByRole('slider', { name: 'Time of day', exact: true }));
+  await audit('Date field', page.getByLabel('Date', { exact: true }));
+  await audit('Trace chip', page.getByRole('region', { name: 'Evaluation trace', exact: true }).getByRole('button').first());
+  await page.getByRole('region', { name: 'Evaluation trace', exact: true }).getByRole('button', { name: /^Average / }).click();
+  await page.getByRole('radio', { name: /^Pin a typed value/ }).check();
+  await audit('Combobox trigger', page.getByRole('combobox', { name: 'Pin status', exact: true }));
+  await page.getByRole('combobox', { name: 'Pin status', exact: true }).click();
+  await audit('Menu option', page.getByRole('option', { name: 'Loading', exact: true }), 'focus-menu-light');
+  await page.getByRole('option', { name: 'Loading', exact: true }).click();
+  await closeInspector(page);
+  await page.getByRole('button', { name: 'Each Run & Items', exact: true }).first().click();
+  const evidence = page.getByRole('dialog', { name: 'Run evidence', exact: true });
+  const lights = evidence.getByRole('region', { name: 'Lights on each evidence', exact: true });
+  await audit('Scrollable iterations', lights.getByRole('list', { name: 'Lights on iterations', exact: true }));
+  await audit('Iteration button', lights.getByRole('button', { name: /1\. Lamp/ }));
+  const path = info.outputPath('focus-contrast.json');
+  writeFileSync(path, JSON.stringify({ samples: records.length, minimum: Math.min(...records.map(row => row.ratio)), pairs: records }, null, 2));
+  await info.attach('focus-contrast.json', { path, contentType: 'application/json' });
+  expect(records.filter(row => row.ratio < 3)).toEqual([]);
+  expect(network).toHaveLength(1);
 });

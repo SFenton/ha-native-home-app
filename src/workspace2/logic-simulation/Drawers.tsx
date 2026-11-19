@@ -48,7 +48,7 @@ export function SimulationDrawers({ outputs, program, presentation, blockNames }
       <button type="button" aria-pressed={drawer === 'items'} onClick={() => setDrawer('items')}>Items</button>
       <button type="button" aria-pressed={drawer === 'trace'} onClick={() => setDrawer('trace')}>Trace</button>
     </div>
-    {drawer === 'items' && <SelectMenu label="Show items" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All items' }, { value: 'kept', label: 'Kept' }, { value: 'dropped', label: 'Dropped' }]} />}
+    {drawer === 'items' && <SelectMenu label="Show items" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All items' }, { value: 'kept', label: 'Kept' }, { value: 'dropped', label: 'Dropped' }]} popupClassName="w2-simulation-surface" />}
     {outputs.map((output, index) => {
       const { trace } = output;
       const outputName = presentation?.outputs?.[anchorKey(output.output)]?.name ?? (program.roots[index].name === output.output.id ? `Output ${index + 1}` : program.roots[index].name);

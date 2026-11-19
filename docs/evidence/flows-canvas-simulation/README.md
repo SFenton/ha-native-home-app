@@ -41,8 +41,8 @@ as a flaky CI assertion.
 
 ## Recorded checks and artifacts
 
-`npm test -- --maxWorkers=2`: 269 files, 12,192 passed and one existing skip.
-`npm run build`: passed. Focused Playwright: 16 passed across desktop
+`npm test -- --maxWorkers=2`: 270 files, 12,194 passed and one existing skip.
+`npm run build`: passed. Focused Playwright: 24 passed across desktop
 (1440 x 900; design scene 1440 x 1100) and phone (390 x 844, 2x capture).
 The permanent corpus comparison and observer invariants remain in those tests.
 `npm run scan:house`: zero findings. Temporary browser servers were stopped.
@@ -57,6 +57,15 @@ The permanent corpus comparison and observer invariants remain in those tests.
   [phone](phone-import-network.json). An unchanged import, active-row deletion,
   empty-list replacement and re-import all retain Simulated and make zero
   requests after advancing beyond the shared debounce.
+- Captured active-case regressions: modified active ID on
+  [desktop](desktop-active-import-network.json) and
+  [phone](phone-active-import-network.json), unchanged import on
+  [desktop](desktop-unchanged-import-network.json) and
+  [phone](phone-unchanged-import-network.json), modified inactive ID on
+  [desktop](desktop-inactive-import-network.json) and
+  [phone](phone-inactive-import-network.json). Each compares persisted imported
+  data with the running 25.0 C capture, then proves only explicit selection
+  applies the stored version. All have zero simulation requests.
 - Failed imports: denied storage on [desktop](desktop-denied-import-network.json)
   and [phone](phone-denied-import-network.json); quota exceeded on
   [desktop](desktop-quota-import-network.json) and
@@ -81,6 +90,25 @@ hooks, shared live-run hook, canvas, document contract or network API.
 | Bounded evidence falsely appeared complete | Real 60-item pipeline runs keep actual counts/results identical while bounded step/iteration copies set the report flag. Browser captures show the trace-wide warning and actual count 60: [desktop](desktop-truncated-trace.png), [phone](phone-truncated-trace.png). |
 | Text contrast below AA | Scoped text corrections cover mixed Live backgrounds, selected purple rows and result badges. The rendered contrast audit below checks every visible text/input pair in each exercised surface and state, in both appearances. No global or canvas colours changed. |
 
+### Round-2 corrections and additive grant
+
+The captured active case is now independent of the saved list. Same-ID imports
+can save a different version, but cannot change the active pins, clock, base or
+expectations. A visible "Saved version differs. Reselect to apply." note
+distinguishes the versions in the canvas and open drawer. The changed saved row
+does not present the old running output as evidence for its new inputs.
+Desktop/phone tests cover modified active, unchanged and modified inactive IDs,
+persisted bytes, explicit reselection and intercepted traffic.
+
+The owner separately granted **`src/workspace2/SelectMenu.tsx` only for an
+additive optional `popupClassName` prop**. Only the two simulation call sites
+pass it, so their portalled options receive the simulation focus class.
+`select-menu.test.tsx` records the real field/popup DOM from before this grant
+was applied, then requires it to remain identical when the prop is omitted.
+A second test proves opting in changes only the popup class and is reversible.
+The approximately 70 other call sites and their shared cyan focus style are
+unchanged; the wider Studio focus issue remains a separate follow-up.
+
 ### Rendered contrast
 
 The permanent Playwright audit uses computed foregrounds and the full composed
@@ -103,6 +131,54 @@ backgrounds and ratios: [desktop](desktop-contrast.json) (6,848 text samples,
 202 scene/appearance/colour pairs), [phone](phone-contrast.json) (5,216 samples,
 180 pairs). All 14 design captures below were regenerated after these colour
 corrections.
+
+### Keyboard-focus contrast, every control type
+
+The permanent focus audit establishes keyboard modality, focuses each control,
+and requires an actual `:focus-visible` solid outline at least 2 CSS px wide.
+It samples the computed outline colour against the composed ancestor surface
+it is painted on; a zero-offset outline is also checked against the control's
+own filled background. It checks full opacity and uses the existing Studio
+WCAG helpers. The simulation-scoped ring uses `--w2-ink-card`, not the shared
+cyan. Desktop and phone measured the same ratios below.
+
+| Focused control/state | Light | Dark |
+| --- | ---: | ---: |
+| Selected mode segment | 14.00:1 | 10.98:1 |
+| Unselected mode segment | 14.00:1 | 10.98:1 |
+| Tonal toolbar button | 16.10:1 | 13.03:1 |
+| Values-ground link button | 15.43:1 | 14.44:1 |
+| Values disclosure | 15.43:1 | 14.44:1 |
+| Selected scenario row | 13.90:1 | 10.91:1 |
+| Unselected scenario row | 16.10:1 | 13.03:1 |
+| Primary action | 16.10:1 | 13.03:1 |
+| Default action | 16.10:1 | 13.03:1 |
+| Icon action on selected row | 13.90:1 | 10.91:1 |
+| Scrollable comparison region | 16.10:1 | 13.03:1 |
+| Text field | 16.10:1 | 13.03:1 |
+| JSON textarea | 16.10:1 | 13.03:1 |
+| Source radio | 16.10:1 | 13.03:1 |
+| Selected source radio | 16.10:1 | 13.03:1 |
+| Number field | 16.10:1 | 13.03:1 |
+| Number slider | 16.10:1 | 13.03:1 |
+| Selected clock source segment | 14.00:1 | 10.98:1 |
+| Unselected clock source segment | 14.00:1 | 10.98:1 |
+| Time field | 16.10:1 | 13.03:1 |
+| Clock slider | 16.10:1 | 13.03:1 |
+| Date field | 16.10:1 | 13.03:1 |
+| Trace chip | 16.10:1 | 13.03:1 |
+| Combobox trigger (minimum of both adjacent grounds) | 14.00:1 | 10.98:1 |
+| Portalled menu option | 16.10:1 | 13.03:1 |
+| Scrollable iterations | 16.10:1 | 13.03:1 |
+| Iteration button | 16.10:1 | 13.03:1 |
+| **Minimum** | **13.90:1** | **10.91:1** |
+
+All exceed **3:1**. Full precision colours and grounds are recorded in
+[desktop-focus-contrast.json](desktop-focus-contrast.json) and
+[phone-focus-contrast.json](phone-focus-contrast.json): 56 measurements per
+form across 27 control/state types and both appearances. The eight light-mode
+focus captures below include toolbar segments, selected scenario rows, source
+sliders and portalled menu options.
 
 ## Design comparison
 
@@ -132,6 +208,14 @@ resolution; the simulation reference contains both light and dark scenes.
 | Saved cases after reload, phone | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios table"> | <img src="phone-scenarios.png" width="260" alt="Phone saved scenarios table"> |
 | Bounded evidence warning and actual counts, desktop | <img src="../../design/flows/13-sim.png" width="330" alt="Approved trace concept"> | <img src="desktop-truncated-trace.png" width="420" alt="Desktop bounded trace warning and actual counts"> |
 | Bounded evidence warning and actual counts, phone | <img src="../../design/flows/13-sim.png" width="330" alt="Approved trace concept"> | <img src="phone-truncated-trace.png" width="260" alt="Phone bounded trace warning and actual counts"> |
+| Keyboard focus, toolbar, desktop light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved simulation toolbar"> | <img src="desktop-focus-mode-light.png" width="420" alt="Desktop accessible mode focus"> |
+| Keyboard focus, selected row, desktop light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenario table"> | <img src="desktop-focus-scenario-light.png" width="420" alt="Desktop accessible selected-row focus"> |
+| Keyboard focus, inspector, desktop light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector"> | <img src="desktop-focus-inspector-light.png" width="420" alt="Desktop accessible slider focus"> |
+| Keyboard focus, portalled menu, desktop light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector"> | <img src="desktop-focus-menu-light.png" width="420" alt="Desktop simulation-only menu focus"> |
+| Keyboard focus, toolbar, phone light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved simulation toolbar"> | <img src="phone-focus-mode-light.png" width="260" alt="Phone accessible mode focus"> |
+| Keyboard focus, selected row, phone light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenario table"> | <img src="phone-focus-scenario-light.png" width="260" alt="Phone accessible selected-row focus"> |
+| Keyboard focus, inspector, phone light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector"> | <img src="phone-focus-inspector-light.png" width="260" alt="Phone accessible slider focus"> |
+| Keyboard focus, portalled menu, phone light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector"> | <img src="phone-focus-menu-light.png" width="260" alt="Phone simulation-only menu focus"> |
 
 ### Intentional deviations and reasons
 
@@ -143,8 +227,8 @@ resolution; the simulation reference contains both light and dark scenes.
   It loads the real Studio theme, segmented controls, fields, buttons, tags
   and sheet primitives. The reference's purple pin semantic has no existing
   Studio theme token, so a scoped light/dark purple token was added. Text
-  contrast corrections are also scoped here; the global Studio palette is
-  unchanged.
+  contrast corrections are also scoped here; the global Studio palette and
+  non-simulation focus indicators are unchanged.
 - The authored fixture uses the approved native Add/Divide average recipe,
   so the trace includes its real Add and If/Otherwise results instead of
   concealing them or inventing a native Aggregate block. Subtitle kept is
@@ -170,12 +254,12 @@ resolution; the simulation reference contains both light and dark scenes.
 
 The final reservation check used origin/main
 `427eaba6236804275de58d3759c467f4bfcf3798` and fetched all open heads:
-#27 `1de7dd914293844db4c6d00f0695340cb9c9745d` (26 paths),
+#27 `e626cf11002661e7b92577b3f6260d8ac519d7bf` (26 paths),
 #28 `57705b34fbcb69dfd8f1eef0795bee2c2809f228` (8 paths), and
-#29 `57919bd8ffea8c0db9d88d96db8b905cbf5123be` (75 paths).
+#29 `613f8245e3a2270b934e92e0db32bcc32a6cbe2b` (75 paths).
 The full diff-derived reservation sets had zero intersections with this lane.
 
-The reviewed baseline `3669b21` subsequently completed all CI checks green,
+The round-2 reviewed baseline `2ef61f6` completed all 12 CI checks green,
 including shard 6. The earlier browser-package installation failure is no
 longer a current blocker. Fresh-head CI status is reported separately in the
 PR handoff; the local results above are not substituted for remote CI.

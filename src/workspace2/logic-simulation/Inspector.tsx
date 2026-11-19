@@ -33,7 +33,7 @@ export function SourceInspector({ name, presentation, choice, onChoice, live, sc
       {source && choice === 'state' && <div className="w2-sim-pin-control"><TextField label={`State for ${name}`} value={state} onChange={onState} /></div>}
       {!source && radio('typed', 'Pin a typed value', 'Override this output, without inventing its inputs')}
       {choice === 'typed' && <div className="w2-sim-pin-control">
-        <Field label="Pin status"><SelectMenu label="Pin status" value={status} options={[{ value: 'value', label: 'Value' }, { value: 'loading', label: 'Loading' }, { value: 'unavailable', label: 'Unavailable' }]} onChange={onStatus} /></Field>
+        <Field label="Pin status"><SelectMenu label="Pin status" value={status} options={[{ value: 'value', label: 'Value' }, { value: 'loading', label: 'Loading' }, { value: 'unavailable', label: 'Unavailable' }]} onChange={onStatus} popupClassName="w2-simulation-surface" /></Field>
         <TextField label="Typed value (JSON)" value={typed} onChange={onTyped} />
       </div>}
       <label className="w2-sim-radio w2-sim-later"><input type="radio" disabled name={`source-${name}`} />

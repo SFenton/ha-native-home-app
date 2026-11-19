@@ -1,0 +1,1070 @@
+{
+  "samples": 56,
+  "minimum": 10.908999554491833,
+  "pairs": [
+    {
+      "theme": "light",
+      "control": "Selected mode segment",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Selected mode segment",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Unselected mode segment",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Unselected mode segment",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Tonal toolbar button",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Tonal toolbar button",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Values-ground link button",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Values-ground link button",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Values disclosure",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Values disclosure",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Selected scenario row",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 13.90258818033684,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Selected scenario row",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 10.908999554491833,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Unselected scenario row",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Unselected scenario row",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Primary action",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Primary action",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Default action",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Default action",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Icon action on selected row",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 13.90258818033684,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Icon action on selected row",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 10.908999554491833,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Scrollable comparison region",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Scrollable comparison region",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Text field",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Text field",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "JSON textarea",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "JSON textarea",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Source radio",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Source radio",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Selected source radio",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Selected source radio",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Number field",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Number field",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Number slider",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Number slider",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Selected clock source segment",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Selected clock source segment",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Unselected clock source segment",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Unselected clock source segment",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Time field",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Time field",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Clock slider",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Clock slider",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Date field",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Date field",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Trace chip",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Trace chip",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Combobox trigger",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 0
+    },
+    {
+      "theme": "light",
+      "control": "Combobox trigger",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "width": 2,
+      "offset": 0
+    },
+    {
+      "theme": "dark",
+      "control": "Combobox trigger",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 0
+    },
+    {
+      "theme": "dark",
+      "control": "Combobox trigger",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "width": 2,
+      "offset": 0
+    },
+    {
+      "theme": "light",
+      "control": "Menu option",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Menu option",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Scrollable iterations",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Scrollable iterations",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "light",
+      "control": "Iteration button",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "width": 2,
+      "offset": 2
+    },
+    {
+      "theme": "dark",
+      "control": "Iteration button",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "width": 2,
+      "offset": 2
+    }
+  ]
+}

@@ -9,9 +9,9 @@ import { anchorKey, sourceKey } from './contracts';
 import { capturedTime, displayValue, type ValuePresentation } from './presentation';
 import { Tag } from '../kit';
 
-export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, selectedId, run, results, inputNodes, blockLabel, outputLabel, outputKeys, onSelect, onCapture, onCreate, onRunAll, onEdit, onDelete, blocked, children }: {
+export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, selectedId, savedVersionDiffers, run, results, inputNodes, blockLabel, outputLabel, outputKeys, onSelect, onCapture, onCreate, onRunAll, onEdit, onDelete, blocked, children }: {
   open: boolean; onClose: () => void; program: SimulationProgram; scenarios: readonly SimulationCase[]; snapshot: HeldSnapshot;
-  selectedId: string; run: SimulationRun; results: readonly ScenarioResult[]; inputNodes: readonly GraphNode[];
+  selectedId: string; savedVersionDiffers: boolean; run: SimulationRun; results: readonly ScenarioResult[]; inputNodes: readonly GraphNode[];
   blockLabel: (node: GraphNode) => ValuePresentation; outputLabel: (index: number) => ValuePresentation;
   outputKeys?: readonly string[];
   onSelect: (id: string) => void; onCapture: () => void; onCreate: () => void; onRunAll: () => void;
@@ -59,7 +59,7 @@ export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, s
                   return <tr key={scenario.id} aria-selected={selectedId === scenario.id}>
                     <th scope="row"><button type="button" aria-label={`Use scenario ${scenario.name}`} onClick={() => onSelect(scenario.id)} title={`Captured ${capturedTime(scenario.capturedAt)}`}>{scenario.name}</button></th>
                     {inputNodes.map(node => { const value = inputValue(node, scenario); return <td key={node.id} className={value.pinned ? 'w2-sim-pinned-value' : 'w2-sim-live-value'} title={value.pinned ? 'Pinned by the scenario' : 'Live at capture'}>{value.text}</td>; })}
-                    {outputs.map(({ root, index }) => <td key={anchorKey(root.anchor)}>{displayValue(result?.outputs[index]?.actual.result ?? (selectedId === scenario.id ? run.outputs[index]?.result : undefined), outputLabel(index))}</td>)}
+                    {outputs.map(({ root, index }) => <td key={anchorKey(root.anchor)}>{displayValue(result?.outputs[index]?.actual.result ?? (selectedId === scenario.id && !savedVersionDiffers ? run.outputs[index]?.result : undefined), outputLabel(index))}</td>)}
                     <td aria-label={`${scenario.name}: ${result?.status ?? 'Not run'}`}>
                       {!scenario.expected.length ? '—' : !result ? <Tag>Not run</Tag> : <Tag tone={result.status === 'Passed' ? 'success' : result.status === 'Failed' ? 'error' : 'neutral'}>
                         {result.status === 'Passed' ? '✓ Matches' : result.status === 'Failed' ? `✗ Expected ${failure ?? 'a different result'}` : 'Incomplete'}
@@ -75,6 +75,7 @@ export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, s
             </table>
           </div>
           <p className="w2-sim-legend"><span className="w2-sim-live-value">Grey italic: live from Home Assistant.</span> <span className="w2-sim-pinned-value">Purple: pinned by the scenario.</span></p>
+          {savedVersionDiffers && <p role="note" className="w2-sim-legend">Saved version differs. Reselect to apply.</p>}
           {results.filter(result => result.status === 'Incomplete').map(result => <p key={result.id} className="w2-caption w2-sim-incomplete"><strong>{result.name}: Incomplete.</strong> Captured data or expectations need review. Edit the scenario to inspect the recorded inputs and results.</p>)}
           {children}
         </Drawer.Content>

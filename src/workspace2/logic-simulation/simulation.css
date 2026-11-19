@@ -9,6 +9,7 @@
   color: var(--w2-ink-card);
   background: var(--w2-card);
 }
+.w2-scope.w2-simulation-surface:focus-visible, .w2-scope.w2-simulation-surface :focus-visible { outline: 2px solid var(--w2-ink-card); outline-offset: 2px; }
 .w2-simulation { min-width: 0; min-height: calc(100dvh - 60px); }
 .w2-simulation h2, .w2-simulation-surface h2 { font-size: 15px; margin: 0; }
 .w2-simulation h3, .w2-simulation-surface h3 { font-size: 12px; }
