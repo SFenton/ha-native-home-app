@@ -1,7 +1,13 @@
 {
   "failure": "SecurityError",
-  "cpuRate": 1,
-  "delayedRequest": false,
+  "cpuRate": 4,
+  "delayMs": null,
+  "timerBoundMs": 5000,
+  "timerDrain": {
+    "elapsedMs": 1,
+    "callbacks": 1,
+    "pendingTimers": 0
+  },
   "initialReads": 2,
   "unchangedPersistedList": true,
   "unsavedImportRetained": true,

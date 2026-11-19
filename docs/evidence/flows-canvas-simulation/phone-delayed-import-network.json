@@ -1,7 +1,13 @@
 {
   "failure": "QuotaExceededError",
-  "cpuRate": 1,
-  "delayedRequest": true,
+  "cpuRate": 4,
+  "delayMs": 4999,
+  "timerBoundMs": 5000,
+  "timerDrain": {
+    "elapsedMs": 4999,
+    "callbacks": 2,
+    "pendingTimers": 0
+  },
   "initialReads": 2,
   "unchangedPersistedList": true,
   "unsavedImportRetained": true,

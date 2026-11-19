@@ -42,7 +42,7 @@ as a flaky CI assertion.
 ## Recorded checks and artifacts
 
 `npm test -- --maxWorkers=2`: 270 files, 12,194 passed and one existing skip.
-`npm run build`: passed. Focused Playwright: 28 passed across desktop
+`npm run build`: passed. Focused Playwright: 54 passed across desktop
 (1440 x 900; design scene 1440 x 1100) and phone (390 x 844, 2x capture).
 The permanent corpus comparison and observer invariants remain in those tests.
 `npm run scan:house`: zero findings. Temporary browser servers were stopped.
@@ -90,9 +90,9 @@ incorrectly counted that legitimate setup read as import traffic.
 
 Both failed-import cases now await the remount's completed response and assert
 exactly two setup reads before selecting a scenario. They record a fresh
-request-count baseline immediately before import, advance the clock 1,000 ms
-past the shared debounce and require **zero requests of any kind** in that
-window. The mode, active output, unchanged persisted/visible list, retained
+request-count baseline immediately before import, drain import-scheduled timers
+with a finite bound and require **zero requests of any kind** in that window.
+The mode, active output, unchanged persisted/visible list, retained
 unsaved JSON and visible warning assertions are unchanged. No production code,
 retry, fixed sleep or allowed simulation request was added.
 
@@ -101,7 +101,7 @@ repetitions. The final request-accounting correction and its negative controls
 were then repeated at both normal and 4x CPU, as detailed below. All browser
 execution used port 4823 and isolated `test-results/studio-data/w2-s`.
 
-#### Late route-delivery guard and permanent negative control
+#### Late route-delivery guard and permanent negative controls
 
 Review of `f3603e9` found that a copied Node-side route array could still miss
 an import-triggered request delivered during asynchronous attachment work.
@@ -110,38 +110,57 @@ page**. After the clock advances and pending requests complete, it attaches
 diagnostics, then re-reads the page ledger and the final live route-count delta.
 Both must be zero. No endpoint, including safe flow-run reads, is exempt.
 
-Both storage-failure cases have a permanent negative-control variant. The
-test-only storage wrapper schedules a POST flow-run request 600 ms into the
-actual failed-import handler. The same zero-request guard must reject this
-variant; the control also requires exactly that one injected request.
+Review of `58bed38` then showed that advancing only 1,000 ms missed timers
+scheduled for 1,500 or 3,000 ms. Zero in-flight requests did not establish that
+the import had finished scheduling work.
+
+The test now pauses the fake clock and tracks import-scheduled timeouts,
+intervals, animation frames and idle callbacks, including cancellation.
+It advances to the next scheduled callback and waits for in-flight requests,
+repeating until no timer remains. `IMPORT_TIMER_BOUND_MS` is **5,000 ms**;
+pending timers at that boundary fail with their kinds and due times. A separate
+100-callback/100-drain-step cap bounds self-rescheduling work, and network
+completion has an explicit 8-second timeout. The final zero-request guard
+drains again after asynchronous attachment work before reading fresh counters.
+This is a quiescence check, not a larger fixed observation window: a timer
+beyond the bound fails rather than being ignored.
+
+Both storage-failure cases have parameterized permanent negative controls. The
+test-only storage wrapper schedules a POST flow-run request **0, 300, 600,
+1,500, 3,000 or 4,999 ms** into the actual failed-import handler. The last delay
+is defined as `IMPORT_TIMER_BOUND_MS - 1`. The same zero-request guard must
+reject each variant; the control also requires exactly that one injected
+request in both browser and route counters.
 No application handler, bridge or request implementation is modified.
 `STUDIO_E2E_CPU_RATE=4` enables Chromium CPU throttling for these cases, so the
 delayed-request regression can be stressed without scratch source mutations.
 
-| CPU rate | Form | Normal imports, zero requests | Delayed mutations rejected |
+| CPU rate | Form | Normal imports, zero requests | Six delayed mutations rejected |
 | --- | --- | ---: | ---: |
-| 1x | Desktop | 30/30 | 30/30 |
-| 1x | Phone | 30/30 | 30/30 |
-| 4x | Desktop | 30/30 | 30/30 |
-| 4x | Phone | 30/30 | 30/30 |
+| 1x | Desktop | 30/30 | 180/180 |
+| 1x | Phone | 30/30 | 180/180 |
+| 4x | Desktop | 30/30 | 180/180 |
+| 4x | Phone | 30/30 | 180/180 |
 
-These are **240 passing cases**, run with `--repeat-each=30 --workers=2`.
-All 240 attachments were checked: two settled setup reads, matching browser/
-route deltas, and zero import requests in all 120 normal runs. All 120 negative
-controls observed exactly one delayed flow-run and required the guard to
-reject it. [Full measured repetition summary](quota-flake-repeats.json);
+These are **840 passing quota cases**, run with `--repeat-each=30 --workers=2`.
+All 840 attachments were checked: two settled setup reads, matching browser/
+route deltas, drained timers, and zero import requests in all 120 normal runs.
+All 720 negative controls observed exactly one delayed flow-run and required
+the guard to reject it, 30 times for every delay/form/CPU combination.
+[Full measured repetition summary](quota-flake-repeats.json);
 example injected traffic on [desktop](desktop-delayed-import-network.json)
-and [phone](phone-delayed-import-network.json). These two negative-control
-records deliberately contain a request; they are detection evidence, not
-claims of network-free simulation.
+and [phone](phone-delayed-import-network.json) shows the 4,999 ms control.
+These two negative-control records deliberately contain a request; they are
+detection evidence, not claims of network-free simulation.
 
 The four denied/quota records above are refreshed normal runs and continue to
-show zero import requests. The final full suite passed **28/28 browser cases**;
+show zero import requests. The final full suite passed **54/54 browser cases**,
+including all six delays for both storage failures and finite-failure controls
+for a timer beyond the bound, a recurring interval and a self-rescheduling
+timeout on both form factors;
 12,194 unit tests (one existing skip), build and house scan also pass.
-No production code changed. The prior container failure was Ubuntu mirror
-503/resource errors; a retry was requested, but GitHub refused while its
-workflow was still running (HTTP 403). New-head CI is reported in the PR
-handoff rather than being described as green here.
+No production code changed. These results are local evidence, not a claim that
+CI is green. CI was not awaited for this revision.
 
 ## Independent-review corrections
 
