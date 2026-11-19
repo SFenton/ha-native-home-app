@@ -1,0 +1,379 @@
+{
+  "base": "285584234bdfd60c2cca4dcd255d46f9eb7419c3",
+  "failureRun": "https://github.com/SFenton/ha-native-home-app/actions/runs/44514049130/job/135525330885",
+  "cause": "Fixture loading explicitly remounted the host in Live. Its debounced refresh fired while Playwright waited for the scenario drawer to stop moving, before scenario selection and before the failed import.",
+  "originalTraceMonotonicMs": {
+    "initialRead": 411272.035,
+    "fixtureLoadClick": 411509.715,
+    "remountRead": 412155.324,
+    "scenarioSelectionClickDispatched": 412537.265,
+    "failedImportClickStarted": 412683.396
+  },
+  "command": "STUDIO_E2E_PORT=4823 STUDIO_E2E_DATA_DIR=./test-results/studio-data/w2-s npx playwright test tests/e2e/workspace2-flows-simulation.spec.ts --grep 'failed import is transactional and visible: QuotaExceededError' --repeat-each=30 --workers=1 --output=test-results/flows-sim-quota-repeat",
+  "credentials": "HA credential environment variables unset; fixture-only responses",
+  "desktopPassed": 30,
+  "phonePassed": 30,
+  "failed": 0,
+  "samples": [
+    {
+      "project": "desktop",
+      "repeatIndex": 0,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 1,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 2,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 3,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 4,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 5,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 6,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 7,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 8,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 9,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 10,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 11,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 12,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 13,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 14,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 15,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 16,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 17,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 18,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 19,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 20,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 21,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 22,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 23,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 24,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 25,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 26,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 27,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 28,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "desktop",
+      "repeatIndex": 29,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 0,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 1,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 2,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 3,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 4,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 5,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 6,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 7,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 8,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 9,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 10,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 11,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 12,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 13,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 14,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 15,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 16,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 17,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 18,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 19,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 20,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 21,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 22,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 23,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 24,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 25,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 26,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 27,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 28,
+      "initialReads": 2,
+      "simulationRequests": 0
+    },
+    {
+      "project": "phone",
+      "repeatIndex": 29,
+      "initialReads": 2,
+      "simulationRequests": 0
+    }
+  ]
+}

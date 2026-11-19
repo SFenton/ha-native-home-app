@@ -239,7 +239,12 @@ for (const change of ['active', 'unchanged', 'inactive'] as const) {
 for (const failure of ['SecurityError', 'QuotaExceededError']) {
   test(`failed import is transactional and visible: ${failure}`, async ({ page }, info) => {
     const network = await open(page);
+    // Loading fixtures remounts the host in Live; settle that refresh before entering simulation.
+    const refreshed = page.waitForResponse(response => response.url().endsWith('/native/api/ha/flow-run') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+    expect(await (await refreshed).finished()).toBeNull();
+    await expect(output(page, 'Chores count')).toHaveText('6');
+    expect(network).toHaveLength(2);
     const drawer = await scenarios(page);
     await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
     const saved = await page.evaluate(() => {
@@ -259,6 +264,7 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) {
       };
     }, { failure, key: saved.key });
     await page.clock.install();
+    const initialReads = network.length;
     await drawer.getByRole('button', { name: 'Import scenarios (replace browser list)', exact: true }).click();
     const warning = page.getByRole('status').filter({ hasText: 'Import not saved.' });
     await expect(warning).toContainText('The saved scenario list is unchanged.');
@@ -268,8 +274,10 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) {
     await expect(page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Simulated', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(output(page, 'Subtitle')).toHaveText('Too Warm');
     await page.clock.runFor(1000);
-    expect(network).toHaveLength(1);
-    await attachNetwork(info, { failure, unchangedPersistedList: true, unsavedImportRetained: true, warning: await warning.textContent(), simulationFetches: 0, requests: network });
+    const simulationRequests = network.slice(initialReads);
+    await attachNetwork(info, { failure, initialReads, unchangedPersistedList: true, unsavedImportRetained: true, warning: await warning.textContent(), simulationFetches: simulationRequests.length, simulationRequests, requests: network });
+    expect(simulationRequests).toEqual([]);
+    expect(network.every(request => request.method === 'POST' && request.url.endsWith('/native/api/ha/flow-run'))).toBe(true);
   });
 }
 test('AA contrast for every rendered simulation text/background pair in both appearances', async ({ page }, info) => {

@@ -77,6 +77,34 @@ The permanent corpus comparison and observer invariants remain in those tests.
   six after Keep Where; First Few separately cuts six to five. These are actual
   observations, not reconstructed drawer evidence.
 
+### Failed-import timing regression after merge
+
+The [phone quota failure on #28](https://github.com/SFenton/ha-native-home-app/actions/runs/44514049130/job/135525330885)
+was a test setup race, not a failed import resuming Live. Its retained trace
+shows the second read at monotonic **412155.324 ms**, before the scenario click
+was dispatched (**412537.265 ms**) and before the failed import click began
+(**412683.396 ms**). "Load fixture scenarios" deliberately remounts the host in
+Live. On this run its 600 ms debounced refresh fired while Playwright waited
+for the phone drawer to stop moving. The old whole-test one-request assertion
+incorrectly counted that legitimate setup read as import traffic.
+
+Both failed-import cases now await the remount's completed response and assert
+exactly two setup reads before selecting a scenario. They record a fresh
+request-count baseline immediately before import, advance the clock 1,000 ms
+past the shared debounce and require **zero requests of any kind** in that
+window. The mode, active output, unchanged persisted/visible list, retained
+unsaved JSON and visible warning assertions are unchanged. No production code,
+retry, fixed sleep or allowed simulation request was added.
+
+From main `2855842`, the quota case passed **30 desktop + 30 phone repetitions**
+with `--repeat-each=30 --workers=1`, port 4823 and isolated
+`test-results/studio-data/w2-s`. Every attachment was checked for two setup
+reads and an empty simulation window:
+[full measured repetition summary](quota-flake-repeats.json). The four
+denied/quota traffic records above are refreshed and explicitly separate setup
+reads from measured simulation requests. Afterwards the full 24-case browser
+suite, 12,194 unit tests (one existing skip), build and house scan passed.
+
 ## Independent-review corrections
 
 The five P2 findings at `3669b21` are addressed without changing the native
