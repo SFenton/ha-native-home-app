@@ -31,6 +31,6 @@ it('keeps acceptance, diagnostics, manifests and output bytes identical to main 
       decode: result(() => decodeCompositionPublication(bytes)),
     }];
   });
-  expect(cases).toHaveLength(1797);
-  expect(createHash('sha256').update(JSON.stringify(cases)).digest('hex')).toBe('9efa098c9d1e03e821cf010eef93e03c199f65de0c455b7b4e367eeb655e92d8');
+  expect(cases).toHaveLength(1812);
+  expect(createHash('sha256').update(JSON.stringify(cases)).digest('hex')).toBe('22a3ab90825bd16fcbd697bbdb747cc47eda39cd2dff6f9bb93498d49e7eed2d');
 }, 30_000);
