@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
@@ -16,6 +17,10 @@ function result(operation: () => unknown) {
     return { ok: false, issues: error.issues };
   }
 }
+
+it('keeps the committed plain visitor fresh without rewriting it', () => {
+  execFileSync(process.execPath, ['scripts/generate-expression-checker.mjs', '--check'], { stdio: 'pipe' });
+});
 
 it('matches before/after baseline bytes for all 1797 corpus documents/publication fixtures with and without an observer', () => {
   let visits = 0;
