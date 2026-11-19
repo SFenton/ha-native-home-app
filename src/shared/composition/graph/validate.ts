@@ -1,9 +1,9 @@
 import { catalogByKey } from './catalog';
-import { atPointer, copy, copyShape, fingerprint, replaceAt, sameJSON } from './json';
+import { atPointer, copy, copyShape, fingerprint, record, replaceAt, sameJSON } from './json';
 import { expressionPort, expressionScope, inputType, portsCompatible, scopesCompatible } from './ports';
-import { grammarChildren, type FragmentKind } from './grammar';
+import { expressionChildren, grammarChildren, type FragmentKind } from './grammar';
 import type { Json } from '../../types';
-import type { GraphDiagnostic, GraphEdge, GraphJSON, GraphNode, LogicGraph } from './types';
+import type { GraphDiagnostic, GraphEdge, GraphJSON, GraphNode, GraphPort, LogicGraph, PortType } from './types';
 import { assertCompositionBounds, CompositionValidationError } from '../json';
 import { elementOf, type Shape } from '../pipeline/shape';
 import { requestShape } from '../pipeline/sources';
@@ -11,11 +11,234 @@ import { newFacts, typeOperand, typeStep, type TypeScope } from '../pipeline/typ
 import { requestSchema } from '../pipeline/schema';
 import { graphInputsSchema, graphStepSchema } from './capabilities';
 
-export function validateGraph(graph: LogicGraph, options: { readonly projection?: boolean } = {}): readonly GraphDiagnostic[] {
+function readonlyMap<K, V>(map: Map<K, V>): ReadonlyMap<K, V> {
+  const view: ReadonlyMap<K, V> = {
+    get size() { return map.size; },
+    get: key => map.get(key), has: key => map.has(key),
+    keys: () => map.keys(), values: () => map.values(), entries: () => map.entries(),
+    [Symbol.iterator]: () => map[Symbol.iterator](),
+    forEach: (callback, receiver) => { for (const [key, value] of map) callback.call(receiver, value, key, view); },
+  };
+  return Object.freeze(view);
+}
+const constructionSeal = Symbol('immutable graph data');
+const constructionAuthority = Symbol();
+const isProxy = typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function'
+  ? process.getBuiltinModule('node:util').types.isProxy : undefined;
+function plainDataValue(descriptor: PropertyDescriptor | undefined, key: PropertyKey): unknown {
+  if (!descriptor || !('value' in descriptor)) throw new TypeError(`Graph revisions require own data properties; accessor ${String(key)} is not supported.`);
+  const child: unknown = descriptor.value;
+  if (typeof child === 'function') throw new TypeError('Graph revisions require plain data; functions are not supported.');
+  return child;
+}
+class ConstructionSeal {
+  readonly #values: WeakSet<object>;
+  readonly #batch: Readonly<{ complete: boolean }>;
+  constructor(values: WeakSet<object>, batch: Readonly<{ complete: boolean }>, authority: typeof constructionAuthority) {
+    if (authority !== constructionAuthority) throw new TypeError('Graph construction seals are private.');
+    this.#values = values;
+    this.#batch = batch;
+    Object.freeze(this);
+  }
+  static holds(value: object): boolean {
+    if (isProxy?.(value)) throw new TypeError('Graph revisions require plain data; Proxy objects are not supported.');
+    const descriptor = Object.getOwnPropertyDescriptor(value, constructionSeal);
+    const seal = descriptor ? plainDataValue(descriptor, constructionSeal) : undefined;
+    return seal instanceof ConstructionSeal && #values in seal && seal.#batch.complete && seal.#values.has(value);
+  }
+}
+Object.freeze(ConstructionSeal.prototype);
+Object.freeze(ConstructionSeal);
+function plainData(value: object, pending: object[]): void {
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) {
+    throw new TypeError('Graph revisions require plain data with Object.prototype, Array.prototype or null.');
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    const child = plainDataValue(Object.getOwnPropertyDescriptor(value, key), key);
+    if (key !== constructionSeal && child !== null && typeof child === 'object') pending.push(child);
+  }
+}
+function freezeRevision(graph: LogicGraph): void {
+  if (ConstructionSeal.holds(graph)) return;
+  const seen = new WeakSet<object>(), pending: object[] = [graph], batch = { complete: false };
+  const seal = new ConstructionSeal(seen, batch, constructionAuthority);
+  while (pending.length) {
+    const value = pending.pop()!;
+    if (ConstructionSeal.holds(value) || seen.has(value)) continue;
+    seen.add(value);
+    if (Object.isExtensible(value)) Object.defineProperty(value, constructionSeal, { value: seal });
+    Object.freeze(value);
+    // Freeze first: even an undetectable proxy cannot swap the child values being certified.
+    plainData(value, pending);
+  }
+  // Cycles and shared children become trusted only after the whole batch is frozen.
+  batch.complete = true;
+  Object.freeze(batch);
+}
+/** Constructs immutable data once; later revisions reuse sealed nodes and payloads. */
+export function constructGraphRevision(graph: LogicGraph): LogicGraph {
+  if (ConstructionSeal.holds(graph)) return graph;
+  freezeRevision(graph);
+  if (ConstructionSeal.holds(graph)) return graph;
+  const revision = { ...graph };
+  freezeRevision(revision);
+  return revision;
+}
+function sameUnboundJSON(left: GraphJSON, right: GraphJSON, bindings: ReadonlyMap<string | undefined, readonly GraphPort[]>, at = ''): boolean {
+  if (left === right || bindings.has(at)) return true;
+  if (Array.isArray(left)) {
+    if (!Array.isArray(right) || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) if (left[i] !== right[i] && !sameUnboundJSON(left[i], right[i], bindings, `${at}/${i}`)) return false;
+    return true;
+  }
+  if (!record(left) || !record(right)) return false;
+  const keys = Object.keys(left);
+  if (keys.length !== Object.keys(right).length) return false;
+  for (const key of keys) {
+    if (!Object.hasOwn(right, key)) return false;
+    if (left[key] === right[key]) continue;
+    const encoded = key.includes('~') || key.includes('/') ? key.replace(/~/g, '~0').replace(/\//g, '~1') : key;
+    if (!sameUnboundJSON(left[key], right[key], bindings, `${at}/${encoded}`)) return false;
+  }
+  return true;
+}
+class RevisionIndex {
+  readonly #graph: LogicGraph;
+  readonly #graphs: WeakSet<LogicGraph>;
+  readonly #immutable: boolean;
+  readonly #nodes = new Map<string, GraphNode>();
+  readonly #incoming = new Map<string, Map<string, GraphEdge[]>>();
+  readonly #dependencies = new Map<string, GraphEdge[]>();
+  readonly #bindings = new Map<GraphNode, Map<string | undefined, GraphPort[]>>();
+  readonly #wide = new Map<GraphNode, { inputs: Map<string, GraphPort>; outputs: Map<string, GraphPort>; scopes: Map<string | undefined, string | undefined> }>();
+  readonly #children = new Map<GraphNode, readonly ReturnType<typeof grammarChildren>[number][]>();
+  readonly #empty: readonly never[] = Object.freeze([]);
+  readonly nodes: ReadonlyMap<string, GraphNode>;
+  readonly incomingNodes: ReadonlyMap<string, readonly GraphEdge[]>;
+  constructor(graph: LogicGraph, immutable = false) {
+    if (immutable) freezeRevision(graph);
+    this.#immutable = immutable;
+    this.#graph = graph;
+    this.#graphs = new WeakSet([graph]);
+    for (const node of graph.nodes) {
+      this.#nodes.set(node.id, node);
+      if (node.inputs.length > 8 || node.outputs.length > 8) {
+        const inputs = new Map<string, GraphPort>(), outputs = new Map<string, GraphPort>(), scopes = new Map<string | undefined, string | undefined>();
+        for (const input of node.inputs) {
+          if (!inputs.has(input.id)) inputs.set(input.id, input);
+          if (!scopes.has(input.type.scopeId)) scopes.set(input.type.scopeId, input.binding);
+        }
+        for (const output of node.outputs) if (!outputs.has(output.id)) outputs.set(output.id, output);
+        this.#wide.set(node, { inputs, outputs, scopes });
+      }
+      if (!node.inputs.length) continue;
+      const bindings = new Map<string | undefined, GraphPort[]>();
+      for (const input of node.inputs) {
+        let group = bindings.get(input.binding);
+        if (!group) bindings.set(input.binding, group = []);
+        group.push(input);
+      }
+      for (const group of bindings.values()) Object.freeze(group);
+      this.#bindings.set(node, bindings);
+    }
+    for (const edge of graph.edges) {
+      let ports = this.#incoming.get(edge.to.nodeId), edges = ports?.get(edge.to.portId), dependencies = this.#dependencies.get(edge.to.nodeId);
+      if (!ports) this.#incoming.set(edge.to.nodeId, ports = new Map());
+      if (!edges) ports.set(edge.to.portId, edges = []);
+      if (!dependencies) this.#dependencies.set(edge.to.nodeId, dependencies = []);
+      edges.push(edge); dependencies.push(edge);
+    }
+    for (const ports of this.#incoming.values()) for (const edges of ports.values()) Object.freeze(edges);
+    for (const edges of this.#dependencies.values()) Object.freeze(edges);
+    this.nodes = readonlyMap(this.#nodes);
+    this.incomingNodes = readonlyMap(this.#dependencies);
+    Object.freeze(this);
+  }
+  static matches(candidate: RevisionIndex, graph: LogicGraph): boolean {
+    return candidate instanceof RevisionIndex && #graphs in candidate && Object.getPrototypeOf(candidate) === RevisionIndex.prototype && candidate.#immutable && candidate.#graphs.has(graph);
+  }
+  get graph(): LogicGraph { return this.#graph; }
+  get nodeCount(): number { return this.#nodes.size; }
+  node(id: string): GraphNode | undefined { return this.#nodes.get(id); }
+  incoming(nodeId: string, portId: string): readonly GraphEdge[] { return this.#incoming.get(nodeId)?.get(portId) ?? this.#empty; }
+  dependencies(nodeId: string): readonly GraphEdge[] { return this.#dependencies.get(nodeId) ?? this.#empty; }
+  matchingInputs(node: GraphNode, binding: string): readonly GraphPort[] { return this.#bindings.get(node)?.get(binding) ?? this.#empty; }
+  port(node: GraphNode, id: string, direction: 'input' | 'output'): GraphPort | undefined {
+    const wide = this.#wide.get(node);
+    if (wide) return wide[direction === 'input' ? 'inputs' : 'outputs'].get(id);
+    for (const port of node[direction === 'input' ? 'inputs' : 'outputs']) if (port.id === id) return port;
+    return undefined;
+  }
+  scopeBinding(node: GraphNode, scopeId: string | undefined): string | undefined {
+    const wide = this.#wide.get(node);
+    if (wide) return wide.scopes.get(scopeId);
+    for (const input of node.inputs) if (input.type.scopeId === scopeId) return input.binding;
+    return undefined;
+  }
+  sameUnbound(node: GraphNode, original: GraphJSON): boolean {
+    const bindings = this.#bindings.get(node);
+    return bindings ? sameUnboundJSON(node.payload.value, original, bindings) : sameJSON(node.payload.value, original);
+  }
+  children(node: GraphNode): readonly ReturnType<typeof grammarChildren>[number][] {
+    if (node.payload.kind === 'source-selection' || record(node.payload.value) && 'type' in node.payload.value
+      && (node.payload.value.type === 'hole' || node.payload.value.type === 'literal' && (node.payload.kind === 'operand' || node.payload.kind === 'condition'))) return this.#empty;
+    let children = this.#children.get(node);
+    if (!children) {
+      const kind: FragmentKind = node.payload.kind === 'template' || node.payload.kind === 'logic-ref' ? node.payload.representation
+        : node.payload.kind === 'hole' || node.payload.kind === 'opaque' ? 'auto' : node.payload.kind;
+      const value = node.payload.value;
+      const descriptors = (kind === 'operand' || kind === 'condition') && record(value) && 'type' in value && (value.type === 'math' || value.type === 'item')
+        ? expressionChildren(value, kind) : grammarChildren(value, kind);
+      children = Object.freeze(descriptors.map(child => Object.freeze(child)));
+      this.#children.set(node, children);
+    }
+    return children;
+  }
+}
+Object.freeze(RevisionIndex.prototype);
+Object.freeze(RevisionIndex);
+export type GraphRevisionIndex = RevisionIndex;
+export function prepareGraphRevision(graph: LogicGraph): GraphRevisionIndex { return new RevisionIndex(graph, true); }
+function revisionIndex(graph: LogicGraph, prepared?: GraphRevisionIndex): GraphRevisionIndex {
+  if (prepared === undefined) return new RevisionIndex(graph);
+  if (!RevisionIndex.matches(prepared, graph)) throw new TypeError('Expected indexes for this exact immutable graph revision.');
+  return prepared;
+}
+class ValidatedGraph {
+  readonly #graph: LogicGraph;
+  readonly #states: WeakMap<LogicGraph, { readonly graph: LogicGraph; readonly diagnostics: readonly GraphDiagnostic[]; readonly index: GraphRevisionIndex }>;
+  constructor(graph: LogicGraph, prepared?: GraphRevisionIndex) {
+    this.#graph = graph;
+    const index = prepared === undefined ? prepareGraphRevision(graph) : revisionIndex(graph, prepared);
+    const diagnostics = Object.freeze(validateGraph(graph, { index }).map(diagnostic => Object.freeze(diagnostic)));
+    this.#states = new WeakMap([[graph, Object.freeze({ graph, diagnostics, index })]]);
+    Object.freeze(this);
+  }
+  get graph(): LogicGraph { return this.#graph; }
+  get diagnostics(): readonly GraphDiagnostic[] { return this.#states.get(this.#graph)!.diagnostics; }
+  static read(candidate: ValidatedGraph): { graph: LogicGraph; diagnostics: readonly GraphDiagnostic[]; index: GraphRevisionIndex } {
+    if (!(candidate instanceof ValidatedGraph) || !(#graph in candidate)) throw new TypeError('Expected an authentic graph validation handoff.');
+    const state = candidate.#states.get(candidate.#graph);
+    if (!state) throw new TypeError('Expected validation for this exact immutable graph revision.');
+    return state;
+  }
+}
+Object.freeze(ValidatedGraph.prototype);
+Object.freeze(ValidatedGraph);
+export type GraphValidation = ValidatedGraph;
+/** Validates constructed immutable data, importing uncertified input before issuing a handoff. */
+export function validateForLowering(graph: LogicGraph, index?: GraphRevisionIndex): GraphValidation {
+  return new ValidatedGraph(graph, index);
+}
+export function readGraphValidation(validated: GraphValidation): { graph: LogicGraph; diagnostics: readonly GraphDiagnostic[]; index: GraphRevisionIndex } {
+  return ValidatedGraph.read(validated);
+}
+export function validateGraph(graph: LogicGraph, options: { readonly projection?: boolean; readonly index?: GraphRevisionIndex } = {}): readonly GraphDiagnostic[] {
   try {
     assertCompositionBounds(graph.original);
     for (const node of graph.nodes) assertCompositionBounds(node.payload.value);
-    return validateGraphChecked(graph, options);
+    return validateGraphChecked(graph, options, revisionIndex(graph, options.index));
   } catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
     return error.issues.map(issue => ({
@@ -24,27 +247,28 @@ export function validateGraph(graph: LogicGraph, options: { readonly projection?
     }));
   }
 }
-function validateGraphChecked(graph: LogicGraph, options: { readonly projection?: boolean }): readonly GraphDiagnostic[] {
+function validateGraphChecked(graph: LogicGraph, options: { readonly projection?: boolean }, index: GraphRevisionIndex): readonly GraphDiagnostic[] {
   const errors: GraphDiagnostic[] = [];
   const anchor = graph.roots[0]?.anchor ?? { kind: 'document' as const, id: 'document', field: '', fingerprint: fingerprint(graph.original) };
+  let firstOrigins: Map<string, string> | undefined;
   const report = (code: GraphDiagnostic['code'], message: string, nodeId?: string, portId?: string, hint = false) => {
     if (hint && options.projection) return;
-    errors.push({ severity: hint ? 'warning' : 'error', ...(hint ? { hint: true as const } : {}), code, message: hint ? `Wiring hint: ${message}` : message, anchor, nodeId, portId, pointer: graph.nodes.find(node => node.id === nodeId)?.origins[0] ?? '' });
+    if (nodeId !== undefined && !firstOrigins) {
+      firstOrigins = new Map();
+      for (const node of graph.nodes) if (!firstOrigins.has(node.id)) firstOrigins.set(node.id, node.origins[0] ?? '');
+    }
+    errors.push({ severity: hint ? 'warning' : 'error', ...(hint ? { hint: true as const } : {}), code, message: hint ? `Wiring hint: ${message}` : message, anchor, nodeId, portId, pointer: nodeId === undefined ? '' : firstOrigins!.get(nodeId) ?? '' });
   };
-  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
-  if (nodes.size !== graph.nodes.length) report('duplicate_id', 'Block IDs must be unique.');
+  const nodes = { get: (id: string) => index.node(id) };
+  if (index.nodeCount !== graph.nodes.length) report('duplicate_id', 'Block IDs must be unique.');
   if (new Set(graph.edges.map(edge => edge.id)).size !== graph.edges.length) report('duplicate_id', 'Connection IDs must be unique.');
   const scopes = new Map(graph.scopes.map(scope => [scope.id, scope]));
-  const descriptions = new Map(graph.nodes.filter(node => node.payload.kind !== 'opaque').map(node => {
-    const kind: FragmentKind = node.payload.kind === 'template' || node.payload.kind === 'logic-ref' ? node.payload.representation
-      : node.payload.kind === 'hole' || node.payload.kind === 'opaque' ? 'auto' : node.payload.kind;
-    return [node.id, grammarChildren(node.payload.value, kind)] as const;
-  }));
-  const incoming = new Map<string, GraphEdge[]>(), dependencies = new Map<string, GraphEdge[]>();
-  for (const edge of graph.edges) {
-    const key = `${edge.to.nodeId}:${edge.to.portId}`;
-    incoming.set(key, [...incoming.get(key) ?? [], edge]);
-    dependencies.set(edge.to.nodeId, [...dependencies.get(edge.to.nodeId) ?? [], edge]);
+  const descriptions = new Map<string, ReadonlyMap<string, ReturnType<typeof grammarChildren>[number]>>(), emptyChildren = new Map<string, ReturnType<typeof grammarChildren>[number]>();
+  for (const node of graph.nodes) {
+    if (node.payload.kind === 'opaque') continue;
+    const children = index.children(node), bindings = children.length ? new Map<string, typeof children[number]>() : emptyChildren;
+    for (const child of children) if (!bindings.has(child.binding)) bindings.set(child.binding, child);
+    descriptions.set(node.id, bindings);
   }
   const originalValues = new Map<string, GraphJSON | undefined>([['', graph.original]]);
   const originalAt = (at: string): GraphJSON | undefined => {
@@ -59,7 +283,9 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     }
     let value = originalValues.get(parent);
     for (const own of pending.reverse()) {
-      value = value === undefined ? undefined : atPointer(value, own.slice(parent.length));
+      const key = own.slice(parent.length + 1);
+      value = Array.isArray(value) ? Object.hasOwn(value, key) ? value[Number(key)] : undefined
+        : record(value) && Object.hasOwn(value, key) ? value[key] : undefined;
       originalValues.set(own, value); parent = own;
     }
     return value;
@@ -69,14 +295,18 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     const cached = unchangedNodes.get(node.id);
     if (cached !== undefined) return cached;
     if (!node.origins.length || node.provenance !== 'lifted' && node.provenance !== 'opaque') return false;
+    if (!node.inputs.length) {
+      const original = originalAt(node.origins[0]), unchanged = original !== undefined && sameJSON(node.payload.value, original);
+      unchangedNodes.set(node.id, unchanged);
+      return unchanged;
+    }
     if (checkingUnchanged.has(node.id)) return false;
     checkingUnchanged.add(node.id);
     const original = originalAt(node.origins[0]);
-    const omitted = node.inputs.length ? new Set(node.inputs.flatMap(input => input.binding === undefined ? [] : [input.binding])) : undefined;
-    const unchanged = (node.provenance === 'lifted' || node.provenance === 'opaque') && original !== undefined
-      && sameJSON(node.payload.value, original, omitted)
+    const unchanged = original !== undefined
+      && index.sameUnbound(node, original)
       && node.inputs.every(input => {
-        const edges = incoming.get(`${node.id}:${input.id}`), child = edges?.length === 1 ? nodes.get(edges[0].from.nodeId) : undefined;
+        const edges = index.incoming(node.id, input.id), child = edges.length === 1 ? nodes.get(edges[0].from.nodeId) : undefined;
         return child !== undefined && child.origins[0] === node.origins[0] + input.binding && isUnchanged(child);
       });
     checkingUnchanged.delete(node.id); unchangedNodes.set(node.id, unchanged);
@@ -93,7 +323,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     let value = copy(node.payload.value);
     for (const input of node.inputs) {
       if (input.binding === undefined) continue;
-      const edges = incoming.get(`${id}:${input.id}`) ?? [];
+      const edges = index.incoming(id, input.id);
       if (edges.length !== 1) continue;
       const child = assemble(edges[0].from.nodeId, depth + 1);
       if (child === undefined || atPointer(value, input.binding) === undefined) continue;
@@ -103,7 +333,8 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     return value;
   };
   const typedFlows = new Map<string, { params: TypeScope['params']; initial: Shape; steps: Shape[]; stepCount: number } | undefined>();
-  const actualOutput = (node: GraphNode) => {
+  const actualOutputs = new Map<GraphNode, PortType | undefined>();
+  const computeOutput = (node: GraphNode) => {
     const output = node.outputs[0]?.type;
     if (!output || node.payload.kind !== 'operand' && node.payload.kind !== 'condition') return output;
     const current = assemble(node.id), scope = scopes.get(node.scopeId);
@@ -112,8 +343,8 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     let item = owner?.payload.kind !== 'flow-inputs' && scope?.itemShape ? copyShape(scope.itemShape) : undefined;
     if (owner?.payload.kind === 'flow-inputs') {
       const childValue = (binding: string) => {
-        const port = owner.inputs.find(input => input.binding === binding);
-        const edges = port ? incoming.get(`${owner.id}:${port.id}`) : undefined;
+        const port = index.matchingInputs(owner, binding)[0];
+        const edges = port ? index.incoming(owner.id, port.id) : undefined;
         return edges?.length === 1 ? assemble(edges[0].from.nodeId) : undefined;
       };
       if (!typedFlows.has(owner.id)) {
@@ -124,7 +355,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
           typedFlows.set(owner.id, { params, initial, steps: [], stepCount: inputs.steps.length });
         } else typedFlows.set(owner.id, undefined);
       }
-      const flow = typedFlows.get(owner.id), binding = owner.inputs.find(input => input.type.scopeId === scope?.id)?.binding;
+      const flow = typedFlows.get(owner.id), binding = index.scopeBinding(owner, scope?.id);
       params = flow?.params ?? new Map();
       item = undefined;
       if (flow && binding) {
@@ -143,6 +374,10 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     return current !== undefined
       ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(item ? { item } : {}) }, expressionScope(current, node.scopeId, graph.scopes)) : output;
   };
+  const actualOutput = (node: GraphNode) => {
+    if (!actualOutputs.has(node)) actualOutputs.set(node, computeOutput(node));
+    return actualOutputs.get(node);
+  };
   if (scopes.size !== graph.scopes.length) report('duplicate_id', 'Scope IDs must be unique.', undefined, undefined, true);
   for (const scope of graph.scopes) {
     const seen = new Set([scope.id]);
@@ -156,8 +391,8 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
   }
   for (const edge of graph.edges) {
     const from = nodes.get(edge.from.nodeId), to = nodes.get(edge.to.nodeId);
-    const output = from?.outputs.find(port => port.id === edge.from.portId);
-    const input = to?.inputs.find(port => port.id === edge.to.portId);
+    const output = from && index.port(from, edge.from.portId, 'output');
+    const input = to && index.port(to, edge.to.portId, 'input');
     if (!from || !to || !output || !input) { report('invalid_reference', 'Connection names a missing block or port.', edge.to.nodeId, edge.to.portId); continue; }
     if (edge.binding !== input.binding) report('invalid_reference', 'Connection binding does not match the input.', to.id, input.id);
     if (edge.kind !== output.type.representation) report('binding_type', 'Connection representation does not match its output.', to.id, input.id, true);
@@ -171,25 +406,29 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     if (unchanged && from.scopeId === to.scopeId) continue;
     const actual = actualOutput(from) ?? output.type;
     const destinationScopeId = ['document', 'flow', 'flow-inputs', 'logic-entry'].includes(to.payload.kind) ? input.type.scopeId ?? to.scopeId : to.scopeId;
-    const expected = inputType({ ...to, scopeId: destinationScopeId }, edge.binding, input.type, descriptions.get(to.id)?.find(child => child.binding === edge.binding)?.kind);
+    const expected = inputType({ ...to, scopeId: destinationScopeId }, edge.binding, input.type, descriptions.get(to.id)?.get(edge.binding)?.kind);
     const sameScope = scopesCompatible(actual, expected, graph.scopes);
     const match = portsCompatible(actual, expected, graph.scopes);
     if (!match.compatible && (!unchanged || !sameScope)) report(sameScope ? 'binding_type' : 'scope_mismatch', match.reason!, to.id, input.id, true);
   }
   for (const node of graph.nodes) {
     if (!scopes.has(node.scopeId)) report('invalid_reference', 'Block scope is missing.', node.id, undefined, true);
-    const ids = [...node.inputs, ...node.outputs.map(port => ({ ...port, id: `out:${port.id}` }))].map(port => port.id);
-    if (new Set(ids).size !== ids.length) report('duplicate_id', 'Port IDs must be unique.', node.id);
+    if (node.inputs.length + node.outputs.length > 1) {
+      const ids = new Set<string>();
+      for (const input of node.inputs) ids.add(input.id);
+      for (const output of node.outputs) ids.add(`out:${output.id}`);
+      if (ids.size !== node.inputs.length + node.outputs.length) report('duplicate_id', 'Port IDs must be unique.', node.id);
+    }
     if (node.payload.kind !== 'opaque') {
-      const expected = new Set(descriptions.get(node.id)!.map(child => child.binding));
-      for (const binding of expected) {
-        const ports = node.inputs.filter(input => input.binding === binding);
-        if (ports.length !== 1 || !ports[0].required) report('missing_required', 'Each grammar child requires one named input.', node.id);
+      const expected = descriptions.get(node.id)!;
+      for (const binding of expected.keys()) {
+        const matching = index.matchingInputs(node, binding);
+        if (matching?.length !== 1 || !matching[0].required) report('missing_required', 'Each grammar child requires one named input.', node.id);
       }
       for (const input of node.inputs) if (input.binding === undefined || !expected.has(input.binding)) report('invalid_reference', 'Input binding is not a child of this grammar node.', node.id, input.id);
     }
     for (const input of node.inputs) {
-      const count = incoming.get(`${node.id}:${input.id}`)?.length ?? 0;
+      const count = index.incoming(node.id, input.id).length;
       if (count > 1) report('occupied_input', 'An input accepts at most one connection.', node.id, input.id);
       if (!count && input.required) report('missing_required', 'A required input is disconnected.', node.id, input.id);
     }
@@ -209,13 +448,13 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     if (active.size >= 40) { report('limit_exceeded', 'Graph exceeds the existing JSON depth boundary.', id); return; }
     if (visited.has(id)) return;
     active.add(id);
-    dependencies.get(id)?.forEach(edge => visit(edge.from.nodeId));
+    for (const edge of index.dependencies(id)) visit(edge.from.nodeId);
     active.delete(id); visited.add(id);
   };
   graph.nodes.forEach(node => visit(node.id));
   if (!graph.roots.length) report('missing_required', 'A graph must have an output.');
   for (const root of graph.roots) {
-    const output = nodes.get(root.nodeId)?.outputs.find(port => port.id === root.portId);
+    const rootNode = nodes.get(root.nodeId), output = rootNode && index.port(rootNode, root.portId, 'output');
     if (!output) report('invalid_reference', 'Output block or port is missing.', root.nodeId, root.portId);
     else if (!options.projection) {
       const actual = actualOutput(nodes.get(root.nodeId)!) ?? output.type;

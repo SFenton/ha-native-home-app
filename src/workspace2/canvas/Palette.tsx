@@ -1,0 +1,70 @@
+import { useMemo, useRef, useState } from 'react';
+import { ChevronRight, Search, X } from 'lucide-react';
+import { blockCatalog, type BlockCatalogEntry, type GraphScopeKind, type LogicGraph } from '../../shared/composition/graph';
+import { blockGroup, blockName, blockResult, nodeName, paletteAvailability, paletteGroups } from './blocks';
+import BlockIcon from './BlockIcon';
+import { wireKind } from './theme';
+import { indexGraph, type CanvasGraphIndex } from './graph-index';
+const comparisonNames: Readonly<Record<string, string>> = { eq: 'Is / Is Not', above: 'Above / Below', before: 'Before / After' };
+
+export default function Palette({ scope, capabilities, sourceId, graph, index: providedIndex, locate, onAdd, close }: {
+  scope: GraphScopeKind; capabilities: readonly string[]; sourceId?: string; graph: LogicGraph; index?: CanvasGraphIndex; locate: (id: string) => void; onAdd: (entry: BlockCatalogEntry) => void; close: () => void;
+}) {
+  const [query, setQuery] = useState(''), [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  const root = useRef<HTMLElement>(null), needle = query.trim().toLowerCase();
+  const index = useMemo(() => providedIndex ?? indexGraph(graph), [graph, providedIndex]);
+  const results = useMemo(() => new Map(blockCatalog.map(entry => [entry.key, blockResult(entry, sourceId)])), [sourceId]);
+  const availability = useMemo(() => new Map(blockCatalog.map(entry => [entry.key, paletteAvailability(entry, scope, capabilities, sourceId)])), [scope, capabilities, sourceId]);
+  const names = useMemo(() => new Map(graph.nodes.map(node => [node.id, nodeName(node, graph, index)])), [graph, index]);
+  const entries = useMemo(() => blockCatalog.filter(entry => `${blockName(entry.key)} ${blockGroup(entry)} ${entry.key}`.toLowerCase().includes(needle)), [needle]);
+  const available = entries.filter(entry => availability.get(entry.key)!.enabled && (needle || !['predicate.compare.ne', 'predicate.compare.below', 'predicate.compare.after'].includes(entry.key)));
+  const unavailable = entries.filter(entry => !availability.get(entry.key)!.enabled);
+  const current = graph.nodes.filter(node => names.get(node.id)!.toLowerCase().includes(needle));
+  const name = (entry: BlockCatalogEntry) => !needle && entry.grammar === 'predicate.compare'
+    ? (comparisonNames[entry.variant] ?? blockName(entry.key)) : blockName(entry.key);
+  const toggle = (group: string) => setOpened(held => { const next = new Set(held); if (next.has(group)) next.delete(group); else next.add(group); return next; });
+  return <aside ref={root} className="w2-canvas-palette" aria-label="Block palette" onKeyDown={event => {
+    if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    if (event.target instanceof HTMLInputElement && ['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    const buttons = [...root.current?.querySelectorAll<HTMLButtonElement>('[data-block-choice]') ?? []].filter(button => button.getClientRects().length);
+    if (!buttons.length) return;
+    event.preventDefault();
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement), delta = event.key === 'ArrowUp' ? -2 : event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' ? 2 : 1;
+    if (index < 0) root.current?.querySelector<HTMLButtonElement>('[data-block-add-choice]')?.focus();
+    else buttons[(index + delta + buttons.length) % buttons.length]?.focus();
+  }}>
+    <div className="w2-canvas-panel-head"><strong>Blocks</strong><button type="button" aria-label="Close block palette" onClick={close}><X size={16}/></button></div>
+    <label className="w2-canvas-search"><Search size={16} aria-hidden/><input autoFocus type="search" aria-label="Find a block" placeholder="Find a block" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => {
+      if (event.key === 'Enter' && available[0]) { event.preventDefault(); onAdd(available[0]); }
+      if (event.key === 'Escape') close();
+    }}/></label>
+    <div className="w2-canvas-palette-scroll">
+      {paletteGroups.map(group => {
+        const here = available.filter(entry => blockGroup(entry) === group), nodes = group === 'In This Flow' ? current : [];
+        const previews = group === 'In This Flow' ? nodes.map(node => names.get(node.id)!) : here.map(name);
+        if (needle && !previews.length) return null;
+        const open = Boolean(needle) || opened.has(group);
+        return <section className="w2-canvas-category" key={group}>
+          <button type="button" className="w2-canvas-category-head" aria-expanded={open} aria-label={`${group}, ${previews.length} blocks`} onClick={() => toggle(group)}>
+            <ChevronRight size={12} aria-hidden data-open={open || undefined}/><span>{group}</span>
+            {!open && <small>{previews.slice(0, 3).join(', ') || 'None here'}</small>}<span className="w2-canvas-count">{previews.length}</span>
+          </button>
+          {open && <ul aria-label={`${group} blocks`} className="w2-canvas-palette-grid">
+            {nodes.map(node => <li key={node.id}><button type="button" data-block-choice aria-label={`Go to ${names.get(node.id)} ${index.ordinals.get(node.id)}`} onClick={() => locate(node.id)}>
+              <BlockIcon catalogKey={node.catalogKey} size={20}/><span>{names.get(node.id)}</span>
+            </button></li>)}
+            {here.map(entry => {
+              const output = results.get(entry.key);
+              return <li key={entry.key}><button type="button" data-block-choice data-block-add-choice aria-label={`Add ${name(entry)}${output ? `, ${output.valueType}` : ''}`} onClick={() => onAdd(entry)}>
+                {output && <i className="w2-canvas-type-dot" data-wire-type={wireKind(output)} aria-hidden/>}<BlockIcon catalogKey={entry.key} size={20}/><span>{name(entry)}</span>
+              </button></li>;
+            })}
+          </ul>}
+        </section>;
+      })}
+      {!!unavailable.length && <details className="w2-canvas-unavailable"><summary>Not available here <span>{unavailable.length}</span></summary><ul>{unavailable.map(entry => <li key={entry.key}><strong>{blockName(entry.key)}</strong><p>{availability.get(entry.key)!.reason}</p></li>)}</ul></details>}
+      {!entries.length && !current.length && <p>Nothing matches.</p>}
+    </div>
+    <p className="w2-canvas-caption w2-canvas-palette-foot">Click to add, or search and use arrows and Enter. The dot shows what a block gives back: <span><i data-wire-type="number"/> number, <i data-wire-type="condition"/> yes/no, <i data-wire-type="text"/> text.</span></p>
+  </aside>;
+}

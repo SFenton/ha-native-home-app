@@ -7,33 +7,36 @@ import { compileGraphValue, consumingDocument, contextualCompilation, type Fragm
 import { budgetFromCompilation } from './budgets';
 import { fingerprint, record, withoutCanvasMetadata } from './json';
 import type { GraphBudget, GraphDiagnostic, GraphEdge, GraphJSON, GraphRoot, GraphSourceLocation, LogicGraph, LoweringResult } from './types';
-import { validateGraph } from './validate';
+import { prepareGraphRevision, readGraphValidation, validateForLowering, validateGraph, type GraphRevisionIndex, type GraphValidation } from './validate';
 import { expansionSourceMap } from './provenance';
 
 export interface LowerOptions {
   readonly targetCapabilities?: readonly string[];
   readonly library?: readonly LogicEntry[];
   readonly itemScope?: ItemScope;
+  readonly index?: GraphRevisionIndex;
+  readonly accounting?: boolean;
 }
+const jsonArray = (value: GraphJSON): value is readonly GraphJSON[] => Array.isArray(value);
 /** Lossless buffer projection only. This does not authorize Apply, Save or publication. */
 export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly sourceMap: readonly GraphSourceLocation[] } {
-  const errors = validateGraph(graph, { projection: true }).filter(diagnostic => diagnostic.severity === 'error');
+  const index = prepareGraphRevision(graph);
+  const errors = validateGraph(graph, { projection: true, index }).filter(diagnostic => diagnostic.severity === 'error');
   if (errors.length) throw new CompositionValidationError(errors.map(error => ({
     code: ['cycle', 'occupied_input', 'scope_mismatch', 'opaque_region', 'invalid_layout', 'recipe_disabled'].includes(error.code) ? 'invalid_combination' : error.code as CompositionIssue['code'],
     pointer: error.pointer,
   })));
-  return projectValidatedGraph(graph);
+  return projectValidatedGraph(graph, index);
 }
-function projectValidatedGraph(graph: LogicGraph): { readonly ast: Json; readonly sourceMap: readonly GraphSourceLocation[] } {
-  const byId = new Map(graph.nodes.map(node => [node.id, node])), sourceMap: GraphSourceLocation[] = [];
-  const incoming = new Map(graph.edges.map(edge => [`${edge.to.nodeId}:${edge.to.portId}`, edge]));
+function projectValidatedGraph(graph: LogicGraph, index: GraphRevisionIndex): { readonly ast: Json; readonly sourceMap: readonly GraphSourceLocation[] } {
+  const sourceMap: GraphSourceLocation[] = [];
   let emitted = 0;
   const emit = (id: string, at: string, root: GraphRoot): Json => {
     if (++emitted > 100_000) throw new CompositionValidationError([{ code: 'limit_exceeded', pointer: at }]);
-    const node = byId.get(id)!;
+    const node = index.node(id)!;
     const bindings = node.inputs.length ? new Map<string, GraphEdge>() : undefined;
     for (const input of node.inputs) {
-      const edge = incoming.get(`${id}:${input.id}`);
+      const edge = index.incoming(id, input.id)[0];
       if (edge && input.binding !== undefined) bindings!.set(input.binding, edge);
     }
     const project = (candidate: GraphJSON, local: string): Json => {
@@ -41,8 +44,16 @@ function projectValidatedGraph(graph: LogicGraph): { readonly ast: Json; readonl
       if (edge) return emit(edge.from.nodeId, own, root);
       if (sourceMap.length >= 100_000) throw new CompositionValidationError([{ code: 'limit_exceeded', pointer: own }]);
       sourceMap.push({ pointer: own, nodeId: id, portId: 'value', anchor: root.anchor });
-      if (Array.isArray(candidate)) return candidate.map((value, index) => project(value, pointer(local, index)));
-      if (candidate !== null && typeof candidate === 'object') return Object.fromEntries(Object.entries(candidate).map(([key, value]) => [key, project(value, pointer(local, key))]));
+      if (jsonArray(candidate)) {
+        const values: Json[] = [];
+        for (let i = 0; i < candidate.length; i++) values.push(project(candidate[i], `${local}/${i}`));
+        return values;
+      }
+      if (candidate !== null && typeof candidate === 'object') {
+        const value: Record<string, Json> = {};
+        for (const key of Object.keys(candidate)) value[key] = project(candidate[key], key.includes('~') || key.includes('/') ? pointer(local, key) : `${local}/${key}`);
+        return value;
+      }
       return candidate;
     };
     return project(node.payload.value, '');
@@ -51,11 +62,16 @@ function projectValidatedGraph(graph: LogicGraph): { readonly ast: Json; readonl
   return { ast: values.length === 1 ? values[0] : values, sourceMap };
 }
 export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringResult {
-  const validation = validateGraph(graph), errors: GraphDiagnostic[] = validation.filter(diagnostic => diagnostic.severity === 'error');
+  return lowerValidated(validateForLowering(graph, options.index), options);
+}
+/** Uses the explicitly validated immutable revision, with exactly the same refusal path as lower. */
+export function lowerValidated(validated: GraphValidation, options: LowerOptions = {}): LoweringResult {
+  const { graph, diagnostics: validation, index } = readGraphValidation(validated);
+  const errors: GraphDiagnostic[] = validation.filter(diagnostic => diagnostic.severity === 'error');
   const hints = validation.filter(diagnostic => diagnostic.severity === 'warning');
   if (errors.length || !graph.roots.length) return { ok: false, original: graph.original, errors, budgets: [] };
   let ast: Json, sourceMap: readonly GraphSourceLocation[];
-  try { ({ ast, sourceMap } = projectValidatedGraph(graph)); assertCompositionBounds(ast); }
+  try { ({ ast, sourceMap } = projectValidatedGraph(graph, index)); assertCompositionBounds(ast); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
     return { ok: false, original: graph.original, errors: [...errors, ...error.issues.map(issue => diagnostic(issue, graph.roots[0]))], budgets: [] };
@@ -80,10 +96,11 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
     }
   });
   if (errors.length) return { ok: false, original: graph.original, errors, budgets: [] };
-  const documents = new Map([...contextDocuments].map(([key, document]) => [key, compileGraphValue(document, { kind: 'document' })]));
+  const documents = new Map([...contextDocuments].map(([key, document]) => [key, compileGraphValue(document, { kind: 'document', accounting: options.accounting })]));
   const compileOptions: FragmentOptions[] = graph.roots.map((root, index) => ({
     kind: root.destination.kind === 'flow' && record(values[index]) && values[index].model !== 'pipeline@1' ? 'flow-inputs' as const : root.destination.kind,
     context: root.destination.context, library: options.library, itemScope: options.itemScope, allowControl: root.destination.allowControl,
+    accounting: options.accounting,
     sourceId: root.destination.sourceId ?? (root.anchor.kind === 'flow' ? root.anchor.id : undefined),
   }));
   const compilations = graph.roots.map((root, index) => {
