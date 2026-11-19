@@ -38,8 +38,8 @@ silently replaced. Review is a new, read-only task, independent from its author.
 
 ## Verification
 
-Use `npm test`, `npm run build`, and focused Playwright tests. Browser tests own
-port 4801 and isolated `test-results/studio-data`; the interactive studio owns
+Use `npm test`, `npm run build`, and focused Playwright tests. Browser tests use
+`STUDIO_E2E_PORT` (default 4815) and isolated `test-results/studio-data`; the interactive studio owns
 port 4800 and `data/`. Never reset the user's development data to run tests.
 
 Use `node scripts/smoke-container.mjs` after building the image to test production

@@ -6,11 +6,13 @@ import { isPhone, openWorkspace, previewRoot, seed, selectTile, snap } from './w
 const home = (JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: { pages: { id: string }[] } }).document;
 const garage = { ...newStateTile('cover.demo_garage', 'Demo Garage', 'garage', undefined)!, id: 'demo-garage' };
 const lock = { ...newStateTile('lock.demo_front', 'Demo Front Lock', undefined, undefined)!, id: 'demo-front-lock' };
-const withTiles = addStateTile(addStateTile(home as never, home.pages[0].id, garage), home.pages[0].id, lock);
+const robot = { ...newStateTile('vacuum.demo_robot', 'Demo Robot', undefined, undefined)!, id: 'demo-robot' };
+const withTiles = addStateTile(addStateTile(addStateTile(home as never, home.pages[0].id, garage), home.pages[0].id, lock), home.pages[0].id, robot);
 
-/** Stubs the house so the two tiles have a state to follow: a closed garage door and a locked lock. */
+/** Stubs the tiles' entities: a closed garage door, a locked lock and a docked robot. */
 async function stubHouse(page: Page) {
-  const states = [{ entityId: 'cover.demo_garage', name: 'Demo Garage', state: 'closed', deviceClass: 'garage' }, { entityId: 'lock.demo_front', name: 'Demo Front Lock', state: 'locked' }];
+  const states = [{ entityId: 'cover.demo_garage', name: 'Demo Garage', state: 'closed', deviceClass: 'garage' }, { entityId: 'lock.demo_front', name: 'Demo Front Lock', state: 'locked' },
+    { entityId: 'vacuum.demo_robot', name: 'Demo Robot', state: 'docked' }];
   await page.route('**/api/native-home', route => route.fulfill({ json: { mode: 'live', houseConfig: { schema: 2, hash: 'a'.repeat(64), config: {} }, states } }));
 }
 test.beforeEach(async ({ request, page }) => { await seed(request, withTiles); await stubHouse(page); });
@@ -23,6 +25,19 @@ async function show(page: Page, name: string) {
   await page.getByRole('combobox', { name: 'Show state' }).click();
   await page.getByRole('option', { name: new RegExp(`^${name}\\b`) }).click();
 }
+
+test('Robot draws the house while docked and the vacuum in every other state', async ({ page }) => {
+  await openWorkspace(page);
+  await selectTile(page, 'Demo Robot');
+  const glyph = tile(page, 'demo-robot').locator('.sh-tile-glyph [data-icon]');
+  await expect(glyph).toHaveAttribute('data-icon', 'house');
+  for (const state of ['Idle', 'Cleaning', 'Mowing', 'Paused', 'Returning', 'Error', 'Unavailable', 'Unknown']) {
+    await show(page, state);
+    await expect(glyph).toHaveAttribute('data-icon', 'robotic.vacuum');
+  }
+  await show(page, 'Docked');
+  await expect(glyph).toHaveAttribute('data-icon', 'house');
+});
 
 test('Show state draws the selected tile in that state, and deselecting restores it', async ({ page }) => {
   await openWorkspace(page);

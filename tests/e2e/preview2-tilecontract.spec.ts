@@ -227,26 +227,27 @@ const inkOf = async (page: Page, id: string) => tile(page, id).evaluate(element 
   const glyph = element.querySelector('.sh-tile-glyph, .sh-dv-lighttile-glyph'), line = element.querySelector('.sh-tile-line');
   return { glyph: glyph ? getComputedStyle(glyph).color : '', line: line ? getComputedStyle(line).color : '', face: getComputedStyle(element.querySelector('.sh-tile') ?? element).color };
 });
-// The gate (`src/shared/composition/tile-ink-gate.ts`) is off: with no `ink` in the address the preview draws today's grey, and `ink=primary` draws what the gate will draw once it is on.
+// Primary ink is shipped; the explicit muted override still draws a legacy publication.
 for (const family of families) for (const scheme of schemes) {
-  test(`item 6: the ink gate off draws the old grey and on draws the primary ink; lit and unavailable stay (${family.name}, ${scheme})`, async ({ page }) => {
+  test(`item 6: shipped primary ink is the default and muted preserves legacy ink; lit and unavailable stay (${family.name}, ${scheme})`, async ({ page }) => {
     await open(page, family, scheme, 'page:page-tc-ink');
-    await expect(page.locator('[data-preview-root]')).toHaveAttribute('data-ink', 'muted');
-    await shot(page, 'ink-gate-off', scheme, family);
-    const before = await inkOf(page, 'tc-ink-garage');
-    expect(before.glyph).toBe('rgb(142, 142, 147)');
-    expect(before.line).not.toBe('rgb(255, 255, 255)');
-    await page.goto(`${page.url()}&ink=primary`);
-    await expect(page.locator('.sh-tile').first()).toBeVisible(patient);
     await expect(page.locator('[data-preview-root]')).toHaveAttribute('data-ink', 'primary');
-    await page.waitForTimeout(300);
-    await shot(page, 'ink-gate-on', scheme, family);
+    await shot(page, 'ink-primary-default', scheme, family);
     // A page is always dark: white. The idle garage glyph and its line are white; the unavailable light keeps its grey glyph.
     const idle = await inkOf(page, 'tc-ink-garage');
     expect(idle.glyph).toBe('rgb(255, 255, 255)');
     expect(idle.line).toBe('rgb(255, 255, 255)');
     // The lit Study lights tile (a filled face) keeps its own ink: never the primary white of the idle face.
-    expect((await inkOf(page, 'tc-ink-switch')).line).not.toBe('');
+    const lit = await inkOf(page, 'tc-ink-lit'), unavailable = await inkOf(page, 'tc-ink-dead');
+    await page.goto(`${page.url()}&ink=muted`);
+    await expect(page.locator('.sh-tile').first()).toBeVisible(patient);
+    await expect(page.locator('[data-preview-root]')).toHaveAttribute('data-ink', 'muted');
+    await shot(page, 'ink-muted-legacy', scheme, family);
+    const legacy = await inkOf(page, 'tc-ink-garage');
+    expect(legacy.glyph).toBe('rgb(142, 142, 147)');
+    expect(legacy.line).not.toBe('rgb(255, 255, 255)');
+    expect(await inkOf(page, 'tc-ink-lit')).toEqual(lit);
+    expect(await inkOf(page, 'tc-ink-dead')).toEqual(unavailable);
   });
 }
 

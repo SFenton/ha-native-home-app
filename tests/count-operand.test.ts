@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { compileCompositionDocument, INK_DEFAULT_CAPABILITY } from '../src/shared/composition/compiler';
 import { evaluateOperand, loading, unavailable, value, type Environment } from '../src/shared/composition/evaluator';
 import { MAX_COUNT_ENTRIES, MAX_EXPRESSION_NODES, checkOperand, operandKind, operandSchema, type Operand } from '../src/shared/composition/expression';
 import { CompositionValidationError, type CompositionIssue } from '../src/shared/composition/json';
@@ -99,9 +99,9 @@ describe('count: evaluation', () => {
 });
 
 describe('a document without a count', () => {
-  it('compiles as it did: its capabilities do not change', () => {
+  it('adds only the shipped tile ink default, not the count capability', () => {
     const before = compileCompositionDocument(structuredClone(base.document)).capabilities;
-    expect(before).toEqual(base.capabilities);
+    expect(before).toEqual([...base.capabilities, INK_DEFAULT_CAPABILITY].sort());
   });
 });
 

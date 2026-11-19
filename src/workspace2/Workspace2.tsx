@@ -2,6 +2,8 @@ import { fetchPicture } from '../preview2/map-picture';
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
 import { useRecords } from './data/useRecords';
+import { INK_DEFAULT_CAPABILITY } from '../shared/composition/compiler';
+import { defaultPreviewInk, PreviewInkContext } from '../preview2/ink';
 import Preview2, { previewWindows, type PreviewWindow } from './preview';
 import { useStudioTheme } from './useStudioTheme';
 import { useAppearance } from './appearance';
@@ -139,6 +141,8 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   useEffect(() => { if (narrow && overlayOpen) ws.repeats.setOpen(false); }, [narrow, overlayOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const bottomInset = narrow && (levelOpen || repeatsUp) ? coverage(SNAP_HALF) : narrow && target ? coverage(snap) : 0;
   const className = `w2 w2-scope ${narrow ? 'w2-narrow' : 'w2-wide'} ${theme.dark ? 'w2-dark' : 'w2-light'}`;
+  // A clean draft publishes its saved manifest; unsaved edits are compiled before publishing.
+  const ink = !studio.dirty && studio.envelope ? studio.envelope.capabilities.includes(INK_DEFAULT_CAPABILITY) ? 'primary' : 'muted' : defaultPreviewInk;
   const stage = useMemo(() => document && ws.surface && ws.previewDocument ? <PreviewGuard document={ws.previewDocument} lastGood={ws.lastGoodDocument}>{shown => <Preview2
     document={shown} mode={ws.mode} surface={ws.surface!} onSurfaceChange={ws.setSurface} selection={ws.selection} onSelect={ws.select} onOpenTemplate={ws.openTemplate}
     window={window_} textScale={textScales[textStep]} appearance={appearance === 'follow' ? undefined : appearance} bezel={!narrow} live={ws.houseStates.live} overlay={ws.houseStates.overlay}
@@ -153,6 +157,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const properties = target && document ? <PropertiesPanel ws={ws} onClose={close} onOpenProject={openProjectDialog} notice={notice} onError={showError}/> : null;
   const loadingState = !document ? <CanvasState loading={!studio.error} error={studio.error} onRetry={() => void studio.reload()}/> : undefined;
   return <div className={className} data-testid="workspace2" hidden={!active}>
+    <PreviewInkContext.Provider value={ink}>
     <SelectMenusContext.Provider value>
     <SimulatorWindowContext.Provider value={simulator}>
     <ToastHost>
@@ -205,5 +210,6 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
     </ToastHost>
     </SimulatorWindowContext.Provider>
     </SelectMenusContext.Provider>
+    </PreviewInkContext.Provider>
   </div>;
 }

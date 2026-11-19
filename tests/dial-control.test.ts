@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { compileCompositionDocument, INK_DEFAULT_CAPABILITY } from '../src/shared/composition/compiler';
 import { evaluateOperand, type Environment } from '../src/shared/composition/evaluator';
 import { tokenProblem } from '../src/shared/composition/dial-control';
 import { layoutDial } from '../src/shared/composition/dial-math';
@@ -72,14 +72,14 @@ describe('the two dial ids', () => {
     expect(compile([dialControl({ stoppers: [stopper('low', 68, { ink: ruled }), stopper('high', 75)] })])).toContain('sh.rules@1');
     expect(compile([dialControl()])).not.toContain('sh.rules@1');
   });
-  it('leave a document that uses neither as it was', () => {
+  it('leave a document that uses neither as it was, apart from the shipped tile ink default', () => {
     const names = readdirSync(path.join(corpus, 'accept')).filter(name => name.endsWith('.json') && !/^(pending-)?(dialctl|dial-text-place)-/.test(name));
     let count = 0;
     for (const name of names) {
       const envelope = JSON.parse(readFileSync(path.join(corpus, 'accept', name), 'utf8')) as { capabilities: string[]; document: J };
       if (!envelope.document?.pages) continue;
       const compiled = compileCompositionDocument(envelope.document);
-      expect(compiled.capabilities, name).toEqual(envelope.capabilities);
+      expect(compiled.capabilities, name).toEqual([...new Set([...envelope.capabilities, INK_DEFAULT_CAPABILITY])].sort());
       for (const id of ids) expect(compiled.capabilities, name).not.toContain(id);
       count += 1;
     }

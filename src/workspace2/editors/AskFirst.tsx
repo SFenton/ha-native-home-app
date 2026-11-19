@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { ChevronRight, Lock } from 'lucide-react';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { AlertBox } from '../../preview2/AlertOverlay';
 import { alertOf } from '../../preview2/alert';
+import { PreviewInkContext } from '../../preview2/ink';
 import { Tag, useNarrow, usePush } from '../kit';
 import { askOf, askProblem, askSummary, withAsk } from './action';
 import { useAlertPreview } from './alertPreview';
@@ -16,11 +17,12 @@ export const ALERT_LINGER_MS = 150;
 
 /** The alert on a slice of wallpaper, 190 px high: the page's own picture, there where the simulator is hidden. */
 export function AlertPicture({ path, draft }: { path: EditorPath; draft: Draft }) {
+  const ink = useContext(PreviewInkContext);
   const doc = useDraftDocument(draft);
   const spec = alertOf(askOf(valueAt(doc, path) as never));
   if (!spec) return null;
   return <figure className="w2-alert-picture" aria-label="A picture of the alert">
-    <div className="sh-preview2 w2-alert-picture-frame" aria-hidden="true"><div className="w2-alert-wall"/><AlertBox alert={spec}/></div>
+    <div className="sh-preview2 w2-alert-picture-frame" data-ink={ink} aria-hidden="true"><div className="w2-alert-wall"/><AlertBox alert={spec}/></div>
   </figure>;
 }
 
