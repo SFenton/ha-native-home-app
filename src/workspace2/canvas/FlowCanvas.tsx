@@ -15,6 +15,7 @@ import { describeObservation, type CanvasHostWithObservations } from './observat
 import { indexGraph } from './graph-index';
 import CanvasBlock, { type BlockActions } from './CanvasBlock';
 import { blockLayoutKey, presentBlocks, type BlockPresentation } from './presentation';
+import { intersectsWindow, useCanvasWindow } from './windowing';
 
 const focusKey = (focus: CanvasFocus) => JSON.stringify(focus);
 const editable = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
@@ -73,6 +74,8 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const moreButton = useRef<HTMLButtonElement>(null), problemsButton = useRef<HTMLButtonElement>(null);
   const restore = useRef(false), connectionReturn = useRef<CanvasFocus | null>(null);
   const graph = state.graph;
+  const windowed = view === 'graph' && graph.nodes.length > 200;
+  const canvasWindow = useCanvasWindow(viewport, windowed, zoom);
   const index = useMemo(() => indexGraph(graph), [graph]);
   const names = useMemo(() => new Map(graph.nodes.map(node => [node.id, nodeName(node, graph, index)])), [graph, index]);
   const nameOf = (node: GraphNode) => names.get(node.id)!;
@@ -108,25 +111,49 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   }, [state, view, entered, panel, connection, deleting, leaving, phone]);
   const positions = graph.nodes.map(node => node.id === moving?.nodeId ? { x: moving.x, y: moving.y } : node.position ?? { x: 24, y: 24 });
   const width = Math.max(900, ...positions.map(position => position.x + 300)), height = Math.max(600, ...graph.nodes.map((node, index) => positions[index].y + 140 + (node.inputs.length + node.outputs.length) * 44));
+  const visible = useMemo(() => new Set(ordered.filter(node => {
+    const position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
+    return !windowed || node.id === selected?.id || node.id === entered
+      || intersectsWindow(canvasWindow, position.x, position.y, position.x + 190, position.y + 140 + (node.inputs.length + node.outputs.length) * 44);
+  }).map(node => node.id)), [windowed, canvasWindow, ordered, moving, selected?.id, entered]);
+  const visibleKey = [...visible].join('\0');
+  const wireGeometry = useMemo(() => ({ ports: new Map<string, { x: number; y: number }>(), measured: new Set<string>() }), [layoutKey, moving, view, zoom, phone, host.observations]);
   // Payload-only revisions retain both the block models and measured wire geometry.
   useLayoutEffect(() => {
     if (view !== 'graph' || !board.current) return;
     const measure = () => {
-      const bounds = board.current?.getBoundingClientRect();
-      if (!bounds) return;
+      let bounds: DOMRect | undefined;
+      const { ports, measured } = wireGeometry;
+      const point = (socket: GraphEdge['from'], direction: 'input' | 'output') => {
+        const key = focusKey({ ...socket, direction }), cached = ports.get(key);
+        const element = elementFor({ ...socket, direction });
+        if (cached && (measured.has(key) || !element)) return cached;
+        if (element && board.current) {
+          bounds ??= board.current.getBoundingClientRect();
+          const port = element.getBoundingClientRect();
+          const point = { x: ((direction === 'output' ? port.right : port.left) - bounds.left) / zoom, y: (port.top + port.height / 2 - bounds.top) / zoom };
+          ports.set(key, point);
+          measured.add(key);
+          return point;
+        }
+        const node = index.nodes.get(socket.nodeId)!, model = models.get(node.id)!, position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
+        const row = model.ports.findIndex(port => port.port.id === socket.portId && port.direction === direction);
+        const point = { x: position.x + (direction === 'output' ? 190 : 0), y: position.y + 40 + (model.detail ? 24 : 0) + (row + .5) * (phone ? 44 : 29) };
+        ports.set(key, point);
+        return point;
+      };
       setWirePaths(graph.edges.flatMap(edge => {
-        const from = elementFor({ ...edge.from, direction: 'output' })?.getBoundingClientRect(), to = elementFor({ ...edge.to, direction: 'input' })?.getBoundingClientRect();
-        if (!from || !to) return [];
-        const start = { x: (from.right - bounds.left) / zoom, y: (from.top + from.height / 2 - bounds.top) / zoom };
-        const end = { x: (to.left - bounds.left) / zoom, y: (to.top + to.height / 2 - bounds.top) / zoom };
+        const from = index.nodes.get(edge.from.nodeId)!, to = index.nodes.get(edge.to.nodeId)!;
+        const a = from.id === moving?.nodeId ? moving : from.position ?? { x: 24, y: 24 }, b = to.id === moving?.nodeId ? moving : to.position ?? { x: 24, y: 24 };
+        if (windowed && !intersectsWindow(canvasWindow, Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x) + 240,
+          Math.max(a.y + 140 + (from.inputs.length + from.outputs.length) * 44, b.y + 140 + (to.inputs.length + to.outputs.length) * 44))) return [];
+        const start = point(edge.from, 'output'), end = point(edge.to, 'input');
         const bend = Math.max(48, Math.abs(end.x - start.x) / 2), type = index.nodes.get(edge.from.nodeId)?.outputs.find(port => port.id === edge.from.portId)?.type;
         return [{ id: edge.id, from: edge.from, path: `M${start.x},${start.y} C${start.x + bend},${start.y} ${end.x - bend},${end.y} ${end.x},${end.y}`, kind: type ? wireKind(type) : 'record' }];
       }));
     };
     measure();
-    const observer = new ResizeObserver(measure); observer.observe(board.current);
-    return () => observer.disconnect();
-  }, [layoutKey, moving, view, zoom, phone, host.observations]);
+  }, [wireGeometry, windowed, canvasWindow, visibleKey]);
   const close = () => { onClose(); returnFocus?.focus(); };
   const apply = async () => {
     if (!result.ok || detached.length || busy) return;
@@ -189,12 +216,13 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const actions = useMemo<BlockActions>(() => ({
     register: target => element => { if (element) refs.current.set(focusKey(target), element); else refs.current.delete(focusKey(target)); },
     remember: target => setState(held => held.focus?.nodeId === target.nodeId && held.focus?.portId === target.portId && held.focus?.direction === target.direction ? held : { ...held, focus: target }),
+    reveal: node => locate(node.id),
     select: node => { focus({ nodeId: node.id }); setEntered(node.id); setPanel('inspector'); },
     headerKeys, nodeKeys, move: beginMove,
     connect: request => { connectionReturn.current = { ...request.socket, direction: request.direction }; setConnection(request); },
     disconnect: edgeId => send({ type: 'disconnect', edgeId }),
     inspect: () => setPanel('inspector'), remove: setDeleting,
-  }), [focus, headerKeys, nodeKeys, beginMove, send]);
+  }), [focus, headerKeys, nodeKeys, beginMove, send, locate]);
   const add = (entry: BlockCatalogEntry) => {
     const seed = blockSeed(entry, host.data.sources[0]?.id), scopeId = selected?.scopeId ?? graph.scopes[0]?.id;
     if (seed && scopeId) send({ type: 'add', seed, scopeId });
@@ -243,16 +271,17 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     <div className="w2-canvas-work">
       {!phone && panel === 'palette' && palette}
       <main className="w2-canvas-main" aria-label="Flow canvas">
-        <p id="w2-canvas-key-help" className="w2-canvas-sr">Arrows select blocks or traverse their controls. Enter enters ports and actions. Escape returns to the header. Tab leaves the graph. Use Move for 8 px steps, Shift for 32 px. Delete removes a block. Control or Command Z undoes an edit.</p>
+        <p id="w2-canvas-key-help" className="w2-canvas-sr">Arrows select blocks or traverse their controls. Home and End reach the first and last blocks. Every block header remains in reading order; select an off-screen header to reveal its ports, or use Outline for all blocks and connections. Enter enters ports and actions. Escape returns to the header. Tab leaves the graph. Use Move for 8 px steps, Shift for 32 px. Delete removes a block. Control or Command Z undoes an edit.</p>
         <div className="w2-canvas-viewport" ref={viewport}>
           <div className="w2-canvas-scaled" style={view === 'graph' ? { width: width * zoom, height: height * zoom } : undefined}>
             <ul ref={board} className={`w2-canvas-nodes w2-canvas-${view}`} aria-label={view === 'graph' ? 'Flow graph blocks' : 'Flow outline blocks'} aria-describedby="w2-canvas-key-help"
               style={view === 'graph' ? { width, height, transform: `scale(${zoom})` } : undefined}>
               {view === 'graph' && <CanvasWires paths={wirePaths} width={width} height={height} observations={host.observations}/>}
-              {ordered.map(node => {
+              {ordered.map((node, positionInSet) => {
                 const position = node.id === moving?.nodeId ? moving : node.position;
                 const active = selected?.id === node.id;
                 return <CanvasBlock key={node.id} model={models.get(node.id)!} observation={host.observations?.[node.id]}
+                  visible={visible.has(node.id)} position={positionInSet + 1} count={ordered.length}
                   active={active} controls={entered === node.id} tabStop={active || !selected && ordered[0] === node} positioned={view === 'graph'} x={position?.x ?? 24} y={position?.y ?? 24} actions={actions}/>;
               })}
             </ul>

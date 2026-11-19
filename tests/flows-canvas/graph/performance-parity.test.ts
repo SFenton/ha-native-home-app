@@ -48,4 +48,26 @@ it('reuses an exact revision index without exposing mutable trusted maps or acce
   expect(() => validateForLowering(graph, { ...index })).toThrow(TypeError);
   expect(() => validateForLowering(graph, Object.create(Object.getPrototypeOf(index)))).toThrow(TypeError);
   expect(() => validateForLowering(graph, new Proxy(index, {}))).toThrow(TypeError);
+  expect(() => validateForLowering(graph, Reflect.construct(Object.getPrototypeOf(index).constructor, [graph]))).toThrow(TypeError);
+});
+it.each(['edges', 'nodes', 'literal'] as const)('prevents %s from changing after validation, including a shallow-frozen outer graph', part => {
+  const graph = Object.freeze(lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph);
+  const validated = validateForLowering(graph), before = lowerValidated(validated);
+  if (part === 'edges') {
+    expect(() => Array.prototype.pop.call(graph.edges)).toThrow(TypeError);
+    expect(Reflect.set(graph.edges[0].to, 'portId', 'missing')).toBe(false);
+  } else if (part === 'nodes') {
+    expect(() => Array.prototype.pop.call(graph.nodes)).toThrow(TypeError);
+    expect(Reflect.set(graph.nodes[0], 'inputs', [])).toBe(false);
+  } else {
+    const literal = graph.nodes.find(node => node.payload.kind === 'operand' && node.payload.value.type === 'literal')!;
+    if (literal.payload.kind !== 'operand' || literal.payload.value.type !== 'literal') throw new Error('Expected literal fixture.');
+    expect(Reflect.set(literal.payload.value, 'value', 99)).toBe(false);
+    expect(Reflect.set(literal.payload, 'value', { type: 'literal', value: 99 })).toBe(false);
+  }
+  expect(lowerValidated(validated)).toEqual(before);
+  expect(lowerValidated(validated)).toEqual(lower(graph));
+  const changed = { ...graph, edges: graph.edges.slice(1) };
+  expect(lower(changed).ok).toBe(false);
+  expect(() => validateForLowering(changed, readGraphValidation(validated).index)).toThrow(TypeError);
 });

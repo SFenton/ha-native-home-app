@@ -21,6 +21,24 @@ function readonlyMap<K, V>(map: Map<K, V>): ReadonlyMap<K, V> {
   };
   return Object.freeze(view);
 }
+function freezeRevision(graph: LogicGraph): void {
+  const seen = new Set<object>();
+  const freeze = (value: object): void => {
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        const child: unknown = value[i];
+        if (child !== null && typeof child === 'object') freeze(child);
+      }
+    } else for (const key of Object.getOwnPropertyNames(value)) {
+      const child = (value as Record<string, unknown>)[key];
+      if (child !== null && typeof child === 'object') freeze(child);
+    }
+    Object.freeze(value);
+  };
+  freeze(graph);
+}
 function sameUnboundJSON(left: GraphJSON, right: GraphJSON, bindings: ReadonlyMap<string | undefined, readonly GraphPort[]>, at = ''): boolean {
   if (left === right || bindings.has(at)) return true;
   if (Array.isArray(left)) {
@@ -42,6 +60,7 @@ function sameUnboundJSON(left: GraphJSON, right: GraphJSON, bindings: ReadonlyMa
 class RevisionIndex {
   readonly #graph: LogicGraph;
   readonly #graphs: WeakSet<LogicGraph>;
+  readonly #immutable: boolean;
   readonly #nodes = new Map<string, GraphNode>();
   readonly #incoming = new Map<string, Map<string, GraphEdge[]>>();
   readonly #dependencies = new Map<string, GraphEdge[]>();
@@ -51,7 +70,9 @@ class RevisionIndex {
   readonly #empty: readonly never[] = Object.freeze([]);
   readonly nodes: ReadonlyMap<string, GraphNode>;
   readonly incomingNodes: ReadonlyMap<string, readonly GraphEdge[]>;
-  constructor(graph: LogicGraph) {
+  constructor(graph: LogicGraph, immutable = false) {
+    if (immutable) freezeRevision(graph);
+    this.#immutable = immutable;
     this.#graph = graph;
     this.#graphs = new WeakSet([graph]);
     for (const node of graph.nodes) {
@@ -89,7 +110,7 @@ class RevisionIndex {
     Object.freeze(this);
   }
   static matches(candidate: RevisionIndex, graph: LogicGraph): boolean {
-    return candidate instanceof RevisionIndex && #graphs in candidate && Object.getPrototypeOf(candidate) === RevisionIndex.prototype && candidate.#graphs.has(graph);
+    return candidate instanceof RevisionIndex && #graphs in candidate && Object.getPrototypeOf(candidate) === RevisionIndex.prototype && candidate.#immutable && candidate.#graphs.has(graph);
   }
   get graph(): LogicGraph { return this.#graph; }
   get nodeCount(): number { return this.#nodes.size; }
@@ -132,9 +153,9 @@ class RevisionIndex {
 Object.freeze(RevisionIndex.prototype);
 Object.freeze(RevisionIndex);
 export type GraphRevisionIndex = RevisionIndex;
-export function prepareGraphRevision(graph: LogicGraph): GraphRevisionIndex { return new RevisionIndex(graph); }
+export function prepareGraphRevision(graph: LogicGraph): GraphRevisionIndex { return new RevisionIndex(graph, true); }
 function revisionIndex(graph: LogicGraph, prepared?: GraphRevisionIndex): GraphRevisionIndex {
-  if (prepared === undefined) return prepareGraphRevision(graph);
+  if (prepared === undefined) return new RevisionIndex(graph);
   if (!RevisionIndex.matches(prepared, graph)) throw new TypeError('Expected indexes for this exact immutable graph revision.');
   return prepared;
 }
@@ -143,7 +164,7 @@ class ValidatedGraph {
   readonly #states: WeakMap<LogicGraph, { readonly graph: LogicGraph; readonly diagnostics: readonly GraphDiagnostic[]; readonly index: GraphRevisionIndex }>;
   constructor(graph: LogicGraph, prepared?: GraphRevisionIndex) {
     this.#graph = graph;
-    const index = revisionIndex(graph, prepared);
+    const index = prepared === undefined ? prepareGraphRevision(graph) : revisionIndex(graph, prepared);
     const diagnostics = Object.freeze(validateGraph(graph, { index }).map(diagnostic => Object.freeze(diagnostic)));
     this.#states = new WeakMap([[graph, Object.freeze({ graph, diagnostics, index })]]);
     Object.freeze(this);
@@ -160,7 +181,7 @@ class ValidatedGraph {
 Object.freeze(ValidatedGraph.prototype);
 Object.freeze(ValidatedGraph);
 export type GraphValidation = ValidatedGraph;
-/** Explicit handoff for one immutable graph revision; never reuse after mutating it. */
+/** Freezes the revision deeply before validation so the trusted handoff cannot become stale. */
 export function validateForLowering(graph: LogicGraph, index?: GraphRevisionIndex): GraphValidation {
   return new ValidatedGraph(graph, index);
 }

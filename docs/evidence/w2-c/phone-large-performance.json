@@ -1,13 +1,24 @@
 {
   "nodes": 2341,
   "steps": 32,
-  "mount": 2253.0529160000006,
-  "lookup": 4.299999713897705,
-  "focus": 452.91812500000015,
-  "edit": 567.4774999999972,
+  "mount": 1082.8041250000024,
+  "lookup": 9.5,
+  "focus": 121.35791600000084,
+  "edit": 164.0782500000023,
+  "mountReads": {
+    "ports": 96,
+    "boards": 1
+  },
   "geometryReads": {
     "ports": 0,
     "boards": 0
+  },
+  "mountProfile": {
+    "Nodes": 31436,
+    "LayoutCount": 5,
+    "LayoutDuration": 0.022774,
+    "RecalcStyleDuration": 0.013956,
+    "ScriptDuration": 0.618664
   },
   "budgets": {
     "mount": 5000,

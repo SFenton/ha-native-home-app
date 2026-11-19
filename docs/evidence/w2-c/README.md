@@ -25,39 +25,50 @@ npx vitest run tests/flows-canvas/graph/canvas-performance.test.ts \
 
 Final local results for this revision:
 
-- Full suite: **273 files, 14,127 passing tests**, one pre-existing skip.
+- Full suite: **278 files, 14,164 passing tests**, one pre-existing skip.
 - Production build and TypeScript: **passed**.
-- Canvas-focused units: **176 passed**.
-- Isolated Playwright: **24 passed**, twelve desktop and twelve phone.
-- Standard CI Playwright config: **24 passed, none skipped**, using the same
+- Isolated Playwright: **26 passed**, thirteen desktop and thirteen phone.
+- Standard CI Playwright config runs the same cases using the same
   4822/data overrides. The harness HTML swap is test-owned; no shell/server or
   workflow change is needed.
 - **2,341 nodes / 32 steps:** validate plus already-validated lower median
-  **19.12 ms**, minimum 17.87, maximum 34.19; 31 samples after 30 instrumented warmups.
-  Stage medians: **validate 11.87 ms; lower 7.13 ms; adapter 3.48 ms**.
+  **26.27 ms**, minimum 23.45, maximum 47.57; 31 samples after 30 instrumented warmups.
+  Stage medians: **validate 17.73 ms; lower 8.29 ms; adapter 3.52 ms**.
   Lower includes the adapter; medians are independent and are not additive.
   Exactly one native source compile is asserted per sample, with the original
   **<=50 ms** gate unchanged.
-  An isolated rerun measured **15.47 ms** (14.70-29.18), with stages
-  **9.18 / 6.30 / 3.17 ms**. Index construction is included, not moved outside
+  Deep-freezing and index construction cost **7.06 ms** and are included, not moved outside
   the timed validation/total. The identical immutable fixture is used every run;
   warmups include the adapter/native-checker spies, and their records are cleared
   before collecting the 31 measured samples.
 
 The review baseline was **11,570 ms lookup**, **42,810 ms Chromium mount** and a
-focus timeout. The new standard-config browser measurements are:
+focus timeout. The round-three local isolated browser measurements are:
 
 | 2,341-node fixture | Desktop | Phone | Asserted budget |
 | --- | ---: | ---: | ---: |
-| Mount, navigation through two painted frames | 2,323.59 ms | 2,253.05 ms | <5,000 ms |
-| Build index and resolve every incoming port | 3.20 ms | 4.30 ms | <50 ms |
-| Select a Number and focus its output | 444.61 ms | 452.92 ms | <1,000 ms |
-| Submit a valid literal edit through two painted frames | 595.30 ms | 567.48 ms | <1,500 ms |
+| Mount, navigation through two painted frames | 1,118.21 ms | 1,082.80 ms | <5,000 ms |
+| Freeze/build index and resolve every incoming port | 9.10 ms | 9.50 ms | <50 ms |
+| Select a Number and focus its output | 101.09 ms | 121.36 ms | <1,000 ms |
+| Submit a valid literal edit through two painted frames | 148.10 ms | 164.08 ms | <1,500 ms |
 
 Raw browser measurements are in [desktop](desktop-large-performance.json) and
 [phone](phone-large-performance.json), and attached to the browser test report.
 These are real browser interactions on the complete fixture, not a smaller
-proxy or a disconnected edit that avoids compilation.
+proxy or a disconnected edit that avoids compilation. All 2,341 blocks remain
+in the graph; only visual cards/ports and nearby wires are windowed. Lightweight
+headers retain complete assistive-technology order and list position metadata.
+Off-screen DOM focus and Home/End reveal and scroll their target, and Outline
+still exposes all 2,341 full blocks and 2,340 connections.
+
+The pre-windowing local mount profile made **9,360 port reads** on each device,
+with scripting **1.181 / 1.181 s** and style recalculation **0.139 / 0.139 s**.
+Windowed profiles made **99 / 96 port reads**, with scripting **0.627 / 0.619 s**
+and style recalculation **0.016 / 0.014 s**. Chromium's total-node metric fell
+from **321,598 / 316,420** to **38,050 / 31,436** (including detached nodes).
+The regression asserts fewer than 100 visual cards and 500 mount port reads,
+without changing the original timing gates. The hosted mount target is <=2,500 ms;
+current-head hosted results are recorded in the PR body.
 The literal-edit regression additionally asserts **zero port/board geometry
 reads**. Stable block presentation models, actions and memoized wires avoid
 graph-wide React rendering; only affected models change. Actual topology,
@@ -103,6 +114,12 @@ diagnostics, prototype impostors and proxies are rejected. The exact graph keys 
 private per-token WeakMap; trusted reads do not compare or hash graph contents.
 Core indexes are per call or immutable editor revision and shared with projection,
 with no cross-call caches or mutable module state.
+Preparation now also deeply freezes the exact graph and nested data. Edge/node
+array edits, edge endpoints, input arrays and nested literal changes are refused
+at runtime; tests include an already shallow-frozen outer graph. No shallow
+`Object.isFrozen` shortcut or cross-call freeze registry is used. Standalone
+diagnostic-only `validateGraph` remains non-freezing, preserving #24's same-object
+mutation regression; trusted preparation and direct lower freeze before indexing.
 
 The dedicated configuration defaults to 4822 and honors the port/data overrides.
 It has no HA/persistence backend or credentials. The standard configuration uses

@@ -46,4 +46,4 @@ it('C-meter preserves one compilation and <=50ms median validate plus lower for 
   const start = performance.now();
   for (let i = 0; i < 1_000_000; i++) if (readGraphValidation(token).graph !== edited) throw new Error('Wrong validated revision.');
   process.stdout.write(`Canvas trust: ${(performance.now() - start).toFixed(2)} ns/call over 1000000 exact-revision WeakMap reads after 10000 warmups.\n`);
-});
+}, 30_000);

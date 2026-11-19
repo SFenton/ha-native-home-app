@@ -12,6 +12,7 @@ import { wireKind } from './theme';
 export interface BlockActions {
   register(target: CanvasFocus): (element: HTMLButtonElement | null) => void;
   remember(target: CanvasFocus): void;
+  reveal(node: GraphNode): void;
   select(node: GraphNode): void;
   headerKeys(event: KeyboardEvent<HTMLButtonElement>, node: GraphNode): void;
   nodeKeys(event: KeyboardEvent<HTMLLIElement>, node: GraphNode): void;
@@ -31,9 +32,17 @@ interface Props {
   x: number;
   y: number;
   actions: BlockActions;
+  visible: boolean;
+  position: number;
+  count: number;
 }
-export default memo(function CanvasBlock({ model, observation, active, controls, tabStop, positioned, x, y, actions }: Props) {
+export default memo(function CanvasBlock({ model, observation, active, controls, tabStop, positioned, x, y, actions, visible, position, count }: Props) {
   const { node, name, detail } = model;
+  if (!visible) return <li className="w2-canvas-sr" data-node-id={node.id} data-windowed aria-posinset={position} aria-setsize={count}>
+    <button type="button" ref={actions.register({ nodeId: node.id })} tabIndex={-1} aria-label={`Select ${name} ${model.ordinal}`}
+      aria-description="Off-screen block. Select to bring it into view and edit its ports." onFocus={() => actions.reveal(node)} onClick={() => actions.reveal(node)}
+      onKeyDown={event => actions.headerKeys(event, node)}>{name}</button>
+  </li>;
   const renderPort = ({ port, direction, label, links, kind, itemKind, connected, disconnect }: PortPresentation) => {
     const target = { nodeId: node.id, portId: port.id, direction };
     const type = port.type.valueType === 'unresolved' ? 'Unresolved type' : port.type.valueType;
@@ -50,7 +59,7 @@ export default memo(function CanvasBlock({ model, observation, active, controls,
       {direction === 'input' && port.required && !connected && <span className="w2-canvas-error" aria-hidden>!</span>}
     </button>;
   };
-  return <li className="w2-canvas-node" data-selected={active || undefined} data-node-id={node.id} data-scenario-pinned={observation?.scenarioPinned || undefined} style={positioned ? { left: x, top: y } : undefined} onKeyDown={event => actions.nodeKeys(event, node)}>
+  return <li className="w2-canvas-node" aria-posinset={position} aria-setsize={count} data-selected={active || undefined} data-node-id={node.id} data-scenario-pinned={observation?.scenarioPinned || undefined} style={positioned ? { left: x, top: y } : undefined} onKeyDown={event => actions.nodeKeys(event, node)}>
     <button type="button" ref={actions.register({ nodeId: node.id })} className="w2-canvas-node-head" aria-label={`Select ${name} ${model.ordinal}`} aria-description={observation?.scenarioPinned ? 'Pinned by scenario.' : undefined} aria-pressed={active}
       tabIndex={tabStop ? 0 : -1} onFocus={() => actions.remember({ nodeId: node.id })} onClick={() => actions.select(node)} onKeyDown={event => actions.headerKeys(event, node)}>
       <span className="w2-canvas-block-icon" data-wire-type={wireKind(node.outputs[0].type)}><BlockIcon catalogKey={node.catalogKey}/></span><strong>{name}</strong>{model.root && <small>Output</small>}

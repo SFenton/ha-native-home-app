@@ -68,6 +68,16 @@ icons; the existing theme and graph helpers supply tokens, shapes and LAN-safe
 license/notices changed. SVG wires are decorative; native HTML controls and the
 outline provide the full editing interface.
 
+Graphs above 200 blocks window their visual cards, port readings and wires to
+the viewport plus 240 CSS pixels of overscan. Each off-screen block keeps a
+lightweight header in the same list order, with its position and total size
+exposed to assistive technology. Focusing/activating that header or navigating
+with arrows/Home/End renders the full block and scrolls it into view. Selected
+and entered blocks remain mounted. Outline retains every full block and wire.
+Only newly visible port geometry is read; scrolling, viewport resize and
+payload-only edits reuse existing board-space coordinates. Off-screen wire
+endpoints use layout estimates until their actual ports are mounted.
+
 Node, edge, incoming-port, binding and wide-port indexes are built once per
 immutable graph revision with `prepareGraphRevision(graph)`. Canvas lookup,
 validation and projection share that opaque revision index; only read-only
@@ -89,13 +99,20 @@ immutable revision, shared index and ordered diagnostics in a private WeakMap
 keyed on that graph object. Lowering checks its runtime class/private brand and
 per-token WeakMap in O(1); spread copies, wrappers, proxies and replaced diagnostics
 cannot bypass validation. There is no module-level registry.
+Preparation deeply freezes the graph and its nested data before indexing or
+issuing a trusted token. Post-validation edge, node and literal mutations fail
+rather than leaving stale trusted state. Shallow-frozen input is still traversed;
+there is no "outer object is frozen" shortcut. The traversal's visited set is
+local to the call, with no immutable-object cache or module-level state.
+Standalone `validateGraph(graph)` remains a non-freezing diagnostic query;
+`prepareGraphRevision`, `validateForLowering` and direct `lower` freeze revisions.
 Calling `lower(graph)` directly still
 validates and takes the same refusal path; `lower(graph, { index })` also validates,
 but reuses the already prepared exact-revision indexes. Indexes are call-local or
 owned by one immutable editor revision, with no cross-call cache or mutable module
 state. The performance guard retains its 50 ms median. It uses the unchanged
 2,341-node edited fixture for 30 instrumented warmups and 31 measured runs, includes
-fresh index preparation in every validation/total sample, and asserts one native
+fresh deep-freezing/index preparation in every validation/total sample, and asserts one native
 compile per measured run. Stage medians, index cost and a separate million-read
 trusted-handoff profile are printed in local and hosted logs.
 Before/after corpus hashes were captured at the pre-optimization head and cover
