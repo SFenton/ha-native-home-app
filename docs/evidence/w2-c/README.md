@@ -28,34 +28,42 @@ Final local results for this revision:
 - Full suite: **278 files, 14,164 passing tests**, one pre-existing skip.
 - Production build and TypeScript: **passed**.
 - Isolated Playwright: **26 passed**, thirteen desktop and thirteen phone.
-- Standard CI Playwright config runs the same cases using the same
+- Standard CI Playwright config: **26 passed, none skipped**, using the same
   4822/data overrides. The harness HTML swap is test-owned; no shell/server or
   workflow change is needed.
 - **2,341 nodes / 32 steps:** validate plus already-validated lower median
-  **26.27 ms**, minimum 23.45, maximum 47.57; 31 samples after 30 instrumented warmups.
-  Stage medians: **validate 17.73 ms; lower 8.29 ms; adapter 3.52 ms**.
+  **26.69 ms**, minimum 24.32, maximum 38.46; 31 samples after 30 instrumented warmups.
+  Stage medians: **validate 18.01 ms; lower 8.46 ms; adapter 3.77 ms**.
   Lower includes the adapter; medians are independent and are not additive.
   Exactly one native source compile is asserted per sample, with the original
   **<=50 ms** gate unchanged.
-  Deep-freezing and index construction cost **7.06 ms** and are included, not moved outside
+  Deep-freezing and index construction cost **7.32 ms** and are included, not moved outside
   the timed validation/total. The identical immutable fixture is used every run;
   warmups include the adapter/native-checker spies, and their records are cleared
   before collecting the 31 measured samples.
+  This full suite used `npm test -- --maxWorkers=2` because the shared Mac was
+  concurrently running other CPU-intensive tasks. Earlier runs saw a 53.79 ms
+  median failure and a separate 5 s total-test timeout (41.65 ms median);
+  neither is counted as a pass. The final focused run passed at 46.13 ms.
+  The test's overall watchdog is now 30 s so 61 instrumented iterations plus
+  lifting/profiling can finish under contention; the 50 ms performance assertion
+  and every browser budget are unchanged.
 
 The review baseline was **11,570 ms lookup**, **42,810 ms Chromium mount** and a
 focus timeout. The round-three local isolated browser measurements are:
 
 | 2,341-node fixture | Desktop | Phone | Asserted budget |
 | --- | ---: | ---: | ---: |
-| Mount, navigation through two painted frames | 1,118.21 ms | 1,082.80 ms | <5,000 ms |
-| Freeze/build index and resolve every incoming port | 9.10 ms | 9.50 ms | <50 ms |
-| Select a Number and focus its output | 101.09 ms | 121.36 ms | <1,000 ms |
-| Submit a valid literal edit through two painted frames | 148.10 ms | 164.08 ms | <1,500 ms |
+| Mount, navigation through two painted frames | 1,206.01 ms | 1,140.51 ms | <5,000 ms |
+| Freeze/build index and resolve every incoming port | 8.80 ms | 9.10 ms | <50 ms |
+| Select a Number and focus its output | 107.33 ms | 133.49 ms | <1,000 ms |
+| Submit a valid literal edit through two painted frames | 172.60 ms | 202.58 ms | <1,500 ms |
 
 Raw browser measurements are in [desktop](desktop-large-performance.json) and
 [phone](phone-large-performance.json), and attached to the browser test report.
 These are real browser interactions on the complete fixture, not a smaller
-proxy or a disconnected edit that avoids compilation. All 2,341 blocks remain
+proxy or a disconnected edit that avoids compilation. These are standard-config
+measurements; the dedicated config also passed all 26 cases. All 2,341 blocks remain
 in the graph; only visual cards/ports and nearby wires are windowed. Lightweight
 headers retain complete assistive-technology order and list position metadata.
 Off-screen DOM focus and Home/End reveal and scroll their target, and Outline
@@ -63,9 +71,9 @@ still exposes all 2,341 full blocks and 2,340 connections.
 
 The pre-windowing local mount profile made **9,360 port reads** on each device,
 with scripting **1.181 / 1.181 s** and style recalculation **0.139 / 0.139 s**.
-Windowed profiles made **99 / 96 port reads**, with scripting **0.627 / 0.619 s**
-and style recalculation **0.016 / 0.014 s**. Chromium's total-node metric fell
-from **321,598 / 316,420** to **38,050 / 31,436** (including detached nodes).
+Windowed profiles made **99 / 96 port reads**, with scripting **0.655 / 0.632 s**
+and style recalculation **0.018 / 0.014 s**. Chromium's total-node metric fell
+from **321,598 / 316,420** to **38,056 / 31,442** (including detached nodes).
 The regression asserts fewer than 100 visual cards and 500 mount port reads,
 without changing the original timing gates. The hosted mount target is <=2,500 ms;
 current-head hosted results are recorded in the PR body.

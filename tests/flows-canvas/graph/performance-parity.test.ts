@@ -50,6 +50,17 @@ it('reuses an exact revision index without exposing mutable trusted maps or acce
   expect(() => validateForLowering(graph, new Proxy(index, {}))).toThrow(TypeError);
   expect(() => validateForLowering(graph, Reflect.construct(Object.getPrototypeOf(index).constructor, [graph]))).toThrow(TypeError);
 });
+it('preserves resource-boundary diagnostics when deeply nested input must be frozen before validation', () => {
+  const lifted = lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph;
+  let original: typeof lifted.original = null;
+  for (let i = 0; i < 10_000; i++) original = [original];
+  const graph = { ...lifted, original }, expected = validateGraph(graph);
+  expect(expected.some(issue => issue.code === 'limit_exceeded')).toBe(true);
+  expect(validateForLowering(graph).diagnostics).toEqual(expected);
+  const result = lower(graph);
+  expect(result.ok).toBe(false);
+  if (!result.ok) expect(result.errors).toEqual(expected);
+});
 it.each(['edges', 'nodes', 'literal'] as const)('prevents %s from changing after validation, including a shallow-frozen outer graph', part => {
   const graph = Object.freeze(lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph);
   const validated = validateForLowering(graph), before = lowerValidated(validated);

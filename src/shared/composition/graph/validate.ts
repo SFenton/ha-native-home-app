@@ -22,22 +22,22 @@ function readonlyMap<K, V>(map: Map<K, V>): ReadonlyMap<K, V> {
   return Object.freeze(view);
 }
 function freezeRevision(graph: LogicGraph): void {
-  const seen = new Set<object>();
-  const freeze = (value: object): void => {
-    if (seen.has(value)) return;
+  const seen = new Set<object>(), pending: object[] = [graph];
+  while (pending.length) {
+    const value = pending.pop()!;
+    if (seen.has(value)) continue;
     seen.add(value);
+    Object.freeze(value);
     if (Array.isArray(value)) {
       for (let i = 0; i < value.length; i++) {
         const child: unknown = value[i];
-        if (child !== null && typeof child === 'object') freeze(child);
+        if (child !== null && typeof child === 'object') pending.push(child);
       }
     } else for (const key of Object.getOwnPropertyNames(value)) {
       const child = (value as Record<string, unknown>)[key];
-      if (child !== null && typeof child === 'object') freeze(child);
+      if (child !== null && typeof child === 'object') pending.push(child);
     }
-    Object.freeze(value);
-  };
-  freeze(graph);
+  }
 }
 function sameUnboundJSON(left: GraphJSON, right: GraphJSON, bindings: ReadonlyMap<string | undefined, readonly GraphPort[]>, at = ''): boolean {
   if (left === right || bindings.has(at)) return true;
