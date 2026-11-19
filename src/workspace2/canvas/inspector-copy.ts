@@ -45,7 +45,10 @@ export function inspectorDescription(node: GraphNode, graph: LogicGraph, index: 
     if (value.type === 'read') return `Reads ${nodeDetail(node, sources, graph, index)} as ${value.as}. Missing data: ${value.missing}.`;
     if (value.type === 'raw-state') return `Reads the state text from ${nodeDetail(node, sources, graph, index)} without numeric conversion.`;
     if (value.type === 'last-changed') return `Returns when ${nodeDetail(node, sources, graph, index)} last changed state.`;
-    if (value.type === 'choose') return `${Array.isArray(value.cases) ? value.cases.length : 0} rules are checked in order; the first matching If supplies Then. Otherwise: ${index.source(node.id, '/otherwise') ? branchLabel(index.source(node.id, '/otherwise')!, graph, index, sources) : 'unconnected'}.`;
+    if (value.type === 'choose') {
+      const count = Array.isArray(value.cases) ? value.cases.length : 0;
+      return `${count} ${count === 1 ? 'rule is' : 'rules are'} checked in order; the first matching If supplies Then. Otherwise: ${index.source(node.id, '/otherwise') ? branchLabel(index.source(node.id, '/otherwise')!, graph, index, sources) : 'unconnected'}.`;
+    }
     if (value.type === 'date') return `${name}: ${inputNames.join('; ')}.`;
     if (value.type === 'clock') return `Returns ${String(value.part).replaceAll('-', ' ')} from the app clock.`;
   }

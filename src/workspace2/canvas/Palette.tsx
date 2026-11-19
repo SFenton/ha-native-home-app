@@ -19,6 +19,14 @@ export default function Palette({ scope, capabilities, sourceId, graph, index: p
   const entries = useMemo(() => blockCatalog.filter(entry => `${blockName(entry.key)} ${blockGroup(entry)} ${entry.key}`.toLowerCase().includes(needle)), [needle]);
   const available = entries.filter(entry => availability.get(entry.key)!.enabled && (needle || !['predicate.compare.ne', 'predicate.compare.below', 'predicate.compare.after'].includes(entry.key)));
   const unavailable = entries.filter(entry => !availability.get(entry.key)!.enabled);
+  const unavailableReason = (entry: BlockCatalogEntry) => {
+    const reason = availability.get(entry.key)!.reason;
+    if (entry.key === 'recipe.A-number-state') return 'This calculation needs numbers, but these entity states are text.';
+    if (reason?.startsWith('Not available in ')) return 'This block needs a different kind of field or flow.';
+    if (reason?.startsWith('Target does not support ')) return "The app you're targeting does not support this block.";
+    return reason?.startsWith('Requires a destination or template')
+      ? 'Add this through its field or template editor so its required settings are available.' : reason;
+  };
   const current = graph.nodes.filter(node => names.get(node.id)!.toLowerCase().includes(needle));
   const name = (entry: BlockCatalogEntry) => !needle && entry.grammar === 'predicate.compare'
     ? (comparisonNames[entry.variant] ?? blockName(entry.key)) : blockName(entry.key);
@@ -62,7 +70,7 @@ export default function Palette({ scope, capabilities, sourceId, graph, index: p
           </ul>}
         </section>;
       })}
-      {!!unavailable.length && <details className="w2-canvas-unavailable"><summary>Not available here <span>{unavailable.length}</span></summary><ul>{unavailable.map(entry => <li key={entry.key}><strong>{blockName(entry.key)}</strong><p>{availability.get(entry.key)!.reason}</p></li>)}</ul></details>}
+      {!!unavailable.length && <details className="w2-canvas-unavailable" hidden={!needle} open={Boolean(needle)}><summary>Not available here <span>{unavailable.length}</span></summary><ul>{unavailable.map(entry => <li key={entry.key}><strong>{blockName(entry.key)}</strong><p>{unavailableReason(entry)}</p></li>)}</ul></details>}
       {!entries.length && !current.length && <p>Nothing matches.</p>}
     </div>
     <p className="w2-canvas-caption w2-canvas-palette-foot">Click to add, or search and use arrows and Enter. The dot shows what a block gives back: <span><i data-wire-type="number"/> number, <i data-wire-type="condition"/> yes/no, <i data-wire-type="text"/> text.</span></p>
