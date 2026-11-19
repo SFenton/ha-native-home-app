@@ -1,6 +1,6 @@
 # W2-C: isolated canvas interaction evidence
 
-Base: `2fd1e9cfd8a37221690d995ed7b576516d3c7424` (#24). No workspace shell,
+Rebased onto `427eaba` (0.3.15), retaining #24 and #25. No workspace shell,
 native app, server, compiler entry point or evaluator edits.
 
 ## Reproduce
@@ -19,6 +19,15 @@ The standalone Vite CanvasHost harness needs no persistence backend or HA
 credentials. Browser tests use only 4822 and stop their temporary server. No
 test resets the user's data. Screenshots are from Chromium desktop
 1440 x 900 and touch-enabled phone viewport 390 x 844 (not a native-device test).
+
+Final validation on the rebased branch:
+
+- `npm test -- --maxWorkers=2`: 270 files passed; 12,210 tests passed and one
+  pre-existing skip.
+- `npm run build`: passed (TypeScript plus Vite).
+- Canvas-focused units: 49 passed.
+- Isolated Playwright: 10 passed, five desktop and five phone.
+- Temporary browser/server resources stopped; port 4822 has no listener.
 
 ## Acceptance evidence
 
@@ -47,10 +56,11 @@ compiler diagnostics agree; no checker reconciliation is included.
 The dedicated performance test changes a literal in the existing **2,341-node,
 32-step** fixture, warms up five times, then measures `validateGraph + lower`
 15 times. It also spies on the native source entry point: exactly one call per
-iteration, including budgets. An isolated run measured **32.51 ms median**,
-30.98 ms minimum, 33.81 ms maximum (required median <=50 ms).
+iteration, including budgets. The final rebased run measured **37.00 ms median**,
+34.42 ms minimum, 39.73 ms maximum (required median <=50 ms). An earlier run
+measured 32.51 ms median.
 
-**Pending:** W2-D's observer-forwarding PR must merge before production counter
+**Pending:** W2-D's observer-forwarding PR #28 must merge before production counter
 capture can be wired into `graph/compile.ts`. Production meters currently say
 accounting is unavailable. The reducer/UI/fixtures do not pretend those counters
 are live. Performance with that future capture must be remeasured after wiring.
