@@ -173,8 +173,16 @@ The compound summary follows panel 3 of 15-editor, **not superseded panel 2**.
 ## Accounting correctness and remaining dependency
 
 The observation seam is documented in the [host handoff](../../../src/workspace2/canvas/README.md#optional-observation-input).
-PR #30 is still open at `2ef61f6`, without a merged
-requested per-port display DTO. The local readonly contract is
+PR #30 merged as `1ae7d5f`; main is merged into this branch. Its
+`canvasObservations` function and `CanvasObservations` type are exported from
+`workspace2/logic-simulation`, not `shared/composition/graph-observation`.
+The shared module exports the run-observation collector, `createObservation`.
+The simulation display DTO has `{ blocks, order, truncated }`, per-block `ports`
+arrays and additional mixed/loading/not-observed states, so it is not assignable
+to the canvas DTO. Per the owner's fallback instruction, wiring remains with
+W2-I rather than introducing a canvas-to-simulation dependency or editing W2-S
+files. No new adapter test is claimed for a deferred adapter.
+The local readonly contract remains
 `host.observations[nodeId].{scenarioPinned, inputs, outputs}` with port fields
 `state`, `source`, `value` and `kept`. Missing observations show nothing; no
 connected-source or configured-literal fallback exists. Focus restoration and

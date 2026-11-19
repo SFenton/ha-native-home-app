@@ -142,11 +142,18 @@ Missing input observations remain empty even when their connected output has a
 known value. The host owns snapshot freshness and sanitization and must update or
 withdraw stale observations when the graph/simulation changes.
 
-PR #30 was checked at head `845c8b6`: it is still open,
-and its documented contracts do not yet define this per-block/per-port display
-DTO. This local extension avoids editing W2-S or shared graph paths; W2-I/W2-S
-can align the exact field names above. The `observations` harness fixture is a
-scripted display snapshot shaped like this API, not simulation/runtime evidence.
+PR #30 merged to main as `1ae7d5f` and is included in this branch.
+At that revision, `canvasObservations` and its `CanvasObservations` type are
+exported by `workspace2/logic-simulation`, not the shared `graph-observation`
+module (which exports `createObservation`). The simulation DTO contains
+`{ blocks, order, truncated }`, with a `ports` array per block and additional
+mixed/loading/not-observed states; it is not assignable to this local DTO.
+
+The canvas does not import the simulation layer or evaluate a run. Under the
+owner's conditional integration instruction, W2-I retains the adapter/wiring
+until a compatible shared display contract is available. No simulation files
+were edited and no adapter test is claimed. The `observations` harness fixture
+remains scripted display data, not simulation/runtime evidence.
 
 ## Accounting dependency (pending)
 
