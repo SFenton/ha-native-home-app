@@ -5,8 +5,11 @@ import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { Operand, Predicate } from '../src/shared/composition/expression';
 import gallery from '../src/preview2/fixtures/logic-gallery.json';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
-import { pruneEntitySources, sourceUses } from '../src/workspace2/dialogs/sources';
+import { documentDependencies, pruneEntitySources, sourceUses } from '../src/workspace2/dialogs/sources';
 import firstSlice from './fixtures/composition-first-slice.json';
+import { newFlow } from '../src/workspace2/data/flow';
+import type { PipelineSource } from '../src/shared/composition/pipeline';
+import { CompositionValidationError } from '../src/shared/composition/json';
 
 const document = gallery.document as unknown as CompositionDocument;
 const path = ['pages', 0, 'components', 0, 'children', 0];
@@ -15,9 +18,9 @@ const state: Predicate = { type: 'state', sourceId: 'demo-light-1', path: ['stat
 const entitySource = (id: string) => ({ id, kind: 'ha-entity', entityId: { type: 'literal', value: `sensor.demo_${id.replaceAll('-', '_')}` } } satisfies CompositionDocument['dataSources'][number]);
 const sourceRead = (id: string) => ({ type: 'read', from: { type: 'source', sourceId: id, path: ['state'] }, as: 'string', missing: 'unavailable' } satisfies Operand);
 const sourceState = (id: string): Predicate => ({ ...state, sourceId: id });
-const textReader = (id: string): CompositionDocument['pages'][number]['components'][number] => ({
+const textReader = (id: string) => ({
   id, title: id, type: 'text', layout: { span: 1 }, props: { value: sourceRead(id), style: 'body', unavailableText: 'Unavailable' },
-});
+} satisfies CompositionDocument['pages'][number]['components'][number]);
 const toolbarReader = (id: string): CompositionDocument['navigation']['chrome']['groups'][number] => ({
   id: `${id}-group`, placement: 'trailing', horizontal: 'shared@1', vertical: 'shared@1',
   items: [{
@@ -36,6 +39,12 @@ const withLevel = (): CompositionDocument => {
     levels: [{ ...surface, id: 'reader-level', title: 'Reader level', toolbar: { type: 'replace', groups: [] }, components: [] }],
   };
 };
+const parameterFlow = (id: string, sourceId: string): PipelineSource => {
+  const source = newFlow(withLevel(), 'none', { title: id }).document.dataSources.at(-1)!;
+  if (source.kind !== 'model' || source.model !== 'pipeline@1') throw new Error('Expected the new flow');
+  return { ...source, id, inputs: { ...source.inputs, parameters: [{ name: 'input', type: 'string', value: sourceRead(sourceId) }], request: { type: 'none', value: { type: 'param', name: 'input' } } } };
+};
+const entityIdRead = (sourceId: string) => ({ ...sourceRead(sourceId), as: 'entity-id', from: { type: 'source', sourceId, path: ['attributes', 'entity_id'] } } satisfies Operand);
 
 it('lists one field rather than its nested operands, and discovers conditions, looks and rules without duplicating children', () => {
   const fields = fieldsWithLogic(document);
@@ -94,6 +103,13 @@ it('finds named transitive readers, not service intent names or literal words th
   const unusedModel: CompositionDocument['dataSources'][number] = { id: 'unused-model', kind: 'model', model: 'power-toggle@1', inputs: { entityId: { type: 'literal', value: 'switch.demo_not_read' } } };
   expect(entityReaders({ ...edited, dataSources: [...edited.dataSources, unusedModel] }).has('switch.demo_not_read')).toBe(false);
   expect(readers.get('switch.demo_light_1')).not.toContain('Power switch');
+});
+
+it('does not turn unused literal entity definitions in an extension catalog into readers', () => {
+  const edited = withLevel();
+  edited.extensions = { type: 'native-extensions@1', watch: 'stub@1', routes: [], cameras: [{ entityId: 'camera.demo_unused', title: 'Unused camera', liveLabel: 'Live', unavailableLabel: 'Unavailable' }] };
+  compileCompositionDocument(edited);
+  expect(entityReaders(edited).has('camera.demo_unused')).toBe(false);
 });
 
 it.each([false, true])('resolves placed private sources with entity overrides, including logic arguments (logic: %s)', throughLogic => {
@@ -200,4 +216,75 @@ it('agrees with pruning across pages, modals, levels, their toolbars, navigation
   expect([...readers.keys()].sort()).toEqual(ids.map(id => entitySource(id).entityId.value).sort());
   for (const id of ids) expect(readers.get(entitySource(id).entityId.value)).toEqual(new Set([id]));
   expect(() => compileCompositionDocument(pruned)).not.toThrow();
+});
+
+it.each(['private flow parameter', 'entity source', 'model input'] as const)('includes an unconsumed %s definition that reads another source', kind => {
+  const edited = withLevel();
+  if (kind === 'private flow parameter') {
+    edited.componentLibrary = [{
+      id: 'saved', name: 'Saved flow', node: { ...textReader('caption'), props: { value: { type: 'literal', value: 'No flow consumer' }, style: 'body', unavailableText: 'Unavailable' } },
+      flows: [parameterFlow('private-flow', 'level-reader')],
+      sources: [{ ...entitySource('level-reader'), entityId: { type: 'literal', value: 'sensor.demo_private_unused' } }],
+    }];
+  } else {
+    edited.dataSources.push(kind === 'entity source'
+      ? { id: 'dependent', kind: 'ha-entity', entityId: entityIdRead('level-reader') }
+      : { id: 'dependent', kind: 'model', model: 'power-toggle@1', inputs: { entityId: entityIdRead('level-reader') } });
+  }
+  compileCompositionDocument(edited);
+  const owner = kind === 'private flow parameter' ? ['componentLibrary', 0] : ['dataSources', 2];
+  const location = kind === 'private flow parameter' ? [...owner, 'flows', 0, 'inputs', 'parameters', 0, 'value']
+    : kind === 'entity source' ? [...owner, 'entityId'] : [...owner, 'inputs', 'entityId'];
+  expect(documentDependencies(edited).edges.filter(edge => edge.target.type === 'source' && edge.target.id === 'level-reader')).toMatchObject([{
+    path: [...location, 'from', 'sourceId'], reader: { path: owner }, kind: 'read',
+  }]);
+  expect(sourceUses(edited).get('level-reader')).toBe(1);
+  expect(entityReaders(edited).get('sensor.demo_level_reader')).toEqual(new Set([kind === 'private flow parameter' ? 'Saved flow' : kind === 'entity source' ? 'Entity' : 'Power switch']));
+  const before = { ...edited, pages: [{ ...edited.pages[0], components: [textReader('level-reader')] }] };
+  expect(pruneEntitySources(before, edited).dataSources).toEqual(edited.dataSources);
+});
+
+it('agrees with compiler-required dependencies across every surface and source kind, with explicit editable-reader exceptions', () => {
+  const edited = withLevel();
+  const ids = ['page', 'modal', 'level', 'toolbar', 'chrome', 'navigation', 'entity-input', 'model-input', 'flow-input', 'private-flow-input', 'saved-sample', 'argument-only', 'unused'];
+  edited.dataSources = ids.map(entitySource);
+  edited.dataSources.push(
+    { id: 'dependent-entity', kind: 'ha-entity', entityId: entityIdRead('entity-input') },
+    { id: 'dependent-model', kind: 'model', model: 'power-toggle@1', inputs: { entityId: entityIdRead('model-input') } },
+    parameterFlow('dependent-flow', 'flow-input'),
+  );
+  edited.pages[0].components = [textReader('page')];
+  edited.modals[0].components = [textReader('modal')];
+  edited.levels![0].components = [textReader('level')];
+  edited.levels![0].toolbar = { type: 'replace', groups: [toolbarReader('toolbar')] };
+  edited.navigation.chrome.groups.push(toolbarReader('chrome'));
+  edited.navigation.tabs[0] = { ...edited.navigation.tabs[0], visibleWhen: sourceState('navigation'), whenUnknown: 'hide' };
+  edited.componentLibrary = [{
+    id: 'saved', name: 'Saved flow',
+    node: { ...textReader('caption'), props: { value: { type: 'literal', value: 'No flow consumer' }, style: 'body', unavailableText: 'Unavailable' } },
+    flows: [parameterFlow('private-flow', 'private-flow-input')], params: [{ name: 'retained', kind: 'source-id' }],
+    sources: [{ ...entitySource('private-flow-input'), entityId: { type: 'literal', value: 'sensor.demo_private_unused' } }],
+  }];
+  edited.pages[0].components.push({ id: 'placed', type: 'component-ref', componentId: 'saved', layout: { span: 1 }, args: { retained: 'argument-only' } });
+  edited.logicLibrary = [{ id: 'saved-logic', name: 'Editable sample', kind: 'operand', params: [{ name: 'value', kind: 'operand', sample: sourceRead('saved-sample') }], body: { type: 'hole', name: 'value' } }];
+  compileCompositionDocument(edited);
+  const before = { ...edited, pages: [{ ...edited.pages[0], components: [...edited.pages[0].components, ...ids.map(textReader)] }] };
+  const pruned = pruneEntitySources(before, edited);
+  compileCompositionDocument(pruned);
+  const readers = entityReaders(edited), uses = sourceUses(edited);
+  for (const id of ids) {
+    let compilerNeeds = false;
+    try { compileCompositionDocument({ ...edited, dataSources: edited.dataSources.filter(source => source.id !== id) }); }
+    catch (error) {
+      if (!(error instanceof CompositionValidationError)) throw error;
+      compilerNeeds = error.issues.some(issue => issue.code === 'invalid_reference');
+    }
+    const editableSample = id === 'saved-sample', structuralArgument = id === 'argument-only';
+    expect(compilerNeeds, id).toBe(!['saved-sample', 'unused'].includes(id));
+    expect((uses.get(id) ?? 0) > 0, id).toBe(compilerNeeds || editableSample);
+    expect(pruned.dataSources.some(source => source.id === id), id).toBe(compilerNeeds || editableSample);
+    expect(readers.has(entitySource(id).entityId.value), id).toBe(compilerNeeds && !structuralArgument || editableSample);
+  }
+  expect(readers.get(entitySource('saved-sample').entityId.value)).toContain('Editable sample');
+  expect([...readers.keys()].sort()).toEqual(ids.filter(id => id !== 'argument-only' && id !== 'unused').map(id => entitySource(id).entityId.value).sort());
 });

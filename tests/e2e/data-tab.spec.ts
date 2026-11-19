@@ -2,7 +2,8 @@ import { test, expect, panelDocument, haToken } from './data-tab-harness';
 import { isPhone, openLibrary, openWorkspace, seed, snap } from './workspace2-helpers';
 import type { Page } from '@playwright/test';
 import { replaceAt } from '../../src/composition-editor';
-import type { CompositionDocument } from '../../src/shared/composition/schema';
+import type { CompositionDocument, CompositionRead } from '../../src/shared/composition/schema';
+import { newFlow } from '../../src/workspace2/data/flow';
 
 async function openData(page: Page) {
   if (!isPhone(page)) return openLibrary(page, 'Data');
@@ -114,6 +115,36 @@ for (const surface of ['page', 'sheet level']) test(`In Use includes a placed pr
   await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Desk Lamp' }).locator('.w2-ha-readers')).toHaveText('Private value');
   await panel.getByRole('button', { name: 'Hall, 1' }).click();
   await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Hall Lamp' }).locator('.w2-ha-readers')).toHaveText('Saved lamp');
+});
+
+test('In Use includes unconsumed source and private-flow definition readers', async ({ page, request }) => {
+  const base = panelDocument();
+  const read = (sourceId: string) => ({ type: 'read', from: { type: 'source', sourceId, path: ['attributes', 'entity_id'] }, as: 'entity-id', missing: 'unavailable' } satisfies CompositionRead);
+  const flow = newFlow(base, 'none', { title: 'Private flow' }).document.dataSources.at(-1)!;
+  if (flow.kind !== 'model' || flow.model !== 'pipeline@1') throw new Error('Expected the new flow');
+  await seed(request, {
+    ...base,
+    dataSources: [
+      ...base.dataSources.filter(source => ['demo-light-1', 'demo-light-2', 'demo-light-3'].includes(source.id)),
+      { id: 'entity-input', kind: 'ha-entity', entityId: read('demo-light-1') },
+      { id: 'model-input', kind: 'model', model: 'power-toggle@1', inputs: { entityId: read('demo-light-2') } },
+    ],
+    componentLibrary: [{
+      id: 'saved-flow', name: 'Saved flow',
+      node: { id: 'caption', title: 'Caption', type: 'text', layout: { span: 1 }, props: { value: { type: 'literal', value: 'No flow consumer' }, style: 'body', unavailableText: 'Unavailable' } },
+      flows: [{ ...flow, inputs: { ...flow.inputs, parameters: [{ name: 'input', type: 'string', value: { ...read('demo-light-3'), as: 'string', from: { type: 'source', sourceId: 'demo-light-3', path: ['state'] } } }], request: { type: 'none', value: { type: 'param', name: 'input' } } } }],
+    }],
+    logicLibrary: [], pages: [{ ...base.pages[0], components: [] }], modals: [],
+  });
+  await openWorkspace(page);
+  await openData(page);
+  const panel = page.getByTestId('data-panel');
+  await expect(panel.getByRole('button', { name: 'In Use · 3' })).toHaveAttribute('aria-pressed', 'true');
+  await panel.getByRole('button', { name: 'Kitchen, 2' }).click();
+  await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Kitchen Lamp' }).locator('.w2-ha-readers')).toHaveText('Entity');
+  await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Desk Lamp' }).locator('.w2-ha-readers')).toHaveText('Saved flow');
+  await panel.getByRole('button', { name: 'Hall, 1' }).click();
+  await expect(panel.locator('.w2-ha-entity').filter({ hasText: 'Hall Lamp' }).locator('.w2-ha-readers')).toHaveText('Power switch');
 });
 
 test('area groups remember expansion and a selected component reveals the entities it reads', async ({ page }) => {
