@@ -29,7 +29,7 @@ export function expressionPort(value: Json, condition: boolean, scope: TypeScope
   return portType(shape, 'operand', scopeId);
 }
 export function expressionScope(value: Json, scopeId: string, scopes: readonly GraphScope[]): string | undefined {
-  const depends = (candidate: Json, names: readonly string[]): boolean => record(candidate) && (names.includes(String(candidate.type))
+  const depends = (candidate: GraphJSON, names: readonly string[]): boolean => record(candidate) && (names.includes(String(candidate.type))
     || expressionChildren(candidate, 'operand').some(child => depends(child.value, names)));
   if (depends(value, ['item', 'index', 'hole'])) return scopeId;
   if (!depends(value, ['param'])) return undefined;

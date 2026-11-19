@@ -1,10 +1,10 @@
 import { z } from 'zod/v4';
 import type { Json } from '../../types';
-import { absorbCompositionExpressionCapabilities, compileCompositionDocumentWithOrigins, compositionDependencyIssues, parseCompositionShape } from '../compiler';
+import { absorbCompositionExpressionCapabilities, checkCompositionPipelineSource, compileCompositionDocumentWithOrigins, CompositionExpansionError, compositionDependencyIssues, parseCompositionShape } from '../compiler';
 import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, type CompositionIssue } from '../json';
-import { expandLogic, type LogicEntry, type LogicOrigin } from '../logic-library';
-import { checkGraphPipeline, graphInputsSchema, graphSourceSchema } from './capabilities';
+import { expandBounded, type LogicEntry, type LogicOrigin } from '../logic-library';
+import { graphInputsSchema, graphSourceSchema } from './capabilities';
 import { describeGrammar, inferFragment, type FragmentKind } from './grammar';
 import { atPointer, copy, join, record, replaceAt, segments, withoutCanvasMetadata } from './json';
 import type { GraphDestination } from './types';
@@ -22,7 +22,23 @@ export interface FragmentCompilation {
   readonly capabilities: readonly string[];
   readonly issues: readonly CompositionIssue[];
   readonly documentIssues?: readonly CompositionIssue[];
+  readonly expandedIssues?: readonly CompositionIssue[];
+  readonly expandedDocumentIssues?: readonly CompositionIssue[];
   readonly dependencies: readonly { from: string; to: string; path: string }[];
+}
+
+export function contextualCompilation(compiled: FragmentCompilation, at: string, fallback: Json): FragmentCompilation {
+  const relative = (issue: CompositionIssue): CompositionIssue => ({
+    ...issue, pointer: issue.pointer === at || issue.pointer.startsWith(`${at}/`) ? issue.pointer.slice(at.length) : issue.pointer,
+  });
+  return {
+    ...compiled,
+    expanded: atPointer(compiled.expanded, at) === undefined ? fallback : copy(atPointer(compiled.expanded, at)!),
+    origins: compiled.origins.filter(origin => origin.pointer === at || origin.pointer.startsWith(`${at}/`))
+      .map(origin => ({ ...origin, pointer: origin.pointer.slice(at.length) })),
+    issues: compiled.issues.map(relative),
+    expandedIssues: compiled.expandedIssues?.map(relative),
+  };
 }
 
 /** Projection into an actual native destination, without guessing its schema or semantics. */
@@ -44,24 +60,29 @@ export function consumingDocument(context: NonNullable<GraphDestination['context
 }
 
 export function compileGraphValue(ast: Json, options: FragmentOptions = {}): FragmentCompilation {
+  if (options.context) {
+    try { return contextualCompilation(compileGraphValue(consumingDocument(options.context, ast), { kind: 'document' }), options.context.pointer, ast); }
+    catch (error) {
+      if (!(error instanceof CompositionValidationError)) throw error;
+      return { expanded: ast, origins: [], issues: error.issues, capabilities: [], dependencies: [] };
+    }
+  }
   const kind = inferFragment(ast, options.kind), issues: CompositionIssue[] = [], capabilities = new Set<string>();
   const dependencies: { from: string; to: string; path: string }[] = [];
   let expanded = ast, origins: readonly LogicOrigin[] = [];
-  let documentIssues: readonly CompositionIssue[] | undefined, checking = false;
-  const contextPrefix = options.context ? `/document${options.context.pointer}` : undefined;
+  let documentIssues: readonly CompositionIssue[] | undefined, expandedDocumentIssues: readonly CompositionIssue[] | undefined, checking = false;
   try {
-    if (kind === 'document' || options.context) {
-      const input = options.context ? consumingDocument(options.context, ast) : ast;
-      const { compiled, origins: nativeOrigins } = compileCompositionDocumentWithOrigins(withoutCanvasMetadata(input));
+    if (kind === 'document') {
+      const { compiled, origins: nativeOrigins } = compileCompositionDocumentWithOrigins(withoutCanvasMetadata(ast));
       compiled.capabilities.forEach(capability => capabilities.add(capability));
-      if (kind === 'document' && !options.context) {
-        expanded = compiled.expanded;
-        origins = nativeOrigins;
-      }
+      expanded = compiled.expanded;
+      origins = nativeOrigins;
     } else {
       assertCompositionBounds(ast);
-      const expansion = expandLogic(kind === 'fragment' ? ast : { logicLibrary: options.library ?? [], value: ast });
-      const result = parseCompositionShape(z.json(), expansion.document);
+      if (options.library) assertCompositionBounds(options.library);
+      const input = kind === 'fragment' ? ast : options.library?.length ? { logicLibrary: options.library, value: ast } : { value: ast };
+      const expansion = expandBounded(input);
+      const result = expansion.document === input ? kind === 'fragment' ? ast : { value: ast } : parseCompositionShape(z.json(), expansion.document);
       if (kind === 'fragment') {
         expanded = result;
         origins = expansion.origins;
@@ -90,7 +111,7 @@ export function compileGraphValue(ast: Json, options: FragmentOptions = {}): Fra
         } else if (found === 'flow' || found === 'flow-inputs') {
           const source = found === 'flow' ? parse(graphSourceSchema)
             : { id: 'graph-flow', kind: 'model' as const, model: 'pipeline@1' as const, inputs: parse(graphInputsSchema) };
-          const facts = checkGraphPipeline(source, at);
+          const facts = checkCompositionPipelineSource(source, at);
           issues.push(...facts.issues); dependencies.push(...facts.dependencies);
           facts.capabilities.forEach(capability => capabilities.add(capability));
         } else if (found === 'slot') {
@@ -105,13 +126,20 @@ export function compileGraphValue(ast: Json, options: FragmentOptions = {}): Fra
     }
   } catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
-    if (kind === 'document' || options.context) documentIssues = error.issues;
+    if (kind === 'document') documentIssues = error.issues;
+    if (error instanceof CompositionExpansionError) {
+      expanded = parseCompositionShape(z.json(), error.expanded);
+      origins = error.origins;
+      expandedDocumentIssues = error.expandedIssues;
+    }
     issues.push(...error.issues.map(issue => ({
       ...issue,
-      pointer: contextPrefix ? issue.pointer === contextPrefix || issue.pointer.startsWith(`${contextPrefix}/`) ? issue.pointer.slice(contextPrefix.length) : issue.pointer.replace(/^\/document(?=\/|$)/, '')
-        : kind === 'document' ? issue.pointer.replace(/^\/document(?=\/|$)/, '')
+      pointer: kind === 'document' ? issue.pointer.replace(/^\/document(?=\/|$)/, '')
           : kind === 'fragment' || checking ? issue.pointer : issue.pointer.replace(/^\/value(?=\/|$)/, ''),
     })));
   }
-  return { expanded, origins, issues, documentIssues, dependencies, capabilities: [...capabilities].sort() };
+  return {
+    expanded, origins, issues, documentIssues, expandedDocumentIssues, dependencies, capabilities: [...capabilities].sort(),
+    expandedIssues: expandedDocumentIssues?.map(issue => ({ ...issue, pointer: issue.pointer.replace(/^\/document(?=\/|$)/, '') })),
+  };
 }

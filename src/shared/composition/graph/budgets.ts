@@ -3,10 +3,10 @@ import { MAX_CALL_NODES, MAX_CONDITION_DEPTH, MAX_CONDITION_NODES, MAX_EXPRESSIO
 import { PIPELINE_BUDGET } from '../pipeline/evaluate';
 import { PIPELINE_LIMITS } from '../pipeline/schema';
 import { newFacts, typeOperand, typeWhere } from '../pipeline/typing';
-import { compileGraphValue, type FragmentOptions } from './compile';
-import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
+import { compileGraphValue, type FragmentCompilation, type FragmentOptions } from './compile';
+import { grammarChildren, expressionChildren, inferFragment, type FragmentKind } from './grammar';
 import { record } from './json';
-import type { BudgetMeter, GraphBudget, LogicAnchor } from './types';
+import type { BudgetMeter, GraphBudget, GraphJSON, LogicAnchor } from './types';
 
 export function budgetMeter(kind: string, used: number, limit: number | null, pointer = ''): BudgetMeter {
   const ratio = limit === null ? null : used / limit;
@@ -19,14 +19,17 @@ export interface BudgetOptions extends FragmentOptions {
 export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: consume the shared read-only expression/call and flow accounting observer for totals, depths, counter scopes/resets, structural limits and expansion provenance; preserve CHK-nested-choose-budget unchanged.';
 
 export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOptions = {}): GraphBudget {
-  const compiled = compileGraphValue(ast, options), compilerIssues = compiled.issues;
+  return budgetFromCompilation(ast, anchor, compileGraphValue(ast, options), options);
+}
+export function budgetFromCompilation(ast: Json, anchor: LogicAnchor, compiled: FragmentCompilation, options: BudgetOptions = {}): GraphBudget {
+  const compilerIssues = compiled.issues;
   const scopes: GraphBudget['scopes'][number][] = [];
   const conditions: GraphBudget['conditions'][number][] = [], meters: BudgetMeter[] = [];
   const unknownScope = (at: string, limit: number) => {
     scopes.push({ id: `expression:${at}`, kind: 'expression', pointer: at, nodes: null, depth: null, nodeLimit: limit, depthLimit: MAX_EXPRESSION_DEPTH, entries: [at], nodeAccounting: 'unavailable' });
   };
   // This only locates fresh checker entry points. No node/depth counters are maintained here.
-  const flowScopes = (value: Json, kind: 'operand' | 'condition', at: string, entry = true): void => {
+  const flowScopes = (value: GraphJSON, kind: 'operand' | 'condition', at: string, entry = true): void => {
     if (!record(value)) return;
     if (entry) {
       const facts = newFacts(), counter = { nodes: MAX_EXPRESSION_NODES };
@@ -54,7 +57,7 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
       flowScopes(child.value, childKind, at + child.binding, childKind !== kind);
     }
   };
-  const walk = (value: Json, hint: FragmentKind, at: string, flow = false): void => {
+  const walk = (value: GraphJSON, hint: FragmentKind, at: string, flow = false): void => {
     const kind = inferFragment(value, hint);
     if (kind === 'operand' || kind === 'condition') {
       if (flow) { flowScopes(value, kind, at); return; }
@@ -66,8 +69,7 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
       return;
     }
     if (kind === 'flow' || kind === 'flow-inputs') flow = true;
-    const description = describeGrammar(value, kind);
-    for (const child of description.children) walk(child.value, child.kind, at + child.binding, flow);
+    for (const child of grammarChildren(value, kind)) walk(child.value, child.kind, at + child.binding, flow);
   };
   const kind = inferFragment(ast, options.kind);
   if (!options.context && kind !== 'document' && (!compilerIssues.length || ['operand', 'condition', 'call'].includes(kind))) walk(compiled.expanded, kind, '');

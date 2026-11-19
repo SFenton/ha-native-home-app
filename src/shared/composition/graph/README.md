@@ -30,6 +30,8 @@ actions, or UI dependencies.
   or text-length envelope. Lowering projects the fragment into that document and
   calls `compileCompositionDocument`, including for untouched imports. Multiple
   roots sharing a snapshot are compiled with all their replacements assembled.
+  Projection runs once. Each fragment or assembled consuming document compiles
+  once; acceptance, manifest, budget and expansion maps reuse that result.
   Slot capabilities are the whole consuming document's exact native manifest.
   Contextual diagnostics retain the absolute `documentPointer`; a multi-root
   refusal is mapped to the root owning that field, not the first compiled root.
@@ -37,13 +39,17 @@ actions, or UI dependencies.
   error; unknown local representations alone never veto compiler-valid JSON.
   New optional fields and appended array entries can be native destinations.
   Standalone operands, predicates, calls and flows use the existing native
-  fragment checkers; capability absorption and dependency-cycle checks are
+  fragment checkers, including the compiler's complete source binding envelope;
+  capability absorption, source limits and dependency-cycle checks are
   shared with the document compiler. `capabilities` on successful lowering and
   every budget come from those native results, never a caller-provided seed.
   Source maps retain authored entries and add `stage: "expanded"` entries for
   native template landings. Whole-document landings come from the compiler's
   own expansion pass, not a second expansion. `authoredPointer` and `usePointer` keep each copied
   argument tied to its block and use, including failing expanded budget paths.
+  Contextual maps use document-library expansion landings too. Failure diagnostics
+  retain the compiler's authored pointer while locating the responsible argument
+  block through its unremapped expansion landing.
 - `projectGraph(graph)` only projects a working buffer, including opaque JSON.
   It is **not** validation or permission to apply/save/publish an invalid import.
 - `validateGraph` checks projection safety and returns local typing/scope/catalog
@@ -86,6 +92,17 @@ actions, or UI dependencies.
   finite. Overflow gives unavailable (Can't tell), even if the supported average
   step can answer, including cancellation after an overflow. Fallback recipes
   expose an `average_fallback_overflow` warning for older-app UI.
+  Recipe fragments check their whole generated dependency bundle, not sources in
+  isolation. For global references and document limits, pass
+  `context: {document, pointer}` to a value recipe (`averageFixed` takes it in
+  its second argument); the pointer names its actual operand or condition field.
+  The root replacement and all new sources compile together in that document.
+  `lowerFlowBranches(branches, existingSourceIds, document)` accepts the consuming
+  snapshot as its third argument. Without a snapshot these are fragment checks,
+  not proof that external reads resolve or that the consuming document fits.
+  `existingSourceIds` only prevents collisions; non-pipeline IDs never consume
+  pipeline capacity. Legacy `existingFlowCount` hints do not authorize or reject
+  edits: only the consuming compiler decides available document capacity.
 - Call `allocateGraphId` once in the authoring transaction and retain the result.
   It uses the repository LAN-HTTP-compatible helper and checks collisions.
   Lifting uses content-and-origin IDs so reordered array positions cannot reuse
@@ -104,8 +121,11 @@ shared average evaluator for finite-total parity and explicit overflow
 divergence. A-number-state remains
 disabled with its specific prerequisite and compiler pointer; no cast or
 fabricated shape exists.
-The deterministic compiler comparison covers native acceptance/refusal, exact
-manifests, first diagnostics, field limits, edited graphs and lift round trips.
+The deterministic compiler comparison includes seed `0xa43d91e7` and covers native
+acceptance/refusal, exact manifests, first diagnostics, field limits, edited graphs,
+standalone source/flow inputs, recipe bundles and cycles, mixed-source native limits,
+success/failure expansion provenance and lift round trips. The 32-step, 2,341-node
+edited-flow fixture also checks that lowering invokes its native checker once.
 
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
 expansion, draft layout extraction, persistence/conflicts, and publication.

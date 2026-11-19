@@ -30,7 +30,7 @@ import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
 import { groupProblems } from './grid-groups';
 import { lateSpans, type FoldSide } from './fold-sides';
-import { PIPELINE_LIMITS } from './pipeline/schema';
+import { PIPELINE_LIMITS, pipelineSourceSchema, type PipelineSource } from './pipeline/schema';
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
@@ -55,6 +55,31 @@ export function compositionDependencyIssues(dependencies: readonly { from: strin
     }
   }
   return issues;
+}
+
+/** A source needs its binding envelope as well as the pipeline's local requirements. */
+export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1): ReturnType<typeof checkPipelineSource> {
+  const facts = checkPipelineSource(source, at);
+  if (ordinal > PIPELINE_LIMITS.pipelines) facts.issues.push({ code: 'limit_exceeded', pointer: at });
+  return { ...facts, capabilities: [...new Set(['sh.bindings@1', ...facts.capabilities])].sort() };
+}
+
+/** Fragment checking permits external reads; a consuming document additionally resolves those reads. */
+export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources'): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
+  const facts = sources.map((source, index): ReturnType<typeof checkPipelineSource> => {
+    try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1); }
+    catch (error) {
+      if (!(error instanceof CompositionValidationError)) throw error;
+      return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), reads: [], dependencies: [], capabilities: [] };
+    }
+  });
+  const dependencies = facts.flatMap(fact => fact.dependencies);
+  const issues = [...facts.flatMap(fact => fact.issues), ...compositionDependencyIssues(dependencies)];
+  return {
+    sources: facts, issues: issues.length ? new CompositionValidationError(issues).issues : [],
+    reads: facts.flatMap(fact => fact.reads), dependencies,
+    capabilities: [...new Set(facts.flatMap(fact => fact.capabilities))].sort(),
+  };
 }
 
 export const firstSliceCapabilities = [
@@ -256,6 +281,20 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 /** Pure first-slice compiler. No requests, actions, asset-byte checks, or native fidelity claims. */
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
 export interface CompileOptions { tileInkDefault?: boolean }
+/** Native diagnostics keep their public authored pointers and the compiler's corresponding expansion landings. */
+export class CompositionExpansionError extends CompositionValidationError {
+  readonly expandedIssues: readonly CompositionIssue[];
+  constructor(
+    issues: CompositionIssue[],
+    expandedIssues: readonly CompositionIssue[],
+    readonly expanded: unknown,
+    readonly origins: ReturnType<typeof expandBounded>['origins'],
+  ) {
+    const landings = new Map(issues.map((issue, index) => [issue, expandedIssues[index]]));
+    super(issues);
+    this.expandedIssues = this.issues.map(issue => landings.get(issue)!);
+  }
+}
 export function compileCompositionDocument(input: unknown, options: CompileOptions = {}): CompiledComposition {
   return compileRecording(input, options);
 }
@@ -290,7 +329,10 @@ export function compileCompositionDocumentWithOrigins(input: unknown, options: C
     const compiled = compilePlain(expansion.document, options, false, references);
     return { compiled: { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document }, origins: expansion.origins };
   } catch (error) {
-    if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings));
+    if (error instanceof CompositionValidationError) throw new CompositionExpansionError(
+      remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings),
+      error.issues, expansion.document, expansion.origins,
+    );
     throw error;
   }
 }
@@ -1876,13 +1918,12 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     require('bindings');
     register('source', source.id, `${p}/id`);
     if (source.kind === 'model' && source.model === 'pipeline@1') {
-      const found = checkPipelineSource(source, p);
+      const found = checkCompositionPipelineSource(source, p, ++pipelines);
       collected.define(source, p, undefined, found.entities);
       issues.push(...found.issues);
       for (const name of found.capabilities) capabilities.add(name);
       reads.push(...found.reads);
       dependencies.push(...found.dependencies);
-      if (++pipelines > PIPELINE_LIMITS.pipelines) add('limit_exceeded', p);
       return;
     }
     collected.define(source, p);

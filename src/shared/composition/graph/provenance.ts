@@ -1,12 +1,12 @@
 import { z } from 'zod/v4';
 import type { Json } from '../../types';
 import { parseCompositionShape } from '../compiler';
-import { expandKeepingHoles, logicLibrarySchema, type LogicEntry, type LogicOrigin } from '../logic-library';
+import { expandKeepingHoles, logicLibrarySchema, type LogicOrigin } from '../logic-library';
 import { atPointer, join, record } from './json';
 import type { GraphJSON, GraphSourceLocation, LogicAnchor } from './types';
 
 /** Project native expansion landings back to uses and arguments; never expand or count an AST here. */
-export function expansionSourceMap(authored: Json, expanded: Json, origins: readonly LogicOrigin[], anchor: LogicAnchor, sourceMap: readonly GraphSourceLocation[], externalLibrary: readonly LogicEntry[] = []): GraphSourceLocation[] {
+export function expansionSourceMap(authored: Json, expanded: Json, origins: readonly LogicOrigin[], anchor: LogicAnchor, sourceMap: readonly GraphSourceLocation[], externalLibrary: unknown = []): GraphSourceLocation[] {
   if (!origins.length) return [];
   const library = logicLibrarySchema.parse(record(authored) && Array.isArray(authored.logicLibrary) ? authored.logicLibrary : externalLibrary);
   const entries = new Map(library.map(entry => [entry.id, entry]));

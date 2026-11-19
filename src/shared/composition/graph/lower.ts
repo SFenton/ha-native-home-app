@@ -3,10 +3,10 @@ import type { ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, type CompositionIssue } from '../json';
 import type { LogicEntry } from '../logic-library';
 import { compositionDependencyIssues } from '../compiler';
-import { compileGraphValue, consumingDocument } from './compile';
-import { measureBudget } from './budgets';
-import { copy, fingerprint, record, replaceAt, withoutCanvasMetadata } from './json';
-import type { GraphBudget, GraphDiagnostic, GraphRoot, GraphSourceLocation, LogicGraph, LoweringResult } from './types';
+import { compileGraphValue, consumingDocument, contextualCompilation, type FragmentOptions } from './compile';
+import { budgetFromCompilation } from './budgets';
+import { fingerprint, record, withoutCanvasMetadata } from './json';
+import type { GraphBudget, GraphDiagnostic, GraphEdge, GraphJSON, GraphRoot, GraphSourceLocation, LogicGraph, LoweringResult } from './types';
 import { validateGraph } from './validate';
 import { expansionSourceMap } from './provenance';
 
@@ -22,39 +22,40 @@ export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly 
     code: ['cycle', 'occupied_input', 'scope_mismatch', 'opaque_region', 'invalid_layout', 'recipe_disabled'].includes(error.code) ? 'invalid_combination' : error.code as CompositionIssue['code'],
     pointer: error.pointer,
   })));
+  return projectValidatedGraph(graph);
+}
+function projectValidatedGraph(graph: LogicGraph): { readonly ast: Json; readonly sourceMap: readonly GraphSourceLocation[] } {
   const byId = new Map(graph.nodes.map(node => [node.id, node])), sourceMap: GraphSourceLocation[] = [];
   const incoming = new Map(graph.edges.map(edge => [`${edge.to.nodeId}:${edge.to.portId}`, edge]));
-  const mapped = new Set<string>();
   let emitted = 0;
-  const emit = (id: string, at: string, root: GraphRoot, rootIndex: number): Json => {
+  const emit = (id: string, at: string, root: GraphRoot): Json => {
     if (++emitted > 100_000) throw new CompositionValidationError([{ code: 'limit_exceeded', pointer: at }]);
     const node = byId.get(id)!;
-    let value = copy(node.payload.value);
+    const bindings = node.inputs.length ? new Map<string, GraphEdge>() : undefined;
     for (const input of node.inputs) {
       const edge = incoming.get(`${id}:${input.id}`);
-      if (edge && input.binding !== undefined) value = replaceAt(value, input.binding, emit(edge.from.nodeId, at + input.binding, root, rootIndex));
+      if (edge && input.binding !== undefined) bindings!.set(input.binding, edge);
     }
-    const map = (candidate: Json, own: string) => {
-      const key = `${rootIndex}:${own}`;
-      if (!mapped.has(key)) {
-        if (mapped.size >= 100_000) throw new CompositionValidationError([{ code: 'limit_exceeded', pointer: own }]);
-        mapped.add(key);
-        sourceMap.push({ pointer: own, nodeId: id, portId: node.inputs.find(input => own.startsWith(at + (input.binding ?? '\0')))?.id ?? 'value', anchor: root.anchor });
-      }
-      if (candidate !== null && typeof candidate === 'object') Object.entries(candidate).forEach(([key, inner]) => map(inner, pointer(own, key)));
+    const project = (candidate: GraphJSON, local: string): Json => {
+      const edge = bindings?.get(local), own = at + local;
+      if (edge) return emit(edge.from.nodeId, own, root);
+      if (sourceMap.length >= 100_000) throw new CompositionValidationError([{ code: 'limit_exceeded', pointer: own }]);
+      sourceMap.push({ pointer: own, nodeId: id, portId: 'value', anchor: root.anchor });
+      if (Array.isArray(candidate)) return candidate.map((value, index) => project(value, pointer(local, index)));
+      if (candidate !== null && typeof candidate === 'object') return Object.fromEntries(Object.entries(candidate).map(([key, value]) => [key, project(value, pointer(local, key))]));
+      return candidate;
     };
-    map(value, at);
-    return value;
+    return project(node.payload.value, '');
   };
-  const values = graph.roots.map((root, index) => emit(root.nodeId, '', root, index));
+  const values = graph.roots.map(root => emit(root.nodeId, '', root));
   return { ast: values.length === 1 ? values[0] : values, sourceMap };
 }
 export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringResult {
   const validation = validateGraph(graph), errors: GraphDiagnostic[] = validation.filter(diagnostic => diagnostic.severity === 'error');
   const hints = validation.filter(diagnostic => diagnostic.severity === 'warning');
-  if (!graph.roots.length) return { ok: false, original: graph.original, errors, budgets: [] };
+  if (errors.length || !graph.roots.length) return { ok: false, original: graph.original, errors, budgets: [] };
   let ast: Json, sourceMap: readonly GraphSourceLocation[];
-  try { ({ ast, sourceMap } = projectGraph(graph)); assertCompositionBounds(ast); }
+  try { ({ ast, sourceMap } = projectValidatedGraph(graph)); assertCompositionBounds(ast); }
   catch (error) {
     if (!(error instanceof CompositionValidationError)) throw error;
     return { ok: false, original: graph.original, errors: [...errors, ...error.issues.map(issue => diagnostic(issue, graph.roots[0]))], budgets: [] };
@@ -63,48 +64,60 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
   const budgets: GraphBudget[] = [];
   const capabilities = new Set<string>();
   const dependencies: { from: string; to: string; path: string }[] = [];
+  const contextKeys = new Map<number, string>(), contextDocuments = new Map<string, Json>();
+  const fingerprints = new Map<LogicGraph['original'], string>();
   graph.roots.forEach((root, index) => {
-    const value = values[index];
-    const report = (issue: CompositionIssue) => errors.push(diagnostic(issue, root, sourceMap));
-    let context = root.destination.context;
+    const context = root.destination.context;
+    if (!context) return;
     try {
-      if (context) {
-        let document = copy(context.document);
-        for (const [otherIndex, other] of graph.roots.entries()) {
-          if (other.destination.context && fingerprint(other.destination.context.document) === fingerprint(context.document)) {
-            document = consumingDocument({ ...other.destination.context, document }, values[otherIndex]);
-          }
-        }
-        context = { ...context, document };
-      }
+      let key = fingerprints.get(context.document);
+      if (key === undefined) { key = fingerprint(context.document); fingerprints.set(context.document, key); }
+      contextKeys.set(index, key);
+      contextDocuments.set(key, consumingDocument({ ...context, document: contextDocuments.get(key) ?? context.document }, values[index]));
     } catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
-      error.issues.forEach(report);
+      error.issues.forEach(issue => errors.push(diagnostic(issue, root, sourceMap)));
     }
-    const compileOptions = {
-      kind: root.destination.kind === 'flow' && record(value) && value.model !== 'pipeline@1' ? 'flow-inputs' as const : root.destination.kind,
-      context, library: options.library, itemScope: options.itemScope, allowControl: root.destination.allowControl,
-    };
-    const compiled = compileGraphValue(value, compileOptions);
-    sourceMap = [...sourceMap, ...expansionSourceMap(value, compiled.expanded, compiled.origins, root.anchor, sourceMap, options.library)];
+  });
+  if (errors.length) return { ok: false, original: graph.original, errors, budgets: [] };
+  const documents = new Map([...contextDocuments].map(([key, document]) => [key, compileGraphValue(document, { kind: 'document' })]));
+  const compileOptions: FragmentOptions[] = graph.roots.map((root, index) => ({
+    kind: root.destination.kind === 'flow' && record(values[index]) && values[index].model !== 'pipeline@1' ? 'flow-inputs' as const : root.destination.kind,
+    context: root.destination.context, library: options.library, itemScope: options.itemScope, allowControl: root.destination.allowControl,
+  }));
+  const compilations = graph.roots.map((root, index) => {
+    const context = root.destination.context, key = contextKeys.get(index);
+    return context && key !== undefined ? contextualCompilation(documents.get(key)!, context.pointer, values[index]) : compileGraphValue(values[index], compileOptions[index]);
+  });
+  graph.roots.forEach((root, index) => {
+    const compiled = compilations[index], context = root.destination.context;
+    const library = context && record(context.document) ? context.document.logicLibrary ?? options.library : options.library;
+    sourceMap = [...sourceMap, ...expansionSourceMap(values[index], compiled.expanded, compiled.origins, root.anchor, sourceMap, library)];
+  });
+  graph.roots.forEach((root, index) => {
+    const value = values[index], compiled = compilations[index];
+    const report = (issue: CompositionIssue, landing?: string) => errors.push(diagnostic(issue, root, sourceMap, landing));
     compiled.issues.forEach((issue, issueIndex) => {
       const native = compiled.documentIssues?.[issueIndex];
       if (root.destination.context && native?.pointer.startsWith('/document')) {
         const documentPointer = native.pointer.replace(/^\/document(?=\/|$)/, '');
-        const owner = graph.roots.filter(candidate => candidate.destination.context
-          && fingerprint(candidate.destination.context.document) === fingerprint(root.destination.context!.document)
+        const ownerIndex = graph.roots.map((candidate, i) => ({ candidate, i })).filter(({ candidate, i }) => candidate.destination.context
+          && contextKeys.get(i) === contextKeys.get(index)
           && (documentPointer === candidate.destination.context.pointer || documentPointer.startsWith(`${candidate.destination.context.pointer}/`)))
-          .sort((a, b) => b.destination.context!.pointer.length - a.destination.context!.pointer.length)[0];
-        const mapped = diagnostic({ ...native, pointer: owner ? documentPointer.slice(owner.destination.context!.pointer.length) : documentPointer }, owner ?? root, owner ? sourceMap : []);
+          .sort((a, b) => b.candidate.destination.context!.pointer.length - a.candidate.destination.context!.pointer.length)[0]?.i;
+        const owner = ownerIndex === undefined ? undefined : graph.roots[ownerIndex];
+        const landing = compiled.expandedDocumentIssues?.[issueIndex]?.pointer.replace(/^\/document(?=\/|$)/, '');
+        const mapped = diagnostic({ ...native, pointer: owner ? documentPointer.slice(owner.destination.context!.pointer.length) : documentPointer }, owner ?? root, owner ? sourceMap : [],
+          landing === undefined ? undefined : owner ? landing.slice(owner.destination.context!.pointer.length) : landing);
         if (!errors.some(error => error.anchor === mapped.anchor && error.code === mapped.code && error.pointer === mapped.pointer)) errors.push({ ...mapped, documentPointer });
-      } else report(issue);
+      } else report(issue, compiled.expandedIssues?.[issueIndex]?.pointer);
     });
     dependencies.push(...compiled.dependencies.map(dependency => ({ ...dependency, path: `/${index}${dependency.path}` })));
     for (const capability of compiled.capabilities) {
       capabilities.add(capability);
       if (options.targetCapabilities && !options.targetCapabilities.includes(capability)) report({ code: 'unsupported_capability', pointer: '', capability });
     }
-    budgets.push(measureBudget(value, root.anchor, compileOptions));
+    budgets.push(budgetFromCompilation(value, root.anchor, compiled, compileOptions[index]));
   });
   if (graph.roots.length > 1) for (const issue of compositionDependencyIssues(dependencies)) {
     const index = Number(issue.pointer.split('/')[1]), root = graph.roots[index];
@@ -126,8 +139,8 @@ export function semanticFingerprint(graph: LogicGraph): string {
   return fingerprint(graph.roots.length === 1 ? graph.roots[0].destination.kind === 'document' ? withoutCanvasMetadata(ast) : ast
     : Array.isArray(ast) ? ast.map((value, i) => graph.roots[i].destination.kind === 'document' ? withoutCanvasMetadata(value) : value) : ast);
 }
-function diagnostic(issue: CompositionIssue, root: GraphRoot, sourceMap: readonly GraphSourceLocation[] = []): GraphDiagnostic {
-  const origin = sourceMap.filter(location => location.anchor === root.anchor && (location.pointer === issue.pointer || issue.pointer.startsWith(`${location.pointer}/`)))
+function diagnostic(issue: CompositionIssue, root: GraphRoot, sourceMap: readonly GraphSourceLocation[] = [], landing = issue.pointer): GraphDiagnostic {
+  const origin = sourceMap.filter(location => location.anchor === root.anchor && (location.pointer === landing || landing.startsWith(`${location.pointer}/`)))
     .sort((a, b) => b.pointer.length - a.pointer.length || Number(b.stage === 'expanded') - Number(a.stage === 'expanded'))[0];
   return { severity: 'error', code: issue.code, message: issue.pointer.endsWith('/destination/context') ? 'A standalone slot requires its consuming document and field pointer; native field constraints are not guessed.' : `Graph lowering refused: ${issue.code}.`, anchor: root.anchor, pointer: issue.pointer, ...(origin ? { nodeId: origin.nodeId, portId: origin.portId, ...(origin.usePointer === undefined ? {} : { usePointer: origin.usePointer, authoredPointer: origin.authoredPointer }) } : {}), ...(issue.capability ? { capability: issue.capability } : {}) };
 }

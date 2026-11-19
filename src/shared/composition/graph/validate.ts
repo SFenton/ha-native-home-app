@@ -1,14 +1,15 @@
 import { catalogByKey } from './catalog';
-import { atPointer, copy, copyShape, fingerprint, replaceAt } from './json';
+import { atPointer, copy, copyShape, fingerprint, replaceAt, sameJSON } from './json';
 import { expressionPort, expressionScope, inputType, portsCompatible, scopesCompatible } from './ports';
-import { describeGrammar, type FragmentKind } from './grammar';
+import { grammarChildren, type FragmentKind } from './grammar';
 import type { Json } from '../../types';
 import type { GraphDiagnostic, GraphEdge, GraphNode, LogicGraph } from './types';
 import { assertCompositionBounds, CompositionValidationError } from '../json';
 import { elementOf, type Shape } from '../pipeline/shape';
 import { requestShape } from '../pipeline/sources';
-import { newFacts, typeOperand, typeSteps, type TypeScope } from '../pipeline/typing';
-import { graphInputsSchema } from './capabilities';
+import { newFacts, typeOperand, typeStep, type TypeScope } from '../pipeline/typing';
+import { requestSchema } from '../pipeline/schema';
+import { graphInputsSchema, graphStepSchema } from './capabilities';
 
 export function validateGraph(graph: LogicGraph, options: { readonly projection?: boolean } = {}): readonly GraphDiagnostic[] {
   try {
@@ -37,7 +38,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
   const descriptions = new Map(graph.nodes.filter(node => node.payload.kind !== 'opaque').map(node => {
     const kind: FragmentKind = node.payload.kind === 'template' || node.payload.kind === 'logic-ref' ? node.payload.representation
       : node.payload.kind === 'hole' || node.payload.kind === 'opaque' ? 'auto' : node.payload.kind;
-    return [node.id, describeGrammar(copy(node.payload.value), kind)] as const;
+    return [node.id, grammarChildren(node.payload.value, kind)] as const;
   }));
   const incoming = new Map<string, GraphEdge[]>(), dependencies = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {
@@ -45,6 +46,24 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     incoming.set(key, [...incoming.get(key) ?? [], edge]);
     dependencies.set(edge.to.nodeId, [...dependencies.get(edge.to.nodeId) ?? [], edge]);
   }
+  const unchangedNodes = new Map<string, boolean>(), checkingUnchanged = new Set<string>();
+  const isUnchanged = (node: GraphNode): boolean => {
+    const cached = unchangedNodes.get(node.id);
+    if (cached !== undefined) return cached;
+    if (!node.origins.length || node.provenance !== 'lifted' && node.provenance !== 'opaque') return false;
+    if (checkingUnchanged.has(node.id)) return false;
+    checkingUnchanged.add(node.id);
+    const original = atPointer(graph.original, node.origins[0]);
+    const omitted = node.inputs.length ? new Set(node.inputs.flatMap(input => input.binding === undefined ? [] : [input.binding])) : undefined;
+    const unchanged = (node.provenance === 'lifted' || node.provenance === 'opaque') && original !== undefined
+      && sameJSON(node.payload.value, original, omitted)
+      && node.inputs.every(input => {
+        const edges = incoming.get(`${node.id}:${input.id}`), child = edges?.length === 1 ? nodes.get(edges[0].from.nodeId) : undefined;
+        return child !== undefined && child.origins[0] === node.origins[0] + input.binding && isUnchanged(child);
+      });
+    checkingUnchanged.delete(node.id); unchangedNodes.set(node.id, unchanged);
+    return unchanged;
+  };
   const assembled = new Map<string, Json>(), assembling = new Set<string>();
   const assemble = (id: string, depth = 1): Json | undefined => {
     if (depth > 40) throw new CompositionValidationError([{ code: 'limit_exceeded', pointer: nodes.get(id)?.origins[0] ?? '' }]);
@@ -65,21 +84,26 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     assembling.delete(id); assembled.set(id, value);
     return value;
   };
-  const typedFlows = new Map<string, { params: TypeScope['params']; initial: Shape; steps: Shape[] } | undefined>();
+  const typedFlows = new Map<string, { params: TypeScope['params']; initial: Shape; steps: Shape[]; stepCount: number } | undefined>();
   const actualOutput = (node: GraphNode) => {
     const output = node.outputs[0]?.type;
     if (!output) return undefined;
     const current = assemble(node.id), scope = scopes.get(node.scopeId);
     const owner = scope?.ownerNodeId ? nodes.get(scope.ownerNodeId) : undefined;
     let params: TypeScope['params'] = new Map();
-    let item = scope?.itemShape ? copyShape(scope.itemShape) : undefined;
+    let item = owner?.payload.kind !== 'flow-inputs' && scope?.itemShape ? copyShape(scope.itemShape) : undefined;
     if (owner?.payload.kind === 'flow-inputs') {
+      const childValue = (binding: string) => {
+        const port = owner.inputs.find(input => input.binding === binding);
+        const edges = port ? incoming.get(`${owner.id}:${port.id}`) : undefined;
+        return edges?.length === 1 ? assemble(edges[0].from.nodeId) : undefined;
+      };
       if (!typedFlows.has(owner.id)) {
-        const parsed = graphInputsSchema.safeParse(assemble(owner.id));
-        if (parsed.success) {
+        const parsed = graphInputsSchema.safeParse(owner.payload.value), request = requestSchema.safeParse(childValue('/request'));
+        if (parsed.success && request.success) {
           const inputs = parsed.data, params = new Map(inputs.parameters.map(parameter => [parameter.name, parameter.type])), facts = newFacts();
-          const initial = inputs.request.type === 'none' ? typeOperand(inputs.request.value, { params, allowRead: false, allowViewer: true }, '', facts) : requestShape(inputs.request);
-          typedFlows.set(owner.id, { params, initial, steps: typeSteps(inputs.steps, initial, params, '', facts) });
+          const initial = request.data.type === 'none' ? typeOperand(request.data.value, { params, allowRead: false, allowViewer: true }, '', facts) : requestShape(request.data);
+          typedFlows.set(owner.id, { params, initial, steps: [], stepCount: inputs.steps.length });
         } else typedFlows.set(owner.id, undefined);
       }
       const flow = typedFlows.get(owner.id), binding = owner.inputs.find(input => input.type.scopeId === scope?.id)?.binding;
@@ -87,8 +111,14 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
       item = undefined;
       if (flow && binding) {
         const step = /^\/steps\/(\d+)$/.exec(binding);
+        const needed = step ? Number(step[1]) : binding === '/output' ? flow.stepCount : 0;
+        while (flow.steps.length < needed) {
+          const index = flow.steps.length, parsed = graphStepSchema.safeParse(childValue(`/steps/${index}`));
+          if (!parsed.success) break;
+          flow.steps.push(typeStep(parsed.data, flow.steps.at(-1) ?? flow.initial, flow.params, `/steps/${index}`, newFacts()));
+        }
         const shape = step ? Number(step[1]) === 0 ? flow.initial : flow.steps[Number(step[1]) - 1]
-          : binding === '/output' ? flow.steps.at(-1) ?? flow.initial : undefined;
+          : binding === '/output' && flow.steps.length === flow.stepCount ? flow.steps.at(-1) ?? flow.initial : undefined;
         if (shape) item = elementOf(shape) ?? shape;
       }
     }
@@ -118,16 +148,12 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     if (!options.projection && destinationScope && sourceEntry && !sourceEntry.scopes.includes(destinationScope.kind) && from.payload.kind !== 'hole'
       && !['flow', 'flow-inputs', 'logic-entry', 'document'].includes(to.payload.kind)) report('scope_mismatch', 'The connected block is unavailable in the destination scope.', to.id, input.id, true);
     if (options.projection) continue;
-    const original = atPointer(graph.original, to.origins[0] + edge.binding);
-    const fromOriginal = atPointer(graph.original, from.origins[0]);
-    const current = assemble(from.id);
-    const unchanged = (from.provenance === 'lifted' || from.provenance === 'opaque') && to.provenance === 'lifted'
-      && from.origins[0] === to.origins[0] + edge.binding
-      && original !== undefined && fromOriginal !== undefined
-      && current !== undefined && fingerprint(current) === fingerprint(fromOriginal);
+    if (output.type.representation === 'stream' && input.type.representation === 'stream') continue;
+    const unchanged = to.provenance === 'lifted' && from.origins[0] === to.origins[0] + edge.binding && isUnchanged(from);
+    if (unchanged && from.scopeId === to.scopeId) continue;
     const actual = actualOutput(from) ?? output.type;
     const destinationScopeId = ['document', 'flow', 'flow-inputs', 'logic-entry'].includes(to.payload.kind) ? input.type.scopeId ?? to.scopeId : to.scopeId;
-    const expected = inputType({ ...to, scopeId: destinationScopeId }, edge.binding, input.type, descriptions.get(to.id)?.children.find(child => child.binding === edge.binding)?.kind);
+    const expected = inputType({ ...to, scopeId: destinationScopeId }, edge.binding, input.type, descriptions.get(to.id)?.find(child => child.binding === edge.binding)?.kind);
     const sameScope = scopesCompatible(actual, expected, graph.scopes);
     const match = portsCompatible(actual, expected, graph.scopes);
     if (!match.compatible && (!unchanged || !sameScope)) report(sameScope ? 'binding_type' : 'scope_mismatch', match.reason!, to.id, input.id, true);
@@ -137,7 +163,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     const ids = [...node.inputs, ...node.outputs.map(port => ({ ...port, id: `out:${port.id}` }))].map(port => port.id);
     if (new Set(ids).size !== ids.length) report('duplicate_id', 'Port IDs must be unique.', node.id);
     if (node.payload.kind !== 'opaque') {
-      const expected = new Set(descriptions.get(node.id)!.children.map(child => child.binding));
+      const expected = new Set(descriptions.get(node.id)!.map(child => child.binding));
       for (const binding of expected) {
         const ports = node.inputs.filter(input => input.binding === binding);
         if (ports.length !== 1 || !ports[0].required) report('missing_required', 'Each grammar child requires one named input.', node.id);

@@ -12,7 +12,7 @@ import type { Json } from '../../../src/shared/types';
 import { exampleA, exampleB, immutable, predicateBudgetFixtures, sourceParameterTemplate, tooWarmWarning } from './fixtures';
 import { expressionChildren } from '../../../src/shared/composition/graph/grammar';
 import { atPointer, record, replaceAt } from '../../../src/shared/composition/graph/json';
-import { checkPipelineSource } from '../../../src/shared/composition/pipeline/compile';
+import { checkCompositionPipelineSource as checkPipelineSource } from '../../../src/shared/composition/compiler';
 import { pipelineSourceSchema } from '../../../src/shared/composition/pipeline/schema';
 import { workedDocument } from './fixtures/native';
 
