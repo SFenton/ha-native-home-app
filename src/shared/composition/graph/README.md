@@ -13,6 +13,8 @@ actions, or UI dependencies.
   Input constraints come from grammar positions and destination lexical scopes,
   not the previous child's enum/refinements. Item values stay in their step;
   flow parameters remain available in descendant scopes of their own flow.
+  Grammar descriptors and edge lookups are reused within a check or projection,
+  never cached across edits.
 - `lower(graph, {library, targetCapabilities, itemScope})` validates before
   returning atomic replacements. Failures retain `original`; they never return
   a partially modified document. Complete documents use the existing compiler.

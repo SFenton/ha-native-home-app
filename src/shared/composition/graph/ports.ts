@@ -3,9 +3,9 @@ import { inferShape } from '../pipeline/infer';
 import { newFacts, typeOperand, type TypeScope } from '../pipeline/typing';
 import { isAssignable, merge, orNull, withoutNull, type Shape } from '../pipeline/shape';
 import type { Json } from '../../types';
-import type { GraphNode, GraphPort, GraphScope, PortType } from './types';
+import type { GraphJSON, GraphNode, GraphPort, GraphScope, PortType } from './types';
 import { copy, copyShape, record } from './json';
-import { describeGrammar, expressionChildren } from './grammar';
+import { describeGrammar, expressionChildren, type FragmentKind } from './grammar';
 
 export function portType(shape: Shape, representation: PortType['representation'] = 'operand', scopeId?: string): PortType {
   const core = withoutNull(shape);
@@ -40,15 +40,15 @@ export function expressionScope(value: Json, scopeId: string, scopes: readonly G
   }
   return scope?.id ?? scopeId;
 }
-export function inputType(node: Pick<GraphNode, 'payload' | 'scopeId'>, binding: string, actual: PortType): PortType {
+export function inputType(node: Pick<GraphNode, 'payload' | 'scopeId'>, binding: string, actual: PortType, childKind?: FragmentKind): PortType {
   const kind = node.payload.kind === 'template' || node.payload.kind === 'logic-ref' ? node.payload.representation
     : node.payload.kind === 'hole' || node.payload.kind === 'opaque' ? 'auto' : node.payload.kind;
-  const child = describeGrammar(copy(node.payload.value), kind).children.find(child => child.binding === binding);
-  const representation = child?.kind === 'condition' ? 'condition' : child?.kind === 'source-selection' ? 'source-selection'
-    : child?.kind === 'operand' ? 'operand' : child ? 'stream' : actual.representation;
+  const child = childKind ?? describeGrammar(copy(node.payload.value), kind).children.find(child => child.binding === binding)?.kind;
+  const representation = child === 'condition' ? 'condition' : child === 'source-selection' ? 'source-selection'
+    : child === 'operand' ? 'operand' : child ? 'stream' : actual.representation;
   if (representation === 'source-selection') return { ...portType({ kind: 'string' }, representation, node.scopeId), valueType: 'entity' };
   if (representation === 'condition') return portType({ kind: 'boolean' }, representation, node.scopeId);
-  const value = copy(node.payload.value);
+  const value: GraphJSON = node.payload.value;
   let shape: Shape = { kind: 'any' };
   if (!record(value)) return { ...portType(shape, representation, node.scopeId), nullable: true };
   if (value.type === 'math' || value.type === 'numeric') shape = orNull({ kind: 'number' });

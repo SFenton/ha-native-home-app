@@ -282,6 +282,20 @@ describe('typed connections, structural refusals and fan-out', () => {
       ? { ...node, payload: { kind: 'operand', value: { type: 'literal', value: 'Warm' } } } : node) };
     expect(lower(edited)).toMatchObject({ ok: true, ast: { ...ast, cases: [{ ...ast.cases[0], then: { type: 'literal', value: 'Warm' } }] } });
   });
+  it('does not reuse grammar bindings across edits with the same block IDs', () => {
+    const graph = lift({ type: 'not', of: state() }, { kind: 'condition' }).graph, rootId = graph.roots[0].nodeId;
+    const edited: LogicGraph = {
+      ...graph,
+      nodes: graph.nodes.map(node => node.id === rootId ? {
+        ...node, payload: { kind: 'condition', value: { type: 'all', of: [state()] } },
+        inputs: node.inputs.map(input => ({ ...input, id: '/of/0', binding: '/of/0' })),
+      } : node),
+      edges: graph.edges.map(edge => edge.to.nodeId === rootId ? { ...edge, to: { ...edge.to, portId: '/of/0' }, binding: '/of/0' } : edge),
+    };
+    expect(lower(graph).ok).toBe(true);
+    expect(lower(edited)).toMatchObject({ ok: true, ast: { type: 'all', of: [state()] } });
+    expect(lower(graph).ok).toBe(true);
+  });
   it('allows same-step item rewiring but rejects a different step scope', () => {
     const source = pipelineSourceSchema.parse(flow());
     source.inputs.steps.unshift(...[0, 1].map(i => ({ id: `filter-${i}`, op: 'filter' as const, where: { type: 'compare' as const, op: 'eq' as const, left: { type: 'item' as const, path: ['state'] }, right: { type: 'literal' as const, value: 'on' } } })));

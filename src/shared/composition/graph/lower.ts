@@ -27,6 +27,7 @@ export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly 
     pointer: error.pointer,
   })));
   const byId = new Map(graph.nodes.map(node => [node.id, node])), sourceMap: GraphSourceLocation[] = [];
+  const incoming = new Map(graph.edges.map(edge => [`${edge.to.nodeId}:${edge.to.portId}`, edge]));
   const mapped = new Set<string>();
   let emitted = 0;
   const emit = (id: string, at: string, root: GraphRoot, rootIndex: number): Json => {
@@ -34,7 +35,7 @@ export function projectGraph(graph: LogicGraph): { readonly ast: Json; readonly 
     const node = byId.get(id)!;
     let value = copy(node.payload.value);
     for (const input of node.inputs) {
-      const edge = graph.edges.find(edge => edge.to.nodeId === id && edge.to.portId === input.id);
+      const edge = incoming.get(`${id}:${input.id}`);
       if (edge && input.binding !== undefined) value = replaceAt(value, input.binding, emit(edge.from.nodeId, at + input.binding, root, rootIndex));
     }
     const map = (candidate: Json, own: string) => {

@@ -105,7 +105,7 @@ export function lift(ast: Json, options: LiftOptions = {}): LiftResult {
       }
       const inner = visit(child.value, child.kind, childAt, childScope, childTyping);
       const actual = inner.outputs[0].type;
-      const input = { id: child.binding, label: child.binding, type: inputType({ ...node, scopeId: inner.scopeId }, child.binding, actual), required: true, binding: child.binding };
+      const input = { id: child.binding, label: child.binding, type: inputType({ ...node, scopeId: inner.scopeId }, child.binding, actual, child.kind), required: true, binding: child.binding };
       node = { ...node, inputs: [...node.inputs, input] };
       edges.push({ id: `edge-${edges.length + 1}`, kind: actual.representation, from: { nodeId: inner.id, portId: 'value' }, to: { nodeId: id, portId: input.id }, binding: child.binding });
       sourceMap.push({ pointer: childAt, nodeId: id, portId: input.id, anchor });
