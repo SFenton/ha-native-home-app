@@ -115,15 +115,12 @@ describe('G-average target-gated step and exact two-flow fallback', () => {
     const actual = evaluateOperand(operandBase.parse(fallback.ast), { read: id => ({ status: 'value', value: reads.get(id)! }) });
     if (expected === null) expect(actual).toEqual({ status: 'unavailable' });
     else { expect(actual.status).toBe('value'); if (actual.status === 'value') expect(actual.value).toBeCloseTo(expected, 12); }
-    // When PR #20 lands this also runs the real shared average evaluator, not a graph-owned engine.
-    const supported = pipelineSourceSchema.safeParse(recipe('step').sources[0]);
-    if (supported.success) {
-      const run = evaluatePipeline(supported.data.inputs, rows, { clock: { now: '2026-11-18T16:00:00', utcOffsetMinutes: 0 } });
-      expect(run.status).toBe('ok');
-      if (run.status === 'ok') {
-        if (expected === null) expect(run.value).toBeNull();
-        else expect(run.value).toBeCloseTo(expected, 12);
-      }
+    const supported = pipelineSourceSchema.parse(recipe('step').sources[0]);
+    const run = evaluatePipeline(supported.inputs, rows, { clock: { now: '2026-11-18T16:00:00', utcOffsetMinutes: 0 } });
+    expect(run.status).toBe('ok');
+    if (run.status === 'ok') {
+      if (expected === null) expect(run.value).toBeNull();
+      else expect(run.value).toBeCloseTo(expected, 12);
     }
   });
   it('surfaces A-number-state refusal and rejects untyped/text averages', () => {

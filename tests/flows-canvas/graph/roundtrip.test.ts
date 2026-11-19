@@ -11,6 +11,8 @@ import type { Json } from '../../../src/shared/types';
 import { exampleA, exampleB, immutable, predicateBudgetFixtures, sourceParameterTemplate, tooWarmWarning } from './fixtures';
 import { expressionChildren } from '../../../src/shared/composition/graph/grammar';
 import { atPointer, record, replaceAt } from '../../../src/shared/composition/graph/json';
+import { checkPipelineSource } from '../../../src/shared/composition/pipeline/compile';
+import { pipelineSourceSchema } from '../../../src/shared/composition/pipeline/schema';
 
 const clone = (value: unknown): Json => JSON.parse(JSON.stringify(value));
 function roundtrip(value: Json, kind?: 'operand' | 'condition' | 'flow' | 'document', scope?: NonNullable<Parameters<typeof lift>[1]>['scope']) {
@@ -235,7 +237,7 @@ describe('G-roundtrip shared contract corpus', () => {
     if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope)) throw new Error('Expected publication envelope.');
     const document = envelope.document;
     const graph = lift(document, { kind: 'document' });
-    const result = lower(graph.graph);
+    const result = lower(graph.graph, { targetCapabilities: compileCompositionDocument(document).capabilities });
     expect(result.ok, `${entry.file}: ${JSON.stringify(result.ok ? [] : result.errors.slice(0, 3).map(({ code, pointer }) => ({ code, pointer })))}`).toBe(true);
     if (result.ok) expect(canonicalCompositionJSON(result.ast)).toBe(canonicalCompositionJSON(document));
   });
@@ -246,7 +248,7 @@ describe('G-roundtrip shared contract corpus', () => {
       const graph = lift(source, { kind: 'flow' });
       expect(projectGraph(graph.graph).ast, file).toEqual(source);
       if (entry.compiles === true) {
-        const result = lower(graph.graph);
+        const result = lower(graph.graph, { targetCapabilities: checkPipelineSource(pipelineSourceSchema.parse(source), '').capabilities });
         expect(result.ok, `${file}: ${JSON.stringify(result.ok ? [] : result.errors.map(({ code, pointer }) => ({ code, pointer })))}`).toBe(true);
       }
   });

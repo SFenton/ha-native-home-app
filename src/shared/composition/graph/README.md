@@ -47,13 +47,12 @@ actions, or UI dependencies.
   Lifting uses content-and-origin IDs so reordered array positions cannot reuse
   another fragment's saved position.
 
-PR #20 was unmerged when this lane was implemented. `GraphPipeline*` extends
-stable pipeline shapes with the approved average step only. The temporary
-`checkGraphPipeline` bridge uses the existing nullable reduction typing rule;
-it is not a second runtime and does not enable the baseline publication schema.
-Actual evaluation/publication of average and text keep still needs that lane.
-Both are gated by target capabilities. A-number-state remains disabled with its
-specific prerequisite and compiler pointer; no cast or fabricated shape exists.
+After rebasing onto merged PR #20, `GraphPipeline*` and graph schemas are aliases
+of the real shared pipeline exports. There is no temporary average/min bridge.
+Average and text keep remain gated on target capabilities, and parity tests run
+the real shared average evaluator unconditionally. A-number-state remains
+disabled with its specific prerequisite and compiler pointer; no cast or
+fabricated shape exists.
 
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
 expansion, draft layout extraction, persistence/conflicts, and publication.

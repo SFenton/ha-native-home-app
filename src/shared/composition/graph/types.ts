@@ -10,10 +10,9 @@ export type Immutable<T> = T extends (...args: never[]) => unknown ? T
   : T extends readonly (infer U)[] ? readonly Immutable<U>[]
     : T extends object ? { readonly [K in keyof T]: Immutable<T[K]> } : T;
 export type GraphJSON = Immutable<Json>;
-/** Stable structural boundary while PR #20's exports are pending. */
-export type GraphPipelineStep = PipelineStep | { id: string; op: 'average'; value: Operand };
-export type GraphPipelineInputs = Omit<PipelineInputs, 'steps'> & { steps: GraphPipelineStep[] };
-export type GraphPipelineSource = Omit<PipelineSource, 'inputs'> & { inputs: GraphPipelineInputs };
+export type GraphPipelineStep = PipelineStep;
+export type GraphPipelineInputs = PipelineInputs;
+export type GraphPipelineSource = PipelineSource;
 
 export type LogicAnchor =
   | { readonly kind: 'page' | 'modal' | 'component' | 'logic' | 'flow'; readonly id: string; readonly nodeId?: string; readonly field: string }
