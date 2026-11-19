@@ -34,7 +34,10 @@ export function expressionScope(value: Json, scopeId: string, scopes: readonly G
   if (depends(value, ['item', 'index', 'hole'])) return scopeId;
   if (!depends(value, ['param'])) return undefined;
   let scope = scopes.find(scope => scope.id === scopeId);
-  while (scope && scope.kind !== 'flow') scope = scopes.find(parent => parent.id === scope?.parentId);
+  const seen = new Set<string>();
+  while (scope && scope.kind !== 'flow' && !seen.has(scope.id)) {
+    seen.add(scope.id); scope = scopes.find(parent => parent.id === scope?.parentId);
+  }
   return scope?.id ?? scopeId;
 }
 export function inputType(node: Pick<GraphNode, 'payload' | 'scopeId'>, binding: string, actual: PortType): PortType {

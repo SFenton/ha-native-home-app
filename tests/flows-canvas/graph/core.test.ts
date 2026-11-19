@@ -306,6 +306,15 @@ describe('typed connections, structural refusals and fan-out', () => {
     const edited: LogicGraph = { ...graph, nodes: graph.nodes.map(node => node.id === literal.id ? { ...node, payload: { kind: 'operand', value: { type: 'literal', value: '12' } } } : node) };
     expect(lower(edited)).toMatchObject({ ok: false });
   });
+  it('reports cyclic lexical scopes even when an edited parameter must resolve its owner', () => {
+    const graph = base(), literal = graph.nodes.find(node => node.payload.kind === 'operand' && node.payload.value.type === 'literal')!;
+    const edited: LogicGraph = {
+      ...graph,
+      scopes: graph.scopes.map(scope => ({ ...scope, parentId: scope.id })),
+      nodes: graph.nodes.map(node => node.id === literal.id ? { ...node, payload: { kind: 'operand', value: { type: 'param', name: 'missing' } } } : node),
+    };
+    expect(validateGraph(edited)).toContainEqual(expect.objectContaining({ code: 'cycle' }));
+  });
   it('does not silently fill deleted or optionalized grammar ports from their payload skeleton', () => {
     const graph = base(), root = graph.roots[0].nodeId, removed = graph.edges[0];
     for (const inputs of [
