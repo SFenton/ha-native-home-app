@@ -248,7 +248,10 @@ export type BudgetAccountingEvent =
   | { readonly type: 'condition-budget'; readonly action: 'reset' | 'restore'; readonly pointer: string;
     readonly previousScopeId: string; readonly scopeId: string; readonly previousRemaining: number | null; readonly remaining: number | null }
   | { readonly type: 'rule-cases'; readonly pointer: string; readonly count: number; readonly limit: number }
-  | { readonly type: 'steps'; readonly scopeId: string; readonly pointer: string; readonly count: number; readonly limit: number };
+  | { readonly type: 'steps'; readonly scopeId: string; readonly pointer: string; readonly count: number; readonly limit: number }
+  /** A structural refusal with no safely traversable Checker root. No partial traversal events are retained. */
+  | { readonly type: 'schema-limit'; readonly pointer: string; readonly count: number; readonly limit: number;
+    readonly direction: 'minimum' | 'maximum'; readonly partial: true };
 export type BudgetAccountingObserver = (event: BudgetAccountingEvent) => void;
 
 /** Observer-only state shared by the expression and flow checkers. Never constructed on the unobserved path. */
@@ -271,8 +274,14 @@ export class BudgetAccountingScope {
   }
 }
 
-// Only observed checkers get side storage; unobserved instances keep the base layout.
-let checkerAccounting: WeakMap<Checker, { observer: BudgetAccountingObserver; expression?: BudgetAccountingScope; predicate?: BudgetAccountingScope }> | undefined;
+// Synchronous observation is scoped and reentrant; unobserved instances need neither fields nor WeakMap lookups.
+let checkerAccounting: { checker: Checker; observer: BudgetAccountingObserver; expression?: BudgetAccountingScope; predicate?: BudgetAccountingScope } | undefined;
+function observing<T>(checker: Checker, observer: BudgetAccountingObserver, run: () => T): T {
+  const previous = checkerAccounting;
+  checkerAccounting = { checker, observer };
+  try { return run(); }
+  finally { checkerAccounting = previous; }
+}
 
 /** Walks operands, predicates and calls with the app parser's budget, depth, text and combination rules. */
 class Checker implements ExpressionFacts {
@@ -290,20 +299,18 @@ class Checker implements ExpressionFacts {
    * `controlStoppers` is the stopper ids of a dial control's one call (`sh.dial-control@1`): there every `control` names one of them. `'any'` is the
    * schema's own pass, which leaves that to the compiler. Absent, a `control` names none (a bound control, a swipe, or a stopper's own call).
    */
-  constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope, private readonly controlStoppers?: readonly string[] | 'any', observer?: BudgetAccountingObserver) {
-    if (observer) (checkerAccounting ??= new WeakMap()).set(this, { observer });
-  }
+  constructor(private readonly allowControl: boolean, private readonly flow = false, private readonly scope?: ItemScope, private readonly controlStoppers?: readonly string[] | 'any') {}
   add(code: CompositionIssue['code'], pointer: string) { this.issues.push({ code, pointer }); }
   start(nodes: number, pointer: string) {
     this.budget = nodes;
-    const accounting = checkerAccounting?.get(this);
+    const accounting = checkerAccounting?.checker === this ? checkerAccounting : undefined;
     if (accounting) {
       accounting.expression = new BudgetAccountingScope(accounting.observer, 'expression', pointer, nodes, MAX_EXPRESSION_DEPTH);
       accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, null, null, `predicate:${pointer}:initial`);
     }
   }
   beginCondition(pointer: string) {
-    const accounting = checkerAccounting?.get(this);
+    const accounting = checkerAccounting?.checker === this ? checkerAccounting : undefined;
     if (accounting) {
       const previousScopeId = accounting.predicate!.id;
       accounting.predicate = new BudgetAccountingScope(accounting.observer, 'predicate', pointer, MAX_CONDITION_NODES, MAX_CONDITION_DEPTH);
@@ -313,7 +320,7 @@ class Checker implements ExpressionFacts {
     this.conditionBudget = MAX_CONDITION_NODES;
   }
   private enter(pointer: string, depth: number): boolean {
-    const accounting = checkerAccounting?.get(this);
+    const accounting = checkerAccounting?.checker === this ? checkerAccounting : undefined;
     if (depth > MAX_EXPRESSION_DEPTH || this.budget <= 0) {
       accounting?.expression!.enter(pointer, depth, false, this.budget);
       this.add('limit_exceeded', pointer); return false;
@@ -410,7 +417,7 @@ class Checker implements ExpressionFacts {
         if (this.flow) this.add('invalid_combination', pointer);
         if (!value.of.length || value.of.length > MAX_COUNT_ENTRIES) this.add('limit_exceeded', at('of'));
         const outer = this.conditionBudget;
-        const accounting = checkerAccounting?.get(this);
+        const accounting = checkerAccounting?.checker === this ? checkerAccounting : undefined;
         const outerScope = accounting?.predicate;
         value.of.forEach((entry, index) => {
           // Each test has the condition budget a rule's case has.
@@ -486,7 +493,7 @@ class Checker implements ExpressionFacts {
         break;
       case 'choose': {
         this.needs.add('rules');
-        const accounting = checkerAccounting?.get(this);
+        const accounting = checkerAccounting?.checker === this ? checkerAccounting : undefined;
         if (accounting) reportAccounting(accounting.observer, { type: 'rule-cases', pointer: at('cases'), count: value.cases.length, limit: MAX_RULE_CASES });
         if (!value.cases.length || value.cases.length > MAX_RULE_CASES) this.add('limit_exceeded', at('cases'));
         value.cases.forEach((entry, index) => {
@@ -521,7 +528,7 @@ class Checker implements ExpressionFacts {
   }
   predicate(value: Predicate, pointer: string, depth: number, conditionDepth = 1) {
     if (!this.enter(pointer, depth)) return;
-    const accounting = checkerAccounting?.get(this);
+    const accounting = checkerAccounting?.checker === this ? checkerAccounting : undefined;
     if (this.conditionBudget !== Number.POSITIVE_INFINITY && (conditionDepth > MAX_CONDITION_DEPTH || this.conditionBudget <= 0)) {
       accounting?.predicate!.enter(pointer, conditionDepth, false, this.conditionBudget);
       this.add('limit_exceeded', pointer); return;
@@ -610,15 +617,21 @@ const isIdentifier = (value: unknown) => typeof value === 'string' ? value.lengt
 
 /** Checks one operand the way the app's parser does. `allowControl` is true only inside a control's own call. */
 export function checkOperand(value: Operand, pointer: string, allowControl = false, flow = false, scope?: ItemScope, observer?: BudgetAccountingObserver): ExpressionFacts {
-  const checker = new Checker(allowControl, flow, scope, undefined, observer); checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker;
+  const checker = new Checker(allowControl, flow, scope);
+  if (observer) return observing(checker, observer, () => { checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker; });
+  checker.start(MAX_EXPRESSION_NODES, pointer); checker.operand(value, pointer, 1); return checker;
 }
 /** Checks one predicate. */
 export function checkPredicate(value: Predicate, pointer: string, flow = false, scope?: ItemScope, observer?: BudgetAccountingObserver): ExpressionFacts {
-  const checker = new Checker(false, flow, scope, undefined, observer); checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker;
+  const checker = new Checker(false, flow, scope);
+  if (observer) return observing(checker, observer, () => { checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker; });
+  checker.start(MAX_EXPRESSION_NODES, pointer); if (flow) checker.beginCondition(pointer); checker.predicate(value, pointer, 1); return checker;
 }
 /** Checks one `call-service` action. */
 export function checkCallService(value: CallService, pointer: string, allowControl: boolean, scope?: ItemScope, controlStoppers?: readonly string[] | 'any', observer?: BudgetAccountingObserver): ExpressionFacts {
-  const checker = new Checker(allowControl, false, scope, controlStoppers, observer); checker.call(value, pointer); return checker;
+  const checker = new Checker(allowControl, false, scope, controlStoppers);
+  if (observer) return observing(checker, observer, () => { checker.call(value, pointer); return checker; });
+  checker.call(value, pointer); return checker;
 }
 
 // MARK: Schemas with the parser's checks attached

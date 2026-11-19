@@ -34,7 +34,7 @@ import { PIPELINE_LIMITS, pipelineSourceSchema, type PipelineSource } from './pi
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
 import { CompositionReferences, type CompositionDependencies } from './dependencies';
-import { emitSchemaAccounting, isAccountingObserverFailure, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
+import { emitSchemaAccounting, isAccountingObserverFailure, observeSchemaRefusal, rethrowAccountingObserverFailure, withSchemaAccounting } from './studio-logic/accounting';
 
 const referenceCache = new WeakMap<object, CompositionDependencies>();
 
@@ -212,7 +212,7 @@ function usesRgba(value: unknown): boolean {
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-function at(input: unknown, path: PropertyKey[]): unknown {
+function at(input: unknown, path: readonly PropertyKey[]): unknown {
   for (const key of path) {
     if (input === null || typeof input !== 'object' || !Object.hasOwn(input, key)) return undefined;
     input = Reflect.get(input, key);
@@ -243,7 +243,12 @@ export function parseCompositionShape<T>(schema: z.ZodType<T>, input: unknown, a
   const expandedIssues = expand(parsed.error.issues);
   if (accountingObserver) {
     const emitted = new Set<object>();
-    for (const issue of expandedIssues) emitSchemaAccounting(issue, accountingObserver, accountingAt, emitted);
+    const observed = new Map<string, 'complete' | 'partial'>();
+    const read = (path: readonly PropertyKey[]) => at(input, path);
+    for (const issue of expandedIssues) {
+      emitSchemaAccounting(issue, accountingObserver, accountingAt, emitted);
+      observeSchemaRefusal(read, issue, accountingObserver, accountingAt, observed);
+    }
   }
   for (const issue of expandedIssues) {
     const path = issue.path;
@@ -304,7 +309,8 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 export interface CompileOptions {
   tileInkDefault?: boolean;
   /**
-   * Synchronous snapshots from the enforcing schema or scoped checker pass, without replay or result state.
+   * Synchronous snapshots from existing checks, plus one observation-only Checker per structurally limit-refused root.
+   * Refusal-only facts are discarded; untraversable roots emit partial schema-limit snapshots instead.
    * Observer exceptions propagate unchanged (including CompositionValidationError), never as document diagnostics.
    */
   accountingObserver?: BudgetAccountingObserver;
