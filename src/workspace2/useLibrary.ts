@@ -48,8 +48,11 @@ export function useLibrary(tier: Tier, width: number): Library {
     if (open && next === category) update({ [slot]: false });
     else update({ category: next, [slot]: true });
   }, [open, category, update, slot]);
-  const groupOpen = useCallback((id: string, fallback: boolean) => stored.groups?.[id] ?? fallback, [stored.groups]);
-  const setGroup = useCallback((id: string, next: boolean) => update({ groups: { ...stored.groups, [id]: next } }), [update, stored.groups]);
+  const groupOpen = useCallback((id: string, fallback: boolean) => typeof stored.groups?.[id] === 'boolean' ? stored.groups[id] : fallback, [stored.groups]);
+  const setGroup = useCallback((id: string, next: boolean) => setStored(old => {
+    if (old.groups?.[id] === next) return old;
+    const value = { ...old, groups: { ...old.groups, [id]: next } }; write(value); return value;
+  }), []);
   const show = useCallback((next: Category) => update({ category: next }), [update]);
   return { category, open, press, show, setOpen, groupOpen, setGroup };
 }

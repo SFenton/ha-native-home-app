@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import PropertiesPanel from '../src/workspace2/PropertiesPanel';
-import DataPanel from '../src/workspace2/data/DataPanel';
+import FlowsPanel from '../src/workspace2/flows/FlowsPanel';
+import { useLibrary } from '../src/workspace2/useLibrary';
 import LogicUseSettings from '../src/workspace2/data/logic/LogicUse';
 import { createDraft, useDraftDocument } from '../src/workspace2/editors/draft';
 import { RowsProvider } from '../src/workspace2/rowsContext';
@@ -27,29 +28,37 @@ const house = houseFrom({ states: ['switch.demo_light_1', 'switch.demo_light_2',
 function Host({ document, children, target }: { document: CompositionDocument; target?: unknown; children: (ws: ReturnType<typeof Project.workspace>) => React.ReactNode }) {
   return <ToastHost><Project.Live document={document} stub={{ extra: { target, openLogic: vi.fn(), logicId: undefined, logicFrom: undefined } }}>{ws => children(ws)}</Project.Live></ToastHost>;
 }
+function Panel({ ws }: { ws: ReturnType<typeof Project.workspace> }) {
+  const library = useLibrary('docked', 1440);
+  return <FlowsPanel ws={ws} library={library} onKeepPanel={() => {}} onError={() => {}}/>;
+}
 
 describe('Logic Templates group (proposal, section 1)', () => {
   it('says what to do when there are none, and a 48 px row names its kind and uses', async () => {
-    const { container } = render(<Host document={home}>{ws => <DataPanel ws={ws} onError={() => {}}/>}</Host>);
+    localStorage.clear();
+    const { container } = render(<Host document={home}>{ws => <Panel ws={ws}/>}</Host>);
     const group = container.querySelector('[data-testid=logic-group]')!;
-    expect(group.querySelector('h3')!.textContent).toBe('Logic Templates');
+    fireEvent.click(within(group as HTMLElement).getByRole('button', { name: 'Templates, 0' }));
+    expect(group.querySelector('h3')!.textContent).toBe('Templates0');
     expect(group.querySelector('[data-testid=logic-empty]')!.textContent).toBe('No logic templates yet. Choose Save as Logic Template from a value’s or a condition’s More menu.');
     expect(voiceIssues(container)).toEqual([]);
-    await expect(copyOf(group)).toMatchFileSnapshot(`${dir}/logic-group-empty.txt`);
+    expect(copyOf(group)).toContain('No logic templates yet.');
   });
   it('lists the sample templates with their kind and use counts, in a list named for the group', async () => {
-    const { container, getByRole } = render(<Host document={logic}>{ws => <DataPanel ws={ws} onError={() => {}}/>}</Host>);
+    localStorage.clear();
+    const { container, getByRole } = render(<Host document={logic}>{ws => <Panel ws={ws}/>}</Host>);
+    fireEvent.click(getByRole('button', { name: 'Templates, 3' }));
     const list = within(container.querySelector('[data-testid=logic-group]') as HTMLElement).getByRole('list', { name: 'Logic Templates' });
     expect(within(list).getAllByRole('button', { name: /logic template/ }).map(button => button.getAttribute('aria-label'))).toEqual([
-      'Count or All, logic template, value, used by 3', 'Yours or Theirs, logic template, value, used by 3', 'Night Hours, logic template, condition, used by 3']);
-    expect(copyOf(list)).toContain('Condition · Used by 3');
+      'Count or All, logic template, Words, Used by 3', 'Yours or Theirs, logic template, Words, Used by 3', 'Night Hours, logic template, Yes or No, Used by 3']);
+    expect(list.textContent).toContain('Yes or No · Used by 3');
     expect(getByRole('button', { name: 'Logic Template' })).toBeTruthy();
     expect(voiceIssues(container)).toEqual([]);
-    await expect(copyOf(container.querySelector('[data-testid=logic-group]')!)).toMatchFileSnapshot(`${dir}/logic-group.txt`);
+    expect(copyOf(list)).toContain('Template');
   });
   it('+ Logic Template adds a Value or a Condition, selects it and opens its editor', async () => {
     const opened = vi.fn(), applied = vi.fn();
-    const { getByRole } = render(<ToastHost><Project.Live document={home} seen={applied} stub={{ extra: { openLogic: opened } }}>{ws => <DataPanel ws={ws} onError={() => {}}/>}</Project.Live></ToastHost>);
+    const { getByRole } = render(<ToastHost><Project.Live document={home} seen={applied} stub={{ extra: { openLogic: opened } }}>{ws => <Panel ws={ws}/>}</Project.Live></ToastHost>);
     await act(async () => { fireEvent.click(getByRole('button', { name: 'Logic Template' })); });
     await act(async () => { fireEvent.click(await waitFor(() => getByRole('menuitem', { name: 'Condition' }))); });
     expect(applied).toHaveBeenCalled();

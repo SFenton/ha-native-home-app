@@ -70,7 +70,7 @@ const entries: readonly Entry[] = [
     return { node, sources: created };
   } },
   { type: 'bound-control', name: 'Toggle', glyph: 'toggle-right', domains: ['light', 'fan', 'media_player', 'humidifier'], make({ document, entityId = 'light.example', name }) {
-    const { source, created } = sourceFor(document, id => ({ id, kind: 'ha-entity', entityId: literal(entityId) }), item => holdsEntity(item, undefined, entityId), `entity-${shortId(entityId)}`);
+    const { source, created } = sourceFor(document, id => ({ id, kind: 'ha-entity', entityId: literal(entityId) }), item => holdsEntity(item, undefined, entityId), entityId);
     const call = (service: string) => ({ type: 'call-service' as const, domain: entityId.split('.')[0], service, target: { entity_id: literal(entityId) } });
     const node = { ...base('toggle', name ?? entityId), type: 'bound-control' as const, icon: symbol(entityId.startsWith('light.') ? 'lightbulb' : 'power'),
       props: { kind: 'toggle' as const, surface: 'tile' as const, isOn: { type: 'state' as const, sourceId: source.id, path: ['state'], in: ['on'] }, unavailableText: 'Unavailable' },
@@ -123,7 +123,7 @@ const entries: readonly Entry[] = [
   { type: 'status-rail', name: 'Status rail', glyph: 'gallery-horizontal', make: () => ({ sources: [], node: { ...base('rail', 'New rail'), type: 'status-rail', props: {}, children: [] } }) },
   { type: 'row', name: 'Row', glyph: 'list', make({ document, entityId, name }) {
     // With an entity the row shows its state; the data source is reused when the document already reads that entity.
-    const { source, created } = entityId ? sourceFor(document, id => ({ id, kind: 'ha-entity', entityId: literal(entityId) }), item => holdsEntity(item, undefined, entityId), `entity-${shortId(entityId)}`) : { source: undefined, created: [] as Source[] };
+    const { source, created } = entityId ? sourceFor(document, id => ({ id, kind: 'ha-entity', entityId: literal(entityId) }), item => holdsEntity(item, undefined, entityId), entityId) : { source: undefined, created: [] as Source[] };
     const value = source ? { type: 'read' as const, from: { type: 'source' as const, sourceId: source.id, path: ['state'] }, as: 'string' as const, missing: 'unavailable' as const } : literal('');
     return { sources: created, node: { ...base('row', name ?? 'New row'), type: 'row', props: { primary: literal(name ?? 'New row'), secondary: literal(''), value, accessory: 'none', loadingText: 'Loading', unavailableText: 'Unavailable' } } };
   } },
@@ -141,7 +141,7 @@ const entries: readonly Entry[] = [
   } },
   // A readout of an entity: the value is the entity's state; the tone is Neutral until a rule says otherwise.
   { type: 'status-pill', key: 'readout', name: 'Readout', glyph: 'gauge', make({ document, entityId, name }) {
-    const { source, created } = entityId ? sourceFor(document, id => ({ id, kind: 'ha-entity', entityId: literal(entityId) }), item => holdsEntity(item, undefined, entityId), `entity-${shortId(entityId)}`) : { source: undefined, created: [] as Source[] };
+    const { source, created } = entityId ? sourceFor(document, id => ({ id, kind: 'ha-entity', entityId: literal(entityId) }), item => holdsEntity(item, undefined, entityId), entityId) : { source: undefined, created: [] as Source[] };
     const value = source ? { type: 'read' as const, from: { type: 'source' as const, sourceId: source.id, path: ['state'] }, as: 'string' as const, missing: 'unavailable' as const } : literal('Value');
     return { sources: created, node: { ...base('readout', name ?? 'New Readout'), type: 'status-pill', icon: symbol('gauge'), props: { value, detail: literal(''), tone: 'neutral', unavailableText: 'Unavailable' } } as CompositionNode };
   } },

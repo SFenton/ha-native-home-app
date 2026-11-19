@@ -6,6 +6,7 @@ import { TextField } from '../ui';
 import About from './dialogs/About';
 import Activity from './dialogs/Activity';
 import Data from './dialogs/Data';
+import PhoneFlows from './flows/PhoneFlows';
 import Help from './dialogs/Help';
 import History from './dialogs/History';
 import Import from './dialogs/Import';
@@ -20,9 +21,9 @@ import { useRows } from './rows';
 import type { Workspace2 } from './useWorkspace2';
 
 /** Every dialog the Project menu opens (spec 5.7). Tabs, Header Buttons and Wallpaper open the properties surface instead. */
-export type DialogKey = 'rename' | 'data' | 'local-state' | 'links' | 'launch' | 'live' | 'history' | 'import' | 'json' | 'activity' | 'about' | 'help' | 'start-published' | 'restore-draft';
+export type DialogKey = 'rename' | 'data' | 'flows' | 'local-state' | 'links' | 'launch' | 'live' | 'history' | 'import' | 'json' | 'activity' | 'about' | 'help' | 'start-published' | 'restore-draft';
 export const dialogTitles: Record<DialogKey, string> = {
-  rename: 'Rename', data: 'Data', 'local-state': 'Local State', links: 'Links', launch: 'App Launch', live: 'Live Activities', history: 'Publish History',
+  rename: 'Rename', data: 'Data', flows: 'Flows', 'local-state': 'Local State', links: 'Links', launch: 'App Launch', live: 'Live Activities', history: 'Publish History',
   import: 'Import', json: 'Edit as JSON', activity: 'Activity', about: 'About', help: 'Help',
   'start-published': 'Start from Published?', 'restore-draft': 'Restore Previous Draft?',
 };
@@ -61,7 +62,7 @@ export function DialogBody({ dialog, ws, close, onError }: { dialog: DialogKey; 
   const context = useProjectRows(ws, onError);
   if (!context) return null;
   const body = {
-    rename: <Rename/>, data: <Data ws={ws}/>, 'local-state': <LocalState/>, links: <Links/>, launch: <Launch/>, live: <Live/>, history: <History ws={ws}/>,
+    rename: <Rename/>, data: <Data ws={ws}/>, flows: <PhoneFlows ws={ws}/>, 'local-state': <LocalState/>, links: <Links/>, launch: <Launch/>, live: <Live/>, history: <History ws={ws}/>,
     import: <Import ws={ws} close={close}/>, json: <JsonEditor close={close}/>, activity: <Activity ws={ws}/>, about: <About ws={ws}/>, help: <Help/>,
     'start-published': <ReplaceDraft kind="start-published" ws={ws} close={close}/>, 'restore-draft': <ReplaceDraft kind="restore-draft" ws={ws} close={close}/>,
   }[dialog];

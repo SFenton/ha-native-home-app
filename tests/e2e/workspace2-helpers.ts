@@ -86,6 +86,11 @@ const BOOT = 30_000;
 /** Opens the workspace at `/` and waits for the draft. */
 export async function openWorkspace(page: Page): Promise<void> {
   await page.goto('/');
+  await waitForWorkspace(page);
+}
+
+/** Waits for the asynchronous workspace boot without navigating or changing the restored selection. */
+export async function waitForWorkspace(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible({ timeout: BOOT });
   await expect(previewRoot(page)).toBeVisible({ timeout: BOOT });
 }

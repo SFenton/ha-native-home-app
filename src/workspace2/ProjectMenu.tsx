@@ -32,7 +32,7 @@ function sections(ws: Workspace2): Entry[][] {
   const panel = (id: PanelKind, label: string): Entry => ({ id, label, kind: 'panel', panel: id });
   return [
     [panel('tabs', 'Tabs'), panel('header', 'Header Buttons'), panel('wallpaper', 'Wallpaper'), panel('styles', 'State Styles')],
-    [dialog('data'), dialog('local-state'), dialog('links'), dialog('launch'), dialog('live')],
+    [dialog('flows'), dialog('data'), dialog('local-state'), dialog('links'), dialog('launch'), dialog('live')],
     [dialog('history'), dialog('import', 'Import…'),
       ...(ws.houseStates.status === 'ready' ? [dialog('start-published', 'Start from Published')] : []), ...(ws.studio.backup ? [dialog('restore-draft', 'Restore Previous Draft')] : []), { id: 'export', label: 'Export', kind: 'action', run: () => ws.document && exportJson(compositionSourceText(ws.document)) }, dialog('json', 'Edit as JSON…')],
     [dialog('activity'), dialog('about'), dialog('help')],

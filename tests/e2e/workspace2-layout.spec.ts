@@ -129,7 +129,7 @@ for (const [width, height] of sizes) {
       const clipped = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.w2-lib-label')].filter(label => label.scrollWidth > label.clientWidth).map(label => label.textContent));
       expect(clipped).toEqual([]);
       const widths = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.w2-lib-rail-button')].map(button => Math.round(button.getBoundingClientRect().width)));
-      expect(widths).toEqual([58, 58, 58, 58, 58, 58, 58]);
+      expect(widths).toEqual([58, 58, 58, 58, 58, 58, 58, 58]);
     });
   });
 }
@@ -206,7 +206,7 @@ for (const [width, height] of [[1440, 900], [820, 1180], [669, 951]] as const) {
       expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
       const rail = page.getByRole('toolbar', { name: 'Library' });
       await expect(rail).toHaveAttribute('aria-orientation', 'vertical');
-      await expect(rail.getByRole('button')).toHaveText(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Data']);
+      await expect(rail.getByRole('button')).toHaveText(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Flows', 'Data']);
       await library(page, true);
       const panel = page.getByRole('complementary', { name: 'Tabs' });
       await expect(panel).toBeVisible();
@@ -216,7 +216,7 @@ for (const [width, height] of [[1440, 900], [820, 1180], [669, 951]] as const) {
         .map(element => ({ name: element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 24) ?? '', height: element.getBoundingClientRect().height, width: element.getBoundingClientRect().width, disclosure: element.classList.contains('w2-tree-disclosure') }))
         .filter(item => item.height < 43.5 || item.width < (item.disclosure ? 31.5 : 43.5)).map(item => `${item.name} ${Math.round(item.width)}x${Math.round(item.height)}`));
       expect(await small(), 'Tabs').toEqual([]);
-      for (const category of ['Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Data']) {
+      for (const category of ['Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Flows', 'Data']) {
         if (width < 871) { await page.getByTestId('library-panel').getByRole('button', { name: /^Library:/ }).click(); await page.getByRole('menuitem', { name: category }).click(); } else await railButton(page, category).click();
         await expect(page.getByRole('complementary', { name: category })).toBeVisible();
         expect(await small(), category).toEqual([]);

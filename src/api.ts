@@ -4,6 +4,14 @@ export class ApiError extends Error {
 
 export const apiUrl = (path: string) => `./${path.replace(/^\/+/, '')}`;
 
+export interface EntityAreas {
+  areas: { id: string; name: string }[];
+  entities: { entityId: string; areaId?: string; device?: string }[];
+}
+export interface HaEntity { entityId: string; name: string; state: string; unit?: string }
+export const fetchEntityAreas = () => request<EntityAreas>('/native/api/ha/areas');
+export const fetchHaEntities = () => request<HaEntity[]>('/native/api/ha/entities');
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(apiUrl(path), { ...init, headers: { ...(init?.body === undefined || init.body === null ? {} : { 'Content-Type': 'application/json' }), ...init?.headers } });
   const text = await response.text();

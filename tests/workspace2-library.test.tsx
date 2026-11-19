@@ -19,11 +19,11 @@ beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 
 describe('the library rail', () => {
-  it('is a vertical toolbar named Library with the seven categories in order, named by their visible words', () => {
+  it('is a vertical toolbar named Library with the eight categories in order, named by their visible words', () => {
     render(<LibraryRail category="pages" open onPress={() => {}}/>);
     const bar = screen.getByRole('toolbar', { name: 'Library' });
     expect(bar.getAttribute('aria-orientation')).toBe('vertical');
-    expect(within(bar).getAllByRole('button').map(button => button.textContent)).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Data']);
+    expect(within(bar).getAllByRole('button').map(button => button.textContent)).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Flows', 'Data']);
   });
 
   it('presses the active category only while its panel is open, and reports a press', () => {
@@ -40,14 +40,14 @@ describe('the library rail', () => {
   it('moves between the buttons with the arrow keys and keeps one tab stop', () => {
     render(<LibraryRail category="tabs" open onPress={() => {}}/>);
     const buttons = screen.getAllByRole('button');
-    expect(buttons.map(button => button.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
+    expect(buttons.map(button => button.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1, -1]);
     buttons[0].focus();
     fireEvent.keyDown(buttons[0], { key: 'ArrowDown' });
     expect(document.activeElement).toBe(buttons[1]);
     fireEvent.keyDown(buttons[1], { key: 'End' });
+    expect(document.activeElement).toBe(buttons[7]);
+    fireEvent.keyDown(buttons[7], { key: 'ArrowUp' });
     expect(document.activeElement).toBe(buttons[6]);
-    fireEvent.keyDown(buttons[6], { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(buttons[5]);
   });
 });
 
@@ -131,11 +131,11 @@ describe('the flyout panel', () => {
     expect(within(panel).getByRole('button', { name: 'Close' })).toBeTruthy();
   });
 
-  it('lists the seven categories in its menu with a check on the open one, and switches', async () => {
+  it('lists the eight categories in its menu with a check on the open one, and switches', async () => {
     render(<Harness tier="flyout"/>);
     fireEvent.click(screen.getByRole('button', { name: 'Library: Pages' }));
     const items = await screen.findAllByRole('menuitem');
-    expect(items.map(item => item.textContent)).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Data']);
+    expect(items.map(item => item.textContent)).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Flows', 'Data']);
     expect(items[1].querySelector('.w2-lib-check')).toBeTruthy();
     expect(items.filter(item => item.querySelector('.w2-lib-check'))).toHaveLength(1);
     fireEvent.click(items[4]);

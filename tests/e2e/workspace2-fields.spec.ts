@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { buildDocumentIndex } from '../../src/preview2/model';
 import { resolveField } from '../../src/composition-editor';
+import type { CompositionDocument } from '../../src/shared/composition/schema';
 import { schemaAt } from '../../src/workspace2/rows';
 import { closePagesList, isPhone, openPagesList, openWorkspace, seed } from './workspace2-helpers';
 import { readFileSync } from 'node:fs';
@@ -82,6 +83,10 @@ async function reachableDeep(panel: Locator): Promise<Set<string>> {
 
 /** The Data tab's source rows (entities, app topics and models), each opened in the inspector in turn. */
 async function reachableSources(page: Page): Promise<Set<string>> {
+  for (const title of ['App', 'Models']) {
+    const group = page.getByTestId('data-panel').getByRole('button', { name: new RegExp(`^${title}, \\d+$`) });
+    if (await group.count() && await group.getAttribute('aria-expanded') === 'false') await group.click();
+  }
   const rows = page.getByTestId('data-panel').locator('.w2-data-plain .w2-data-row');
   const paths = new Set<string>(), count = await rows.count();
   for (let at = 0; at < count; at++) {
@@ -219,7 +224,7 @@ test('acceptance 2: every editable field of the project is reachable from the Pr
   const doc = withLaunch();
   const parts: { item: string; scope: () => Locator; value: unknown; path: Path; skip: (key: string) => boolean; close: () => Promise<void> }[] = [
     { item: 'Rename', value: doc.name, path: ['name'], skip: () => false },
-    { item: 'Data', value: doc.dataSources, path: ['dataSources'], skip: () => false },
+    { item: 'Data', value: isPhone(page) ? doc.dataSources : doc.dataSources.map((source: CompositionDocument['dataSources'][number]) => source.kind === 'ha-entity' ? {} : source), path: ['dataSources'], skip: () => false },
     { item: 'Local State', value: doc.localState, path: ['localState'], skip: () => false },
     { item: 'Live Activities', value: doc.liveActivities, path: ['liveActivities'], skip: () => false },
     { item: 'App Launch', value: doc.bootstrap, path: ['bootstrap'], skip: () => false },

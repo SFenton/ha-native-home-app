@@ -31,8 +31,12 @@ async function openFlow(page: Page): Promise<Locator> {
   await openWorkspace(page);
   if (sheetPath(page)) {
     await page.getByRole('button', { name: 'Project', exact: true }).click();
-    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Data$/ }).click();
-  } else await openLibrary(page, 'Data');
+    await page.locator('.w2-project-sheet .w2-list-row', { hasText: /^Flows$/ }).click();
+  } else {
+    await openLibrary(page, 'Flows');
+    const group = page.getByRole('button', { name: /^Flows, \d+$/ });
+    if (await group.getAttribute('aria-expanded') === 'false') await group.click();
+  }
   await page.getByRole('button', { name: /Overdue Chores/ }).first().click();
   return sheetPath(page) ? page.getByRole('dialog', { name: 'Project' }) : page.getByLabel('Properties');
 }

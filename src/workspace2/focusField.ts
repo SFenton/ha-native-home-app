@@ -22,6 +22,16 @@ export function focusField(fieldPath: string): void {
   const started = performance.now();
   const apply = (target: HTMLElement) => { if (document.activeElement !== target) target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'center', behavior: 'auto' }); };
   const look = () => {
+    const fold = fieldPath.startsWith('componentLibrary/') && document.querySelector<HTMLElement>('.w2-template-fold > button[aria-expanded=false]');
+    const disclosure = [...document.querySelectorAll<HTMLElement>('[data-disclosure]')].find(element => {
+      const path = element.getAttribute('data-disclosure');
+      return path && (path === fieldPath || fieldPath.startsWith(`${path}/`)) && element.querySelector(':scope > button[aria-expanded=false]');
+    })?.querySelector<HTMLElement>(':scope > button');
+    if (fold || disclosure) {
+      (fold || disclosure)!.click();
+      if (performance.now() - started < 1000) requestAnimationFrame(look);
+      return;
+    }
     const found = rowFor(fieldPath);
     const target = found && control(found);
     if (target) {
@@ -33,6 +43,7 @@ export function focusField(fieldPath: string): void {
       }, delay);
       return;
     }
+    document.querySelector<HTMLElement>('.w2-inspector .w2-advanced > button[aria-expanded=false], .w2-project-sheet .w2-advanced > button[aria-expanded=false]')?.click();
     if (performance.now() - started < 1000) requestAnimationFrame(look);
   };
   requestAnimationFrame(look);

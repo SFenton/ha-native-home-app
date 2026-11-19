@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 import { boundControlActions, boundControlProps, kindDependentActions, kindDependentProps } from './bound-control';
 import { settingsDomain, settingsDestination, settingsItem, settingsFixedItems, type SettingsKind } from './settings';
 import { climateCapabilities, climateCapability, validateClimateControl, validateClimateInputs, type ClimateProps } from './climate';
-import { bodyCount, bodyHeight, checkedBody, COMPONENT_LIMITS, COMPONENT_REF_CAPABILITY, COMPONENT_VALUES_CAPABILITY, derivedId, fieldsOverlap, expandDocument, fieldKind, findNode, findNodePath, ownedSources, readField,
+import { bodyCount, bodyHeight, checkedBody, COMPONENT_LIMITS, COMPONENT_REF_CAPABILITY, COMPONENT_VALUES_CAPABILITY, derivedId, fieldsOverlap, expandDocument, expandSources, fieldKind, findNode, findNodePath, ownedSources, readField,
   type DocumentSource } from './components';
 import { baseTextStyles, compositionChildren, compositionDocumentSchema, type CompositionAction, type CompositionDocument, type CompositionGroups,
   type CompositionActionSlot, type CompositionNode, type ComponentEntry, type ComponentRefNode, type CompositionRead, type CompositionValue, type RepeatNode } from './schema';
@@ -14,7 +14,7 @@ import { deviceControlModel, isRoomDeviceSource, validateDeviceControl, validate
 import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroom';
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
-import { checkCallService, checkOperand, checkPredicate, operandKind, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
+import { checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
 import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesStateFills } from './state-styles';
 import { identifierSchema } from '../validation';
 import { APP_STATE_CAPABILITY } from './app-state';
@@ -24,7 +24,7 @@ import { checkPipelineProvider, checkPipelineRead, checkPipelineSource, checkRep
 import { checkRepeat } from './repeat';
 import { checkChartOperandKind, checkChartSource } from './chart-source';
 import { tileInkDefault } from './tile-ink-gate';
-import { expandBounded, remapLogicIssues } from './logic-library';
+import { expandBounded, expandLogic, logicSampleArguments, remapLogicIssues, type LogicEntry } from './logic-library';
 import { badgeNodeKinds, expandBadgeSettings, initialsReadable, MAX_BADGE_TEXT, remapBadgeIssues } from './profile-badges';
 import { swipeProblems, type SwipeTile, type TileSwipe } from './tile-swipe';
 import { overviewWordKeys, wordKeysFor, wordProblems, type StateWords } from './state-words';
@@ -33,6 +33,9 @@ import { lateSpans, type FoldSide } from './fold-sides';
 import { PIPELINE_LIMITS } from './pipeline/schema';
 import { dialControlProblems } from './dial-control';
 import { vacuumCapabilities, vacuumPrimitiveCapabilities, validateVacuumControl, validateVacuumDescriptor, type VacuumControl } from './vacuum';
+import { CompositionReferences, type CompositionDependencies } from './dependencies';
+
+const referenceCache = new WeakMap<object, CompositionDependencies>();
 
 export const firstSliceCapabilities = [
   'sh.actions.navigation@1', 'sh.assets.publisher@1', 'sh.backdrop@1', 'sh.bindings@1', 'sh.chrome@1',
@@ -234,6 +237,17 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
 export interface CompileOptions { tileInkDefault?: boolean }
 export function compileCompositionDocument(input: unknown, options: CompileOptions = {}): CompiledComposition {
+  return compileRecording(input, options);
+}
+function compileRecording(input: unknown, options: CompileOptions, references?: CompositionDependencies): CompiledComposition {
+  if (references && record(input)) referenceCache.set(input, references);
+  try { return compileWithReferences(input, options, references); }
+  catch (error) {
+    if (references && error instanceof CompositionValidationError) references.issues = error.issues;
+    throw error;
+  }
+}
+function compileWithReferences(input: unknown, options: CompileOptions, references?: CompositionDependencies): CompiledComposition {
   assertCompositionBounds(input);
   let expansion: ReturnType<typeof expandBounded>;
   try { expansion = expandBounded(input); }
@@ -243,19 +257,73 @@ export function compileCompositionDocument(input: unknown, options: CompileOptio
     throw error;
   }
   if (expansion.document === input) {
-    const compiled = compilePlain(input, options, true);
+    const compiled = compilePlain(input, options, true, references);
     // A draft with Show at Most or Spoken As is handed back as authored; `expanded` is what a publication holds.
     return { document: compiled.badged ? input as CompositionDocument : compiled.document, capabilities: compiled.capabilities, expanded: compiled.document };
   }
   // The draft holds named logic: every use is worked out first, so capabilities, budgets and every other check read plain operands and conditions.
   // An issue inside a worked-out use is reported where the use stands in the draft.
   try {
-    const compiled = compilePlain(expansion.document, options);
+    const compiled = compilePlain(expansion.document, options, false, references);
     return { document: input as CompositionDocument, capabilities: compiled.capabilities, expanded: compiled.document };
   } catch (error) {
     if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapLogicIssues(error.issues, expansion.origins, '/document', expansion.bindings));
     throw error;
   }
+}
+
+/** References from the compiler's own typed checks, including library defaults and placed expansions. */
+export function compositionDependencies(document: CompositionDocument, samples: readonly LogicEntry[] = []): CompositionDependencies {
+  if (!referenceCache.has(document)) {
+    try { compileRecording(document, {}, { edges: [], issues: [], complete: false }); }
+    catch (error) { if (!(error instanceof CompositionValidationError)) throw error; }
+  }
+  const compiled = referenceCache.get(document)!;
+  if (!samples.length) return compiled;
+  const collected = new CompositionReferences(document, new Map(), { edges: [], issues: [], complete: false });
+  collected.merge(compiled);
+  collected.graph.issues.push(...compiled.issues);
+  collected.graph.complete = compiled.complete;
+  const libraryText = JSON.stringify(samples);
+  let absent = 'logic-sample', suffix = 0;
+  // Only synthetic holes may produce this identifier, even if a real source shares the checker's default stand-in.
+  while (libraryText.includes(JSON.stringify(absent))) absent = `logic-sample-${++suffix}`;
+  // Saved logic is editable in global scope, even when unplaced or when a parameter is unused.
+  // Use exactly the compiler's typed operand/predicate facts; JSON literal payloads stay opaque.
+  samples.forEach((entry, index) => {
+    const reader = { path: ['logicLibrary', index], value: entry };
+    const at = `/document/logicLibrary/${index}`;
+    const append = (value: unknown, kind: LogicEntry['kind'], path: string) => {
+      let expanded: unknown;
+      try { expanded = (expandLogic({ logicLibrary: samples, x: value }).document as { x: unknown }).x; }
+      catch (error) {
+        if (!(error instanceof CompositionValidationError)) throw error;
+        collected.graph.issues.push(...error.issues);
+        collected.graph.complete = false;
+        return;
+      }
+      try {
+        const facts = kind === 'operand'
+          ? checkOperand(parseCompositionShape(operandSchema, expanded), path)
+          : checkPredicate(parseCompositionShape(predicateSchema, expanded), path);
+        collected.editable({ ...facts, references: facts.references.filter(ref => ref.sourceId !== absent) }, reader);
+      } catch (error) {
+        if (!(error instanceof CompositionValidationError)) throw error;
+        collected.graph.issues.push(...error.issues.map(issue => ({ ...issue, pointer: `${path}${issue.pointer}` })));
+        collected.graph.complete = false;
+      }
+    };
+    append({ type: 'logic-ref', logicId: entry.id, args: logicSampleArguments(entry, absent) }, entry.kind, `${at}/body`);
+    entry.params.forEach((param, offset) => {
+      if (param.sample === undefined) return;
+      const path = `${at}/params/${offset}/sample`;
+      if (param.kind === 'operand' || param.kind === 'condition') append(param.sample, param.kind, path);
+      else if (param.kind === 'source-id' && typeof param.sample === 'string' && param.sample) collected.add({
+        target: { type: 'source', id: param.sample }, path: ['logicLibrary', index, 'params', offset, 'sample'], reader, kind: 'argument', sample: true,
+      });
+    });
+  });
+  return collected.graph;
 }
 /** What compiling a document gives: `document` as it was authored, the `capabilities` its published form needs, and `expanded`, the published form. */
 export interface CompiledComposition {
@@ -265,13 +333,13 @@ export interface CompiledComposition {
   /** The document with every logic use worked out and no `logicLibrary`: what a publication carries. */
   expanded: CompositionDocument;
 }
-function compilePlain(input: unknown, options: CompileOptions, bounded = false): { document: CompositionDocument; capabilities: string[]; badged?: true } {
+function compilePlain(input: unknown, options: CompileOptions, bounded = false, references?: CompositionDependencies): { document: CompositionDocument; capabilities: string[]; badged?: true } {
   if (!bounded) assertCompositionBounds(input);
   // Show at Most and Spoken As are the draft's: they are worked out into plain operands first, so capabilities and every other check read what a publication holds.
   // An issue inside a worked-out badge is reported at the setting that asked for it. `badged` tells the caller the document to hand back is the one authored.
   const settings = expandBadgeSettings(input);
   if (settings.document !== input) {
-    try { return { ...compilePlain(settings.document, options, true), badged: true }; }
+    try { return { ...compilePlain(settings.document, options, true, references), badged: true }; }
     catch (error) {
       if (error instanceof CompositionValidationError) throw new CompositionValidationError(remapBadgeIssues(error.issues, settings.badges, input));
       throw error;
@@ -387,6 +455,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     ...(entry.sources ?? []).map((source, offset) => ({ source: { ...source, id: derivedId(entry.id, source.id) } as DocumentSource, path: `/document/componentLibrary/${index}/sources/${offset}` })),
     ...(entry.flows ?? []).map((source, offset) => ({ source: { ...source, id: derivedId(entry.id, source.id) } as DocumentSource, path: `/document/componentLibrary/${index}/flows/${offset}` })),
   ]);
+  const sources = new Map([...document.dataSources, ...privateSources.map(item => item.source)].map(source => [source.id, source]));
+  const collected = new CompositionReferences(document, sources, references);
   /** The node a reference stands for where its body's root decides something (a placement rule, a sibling count); the reference itself when the entry is missing. */
   const view = (item: CompositionNode): CompositionNode => item.type === 'component-ref' ? library.get(item.componentId)?.node ?? item : item;
   /** True while a library entry's body is walked: a body holds no `component-ref`. */
@@ -430,7 +500,13 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   }
   /** The records the walk is inside while it draws the template of a `repeat` (`sh.repeat@1`); `item` and `index` mean something only there. */
   let repeatScope: ItemScope | undefined;
-  function useCall(call: CallService, path: string, control: boolean) { require('call-service'); absorb(checkCallService(call, path, control, repeatScope)); }
+  function useCall(call: CallService, path: string, control: boolean) {
+    require('call-service'); absorb(checkCallService(call, path, control, repeatScope));
+    const target = call.target?.entity_id;
+    if (target?.type === 'literal') {
+      for (const id of Array.isArray(target.value) ? target.value : [target.value]) if (typeof id === 'string') collected.entity(id, `${path}/target/entity_id`);
+    }
+  }
   /**
    * A slot that follows a rule or an entity (`sh.rules@1`): a `conditional` look walks its conditions, a `bound-color` and a `bound-symbol` walk their
    * value, which must give text. A plain look needs nothing.
@@ -672,6 +748,10 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     if (owned.length > 0) {
       if (document.dataSources.length + expandedSources + owned.length > 1000) add('limit_exceeded', `${path}/componentId`);
       expandedSources += owned.length;
+      if (references) expandSources(ref, entry).forEach((source, index) => {
+        const at = `${path}/sources/${index}`;
+        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1' ? checkPipelineSource(source, at).entities : []);
+      });
     }
     if ((keys.length || valueKeys.length) && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });
   }
@@ -818,7 +898,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     if (repeatScope) add('invalid_combination', `${p}/type`);
     const found = checkRepeat(item, p);
     issues.push(...found.issues);
-    const source = [...document.dataSources, ...privateSources.map(entry => entry.source)].find(entry => entry.id === item.props.providerId);
+    const source = collected.source(item.props.providerId, `${p}/props/providerId`);
     let shape: Shape | undefined;
     if (!source) add('invalid_reference', `${p}/props/providerId`);
     else if (source.kind !== 'model' || source.model !== 'pipeline@1') add('binding_type', `${p}/props/providerId`);
@@ -849,7 +929,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
    * `binding_type`. `limit` and the operands are checked even when the flow is refused, so every slot is still walked.
    */
   function chartSource(series: Extract<Extract<CompositionNode, { type: 'chart' }>['props']['series'], { type: 'source' }>, path: string) {
-    const lookup = new Map([...document.dataSources, ...privateSources.map(entry => entry.source)].map(source => [source.id, source]));
+    const lookup = { get: (id: string) => collected.source(id, `${path}/providerId`) };
     const found = checkChartSource({ series, path }, lookup, repeatScope);
     issues.push(...found.issues);
     const outer = repeatScope;
@@ -1776,6 +1856,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     register('source', source.id, `${p}/id`);
     if (source.kind === 'model' && source.model === 'pipeline@1') {
       const found = checkPipelineSource(source, p);
+      collected.define(source, p, undefined, found.entities);
       issues.push(...found.issues);
       for (const name of found.capabilities) capabilities.add(name);
       reads.push(...found.reads);
@@ -1783,6 +1864,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       if (++pipelines > PIPELINE_LIMITS.pipelines) add('limit_exceeded', p);
       return;
     }
+    collected.define(source, p);
     if (source.kind === 'model' && ['home-status@1', 'home-weather@1', 'home-light@1'].includes(source.model)) {
       require(source.model.slice(0, -2));
       const entity = (value: string, path: string, domains: string[] = []) => {
@@ -1948,7 +2030,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     if (value.type === 'read') dependencies.push({ from: source.id, to: value.from.sourceId, path: `${path}/from/sourceId` });
   });
   for (const ref of refs) {
-    if (catalogs.get(ref.kind)?.has(ref.id)) continue;
+    if (ref.kind === 'source' ? collected.source(ref.id, ref.path, 'argument') !== undefined : catalogs.get(ref.kind)?.has(ref.id)) continue;
     // A `push` or a `page-id` argument may name a level (`sh.sheet-levels@1`); from a page, a chrome item or a `dismiss-then-push` it may not.
     if (ref.kind === 'page' && ref.from !== undefined && catalogs.get('level')?.has(ref.id)) {
       if (ref.from === 'page' || ref.from === 'leaving') add('invalid_combination', ref.path);
@@ -1963,8 +2045,11 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   function checkArgUses() {
     if (!argUses.length) return;
     let found: CompositionIssue[] = [];
-    try { for (const name of compileCompositionDocument(plainDerivedIds(expanded), options).capabilities) capabilities.add(name); }
+    const names = new Map<string, string>(), plain = plainDerivedIds(expanded, names);
+    const nested: CompositionDependencies | undefined = references ? { edges: [], issues: [], complete: false } : undefined;
+    try { for (const name of compileRecording(plain, options, nested).capabilities) capabilities.add(name); }
     catch (error) { if (error instanceof CompositionValidationError) found = error.issues; else throw error; }
+    if (nested) collected.merge(nested, new Map([...names].map(([original, name]) => [name, original])));
     const known = new Set(issues.map(issue => `${issue.code}\0${issue.pointer}`));
     for (const { ref, entry, path } of argUses) {
       const valued = new Set((entry.params ?? []).filter(param => param.kind === 'value').map(param => param.name));
@@ -1982,30 +2067,29 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       }
     }
   }
-  const sources = new Map([...document.dataSources, ...privateSources.map(item => item.source)].map(source => [source.id, source]));
   for (const { props, path } of climateRefs) {
-    const source = sources.get(props.sourceId);
+    const source = collected.source(props.sourceId, `${path}/sourceId`);
     if (!source) add('invalid_reference', `${path}/sourceId`);
     else if (source.kind !== 'model' || source.model !== 'climate@1') add('binding_type', `${path}/sourceId`);
     else validateClimateControl(props, source.inputs, path, add);
   }
   for (const ref of powerRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'power-toggle@1') add(ref.code, ref.path);
   }
   for (const ref of alarmRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'alarm-mode@1') add('binding_type', ref.path);
   }
   for (const ref of doorRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'security-door@1' || source.inputs.kind !== ref.kind) add('binding_type', ref.path);
   }
   for (const ref of cameraRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'camera-stream@1') add('binding_type', ref.path);
     else if (ref.records && source.inputs.recording.type === 'disabled') add('invalid_combination', ref.path);
@@ -2026,7 +2110,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     if (modal && !videoSources(modal.components).includes(ref.source)) add('invalid_combination', ref.path);
   }
   for (const ref of homeRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== ref.model) add('binding_type', ref.path);
   }
@@ -2037,7 +2121,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   }
   for (const ref of expressionRefs) {
     const at = ref.pointer + (ref.kind === undefined ? '/sourceId' : '/from/sourceId');
-    const source = sources.get(ref.sourceId);
+    const source = collected.source(ref.sourceId, at);
     if (!source) { add('invalid_reference', at); continue; }
     // `raw-state` and the list reads stand on an entity only; a list read also needs one of its attributes.
     if (ref.entityOnly && source.kind !== 'ha-entity') { add('binding_type', at); continue; }
@@ -2054,12 +2138,12 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     else if (ref.path.length < 2 || ref.path[0] !== 'attributes') add('invalid_reference', ref.pointer + (ref.kind === undefined ? '/path' : '/from/path'));
   }
   for (const ref of optimisticRefs) {
-    const source = sources.get(ref.sourceId);
+    const source = collected.source(ref.sourceId, ref.pointer);
     if (!source) add('invalid_reference', ref.pointer);
     else if (source.kind !== 'ha-entity') add('binding_type', ref.pointer);
   }
   for (const ref of visibilityRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'ha-entity' && !(source.kind === 'model' && source.model === 'home-status@1')) add('binding_type', ref.path);
   }
@@ -2074,37 +2158,37 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       add('invalid_combination', ref.path);
   }
   for (const ref of roomRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (ref.navigation ? source.kind !== 'model' || source.model !== 'room-navigation@1' : source.kind !== 'ha-entity')
       add('binding_type', ref.path);
   }
   for (const { control, path } of deviceRefs) {
-    const source = sources.get(control.binding.sourceId);
+    const source = collected.source(control.binding.sourceId, `${path}/binding/sourceId`);
     if (!source) add('invalid_reference', `${path}/binding/sourceId`);
     else if (!isRoomDeviceSource(source) || source.model !== deviceControlModel(control.props.control)) add('binding_type', `${path}/binding/sourceId`);
     else if (source.model === 'grill@1' && !source.inputs.details.some(detail => detail.entityId === control.props.detailEntityId))
       add('invalid_reference', `${path}/props/detailEntityId`);
   }
   for (const ref of titleSourceRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'bedroom-provider@1'
       || !['bed-alarm-draft', 'wake-alarm-draft'].includes(source.inputs.kind)) add('binding_type', ref.path);
   }
   for (const ref of bedroomRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'bedroom-provider@1' || !ref.providers.includes(source.inputs.kind))
       add('binding_type', ref.path);
   }
   for (const ref of remoteRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'media-remote@1') add('binding_type', ref.path);
   }
   for (const { control, path } of providerControls) {
-    const source = sources.get(control.props.sourceId);
+    const source = collected.source(control.props.sourceId, `${path}/sourceId`);
     if (!source) { add('invalid_reference', `${path}/sourceId`); continue; }
     if (!isDeviceProvider(source)) { add('binding_type', `${path}/sourceId`); continue; }
     if (control.type === 'custom-light-control' && source.model === 'custom-lights@1') {
@@ -2120,28 +2204,29 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     } else add('binding_type', `${path}/sourceId`);
   }
   for (const { control, path } of vacuumRefs) {
-    const source = sources.get(control.props.sourceId);
+    const source = collected.source(control.props.sourceId, `${path}/sourceId`);
     if (!source) add('invalid_reference', `${path}/sourceId`);
     else if (source.kind !== 'model' || source.model !== 'vacuum@1') add('binding_type', `${path}/sourceId`);
     else validateVacuumControl(control, source.inputs, path, add);
   }
   for (const ref of profileRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'profile-account@1') add('binding_type', ref.path);
   }
   for (const ref of settingsRefs) {
-    const source = sources.get(ref.id);
+    const source = collected.source(ref.id, ref.path);
     if (!source) add('invalid_reference', ref.path);
     else if (source.kind !== 'model' || source.model !== 'settings-provider@1' || source.inputs.domain !== settingsDomain(ref.kind))
       add('binding_type', ref.path);
   }
   for (const ref of providerRefs) {
+    // Missing collection providers have historically been accepted. Do not turn this type-only check into an existence check.
     const source = sources.get(ref.id);
     if (source?.kind === 'model' && source.model === 'pipeline@1') issues.push(...checkPipelineProvider(source.inputs, ref.node, ref.path));
   }
   for (const { read, path } of reads) {
-    const source = sources.get(read.from.sourceId), segments = read.from.path;
+    const source = collected.source(read.from.sourceId, `${path}/from/sourceId`), segments = read.from.path;
     if (!source) { add('invalid_reference', `${path}/from/sourceId`); continue; }
     if (source.kind === 'model' && source.model === 'bedroom-provider@1') {
       if (!['bed-side', 'wake-light'].includes(source.inputs.kind) || segments.length !== 1 || !['stateText', 'phase'].includes(segments[0]))
@@ -2200,6 +2285,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   if (document.assets.map(asset => asset.id).join('\0') !== document.assets.map(asset => asset.id).sort().join('\0')) add('invalid_value', '/document/assets');
   checkArgUses();
   validateChromeContexts(expanded, add);
+  if (references) { references.issues = issues; references.complete = true; }
   if (issues.length) throw new CompositionValidationError(issues);
   return { document, capabilities: [...capabilities].sort() };
 }

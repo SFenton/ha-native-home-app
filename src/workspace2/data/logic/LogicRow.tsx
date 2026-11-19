@@ -18,7 +18,7 @@ export function UseRow({ ws, use, onDone }: { ws: Workspace2; use: LogicUse; onD
 }
 
 /** The uses popover: "Used by 6", one row per use with the place over the node and field; a press selects the node. Past two, "Show 4 More". */
-function Uses({ ws, uses, anchor, onClose }: { ws: Workspace2; uses: LogicUse[]; anchor: HTMLElement | null; onClose: () => void }) {
+export function LogicUses({ ws, uses, anchor, onClose }: { ws: Workspace2; uses: LogicUse[]; anchor: HTMLElement | null; onClose: () => void }) {
   const [all, setAll] = useState(false);
   const shown = all ? uses : uses.slice(0, 2);
   return <Popover.Root open onOpenChange={next => { if (!next) onClose(); }}>
@@ -44,6 +44,6 @@ export default function LogicRow({ ws, entry, uses, actions }: { ws: Workspace2;
     <MoreMenu label={`More for ${entry.name}`} commands={[
       { label: logicWords.rename, run: () => actions.rename(entry.id) }, { label: logicWords.showUses, run: () => setShowing(true) },
       { label: logicWords.duplicate, run: () => actions.duplicate(entry.id) }, { label: logicWords.delete, run: () => actions.remove(entry.id), danger: true, separatorBefore: true }]}/>
-    {showing && <Uses ws={ws} uses={usesOf(ws.document!, entry.id)} anchor={row.current} onClose={() => setShowing(false)}/>}
+    {showing && <LogicUses ws={ws} uses={usesOf(ws.document!, entry.id)} anchor={row.current} onClose={() => setShowing(false)}/>}
   </li>;
 }

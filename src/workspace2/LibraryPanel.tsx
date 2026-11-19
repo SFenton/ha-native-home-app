@@ -6,6 +6,7 @@ import type { SelectionKey } from '../preview2/model';
 import LibraryPalette from './LibraryPalette';
 import LibraryTree from './LibraryTree';
 import DataPanel from './data/DataPanel';
+import FlowsPanel from './flows/FlowsPanel';
 import RepeatsLevel from './repeats/RepeatsLevel';
 import TemplateUsesLevel from './TemplateUses';
 import { categoryInfo } from './LibraryRail';
@@ -19,7 +20,7 @@ const railButton = (category: Category) => window.document.querySelector<HTMLEle
 
 /**
  * The library panel. Docked it is 272 px beside the rail; as a flyout it is 300 px over the rail with a 56 px first row (a pop-up button that shows the
- * open category and lists all seven, and Close). The surfaces (Tabs, Pages, Sheets, Modals) are a tree that goes one level at a time
+ * open category and lists all categories, and Close). The surfaces (Tabs, Pages, Sheets, Modals) are a tree that goes one level at a time
  * (`LibraryTree`); Components and Controls are palettes. It never traps focus: a press on the simulator leaves it open, Close and Escape
  * close it and focus goes back to the rail button.
  */
@@ -54,7 +55,8 @@ export default function LibraryPanel({ ws, document, tier, category, open, shown
   const content = usesEntry ? <TemplateUsesLevel ws={ws} entry={usesEntry} onBack={backFromUses} onKeepPanel={onKeepPanel} onClose={flyout ? undefined : close}/> : repeatsOpen ? <RepeatsLevel ws={ws} onBack={backToRow} onClose={flyout ? undefined : close}/>
     : isTreeCategory(category)
     ? <LibraryTree ws={ws} category={category} library={library} trailApi={trailApi} onCategory={onCategory} onKeepPanel={onKeepPanel} onError={onError} onClose={flyout ? undefined : close}/>
-    : category === 'data' ? <DataPanel ws={ws} onError={onError}/> : <LibraryPalette ws={ws} kind={category} library={library}/>;
+    : category === 'flows' ? <FlowsPanel ws={ws} library={library} onKeepPanel={onKeepPanel} onError={onError}/>
+    : category === 'data' ? <DataPanel ws={ws} library={library} onError={onError}/> : <LibraryPalette ws={ws} kind={category} library={library}/>;
   return <aside ref={panel} className="w2-lib-panel" data-tier={tier} data-open={shown ? '' : undefined} aria-label={info.label} onKeyDown={keys} inert={!open} data-testid="library-panel">
     {flyout && <header className="w2-lib-head w2-lib-flyout-head">
       <Menu.Root>

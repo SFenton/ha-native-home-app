@@ -13,10 +13,11 @@ import { Project } from './support/workspace2-surfaces';
 import homeDomains from '../src/preview2/fixtures/home-domains.json';
 
 const api = vi.hoisted(() => ({ request: vi.fn() }));
-vi.mock('../src/api', () => ({ apiUrl: (path: string) => path, request: api.request }));
+vi.mock('../src/api', async original => ({ ...await original<typeof import('../src/api')>(), apiUrl: (path: string) => path, request: api.request,
+  fetchHaEntities: () => Promise.resolve([]), fetchEntityAreas: () => Promise.resolve({ areas: [], entities: [] }) }));
 
 afterEach(cleanup);
-beforeEach(() => { api.request.mockReset(); });
+beforeEach(() => { api.request.mockReset(); localStorage.clear(); });
 const base = homeDomains.document as unknown as CompositionDocument;
 
 /** A dialog body against a document the dialog itself edits; `seen` receives each edit. */
@@ -41,51 +42,51 @@ describe('Data', () => {
     expect(sourceName(document.dataSources.find(source => source.id === 'home-weather')!)).toBe('Weather');
   });
 
-  it('groups sources under Entities and Models with their id and "Used by n" or "Unused"', () => {
+  it('keeps HA read only and editable models collapsed without Studio ids', () => {
     render(<Dialog dialog="data" document={sample('unused')}/>);
-    expect(within(screen.getByRole('region', { name: 'Entities' })).getAllByText(/^Used by \d+$|^Unused$/).length).toBeGreaterThan(0);
+    expect(screen.getByText('From Home Assistant · read only')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Entities' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Models, / }));
     const models = screen.getByRole('region', { name: 'Models' });
-    expect(within(models).getByText('lonely-weather').tagName).toBe('CODE');
-    expect(within(models).getByText('Unused')).toBeTruthy();
+    expect(within(models).queryByText('lonely-weather')).toBeNull();
+    expect(within(models).getByText('Used by 0')).toBeTruthy();
     expect(within(models).getAllByText(/^Used by \d+$/).length).toBeGreaterThan(10);
   });
 
-  it('searches by name or id, and "Remove Unused" drops only the sources nothing reads', () => {
-    let last = sample('unused');
-    render(<Dialog dialog="data" document={sample('unused')} seen={next => { last = next; }}/>);
-    fireEvent.change(screen.getByPlaceholderText('Search data'), { target: { value: 'lonely' } });
-    expect(screen.getAllByRole('button', { name: /lonely-weather/ })).toHaveLength(1);
-    fireEvent.change(screen.getByPlaceholderText('Search data'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Unused' }));
-    expect(last.dataSources.some(source => source.id === 'lonely-weather')).toBe(false);
-    expect(last.dataSources.length).toBe(base.dataSources.length);
+  it('searches editable models by friendly name without a cleanup action', () => {
+    render(<Dialog dialog="data" document={sample('unused')}/>);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Weather' } });
+    expect(screen.getAllByRole('button', { name: /^Weather, source/ })).toHaveLength(2);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } });
+    expect(screen.queryByRole('button', { name: 'Remove Unused' })).toBeNull();
     expect(removeUnusedSources(base).dataSources.length).toBe(base.dataSources.length);
   });
 
-  it('disables "Remove Unused" when everything is read, and says so when there is no data', () => {
+  it('has no cleanup action, and says so when there is no data', () => {
     const { unmount } = render(<Dialog dialog="data"/>);
-    expect((screen.getByRole('button', { name: 'Remove Unused' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Remove Unused' })).toBeNull();
     unmount();
     render(<Dialog dialog="data" document={{ ...base, dataSources: [] }}/>);
-    expect(screen.getByText('No data yet.')).toBeTruthy();
+    expect(screen.getByText('No entities in use yet.')).toBeTruthy();
   });
 
   it('a row pushes the source\'s own fields, with Back to the list', () => {
     render(<Dialog dialog="data" document={sample('unused')}/>);
-    fireEvent.click(screen.getByRole('button', { name: /lonely-weather/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Models, / }));
+    fireEvent.click(screen.getByRole('button', { name: 'Weather, source, used by 0' }));
     expect(screen.getByRole('heading', { name: 'Weather' })).toBeTruthy();
     expect(document.querySelector('[data-field-path="dataSources/' + (base.dataSources.length) + '/inputs/weatherEntityId"], [data-field-path^="dataSources/' + base.dataSources.length + '"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Data/ }));
-    expect(screen.getByRole('button', { name: 'Add Source' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Source' })).toBeTruthy();
   });
 
   it('"Add Source" lists the models, adds the one chosen and opens its fields', () => {
     let last = base;
     render(<Dialog dialog="data" seen={next => { last = next; }}/>);
-    fireEvent.click(screen.getByRole('button', { name: 'Add Source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
     const names = modelChoices().map(choice => choice.name);
     expect(names).toContain('Weather');
-    fireEvent.click(screen.getByRole('button', { name: 'Weather' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Weather' }));
     expect(last.dataSources.length).toBe(base.dataSources.length + 1);
     expect(last.dataSources.at(-1)).toMatchObject({ kind: 'model', model: 'home-weather@1' });
     expect(screen.getByRole('heading', { name: 'Weather' })).toBeTruthy();

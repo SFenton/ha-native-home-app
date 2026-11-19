@@ -36,11 +36,11 @@ for (const view of viewports) {
   test.describe(view.name, () => {
     test.use({ viewport: { width: view.width, height: view.height } });
 
-    test('the rail has Tabs, Pages, Sheets, Modals, Components, Controls, Data in order, unclipped, and Tabs lists the tab bar with a 56 px header', async ({ page }) => {
+    test('the rail has Tabs, Pages, Sheets, Modals, Components, Controls, Flows, Data in order, unclipped, and Tabs lists the tab bar with a 56 px header', async ({ page }) => {
       // The docked library starts open from 1200 px, so a press on Tabs there would close it: open it only when it is not, then wait for it to stop sliding.
       await openTabs(page);
       const names = await page.getByTestId('library-rail').getByRole('button').allTextContents();
-      expect(names).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Data']);
+      expect(names).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals', 'Components', 'Controls', 'Flows', 'Data']);
       const clipped = await page.getByTestId('library-rail').locator('.w2-lib-label').evaluateAll(nodes => nodes.filter(node => node.scrollWidth > node.clientWidth).map(node => node.textContent));
       expect(clipped).toEqual([]);
       expect(await titles(page)).toEqual(['Home', 'Security', 'Climate']);

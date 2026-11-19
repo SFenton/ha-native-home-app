@@ -106,7 +106,7 @@ export default function Workspace2({ active, onCreatePage, onCreateSheet }: { ac
   const closeLibrary = useCallback(() => { setYielded(false); library.setOpen(false); }, [library]);
   const switchCategory = useCallback((next: Category) => { setYielded(false); if (next !== library.category || !library.open) library.press(next); }, [library]);
   // Project > Data opens the Data panel when there is a rail (the dialog stays a pushed page on a phone): one place to build Data Flows.
-  const showDialog = useCallback((key: DialogKey | undefined) => { if (key === 'data' && !narrow) { setProjectOpen(false); switchCategory('data'); } else setDialog(key); }, [narrow, switchCategory]);
+  const showDialog = useCallback((key: DialogKey | undefined) => { if ((key === 'data' || key === 'flows') && !narrow) { setProjectOpen(false); switchCategory(key); } else setDialog(key); }, [narrow, switchCategory]);
   // The editor's "Used in N places" row opens the Uses level, which lives in the Components panel: open that, whatever it showed.
   useEffect(() => { if (ws.usesId && !narrow) { setYielded(false); library.show('components'); library.setOpen(true); } }, [ws.usesId, narrow]); // eslint-disable-line react-hooks/exhaustive-deps
   const keepPanel = useCallback((key: SelectionKey) => { keptSelection.current = key; }, []);

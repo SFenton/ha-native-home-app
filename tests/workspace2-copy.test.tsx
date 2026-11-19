@@ -32,12 +32,14 @@ import firstSlice from './fixtures/composition-first-slice.json';
 
 vi.mock('../src/api', () => ({
   apiUrl: (path: string) => path,
+  fetchHaEntities: async () => [],
+  fetchEntityAreas: async () => ({ areas: [], entities: [] }),
   request: vi.fn(async (path: string) => path.endsWith('/assets') ? [] : { epoch: 'e', current: null, history: [], storedAssets: 0 }),
 }));
 
 const document_body = () => window.document.body;
 afterEach(cleanup);
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
 const home = homeDomains.document as unknown as CompositionDocument;
 const slice = (firstSlice as unknown as { document: CompositionDocument }).document;
 const dir = './snapshots/copy';

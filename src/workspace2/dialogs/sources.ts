@@ -1,5 +1,8 @@
 import { compositionEditorSchema, defaultField, fieldVariants, resolveField, variantName } from '../../composition-editor';
 import type { CompositionDocument } from '../../shared/composition/schema';
+import { compositionDependencies } from '../../shared/composition/compiler';
+import type { CompositionDependencies } from '../../shared/composition/dependencies';
+import { plainDocument } from '../data/logic/logicPlain';
 import type { Json } from '../../shared/types';
 
 /** A data source of the document. */
@@ -36,22 +39,44 @@ export function sourceName(source: Source, entityNames?: ReadonlyMap<string, str
   return detail ? `${model} · ${detail}` : model;
 }
 
-/** How many places read each source: every string in the document, outside a source's own `id`, that is one source's id. */
+/** One dependency graph for retention and named entity readers, in compiler expansion order. */
+const dependencyCache = new WeakMap<CompositionDocument, CompositionDependencies>();
+export function documentDependencies(document: CompositionDocument): CompositionDependencies {
+  const held = dependencyCache.get(document);
+  if (held) return held;
+  const plain = plainDocument(document);
+  // An unused, half-made logic template must not stop the compiler checking the rest of the editable draft.
+  const { logicLibrary: _library, ...withoutLibrary } = plain;
+  const graph = compositionDependencies(plain.logicLibrary ? withoutLibrary : plain, document.logicLibrary);
+  dependencyCache.set(document, graph);
+  return graph;
+}
+
+/** The compiler checks library defaults as well as placed expansions; neither may lose a referenced global source. */
 export function sourceUses(document: CompositionDocument): Map<string, number> {
   const uses = new Map<string, number>(document.dataSources.map(source => [source.id, 0]));
-  const walk = (value: unknown, own?: boolean) => {
-    if (typeof value === 'string') { if (uses.has(value)) uses.set(value, uses.get(value)! + 1); return; }
-    if (Array.isArray(value)) { for (const item of value) walk(item); return; }
-    if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) { if (own && key === 'id') continue; walk(child); }
-  };
-  const { dataSources, ...rest } = document;
-  walk(rest);
-  for (const source of dataSources) walk(source, true);
+  for (const { target } of documentDependencies(document).edges) {
+    if (target.type === 'source' && uses.has(target.id)) uses.set(target.id, uses.get(target.id)! + 1);
+  }
   return uses;
+}
+
+/** Entity sources are Studio-managed. Pruning and the edit that orphaned them share one history entry. Models stay editable. */
+export function pruneEntitySources(before: CompositionDocument, document: CompositionDocument): CompositionDocument {
+  const previous = sourceUses(before);
+  let next = document;
+  for (;;) {
+    if (!documentDependencies(next).complete) return next;
+    const uses = sourceUses(next);
+    const dataSources = next.dataSources.filter(source => source.kind !== 'ha-entity' || !previous.get(source.id) || (uses.get(source.id) ?? 0) > 0);
+    if (dataSources.length === next.dataSources.length) return next;
+    next = { ...next, dataSources };
+  }
 }
 
 /** The document without the sources nothing reads. */
 export function removeUnusedSources(document: CompositionDocument): CompositionDocument {
+  if (!documentDependencies(document).complete) return document;
   const uses = sourceUses(document);
   return { ...document, dataSources: document.dataSources.filter(source => (uses.get(source.id) ?? 0) > 0) };
 }

@@ -20,7 +20,7 @@ export function ensureSource(document: CompositionDocument, entityId: string, mo
   const found = document.dataSources.find(source => holdsEntity(source, model, entityId));
   if (found) return { document, sourceId: found.id };
   const taken = new Set(document.dataSources.map(item => item.id));
-  const base = `${model ? 'power' : 'entity'}-${entityId.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+  const base = model ? `power-${entityId.replace(/[^A-Za-z0-9_-]/g, '-')}` : entityId;
   let id = base, count = 1;
   while (taken.has(id)) id = `${base}-${++count}`;
   const source: Source = model ? { id, kind: 'model', model, inputs: { entityId: literal(entityId) } } : { id, kind: 'ha-entity', entityId: literal(entityId) };
