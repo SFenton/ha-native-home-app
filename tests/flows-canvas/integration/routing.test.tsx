@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { replaceAt } from '../../../src/composition-editor';
+import { replaceAt, valueAt } from '../../../src/composition-editor';
 import { RowsProvider } from '../../../src/workspace2/rowsContext';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { houseFrom } from '../../../src/preview2/projections';
@@ -11,6 +11,9 @@ import { integrationDocument, integrationSnapshot } from './fixture';
 import type { ReactNode } from 'react';
 import { LogicField } from '../../../src/workspace2/logic-fields/Field';
 import { createDraft } from '../../../src/workspace2/editors/draft';
+import { DraftReadRow } from '../../../src/workspace2/expr/SimpleCondition';
+import { openSimple } from '../../../src/workspace2/expr/condition';
+import type { Predicate } from '../../../src/shared/composition/expression';
 
 const canvas = vi.hoisted(() => ({ suspended: false, open: vi.fn() }));
 vi.mock('../../../src/workspace2/logic-fields/LogicFields', async original => ({
@@ -36,6 +39,20 @@ it('keeps the Only show when disclosure and Done for one check, without legacy c
   expect(within(editor).queryByRole('button', { name: /^Condition 1:/ })).toBeNull();
   fireEvent.click(within(editor).getByRole('button', { name: 'Done' }));
   expect(state.onChange).not.toHaveBeenCalled();
+  state.unchanged();
+});
+
+it.each([
+  { left: { type: 'last-changed', sourceId: 'source-a' }, value: '2026-11-15T21:30:00.000Z', label: 'Last Changed', note: /never equal to a date/ },
+  { left: { type: 'raw-state', sourceId: 'source-a' }, value: 'unknown', label: 'Raw State', note: /Says Unknown or Unavailable/ },
+])('updates $label inside a pushed picker without remounting its saved body', ({ left, value, label, note }) => {
+  const document = integrationDocument(), draft = createDraft(document);
+  const path = ['pages', 0, 'components', 2, 'visibleWhen'];
+  const state = setup(<DraftReadRow draft={draft} readLeaf={current => openSimple(valueAt(current, path) as Predicate)} onChange={vi.fn()}/>, document);
+  expect(screen.getByRole('combobox', { name: 'Read', exact: true }).textContent).toBe('State');
+  act(() => draft.set(replaceAt(draft.get(), path, { type: 'compare', op: left.type === 'last-changed' ? 'before' : 'eq', left, right: { type: 'literal', value } })));
+  expect(screen.getByRole('combobox', { name: 'Read', exact: true }).textContent).toBe(label);
+  expect(screen.getByText(note)).toBeTruthy();
   state.unchanged();
 });
 

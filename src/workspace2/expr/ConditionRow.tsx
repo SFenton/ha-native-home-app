@@ -11,7 +11,7 @@ import type { Draft } from '../editors/draft';
 import { SelectMenu } from '../SelectMenu';
 import { evaluatePredicate } from '../data/logic/logicEval';
 import { ComparisonControls, leftKind, numericState } from './ComparisonControls';
-import { ReadRow } from './SimpleCondition';
+import { DraftReadRow, ReadRow, type ReadLeaf } from './SimpleCondition';
 import ValuePicker, { ValuePickerRow, type Picked } from './ValuePicker';
 import { closeLeaf, comparisonsFor, entityOfSource, markerOf, openLeaf, operandName, readOf, resultText, sentence, sourceOfOperand, type Leaf, type NameContext } from './condition';
 import { Marker, MoreMenu, type MenuCommand } from './ui';
@@ -38,7 +38,7 @@ function closedFor(leaf: Leaf, ctx: NameContext): readonly string[] | undefined 
 type Write = (next: Predicate, document?: CompositionDocument, typing?: string) => void;
 
 /** The three stacked controls of an open comparison: the value picker, the comparison, the other side (spec "Editing"). */
-export function LeafEditor({ draft, leaf, ctx, write, compact = false }: { draft: Draft; leaf: Leaf; ctx: NameContext; write: Write; compact?: boolean }) {
+export function LeafEditor({ draft, leaf, ctx, write, compact = false, readLeaf }: { draft: Draft; leaf: Leaf; ctx: NameContext; write: Write; compact?: boolean; readLeaf?: ReadLeaf }) {
   const { entities } = useWorkspaceData();
   const commit = (next: Leaf, typing?: string, document?: CompositionDocument) => write(closeLeaf(next, id => sourceEntity((document ?? draft.get()).dataSources.find(source => source.id === id)) !== undefined), document, typing);
   const leftSource = sourceOfOperand(leaf.left), entityId = leftSource === undefined ? undefined : entityOfSource(ctx, leftSource);
@@ -54,7 +54,7 @@ export function LeafEditor({ draft, leaf, ctx, write, compact = false }: { draft
   const compareWith = leaf.comparison !== 'has a value' && leaf.comparison !== 'has no value' && leaf.comparison !== 'is one of' && leaf.comparison !== 'is not one of';
   return <div className={compact ? 'w2-expr-simple' : 'w2-expr-leaf'} data-compact={compact || undefined}>
     <ValuePickerRow draft={draft} title="Value" primary={operandName(leaf.left, ctx)} secondary={!compact && entityId && row?.name !== entityId ? entityId : undefined} onPick={pickLeft} conditions
-      footer={compact && <ReadRow leaf={leaf} entityId={entityId} onChange={next => commit(next)}/>}/>
+      footer={compact && (readLeaf ? <DraftReadRow draft={draft} readLeaf={readLeaf} onChange={next => commit(next)}/> : <ReadRow leaf={leaf} entityId={entityId} onChange={next => commit(next)}/>)}/>
     {!compact && <ReadRow leaf={leaf} entityId={entityId} onChange={next => commit(next)}/>}
     <ComparisonControls compact={compact} numeric={itemInfo ? itemInfo.kind === 'number' : numericState(row?.state)} leaf={leaf} onChange={(next, typing) => commit(next, typing)} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} closed={itemInfo?.values ?? closedFor(leaf, ctx)}/>
     {compareWith && <PickerRow stacked title={words.compareWithValue} primary={right && right.type !== 'literal' ? operandName(right, ctx) : words.compareWithValue}>

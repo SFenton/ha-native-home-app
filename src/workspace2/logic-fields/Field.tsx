@@ -55,6 +55,10 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
   const compound = kind === 'condition' && hasMultipleChecks(value);
   const simple = kind === 'condition' && !compound;
   const leaf = check ? openSimple(check) : undefined;
+  const readLeaf = (current: typeof document) => {
+    const predicate = valueAt(current, path) as Predicate | undefined;
+    return predicate ? openSimple(inlineCheck(predicate)) : undefined;
+  };
   const slot = kind === 'slot' ? value as { type?: string; value?: unknown } | undefined : undefined;
   const textSlot = slot && ['literal', 'read', 'expr'].includes(String(slot.type));
   const use = isUse(value) ? value : slot?.type === 'expr' && isUse(slot.value) ? slot.value : undefined;
@@ -76,8 +80,8 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
     {showLabel && <span className="w2-row-label">{label}</span>}
     {simple ? <>
       {inline ?? (fitsSimple(check, ctx).fits
-        ? <SimpleCondition compact draft={draft} rule={check} ctx={ctx} write={(next, base, typing) => draft.set(writeRule(base ?? draft.get(), path, next), typing)}/>
-        : leaf ? <LeafEditor compact draft={draft} leaf={leaf} ctx={ctx} write={(next, base, typing) => draft.set(writeRule(base ?? draft.get(), path, next), typing)}/>
+        ? <SimpleCondition compact draft={draft} rule={check} ctx={ctx} readLeaf={readLeaf} write={(next, base, typing) => draft.set(writeRule(base ?? draft.get(), path, next), typing)}/>
+        : leaf ? <LeafEditor compact draft={draft} leaf={leaf} ctx={ctx} readLeaf={readLeaf} write={(next, base, typing) => draft.set(writeRule(base ?? draft.get(), path, next), typing)}/>
           : check?.type === 'viewer' || check?.type === 'viewer-person' ? <ViewerEditor predicate={check} write={next => draft.set(writeRule(draft.get(), path, next))}/>
             : !use ? predicate ? <p className="w2-caption">{describeLogic(predicate, ctx)}</p>
               : <ValuePickerRow draft={draft} title="Value" primary="Choose a value" conditions onPick={picked => draft.set(writeRule(picked.document, path, defaultFor(picked)))}/> : null)}
