@@ -22,7 +22,7 @@ it('keeps the committed plain visitor fresh without rewriting it', () => {
   execFileSync(process.execPath, ['scripts/generate-expression-checker.mjs', '--check'], { stdio: 'pipe' });
 });
 
-it('matches before/after baseline bytes for all 1797 corpus documents/publication fixtures with and without an observer', () => {
+it('matches before/after baseline bytes for all 1812 corpus documents/publication fixtures with and without an observer', () => {
   let visits = 0;
   const accountingObserver = () => { visits += 1; };
   const paths = ['contract/corpus/accept', 'contract/corpus/reject', 'tests/fixtures', 'src/preview2/fixtures'].flatMap(files).sort();
@@ -37,9 +37,9 @@ it('matches before/after baseline bytes for all 1797 corpus documents/publicatio
     expect(result(() => compileCompositionDocument(envelope.document, { tileInkDefault, accountingObserver })), file).toStrictEqual(compile);
     return [{ file, compile, decode: result(() => decodeCompositionPublication(bytes)) }];
   });
-  expect(cases).toHaveLength(1797);
+  expect(cases).toHaveLength(1812);
   expect(visits).toBeGreaterThan(0);
-  expect(createHash('sha256').update(JSON.stringify(cases)).digest('hex')).toBe('9efa098c9d1e03e821cf010eef93e03c199f65de0c455b7b4e367eeb655e92d8');
+  expect(createHash('sha256').update(JSON.stringify(cases)).digest('hex')).toBe('22a3ab90825bd16fcbd697bbdb747cc47eda39cd2dff6f9bb93498d49e7eed2d');
 }, 30_000);
 
 it('gives both visitor specialisations identical facts and diagnostics for every grammar root in the corpus', () => {

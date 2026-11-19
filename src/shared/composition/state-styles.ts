@@ -1,5 +1,6 @@
 import { z } from 'zod/v4';
 import { identifierSchema } from '../validation';
+import { contrast, glyphContrast } from './color';
 import type { CompositionIssue } from './json';
 
 /**
@@ -75,6 +76,12 @@ const lookFields = {
    * It is a generic choice and names no colour family: the Studio still authors the fill. Needs a `fill` on the same state (`invalid_combination`).
    */
   fillInk: z.enum(fillInks).optional(),
+  /**
+   * The icon colour of the state (`sh.state-style-glyph-tint@1`), in the shape of a tile's own `glyphTint`: an exact `solid-rgb`, or a
+   * `solid-appearance` pair. It draws on a dark face that is neither filled nor an error and never while unavailable; absent leaves the tile's
+   * own tint, then the default ink. Only a resting or in-progress state with no `fill` may carry it (`invalid_combination`).
+   */
+  glyphTint: stateFillSchema.optional(),
   action: actionSchema.optional(),
 };
 const ruleSchema = object({ states: z.array(text(80)).min(1).max(16), ...lookFields });
@@ -351,6 +358,34 @@ export const usesStateFills = (style: Pick<StateStyleDefinition, 'rules' | 'fall
 export const usesFillInk = (style: Pick<StateStyleDefinition, 'rules' | 'fallback'>): boolean =>
   style.fallback.fillInk !== undefined || style.rules.some(rule => rule.fillInk !== undefined);
 
+/** Whether a style uses what `sh.state-style-glyph-tint@1` adds: an icon colour on any state or the fallback. */
+export const usesGlyphTint = (style: Pick<StateStyleDefinition, 'rules' | 'fallback'>): boolean =>
+  style.fallback.glyphTint !== undefined || style.rules.some(rule => rule.glyphTint !== undefined);
+
+/**
+ * The ground a dark-face icon lands on at its lightest: the page's off face (the thin module, `#1C1C1E` at 66%) over the lightest wallpaper
+ * (sRGB grey 0.46), the case the app's own off glyph is lifted for (direction-g, Colour families).
+ */
+export const glyphGroundDark = 0x3A3A3C;
+/** The ground a light-sheet icon lands on: the sheet's white cell. */
+export const glyphGroundLight = 0xFFFFFF;
+
+const packed = (color: { red: number; green: number; blue: number }): number => color.red * 65536 + color.green * 256 + color.blue;
+
+/**
+ * The 3:1 check of an icon colour (`sh.state-style-glyph-tint@1`, WCAG 1.4.11): the dark member (or the single colour) against the dark
+ * ground and the light member (or the single colour) against the sheet's white cell. The app draws the authored value unchanged, so this
+ * is the author's only warning. Returns the words of the first member that falls short, or undefined when both read.
+ */
+export function glyphTintWarning(tint: StateFill | undefined): string | undefined {
+  if (!tint) return undefined;
+  const [light, dark] = tint.type === 'solid-appearance' ? [tint.light, tint.dark] : [tint, tint];
+  const onDark = contrast(packed(dark), glyphGroundDark), onLight = contrast(packed(light), glyphGroundLight);
+  if (onDark < glyphContrast) return `The ${tint.type === 'solid-appearance' ? 'dark color' : 'color'} is ${onDark.toFixed(1)}:1 on the dark face; icons need 3:1.`;
+  if (onLight < glyphContrast) return `The ${tint.type === 'solid-appearance' ? 'light color' : 'color'} is ${onLight.toFixed(1)}:1 on a light sheet; icons need 3:1.`;
+  return undefined;
+}
+
 /**
  * The fill a state draws, if its style gives one: the rule `ruleFor` finds. An unavailable or unknown entity, a first load and a redacted
  * screen are the unknown class and take the unknown rule's fill (`unknownRuleFor`). A request in flight or failed changes the words and
@@ -381,6 +416,8 @@ export function checkStateStyleLibrary(library: StateStyleLibrary, base: string)
     if (value.indicator === 'arc-spinner' && !arcAllowed(value)) add('invalid_combination', `${path}/indicator`);
     if (value.colour !== undefined && !colourAllowed(value.class)) add('invalid_combination', `${path}/colour`);
     if (value.fillInk !== undefined && value.fill === undefined) add('invalid_combination', `${path}/fillInk`);
+    // The icon colour is cosmetic like the colour token: a warning, error or unknown state keeps its class ink, and a fill keeps its fixed icon ink.
+    if (value.glyphTint !== undefined && (!colourAllowed(value.class) || value.fill !== undefined)) add('invalid_combination', `${path}/glyphTint`);
     if (value.action?.otherwise && value.action.requiresFeature === undefined) add('invalid_combination', `${path}/action/otherwise`);
   };
   library.styles.forEach((style, index) => {

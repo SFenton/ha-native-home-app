@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { classFixed, patchStyleRule, removeStyleRule } from '../../shared/composition/state-style-library';
-import { colourAllowed, indicatorOptions, type StateClass, type StateRule } from '../../shared/composition/state-styles';
+import { colourAllowed, glyphTintWarning, indicatorOptions, type StateClass, type StateRule } from '../../shared/composition/state-styles';
 import { defaultIndicator, titleCase } from '../../shared/composition/state-style-preview';
 import { GlyphByName } from '../../preview2/nodes/shared';
 import { usePush } from '../kit';
@@ -30,6 +30,15 @@ function ListInput({ label, value, disabled, onApply }: { label: string; value: 
  * face is lit, and the four layers. "When Tapped" says in words what the disc does; the tap is read-only (a copy of a built-in style
  * keeps the taps it was made with).
  */
+/** The words under the icon color: why it is off, the 3:1 warning, or what it does. */
+function glyphTintNote(rule: StateRule, colourOk: boolean, readOnly: boolean): string | undefined {
+  if (!colourOk) return 'The icon keeps the ink of the class.';
+  if (rule.fill) return 'A fill keeps its own icon ink.';
+  const warning = glyphTintWarning(rule.glyphTint);
+  if (warning) return warning;
+  return rule.glyphTint || readOnly ? 'The icon on a dark face; never while unavailable.' : 'Without one, the tile’s own icon color, then gray.';
+}
+
 export function RulePage({ id, index }: { id: string; index: number }) {
   const { style, readOnly, edit } = useStyle(id);
   const push = usePush();
@@ -72,6 +81,12 @@ export function RulePage({ id, index }: { id: string; index: number }) {
     <LayerRow label="Color" field={`${field}/colour`} edited={rule.colour !== undefined} onReset={() => patch({ colour: undefined })} resetLabel="Clear Color" note={colourOk ? undefined : 'Color follows the class.'}>
       <ChoiceSelect label="Color" value={rule.colour ?? ''} disabled={readOnly || !colourOk} onChange={value => patch({ colour: (value || undefined) as StateRule['colour'] })}
         groups={[{ choices: [{ value: '', label: 'Class Default' }, { value: 'unlit', label: 'Unlit' }, { value: 'lit', label: 'Lit' }] }]}/>
+    </LayerRow>
+    <LayerRow label="Icon color" field={`${field}/glyphTint`} edited={rule.glyphTint !== undefined} onReset={() => patch({ glyphTint: undefined })} resetLabel="Clear Icon Color"
+      note={glyphTintNote(rule, colourOk, readOnly)}>
+      {readOnly && !rule.glyphTint ? <span className="w2-readonly">Tile Default</span>
+        : <ColorPairField label="Icon color" path={`${field}/glyphTint`} allowStandard={false} allowPair value={rule.glyphTint ?? { type: 'solid-rgb', red: 142, green: 142, blue: 147 }}
+          onChange={next => { if (!readOnly && colourOk && !rule.fill && next.type !== 'standard') patch({ glyphTint: next }, `rule-glyph-tint:${id}:${index}`); }}/>}
     </LayerRow>
     <LayerRow label="Fill" field={`${field}/fill`} edited={rule.fill !== undefined} onReset={() => patch({ fill: undefined })} resetLabel="Clear Fill"
       note={rule.fill || readOnly ? undefined : 'Without a fill the tile draws the face of its class.'}>

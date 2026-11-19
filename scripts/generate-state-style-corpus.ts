@@ -217,6 +217,58 @@ needsFills('hidden-words-blank', 'Hidden words are not blank.', { stateStyles: l
 needsFills('hidden-words-too-long', 'Hidden words are at most 80 characters.', { stateStyles: library(vacuumStyle({ hiddenWords: 'x'.repeat(81) })) }, 'reject');
 needsFills('hidden-words-not-text', 'Hidden words are text.', { stateStyles: library(vacuumStyle({ hiddenWords: 7 })) }, 'reject');
 
+// MARK: Icon colour by state (sh.state-style-glyph-tint@1)
+const TINT = 'sh.state-style-glyph-tint@1';
+const warm = rgb(242, 166, 90), cool = rgb(120, 180, 240);
+const tintPair: J = { type: 'solid-appearance', light: rgb(181, 101, 29), dark: warm };
+/** A vacuum style whose resting states say the same words, so a flip between them changes the icon colour alone. */
+const tintStyle = (rules: J[], rest: J = {}): J => vacuumStyle({
+  rules: [...rules, { states: ['unavailable', 'unknown'], class: 'unknown', active: false }], ...rest,
+});
+const readyWarm = (extra: J = {}): J => ({ states: ['docked', 'idle'], class: 'resting', active: false, text: 'Ready', glyphTint: warm, ...extra });
+const readyCool = (extra: J = {}): J => ({ states: ['paused'], class: 'resting', active: false, text: 'Ready', glyphTint: cool, ...extra });
+const cleaning = (extra: J = {}): J => ({ states: ['cleaning'], class: 'resting', active: true, ...extra });
+const tinted = (name: string, note: string, more: Partial<Case>, outcome: 'accept' | 'reject' = 'accept') =>
+  (outcome === 'accept' ? accept : reject)(`glyph-tint-${name}`, note, { ...more, needs: [TINT] });
+tinted('per-state', 'Each resting or in-progress rule carries its own icon colour; the unknown rule carries none.', {
+  stateStyles: library(tintStyle([readyWarm(), readyCool(), cleaning({ glyphTint: cool })])), components: [tile(bind())],
+});
+tinted('pair', 'A light and dark pair resolves with the trait collection; it needs sh.solid-appearance@1 too.', {
+  stateStyles: library(tintStyle([readyWarm({ glyphTint: tintPair }), cleaning()])), components: [tile(bind())],
+});
+tinted('fallback', 'The style fallback may carry the icon colour: a resting fallback state is tinted.', {
+  stateStyles: library(tintStyle([{ states: ['docked'], class: 'resting', active: false }], { fallback: { class: 'resting', active: false, glyphTint: warm } })), components: [tile(bind())],
+});
+tinted('with-static-tint', 'A rule\'s colour beside the tile\'s static glyphTint: the rule wins in its state, the static tint draws in the others.', {
+  stateStyles: library(tintStyle([readyWarm(), cleaning()])), components: [tile(bind(), 'demo-tile', { glyphTint: cool })],
+});
+accept('glyph-tint-absent-needs-no-capability', 'A style that authors no icon colour needs no sh.state-style-glyph-tint@1.', {
+  stateStyles: library(tintStyle([{ states: ['docked'], class: 'resting', active: false }])), components: [tile(bind())],
+});
+tinted('on-error-rule', 'An error rule keeps the error ink: it refuses an icon colour.', {
+  stateStyles: library(tintStyle([{ states: ['docked'], class: 'resting', active: false }, { states: ['failed'], class: 'error', active: false, glyphTint: warm }])),
+}, 'reject');
+tinted('on-warning-rule', 'A warning rule keeps its warning ink: it refuses an icon colour.', {
+  stateStyles: library(tintStyle([{ states: ['docked'], class: 'resting', active: false }, { states: ['stuck'], class: 'warning', active: false, glyphTint: warm }])),
+}, 'reject');
+tinted('on-unknown-rule', 'An unavailable or unknown state keeps the muted grey: it refuses an icon colour.', {
+  stateStyles: library(vacuumStyle({ rules: [{ states: ['docked'], class: 'resting', active: false }, { states: ['unavailable', 'unknown'], class: 'unknown', active: false, glyphTint: warm }] })),
+}, 'reject');
+tinted('beside-fill', 'A rule with a fill keeps the fill\'s fixed icon ink: the icon colour is refused beside it.', {
+  stateStyles: library(tintStyle([{ states: ['docked'], class: 'resting', active: false, fill: rgb(120, 90, 160), glyphTint: warm }])),
+}, 'reject');
+tinted('on-unknown-fallback', 'The fallback is a state too: an unknown-class fallback refuses an icon colour.', {
+  stateStyles: library(tintStyle([{ states: ['docked'], class: 'resting', active: false }], { fallback: { class: 'unknown', active: false, glyphTint: warm } })),
+}, 'reject');
+tinted('missing-capability', 'A rule that writes the field requires sh.state-style-glyph-tint@1 in the publication manifest.', {
+  stateStyles: library(tintStyle([readyWarm()])), tweak: envelope => { envelope.capabilities = envelope.capabilities.filter((name: string) => name !== TINT); },
+}, 'reject');
+const tintRule = (value: unknown) => library(tintStyle([readyWarm({ glyphTint: value })]));
+tinted('missing-blue', 'A tint colour has red, green and blue.', { stateStyles: tintRule({ type: 'solid-rgb', red: 10, green: 20 }) }, 'reject');
+tinted('hex-string', 'A colour is the solid-rgb object, never a string.', { stateStyles: tintRule('#F2A65A') }, 'reject');
+tinted('bound-color', 'A tint is not an entity\'s colour: bound-color is refused.', { stateStyles: tintRule({ type: 'bound-color', value: { type: 'literal', value: 'x' } }) }, 'reject');
+tinted('over-255', 'A channel is 0 to 255.', { stateStyles: tintRule(rgb(300, 20, 20)) }, 'reject');
+
 // MARK: Writing
 function envelope(item: Case): J {
   const value = structuredClone(base);

@@ -80,7 +80,7 @@ export function StateTileNode({ node }: { node: NodeOf<'state-tile'> }) {
   };
   // The tile's own ink (`sh.tile-ink@1`). A face with a fill, or the filled face, keeps its white ink; an error face keeps its red glyph; an unavailable face keeps the muted grey (`TileFaceInk.glyphToken`). The icon tint is for the rest.
   const filledFace = Boolean(look?.filled || look?.fill);
-  const glyphTint = !filledFace && look?.stateClass !== 'error' && look?.stateClass !== 'unknown' ? rgb(node.glyphTint) : undefined;
+  const glyphTint = !filledFace && look?.stateClass !== 'error' && look?.stateClass !== 'unknown' ? rgb(look?.glyphTint ?? node.glyphTint) : undefined;
   const natural = node.cellFit === 'natural';
   const discTint = !filledFace ? rgb(node.discGlyphTint) : undefined;
   const faceStyle = { ...(look?.fill ? { '--fill': rgb(look.fill) } : {}), ...(glyphTint ? { '--glyph': glyphTint } : {}) } as CSSProperties;

@@ -38,6 +38,8 @@ export interface TilePreview {
   fill?: StateFill;
   /** The ink of the words on that fill (`sh.tile-ink@1`); absent is white at 100%. */
   fillInk?: FillInk;
+  /** The state's authored icon colour (`sh.state-style-glyph-tint@1`): drawn where the tile's own icon colour draws, never while unavailable. */
+  glyphTint?: StateFill;
   /** The face is the dense, filled one (`filledWhen` holds). */
   filled: boolean;
   /** The disc's action verb, when the state offers one. */
@@ -107,7 +109,7 @@ export function previewTile(style: StateStyleDefinition, state: string | undefin
   const spoken = spokenValue(text, stateClass);
   return {
     state: state ?? 'unavailable', stateClass, active: rule.active, icon: synthesized ? nodeIcon ?? action?.icon ?? 'circle' : action?.icon ?? rule.icon ?? nodeIcon ?? 'circle', text, indicator, colour,
-    ...(rule.fill ? { fill: rule.fill } : {}), ...(rule.fill && rule.fillInk ? { fillInk: rule.fillInk } : {}), filled: faces?.filled === true && !unknown, ...(action ? { verb: action.verb } : {}), acceptsTaps: !showsArc && stateClass !== 'unknown',
+    ...(rule.fill ? { fill: rule.fill } : {}), ...(rule.fill && rule.fillInk ? { fillInk: rule.fillInk } : {}), ...(rule.glyphTint && !unknown ? { glyphTint: rule.glyphTint } : {}), filled: faces?.filled === true && !unknown, ...(action ? { verb: action.verb } : {}), acceptsTaps: !showsArc && stateClass !== 'unknown',
     showsArc, discOpacity: showsArc ? 0 : stateClass === 'unknown' ? 0.5 : 1,
     voiceOver: showsArc ? `${spoken}, dimmed` : spoken,
   };
