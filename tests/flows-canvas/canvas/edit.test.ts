@@ -27,6 +27,22 @@ describe('C-wire and atomic editing transactions', () => {
     expect(edit(undone, { type: 'redo' }).graph).toBe(changed.graph);
     expect(initial.edges[0].from.nodeId).not.toBe(right.id);
   });
+  it('constructs immutable initial, literal-edit and recipe revisions before compilation', () => {
+    const state = initialEditState(graph()), node = state.graph.nodes[1];
+    if (node.payload.kind !== 'operand') throw new Error('Expected an operand fixture.');
+    expect(Reflect.set(node.payload.value, 'value', 99)).toBe(false);
+    const changed = edit(state, { type: 'update', nodeId: node.id, value: number(7) });
+    expect(changed.graph.nodes[0]).toBe(state.graph.nodes[0]);
+    const updated = changed.graph.nodes[1];
+    if (updated.payload.kind !== 'operand') throw new Error('Expected an updated operand.');
+    expect(Reflect.set(updated.payload.value, 'value', 99)).toBe(false);
+    expect(() => Array.prototype.pop.call(changed.graph.edges)).toThrow(TypeError);
+    const seed = blockSeed(blockCatalog.find(entry => entry.key === 'recipe.average-fixed')!)!;
+    const recipe = edit(changed, { type: 'add', seed, scopeId: changed.graph.scopes[0].id });
+    expect(Reflect.set(recipe.graph.nodes.at(-1)!, 'inputs', [])).toBe(false);
+    expect(() => Array.prototype.pop.call(recipe.graph.edges)).toThrow(TypeError);
+    expect(edit(recipe, { type: 'undo' }).graph).toBe(changed.graph);
+  });
   it('adds over LAN HTTP without crypto.randomUUID, moves atomically, and restores a deleted neighbor on undo', () => {
     let state = initialEditState(graph());
     const seed = blockSeed(blockCatalog.find(entry => entry.key === 'operand.math.multiply')!)!;

@@ -23,7 +23,42 @@ npx vitest run tests/flows-canvas/graph/canvas-performance.test.ts \
   --maxWorkers=2 --reporter=verbose --silent=false
 ```
 
-Final local results for this revision:
+Construction-time immutability correction (supersedes repeated deep freezing):
+
+- The `2f6be72` hosted compiler gate failed at **70.80 ms**: validate **48.82 ms**,
+  validated lower **24.81 ms**, adapter **11.53 ms**, indexes/freezing **18.58 ms**.
+  The increase is not a measured 39 ms handoff lookup: preparation and the other
+  stages all slowed down; stage medians are independent and not additive.
+- Canvas initialization and successful edits now call `constructGraphRevision`.
+  New objects are frozen once and hold private, exact-object, non-enumerable
+  construction seals. Old sealed nodes/payloads are reused without traversal.
+  No mutable module registry or validation/compilation cache is used.
+- Focused local compiler run: **16.91 ms** total; validate **10.22 ms**,
+  lower **6.60 ms**, adapter **3.29 ms**, fresh indexes **0.99 ms**.
+  Construction was **16.73 ms** initially and **0.62 ms** for the edited revision.
+  Isolated trusted-handoff reads averaged **27.26 ns/call**; construction-seal
+  checks **24.52 ns/call**, each over one million reads after 10,000 warmups.
+- Unrestricted `npm test` passed **278 files / 14,169 tests**, one pre-existing skip.
+  Compiler median **30.40 ms** (19.40–77.40); validate **21.03 ms**, lower
+  **7.14 ms**, adapter **3.50 ms**, indexes **1.31 ms**. Under concurrent suite
+  load construction was **99.32 ms** initially and **1.20 ms** for the edit.
+  Build/typecheck passed.
+- Construction is explicitly separated from compiler timing, not silently moved
+  out of an unchanged API: compiler calls reuse constructed immutable data, while
+  browser mount/edit still include construction end to end. The fixture, 30
+  warmups, 31 samples, one-native-compile assertion and 50 ms gate are unchanged.
+  Existing edge/node/literal mutation tests and all corpus/#24 comparisons pass.
+  New tests cover no retraversal/refreezing, seal forgery and non-extensible input.
+- All **26 standard-config local browser cases pass**. Desktop mount/focus/edit:
+  **1,223.98 / 88.34 / 169.71 ms**; phone **1,115.66 / 132.71 / 204.49 ms**.
+  Mount port reads stay **99 / 96**, and edit geometry reads stay **zero**.
+- Completed hosted browsers at the **prior head `2f6be72`** passed all eight
+  shards, including all 26 canvas cases. Desktop mount/focus/edit was
+  **1,898.65 / 252.59 / 287.96 ms**; phone **1,462.08 / 164.81 / 517.94 ms**.
+  Both mount targets passed, but that head's compiler failed at 70.80 ms, so its
+  CI is not green. The new construction revision needs its own hosted evidence.
+
+Earlier round-three local results at `2f6be72`:
 
 - Full suite: **278 files, 14,164 passing tests**, one pre-existing skip.
 - Production build and TypeScript: **passed**.

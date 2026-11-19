@@ -69,7 +69,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const [zoom, setZoom] = useState(1), [moving, setMoving] = useState<{ nodeId: string; x: number; y: number }>();
   const [wirePaths, setWirePaths] = useState<readonly WirePath[]>([]);
   const [initialSnapshot] = useState(() => host.snapshot());
-  const snapshot = useRef(initialSnapshot), baseline = useRef(initialGraph), refs = useRef(new Map<string, HTMLButtonElement>());
+  const snapshot = useRef(initialSnapshot), baseline = useRef(state.graph), refs = useRef(new Map<string, HTMLButtonElement>());
   const viewport = useRef<HTMLDivElement>(null), board = useRef<HTMLUListElement>(null), addButton = useRef<HTMLButtonElement>(null), navigation = useRef<HTMLDivElement>(null);
   const moreButton = useRef<HTMLButtonElement>(null), problemsButton = useRef<HTMLButtonElement>(null);
   const restore = useRef(false), connectionReturn = useRef<CanvasFocus | null>(null);

@@ -99,22 +99,34 @@ immutable revision, shared index and ordered diagnostics in a private WeakMap
 keyed on that graph object. Lowering checks its runtime class/private brand and
 per-token WeakMap in O(1); spread copies, wrappers, proxies and replaced diagnostics
 cannot bypass validation. There is no module-level registry.
-Preparation deeply freezes the graph and its nested data before indexing or
-issuing a trusted token. Post-validation edge, node and literal mutations fail
-rather than leaving stale trusted state. Shallow-frozen input is still traversed;
-there is no "outer object is frozen" shortcut. The traversal's visited set is
-local to the call, with no immutable-object cache or module-level state.
+`constructGraphRevision` (in `graph/validate.ts`) freezes data at the canvas
+initial-state and successful-transaction boundaries. Every newly created graph,
+node, array and payload receives a non-enumerable construction seal; already
+sealed objects are reused without traversing or refreezing their children.
+Seals have private runtime fields, an unexported construction authority and exact
+object identity. They become usable only after the complete construction batch
+is frozen. Borrowed seals, proxies and fabricated constructors cannot certify
+different data; spreading a graph loses its seal and requires full validation.
+These are immutable construction proofs, not cached diagnostics or compilation.
+There is no module-level mutable registry. Already non-extensible external input
+is imported through a new sealed root, and its original fields are also frozen.
+Post-validation edge, node and literal mutations fail. An outer `Object.freeze`
+alone is never treated as proof that its children are immutable.
 Standalone `validateGraph(graph)` remains a non-freezing diagnostic query;
-`prepareGraphRevision`, `validateForLowering` and direct `lower` freeze revisions.
+`prepareGraphRevision`, `validateForLowering` and direct `lower` construct
+uncertified input for compatibility. Constructed revisions take only an O(1)
+seal check, not a graph walk, hash or repeated `Object.freeze` call.
 Calling `lower(graph)` directly still
 validates and takes the same refusal path; `lower(graph, { index })` also validates,
 but reuses the already prepared exact-revision indexes. Indexes are call-local or
-owned by one immutable editor revision, with no cross-call cache or mutable module
-state. The performance guard retains its 50 ms median. It uses the unchanged
+owned by one immutable editor revision, with no cached validation/compilation or
+mutable module state. The performance guard retains its 50 ms median. It uses the unchanged
 2,341-node edited fixture for 30 instrumented warmups and 31 measured runs, includes
-fresh deep-freezing/index preparation in every validation/total sample, and asserts one native
-compile per measured run. Stage medians, index cost and a separate million-read
-trusted-handoff profile are printed in local and hosted logs.
+fresh index preparation in every validation/total sample and asserts one native
+compile per measured run. Initial and edited-revision construction costs are
+reported separately from compiler samples; browser mount/edit measurements
+include them end to end. Stage medians, index cost and separate million-read
+construction-seal/trusted-handoff profiles are printed in local and hosted logs.
 Before/after corpus hashes were captured at the pre-optimization head and cover
 ordered diagnostics and every output field, including source maps and budgets.
 

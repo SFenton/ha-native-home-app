@@ -1,5 +1,6 @@
 import { allocateGraphId, lift, portsCompatible, type GraphEdge, type GraphNode, type GraphPort, type LogicGraph } from '../../shared/composition/graph';
 import { copy } from '../../shared/composition/graph/json';
+import { constructGraphRevision } from '../../shared/composition/graph/validate';
 import { operandBase } from '../../shared/composition/expression';
 import type { BlockSeed } from './blocks';
 import { nodeName } from './blocks';
@@ -50,7 +51,7 @@ export function canConnect(graph: LogicGraph, from: Socket, to: Socket, replace 
   if (occupied && !replace) return { allowed: false, reason: 'This input already has a connection. Use Replace connection to change it in one undoable edit.', occupied };
   return { allowed: true, occupied };
 }
-export const initialEditState = (graph: LogicGraph): EditState => ({ graph, focus: graph.nodes[0] ? { nodeId: graph.nodes[0].id } : null, past: [], future: [], message: '' });
+export const initialEditState = (graph: LogicGraph): EditState => ({ graph: constructGraphRevision(graph), focus: graph.nodes[0] ? { nodeId: graph.nodes[0].id } : null, past: [], future: [], message: '' });
 export function edit(state: EditState, command: EditCommand): EditState {
   if (command.type === 'undo' || command.type === 'redo') {
     const history = command.type === 'undo' ? state.past : state.future, held = history.at(-1);
@@ -80,7 +81,7 @@ export function edit(state: EditState, command: EditCommand): EditState {
         const id = allocateGraphId('wire', wires); wires.add(id);
         return { ...edge, id, from: { ...edge.from, nodeId: remapped.get(edge.from.nodeId)! }, to: { ...edge.to, nodeId: remapped.get(edge.to.nodeId)! } };
       })] };
-      return { graph: updated, focus: { nodeId: remapped.get(seed.id)! }, past: [...state.past, { graph, focus: state.focus }], future: [],
+      return { graph: constructGraphRevision(updated), focus: { nodeId: remapped.get(seed.id)! }, past: [...state.past, { graph, focus: state.focus }], future: [],
         message: 'Average Fixed Values added with two editable numbers and its complete Add / Divide recipe. Undo removes the whole recipe.' };
     }
     const id = allocateGraphId('block', new Set(graph.nodes.map(node => node.id)));
@@ -170,7 +171,7 @@ export function edit(state: EditState, command: EditCommand): EditState {
     updated = { ...graph, roots: [{ ...root, nodeId: node.id, portId: output.id }] };
     focus = { nodeId: node.id }; message = `${nodeName(node)} is now the output.`;
   }
-  return { graph: updated, focus, past: [...state.past, { graph, focus: state.focus }], future: [], message };
+  return { graph: constructGraphRevision(updated), focus, past: [...state.past, { graph, focus: state.focus }], future: [], message };
 }
 
 export function orderedNodes(graph: LogicGraph, index: CanvasGraphIndex = indexGraph(graph)): readonly GraphNode[] {

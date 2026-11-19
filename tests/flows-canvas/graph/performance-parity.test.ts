@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { lift, lower, lowerValidated, prepareGraphRevision, readGraphValidation, validateForLowering, validateGraph } from '../../../src/shared/composition/graph';
+import { constructGraphRevision } from '../../../src/shared/composition/graph/validate';
 import { corpusCases, performanceParitySnapshot } from './fixtures/performance-parity';
 
 const baseline: { head: string; snapshots: Record<string, string> } = JSON.parse(readFileSync(new URL('./fixtures/performance-baseline.json', import.meta.url), 'utf8'));
@@ -49,6 +50,49 @@ it('reuses an exact revision index without exposing mutable trusted maps or acce
   expect(() => validateForLowering(graph, Object.create(Object.getPrototypeOf(index)))).toThrow(TypeError);
   expect(() => validateForLowering(graph, new Proxy(index, {}))).toThrow(TypeError);
   expect(() => validateForLowering(graph, Reflect.construct(Object.getPrototypeOf(index).constructor, [graph]))).toThrow(TypeError);
+});
+it('does not traverse or refreeze constructed data when validating again or replacing one node', () => {
+  const raw = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+  const serialized = JSON.stringify(raw), graph = constructGraphRevision(raw);
+  expect(JSON.stringify(graph)).toBe(serialized);
+  const node = graph.nodes[1], replacement = { ...node, payload: { kind: 'operand' as const, value: { type: 'literal' as const, value: 9 } } };
+  const names = vi.spyOn(Object, 'getOwnPropertyNames'), freeze = vi.spyOn(Object, 'freeze');
+  try {
+    expect(lowerValidated(validateForLowering(graph)).ok).toBe(true);
+    expect(lower(graph).ok).toBe(true);
+    expect(names.mock.calls.some(([value]) => value === graph || value === node || value === graph.original)).toBe(false);
+    expect(freeze.mock.calls.some(([value]) => value === graph || value === node || value === graph.original)).toBe(false);
+    const changed = constructGraphRevision({ ...graph, nodes: graph.nodes.map(held => held === node ? replacement : held) });
+    expect(names.mock.calls.some(([value]) => value === replacement)).toBe(true);
+    expect(names.mock.calls.some(([value]) => value === node || value === graph.original)).toBe(false);
+    expect(freeze.mock.calls.some(([value]) => value === replacement)).toBe(true);
+    expect(freeze.mock.calls.some(([value]) => value === node || value === graph.original)).toBe(false);
+    expect(Reflect.set(replacement.payload.value, 'value', 99)).toBe(false);
+    expect(lower(changed)).toMatchObject({ ok: true, ast: { type: 'math', op: 'add', args: [{ type: 'literal', value: 9 }, { type: 'literal', value: 2 }] } });
+  } finally { names.mockRestore(); freeze.mockRestore(); }
+});
+it('rejects borrowed, proxied and fabricated construction seals rather than trusting another graph', () => {
+  const graph = constructGraphRevision(lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph);
+  const key = Object.getOwnPropertySymbols(graph)[0];
+  if (!key) throw new Error('Expected a constructed graph.');
+  const seal: unknown = Object.getOwnPropertyDescriptor(graph, key)?.value;
+  if (!seal || typeof seal !== 'object') throw new Error('Expected an opaque construction seal.');
+  const borrowed = { ...graph, edges: [] }, proxied = { ...graph, edges: [] };
+  Object.defineProperty(borrowed, key, { value: seal });
+  Object.defineProperty(proxied, key, { value: new Proxy(seal, {}) });
+  expect(() => validateForLowering(borrowed)).toThrow(TypeError);
+  expect(() => validateForLowering(proxied)).toThrow(TypeError);
+  expect(() => Reflect.construct(Object.getPrototypeOf(seal).constructor, [borrowed, { complete: true }, Symbol()])).toThrow(TypeError);
+  const replaceable = { ...graph, edges: [] };
+  Object.defineProperty(replaceable, key, { value: seal, configurable: true });
+  expect(lower(replaceable).ok).toBe(false);
+});
+it('constructs already non-extensible input without leaving writable graph fields behind', () => {
+  const graph = Object.seal(lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph);
+  const constructed = constructGraphRevision(graph);
+  expect(Reflect.set(graph, 'nodes', [])).toBe(false);
+  expect(Reflect.set(constructed, 'nodes', [])).toBe(false);
+  expect(lowerValidated(validateForLowering(constructed)).ok).toBe(true);
 });
 it('preserves resource-boundary diagnostics when deeply nested input must be frozen before validation', () => {
   const lifted = lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph;

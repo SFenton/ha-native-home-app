@@ -21,13 +21,32 @@ function readonlyMap<K, V>(map: Map<K, V>): ReadonlyMap<K, V> {
   };
   return Object.freeze(view);
 }
+const constructionSeal = Symbol('immutable graph data');
+const constructionAuthority = Symbol();
+class ConstructionSeal {
+  readonly #value: object;
+  readonly #batch: Readonly<{ complete: boolean }>;
+  constructor(value: object, batch: Readonly<{ complete: boolean }>, authority: typeof constructionAuthority) {
+    if (authority !== constructionAuthority) throw new TypeError('Graph construction seals are private.');
+    this.#value = value;
+    this.#batch = batch;
+    Object.freeze(this);
+  }
+  static holds(value: object): boolean {
+    const seal: unknown = Object.getOwnPropertyDescriptor(value, constructionSeal)?.value;
+    return seal instanceof ConstructionSeal && #value in seal && seal.#value === value && seal.#batch.complete;
+  }
+}
+Object.freeze(ConstructionSeal.prototype);
+Object.freeze(ConstructionSeal);
 function freezeRevision(graph: LogicGraph): void {
-  const seen = new Set<object>(), pending: object[] = [graph];
+  if (ConstructionSeal.holds(graph)) return;
+  const seen = new Set<object>(), pending: object[] = [graph], created: object[] = [];
   while (pending.length) {
     const value = pending.pop()!;
-    if (seen.has(value)) continue;
+    if (ConstructionSeal.holds(value) || seen.has(value)) continue;
     seen.add(value);
-    Object.freeze(value);
+    created.push(value);
     if (Array.isArray(value)) {
       for (let i = 0; i < value.length; i++) {
         const child: unknown = value[i];
@@ -38,6 +57,23 @@ function freezeRevision(graph: LogicGraph): void {
       if (child !== null && typeof child === 'object') pending.push(child);
     }
   }
+  const batch = { complete: false };
+  for (let i = created.length - 1; i >= 0; i--) {
+    const value = created[i];
+    if (Object.isExtensible(value)) Object.defineProperty(value, constructionSeal, { value: new ConstructionSeal(value, batch, constructionAuthority) });
+    Object.freeze(value);
+  }
+  // Cycles and shared children become trusted only after the whole batch is frozen.
+  batch.complete = true;
+  Object.freeze(batch);
+}
+/** Constructs immutable data once; later revisions reuse sealed nodes and payloads. */
+export function constructGraphRevision(graph: LogicGraph): LogicGraph {
+  if (ConstructionSeal.holds(graph)) return graph;
+  const revision = Object.isExtensible(graph) ? graph : { ...graph };
+  freezeRevision(revision);
+  if (revision !== graph) Object.freeze(graph);
+  return revision;
 }
 function sameUnboundJSON(left: GraphJSON, right: GraphJSON, bindings: ReadonlyMap<string | undefined, readonly GraphPort[]>, at = ''): boolean {
   if (left === right || bindings.has(at)) return true;
@@ -181,7 +217,7 @@ class ValidatedGraph {
 Object.freeze(ValidatedGraph.prototype);
 Object.freeze(ValidatedGraph);
 export type GraphValidation = ValidatedGraph;
-/** Freezes the revision deeply before validation so the trusted handoff cannot become stale. */
+/** Validates constructed immutable data, importing uncertified input before issuing a handoff. */
 export function validateForLowering(graph: LogicGraph, index?: GraphRevisionIndex): GraphValidation {
   return new ValidatedGraph(graph, index);
 }
