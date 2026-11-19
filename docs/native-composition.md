@@ -1078,6 +1078,8 @@ The shared text inspector places **While unavailable: Show fallback / Keep last*
 
 `{ "id": "mean", "op": "average", "value": <operand> }` reduces a list to the mean of its finite numeric parts. Like `min` and `max`, it requires a numeric-compatible operand (`binding_type` for typed text) and gives a number or null. Null and non-number parts, including numeric text, are skipped; no numeric parts or an empty list gives null. The answer is not rounded and prints with the Data Flow number rules above. Cost is `1 + item count + operand nodes per item`, as for `sum`.
 
+The mean of finite parts stays finite, including repeated positive or negative `Number.MAX_VALUE` parts and mixed signs whose intermediate total overflows. Ordinary finite totals still use sum-then-divide, preserving their existing floating-point result and printed text. If the total overflows, sum the parts scaled by their greatest absolute value; restore that sum before dividing when it is finite, otherwise divide the scaled sum before restoring it. The scaled mean is in `[-1, 1]`, so restoring it cannot overflow. Zero is normalized to positive zero.
+
 The Data Flow editor offers **Average** alongside Lowest and Highest, marked **Needs a newer app**. The publication declares the pending `sh.flow-average@1`; the shipped app refuses it until native support ships. `scripts/wgflow-corpus.ts` generates the `flow-average-*` publication and pipeline-evaluation cases.
 
 ### Expressions, rules and app state

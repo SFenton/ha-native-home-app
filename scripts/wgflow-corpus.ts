@@ -466,6 +466,21 @@ pipe('flow-average-all-non-numbers', 'No numeric parts means null, not zero; num
 pipe('flow-average-empty', 'An empty list has no mean.', [], averageStep, scalarOut, null, [], temps);
 pipe('flow-average-unrounded', 'The mean is not rounded: 1, 2 and 2 give 1.6666666666666667.', [{ t: 1 }, { t: 2 }, { t: 2 }], averageStep, scalarOut, 1.6666666666666667);
 pipe('flow-average-negative', 'Negative and positive values share the same mean: -4 and 1 give -1.5.', [{ t: -4 }, { t: 1 }], averageStep, scalarOut, -1.5);
+pipe('flow-average-ordinary-fractions', 'Ordinary floating-point summation is unchanged: 0.1, 0.2 and 0.3 give 0.20000000000000004.',
+  [{ t: 0.1 }, { t: 0.2 }, { t: 0.3 }], averageStep, scalarOut, 0.20000000000000004);
+const largest = Number.MAX_VALUE;
+pipe('flow-average-three-positive-max', 'Three identical largest finite parts have that same finite mean, even though their sum overflows.',
+  [{ t: largest }, { t: largest }, { t: largest }], averageStep, scalarOut, largest);
+pipe('flow-average-three-negative-max', 'Three identical negative largest finite parts have that same finite mean.',
+  [{ t: -largest }, { t: -largest }, { t: -largest }], averageStep, scalarOut, -largest);
+pipe('flow-average-positive-overflow-mixed-signs', 'Two largest positive parts and one negative largest part give largest / 3, not infinity.',
+  [{ t: largest }, { t: largest }, { t: -largest }], averageStep, scalarOut, largest / 3);
+pipe('flow-average-negative-overflow-mixed-signs', 'Two negative largest parts and one positive largest part give -largest / 3.',
+  [{ t: -largest }, { t: -largest }, { t: largest }], averageStep, scalarOut, -largest / 3);
+pipe('flow-average-overflow-cancels', 'Largest parts cancel to zero even when same-sign parts overflow before their opposite signs arrive.',
+  [{ t: largest }, { t: largest }, { t: -largest }, { t: -largest }], averageStep, scalarOut, 0);
+pipe('flow-average-mixed-signs-cancel', 'Alternating largest positive and negative parts still give zero.',
+  [{ t: largest }, { t: -largest }, { t: largest }, { t: -largest }], averageStep, scalarOut, 0);
 // `peakChance` (`WeatherPrecipitationTimeline.swift:30-32`): the highest known chance, nil when none is known; the same shape as min and max.
 pipe('min-of-a-list', 'min is the smallest number over the list; a null is skipped.', temps, [step('low', 'min', { value: item('t') })], scalarOut, -2);
 pipe('max-of-a-list', 'max is the largest number over the list; a null is skipped.', temps, [step('high', 'max', { value: item('t') })], scalarOut, 9);

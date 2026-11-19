@@ -186,8 +186,14 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
         .filter((part): part is number => typeof part === 'number' && Number.isFinite(part));
       if (!numbers.length) return null;
       const total = numbers.reduce((sum, part) => sum + part, 0);
-      // Divide before summing only when finite parts overflow their total.
-      const mean = Number.isFinite(total) ? total / numbers.length : numbers.reduce((sum, part) => sum + part / numbers.length, 0);
+      let mean = total / numbers.length;
+      if (!Number.isFinite(total)) {
+        const scale = numbers.reduce((largest, part) => Math.max(largest, Math.abs(part)), 0);
+        const scaled = numbers.reduce((sum, part) => sum + part / scale, 0);
+        const restored = scaled * scale;
+        // The scaled mean is in [-1, 1], so rescaling cannot overflow. Restore first when cancellation permits it.
+        mean = Number.isFinite(restored) ? restored / numbers.length : (scaled / numbers.length) * scale;
+      }
       return mean === 0 ? 0 : mean;
     }
     case 'running-sum': {
