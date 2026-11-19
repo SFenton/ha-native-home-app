@@ -1,0 +1,44 @@
+.w2-simulation {
+  background: var(--w2-bg, Canvas);
+  color: var(--w2-ink, CanvasText);
+  font: 400 1rem/1.5 system-ui, sans-serif;
+  padding: 1rem;
+  max-inline-size: 80rem;
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+.w2-simulation section, .w2-simulation fieldset, .w2-simulation article {
+  border: 1px solid var(--w2-line, GrayText);
+  border-radius: .75rem;
+  padding: 1rem;
+  margin-block: 1rem;
+  min-inline-size: 0;
+  background: var(--w2-card, Canvas);
+}
+.w2-simulation label { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-block: .75rem; }
+.w2-simulation input, .w2-simulation textarea, .w2-simulation select, .w2-simulation button {
+  font: inherit;
+  color: inherit;
+  background: var(--w2-field, Canvas);
+  border: 1px solid var(--w2-line, GrayText);
+  border-radius: .4rem;
+  padding: .5rem .75rem;
+  min-block-size: 44px;
+  max-inline-size: 100%;
+}
+.w2-simulation textarea { inline-size: 100%; font-family: ui-monospace, monospace; }
+.w2-simulation button { cursor: pointer; margin: .25rem; }
+.w2-simulation button:disabled { cursor: default; opacity: .6; }
+.w2-simulation :focus-visible { outline: 3px solid var(--w2-primary, Highlight); outline-offset: 3px; }
+.w2-simulation ul, .w2-simulation ol { padding-inline-start: 1.5rem; }
+.w2-simulation li { margin-block: .75rem; }
+.w2-simulation output { font-size: 1.5rem; font-weight: 600; }
+.w2-simulation pre { white-space: pre-wrap; overflow-wrap: anywhere; max-block-size: 30rem; overflow: auto; }
+.w2-sim-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.w2-sim-iterations { block-size: 22.5rem; overflow: auto; }
+.w2-sim-iteration { display: flex; flex-direction: column; text-align: start; inline-size: calc(100% - .5rem); block-size: 82px; overflow: auto; }
+@media (max-width: 700px) {
+  .w2-simulation { padding: .5rem; }
+  .w2-simulation section, .w2-simulation fieldset, .w2-simulation article { padding: .75rem; }
+  .w2-simulation label { align-items: stretch; flex-direction: column; }
+}

@@ -1,0 +1,1153 @@
+[
+  {
+    "output": {
+      "kind": "logic",
+      "id": "lights",
+      "field": "/body"
+    },
+    "result": {
+      "kind": "operand",
+      "answer": {
+        "status": "value",
+        "value": 1
+      }
+    },
+    "iterations": [
+      {
+        "blockId": "lights-lift-c59ec2a3-41ff4bd9",
+        "index": 0,
+        "included": true,
+        "result": "yes",
+        "identity": "lamp",
+        "reads": [
+          {
+            "sourceId": "lamp",
+            "path": [
+              "state"
+            ],
+            "access": "read",
+            "answer": {
+              "status": "value",
+              "value": "on"
+            }
+          }
+        ],
+        "tested": [
+          {
+            "pointer": "/of/0/test",
+            "result": {
+              "kind": "condition",
+              "answer": "yes"
+            }
+          }
+        ],
+        "reason": "Yes - counted"
+      },
+      {
+        "blockId": "lights-lift-c59ec2a3-41ff4bd9",
+        "index": 1,
+        "included": false,
+        "result": "no",
+        "identity": "window",
+        "reads": [
+          {
+            "sourceId": "window",
+            "path": [
+              "state"
+            ],
+            "access": "read",
+            "answer": {
+              "status": "value",
+              "value": "off"
+            }
+          }
+        ],
+        "tested": [
+          {
+            "pointer": "/of/1/test",
+            "result": {
+              "kind": "condition",
+              "answer": "no"
+            }
+          }
+        ],
+        "reason": "No - not counted"
+      },
+      {
+        "blockId": "lights-lift-c59ec2a3-41ff4bd9",
+        "index": 2,
+        "included": false,
+        "tested": [],
+        "reason": "Viewer excluded"
+      }
+    ],
+    "steps": []
+  },
+  {
+    "output": {
+      "kind": "flow",
+      "id": "chores-count",
+      "field": "/inputs"
+    },
+    "result": {
+      "kind": "operand",
+      "answer": {
+        "status": "value",
+        "value": 6
+      }
+    },
+    "iterations": [
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 0,
+        "identity": "chore-0",
+        "item": {
+          "uid": "chore-0",
+          "summary": "Fixture chore 1",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 1,
+        "identity": "chore-1",
+        "item": {
+          "uid": "chore-1",
+          "summary": "Fixture chore 2",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 2,
+        "identity": "chore-2",
+        "item": {
+          "uid": "chore-2",
+          "summary": "Fixture chore 3",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 3,
+        "identity": "chore-3",
+        "item": {
+          "uid": "chore-3",
+          "summary": "Fixture chore 4",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 4,
+        "identity": "chore-4",
+        "item": {
+          "uid": "chore-4",
+          "summary": "Fixture chore 5",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 5,
+        "identity": "chore-5",
+        "item": {
+          "uid": "chore-5",
+          "summary": "Fixture chore 6",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 6,
+        "identity": "chore-6",
+        "item": {
+          "uid": "chore-6",
+          "summary": "Fixture chore 7",
+          "status": "completed",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": false,
+        "result": "no",
+        "reason": "Condition No - dropped (flow gaps are null)"
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "index": 7,
+        "identity": "chore-7",
+        "item": {
+          "uid": "chore-7",
+          "summary": "Fixture chore 8",
+          "status": "completed",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": false,
+        "result": "no",
+        "reason": "Condition No - dropped (flow gaps are null)"
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "index": 0,
+        "identity": "chore-0",
+        "item": {
+          "uid": "chore-0",
+          "summary": "Fixture chore 1",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "reason": "Counted",
+        "tested": [
+          {
+            "pointer": "/steps/2",
+            "result": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "index": 1,
+        "identity": "chore-1",
+        "item": {
+          "uid": "chore-1",
+          "summary": "Fixture chore 2",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "reason": "Counted",
+        "tested": [
+          {
+            "pointer": "/steps/2",
+            "result": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "index": 2,
+        "identity": "chore-2",
+        "item": {
+          "uid": "chore-2",
+          "summary": "Fixture chore 3",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "reason": "Counted",
+        "tested": [
+          {
+            "pointer": "/steps/2",
+            "result": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "index": 3,
+        "identity": "chore-3",
+        "item": {
+          "uid": "chore-3",
+          "summary": "Fixture chore 4",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "reason": "Counted",
+        "tested": [
+          {
+            "pointer": "/steps/2",
+            "result": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "index": 4,
+        "identity": "chore-4",
+        "item": {
+          "uid": "chore-4",
+          "summary": "Fixture chore 5",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "reason": "Counted",
+        "tested": [
+          {
+            "pointer": "/steps/2",
+            "result": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "index": 5,
+        "identity": "chore-5",
+        "item": {
+          "uid": "chore-5",
+          "summary": "Fixture chore 6",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "reason": "Counted",
+        "tested": [
+          {
+            "pointer": "/steps/2",
+            "result": {
+              "kind": "operand",
+              "answer": {
+                "status": "value",
+                "value": 1
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "blockId": "chores-count-lift-9c18b0b-5109f00d",
+        "id": "items",
+        "op": "get",
+        "before": null,
+        "after": 8,
+        "input": {
+          "items": [
+            {
+              "uid": "chore-0",
+              "summary": "Fixture chore 1",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-1",
+              "summary": "Fixture chore 2",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-2",
+              "summary": "Fixture chore 3",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-3",
+              "summary": "Fixture chore 4",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-4",
+              "summary": "Fixture chore 5",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-5",
+              "summary": "Fixture chore 6",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-6",
+              "summary": "Fixture chore 7",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-7",
+              "summary": "Fixture chore 8",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            }
+          ]
+        },
+        "output": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-6",
+            "summary": "Fixture chore 7",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-7",
+            "summary": "Fixture chore 8",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "blockId": "chores-count-lift-a389bfac-4486b510",
+        "id": "keep",
+        "op": "filter",
+        "before": 8,
+        "after": 6,
+        "input": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-6",
+            "summary": "Fixture chore 7",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-7",
+            "summary": "Fixture chore 8",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "output": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "blockId": "chores-count-lift-f0e90fce-5980b604",
+        "id": "count",
+        "op": "count",
+        "before": 6,
+        "after": null,
+        "input": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "output": 6,
+        "truncated": false
+      }
+    ]
+  },
+  {
+    "output": {
+      "kind": "flow",
+      "id": "chores-display",
+      "field": "/inputs"
+    },
+    "result": {
+      "kind": "operand",
+      "answer": {
+        "status": "value",
+        "value": [
+          {
+            "id": "chore-0",
+            "title": "Fixture chore 1"
+          },
+          {
+            "id": "chore-1",
+            "title": "Fixture chore 2"
+          },
+          {
+            "id": "chore-2",
+            "title": "Fixture chore 3"
+          },
+          {
+            "id": "chore-3",
+            "title": "Fixture chore 4"
+          },
+          {
+            "id": "chore-4",
+            "title": "Fixture chore 5"
+          }
+        ]
+      }
+    },
+    "iterations": [
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 0,
+        "identity": "chore-0",
+        "item": {
+          "uid": "chore-0",
+          "summary": "Fixture chore 1",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 1,
+        "identity": "chore-1",
+        "item": {
+          "uid": "chore-1",
+          "summary": "Fixture chore 2",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 2,
+        "identity": "chore-2",
+        "item": {
+          "uid": "chore-2",
+          "summary": "Fixture chore 3",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 3,
+        "identity": "chore-3",
+        "item": {
+          "uid": "chore-3",
+          "summary": "Fixture chore 4",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 4,
+        "identity": "chore-4",
+        "item": {
+          "uid": "chore-4",
+          "summary": "Fixture chore 5",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 5,
+        "identity": "chore-5",
+        "item": {
+          "uid": "chore-5",
+          "summary": "Fixture chore 6",
+          "status": "needs_action",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": true,
+        "result": "yes",
+        "reason": "Condition Yes - kept"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 6,
+        "identity": "chore-6",
+        "item": {
+          "uid": "chore-6",
+          "summary": "Fixture chore 7",
+          "status": "completed",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": false,
+        "result": "no",
+        "reason": "Condition No - dropped (flow gaps are null)"
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "index": 7,
+        "identity": "chore-7",
+        "item": {
+          "uid": "chore-7",
+          "summary": "Fixture chore 8",
+          "status": "completed",
+          "due": "2026-11-18",
+          "description": null
+        },
+        "included": false,
+        "result": "no",
+        "reason": "Condition No - dropped (flow gaps are null)"
+      }
+    ],
+    "steps": [
+      {
+        "blockId": "chores-display-lift-9c18b0b-5109f00d",
+        "id": "items",
+        "op": "get",
+        "before": null,
+        "after": 8,
+        "input": {
+          "items": [
+            {
+              "uid": "chore-0",
+              "summary": "Fixture chore 1",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-1",
+              "summary": "Fixture chore 2",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-2",
+              "summary": "Fixture chore 3",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-3",
+              "summary": "Fixture chore 4",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-4",
+              "summary": "Fixture chore 5",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-5",
+              "summary": "Fixture chore 6",
+              "status": "needs_action",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-6",
+              "summary": "Fixture chore 7",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            },
+            {
+              "uid": "chore-7",
+              "summary": "Fixture chore 8",
+              "status": "completed",
+              "due": "2026-11-18",
+              "description": null
+            }
+          ]
+        },
+        "output": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-6",
+            "summary": "Fixture chore 7",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-7",
+            "summary": "Fixture chore 8",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "blockId": "chores-display-lift-a389bfac-4486b510",
+        "id": "keep",
+        "op": "filter",
+        "before": 8,
+        "after": 6,
+        "input": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-6",
+            "summary": "Fixture chore 7",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-7",
+            "summary": "Fixture chore 8",
+            "status": "completed",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "output": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "blockId": "chores-display-lift-5007e238-1470d33a",
+        "id": "first-five",
+        "op": "limit",
+        "before": 6,
+        "after": 5,
+        "input": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-5",
+            "summary": "Fixture chore 6",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "output": [
+          {
+            "uid": "chore-0",
+            "summary": "Fixture chore 1",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-1",
+            "summary": "Fixture chore 2",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-2",
+            "summary": "Fixture chore 3",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-3",
+            "summary": "Fixture chore 4",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          },
+          {
+            "uid": "chore-4",
+            "summary": "Fixture chore 5",
+            "status": "needs_action",
+            "due": "2026-11-18",
+            "description": null
+          }
+        ],
+        "truncated": false
+      }
+    ]
+  }
+]
