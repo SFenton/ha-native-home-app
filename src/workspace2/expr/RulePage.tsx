@@ -24,7 +24,7 @@ export default function RulePage({ draft, path, kind, look, index, label }: { dr
   const thenPath = index === 'otherwise' ? [...base, 'otherwise'] : [...base, 'cases', index, 'then'];
   const rules = rulesOf(valueAt(document, path) as ({ type: string } & Record<string, unknown>) | undefined, kind) as RulesDraft<Operand | Json> | undefined;
   if (!rules || (index !== 'otherwise' && !rules.cases[index])) return null;
-  const write = (next: RulesDraft<Operand | Json>) => draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: next }, kind) as unknown as Json));
+  const write = (next: RulesDraft<Operand | Json>) => draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: next }, kind, valueAt(draft.get(), path)) as unknown as Json));
   const remove = () => { if (index === 'otherwise') return; write({ ...rules, cases: rules.cases.filter((_, i) => i !== index) }); push?.pop(); };
   const then = valueAt(document, thenPath);
   return <div className="w2-expr-rulepage w2-editor-section" data-testid="rule-page">

@@ -41,7 +41,7 @@ function SaveDialog({ draft, path, kind, onClose, onSaved }: { draft: Draft; pat
     const made = entryFromLogic(document, kind, name.trim(), body, rows.filter(row => ticked.has(row.key)));
     const use = makeUse(made.entry, made.args);
     const next = addMadeEntry(document, made.entry);
-    draft.set(replaceAt(next, path, kind === 'value' ? operandSlot(use as unknown as Operand) : use));
+    draft.set(replaceAt(next, path, kind === 'value' ? operandSlot(use as unknown as Operand, slot) : use));
     toastManager.add({ title: logicWords.saved(made.entry.name) });
     onSaved?.();
     onClose();

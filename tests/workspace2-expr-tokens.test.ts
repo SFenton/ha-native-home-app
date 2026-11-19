@@ -77,7 +77,7 @@ describe('the token line', () => {
     const updated = operandSlot(edited, slot);
     expect(updated).toEqual({ type: 'expr', value: { type: 'format', pattern: '{a} now', args: { a: operand } }, ...settings });
     expect(operandSlot(writeLine(parts), updated)).toEqual({ ...operand, ...settings });
-    expect(operandSlot(writeLine([{ text: 'Fixed' }]), updated)).toEqual({ type: 'literal', value: 'Fixed' });
+    expect(operandSlot(writeLine([{ text: 'Fixed' }]), updated)).toEqual({ type: 'expr', value: { type: 'literal', value: 'Fixed' }, ...settings });
   });
   it('does not silently repair an invalid unavailable policy during an edit', () => {
     expect(operandSlot(read('b'), { ...read('a'), whenUnavailable: 'invalid' })).toMatchObject({ whenUnavailable: 'invalid' });

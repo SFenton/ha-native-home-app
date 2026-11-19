@@ -112,13 +112,14 @@ export function slotOperand(slot: { type: string } & Record<string, unknown>): O
   if (slot.type === 'expr') return slot.value as Operand;
   return undefined;
 }
-/** An operand as a text slot: `literal` and `read` stay what they are; anything else is an `expr`. */
+/** Keeps text-slot settings at the root, wrapping even a literal when those settings must survive an edit. */
 export function operandSlot(operand: Operand, previous?: unknown): { type: string } & Record<string, unknown> {
-  if (operand.type === 'literal' && typeof operand.value === 'string') return { type: 'literal', value: operand.value };
+  const settings = previous && typeof previous === 'object' && 'type' in previous && (previous.type === 'read' || previous.type === 'expr')
+    ? { ...('fallback' in previous ? { fallback: previous.fallback } : {}), ...('whenUnavailable' in previous ? { whenUnavailable: previous.whenUnavailable } : {}) }
+    : {};
+  if (operand.type === 'literal' && typeof operand.value === 'string' && !Object.keys(settings).length) return { type: 'literal', value: operand.value };
   const slot = operand.type === 'read' ? operand : { type: 'expr', value: operand };
-  if (!previous || typeof previous !== 'object' || !('type' in previous) || (previous.type !== 'read' && previous.type !== 'expr')) return slot;
-  return { ...slot, ...('fallback' in previous ? { fallback: previous.fallback } : {}),
-    ...('whenUnavailable' in previous ? { whenUnavailable: previous.whenUnavailable } : {}) };
+  return { ...slot, ...settings };
 }
 
 /** The rules "Wording for 0 and 1…" turns a line into: 0 reads "None", 1 reads the line with the number written out, otherwise the line as it was. */

@@ -60,9 +60,9 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     const currentValue = was === 'rules' ? memo.rules!.otherwise : was === 'entity' ? (kind === 'text' ? memo.entity! : memo.fixed!) : memo.fixed!;
     memo.mode = next; setModeState(next);
     let written: Slot;
-    if (next === 'rules') { memo.rules ??= seedRules(currentValue); written = toSlot('rules', { rules: memo.rules }, kind); }
-    else if (next === 'entity') { memo.entity ??= (kind === 'text' ? (was === 'fixed' ? memo.fixed : currentValue) as Operand : { type: 'literal', value: '' }); if (kind !== 'text') memo.fixed ??= currentValue; written = toSlot('entity', { entity: memo.entity, fixed: memo.fixed }, kind); }
-    else { memo.fixed ??= was === 'rules' ? memo.rules!.otherwise : currentValue; written = toSlot('fixed', { fixed: memo.fixed }, kind); }
+    if (next === 'rules') { memo.rules ??= seedRules(currentValue); written = toSlot('rules', { rules: memo.rules }, kind, now); }
+    else if (next === 'entity') { memo.entity ??= (kind === 'text' ? (was === 'fixed' ? memo.fixed : currentValue) as Operand : { type: 'literal', value: '' }); if (kind !== 'text') memo.fixed ??= currentValue; written = toSlot('entity', { entity: memo.entity, fixed: memo.fixed }, kind, now); }
+    else { memo.fixed ??= was === 'rules' ? memo.rules!.otherwise : currentValue; written = toSlot('fixed', { fixed: memo.fixed }, kind, now); }
     draft.set(replaceAt(current, path, written as unknown as Json));
   };
   // Opening in a mode the row's value button chose is one step, made once.
@@ -78,7 +78,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     memo.entity = slotOperand(valueAt(draft.get(), path) as Slot);
     memo.rules = { cases: made.cases, otherwise: made.otherwise } as RulesDraft<Operand | Json>;
     memo.mode = 'rules'; setModeState('rules');
-    draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: memo.rules }, kind) as unknown as Json));
+    draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: memo.rules }, kind, valueAt(draft.get(), path)) as unknown as Json));
   };
   const inputs = mode === 'rules' ? (rulesOf(slot, kind)?.cases ?? []).flatMap(entry => inputsOf(entry.when)) : kind === 'text' && slot ? (() => { const operand = slotOperand(slot); return operand ? operandInputs(operand) : []; })() : mode === 'entity' && slot && 'value' in slot ? operandInputs(slot.value as Operand) : [];
   const unique = [...new Map(inputs.map(input => [`${input.sourceId}|${input.path.join('/')}`, input])).values()];
@@ -88,7 +88,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     {mode === 'fixed' && <>
       {kind === 'text'
         ? <div className="w2-picker-row" data-stacked><TextInput label={label} value={fixedText(slot)} maxLength={maxLength}
-          onCommit={text => draft.set(replaceAt(draft.get(), path, { type: 'literal', value: text }), `fixed:${key}`)}/></div>
+          onCommit={text => draft.set(replaceAt(draft.get(), path, toSlot('fixed', { fixed: { type: 'literal', value: text } }, kind, valueAt(draft.get(), path)) as unknown as Json), `fixed:${key}`)}/></div>
         : <LookControl look={look ?? 'fill'} value={slot as unknown as Json} label={label} onChange={(next, live) => draft.set(replaceAt(draft.get(), path, next), live ? `look:${key}` : undefined)}/>}
       <p className="w2-caption">{words.sameValue}</p></>}
     {mode === 'entity' && kind === 'text' && <FromEntity draft={draft} path={path} label={label} onWording={wording}/>}
