@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.11
+
+- Maintenance and internal changes.
+
 ## 0.3.10
 
 - Studio can lay a page out in two sides for the iPhone Duo partly folded sideways, and its Duo preview reflows into them as the fold moves.
