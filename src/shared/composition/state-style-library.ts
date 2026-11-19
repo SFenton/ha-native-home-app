@@ -1,7 +1,7 @@
 import { createId } from '../ids';
 import { compositionChildren, type CompositionDocument, type CompositionNode } from './schema';
 import {
-  arcAllowed, builtInStyle, builtInStyles, defaultStateLook, overrideLayers, resolveTileStyle, suggestBuiltInStyle,
+  arcAllowed, builtInStyle, colourAllowed, builtInStyles, defaultStateLook, overrideLayers, resolveTileStyle, suggestBuiltInStyle,
   type OverrideLayer, type StateFallback, type StateOverride, type StateRule, type StateStyleDefinition, type StateStyleLibrary,
   type StateTileBinding,
 } from './state-styles';
@@ -192,7 +192,8 @@ export const classFixed = (rule: { states?: string[] }): boolean => Boolean(rule
 
 /**
  * Applies `patch` to a rule or the fallback and keeps the rule valid: an unavailable state stays the unknown class, and an arc
- * spinner the rule can no longer show (an action, or the unknown class) is dropped, and so is an ink with no fill.
+ * spinner the rule can no longer show (an action, or the unknown class) is dropped, and so is an ink with no fill and an icon colour on a
+ * state that cannot carry one (a warning, error or unknown class, or a fill).
  */
 export function patchRule<T extends StateRule | StateFallback>(rule: T, patch: Partial<StateRule>): T {
   const next = { ...rule, ...patch } as T;
@@ -201,6 +202,8 @@ export function patchRule<T extends StateRule | StateFallback>(rule: T, patch: P
   if (next.indicator === 'arc-spinner' && !arcAllowed(next)) delete next.indicator;
   // The ink belongs to the fill (`sh.tile-ink@1`): without a fill it has nothing to be the ink of.
   if (next.fill === undefined) delete next.fillInk;
+  // The icon colour (`sh.state-style-glyph-tint@1`) sits on a resting or in-progress state with no fill: a rule that stops being one drops it.
+  if (next.glyphTint !== undefined && (!colourAllowed(next.class) || next.fill !== undefined)) delete next.glyphTint;
   return next;
 }
 

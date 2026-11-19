@@ -11,6 +11,11 @@ Default for In Progress
 No arc while this state has an action.
 Color
 Class Default
+Icon color
+Icon color
+Gray
+Icon color differs in dark mode
+Without one, the tile’s own icon color, then gray.
 Fill
 Fill
 #546E7A

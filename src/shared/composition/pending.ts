@@ -11,5 +11,5 @@
  * An id is mutable until a publication that uses it has been served: changes fold into `@1`. Afterwards a change of meaning is `@2`.
  */
 export const pendingCompositionCapabilities: readonly string[] = [
-  'sh.avatar@1', 'sh.badge-nodes@1', 'sh.badge-spoken@1', 'sh.component-values@1', 'sh.dial-control@1', 'sh.dial-text-place@1', 'sh.flow-average@1', 'sh.fold-sides@1', 'sh.page-chrome-hide@1', 'sh.page-wide-open@1', 'sh.sheet-levels@1', 'sh.shell-profile@1', 'sh.tabs-visibility@1', 'sh.text-keep@1',
+  'sh.avatar@1', 'sh.badge-nodes@1', 'sh.badge-spoken@1', 'sh.component-values@1', 'sh.dial-control@1', 'sh.dial-text-place@1', 'sh.flow-average@1', 'sh.fold-sides@1', 'sh.page-chrome-hide@1', 'sh.page-wide-open@1', 'sh.sheet-levels@1', 'sh.state-style-glyph-tint@1', 'sh.shell-profile@1', 'sh.tabs-visibility@1', 'sh.text-keep@1',
 ];

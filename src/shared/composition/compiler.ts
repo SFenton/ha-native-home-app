@@ -15,7 +15,7 @@ import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroo
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
 import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type BudgetAccountingObserver, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
-import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesStateFills } from './state-styles';
+import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesGlyphTint, usesStateFills } from './state-styles';
 import { identifierSchema } from '../validation';
 import { APP_STATE_CAPABILITY } from './app-state';
 import { checkModelRead, modelReadFields } from './model-reads';
@@ -534,6 +534,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       register('state-style', style.id, `/document/stateStyles/styles/${index}/id`);
       if (usesStateFills(style)) require('state-style-fills');
       if (usesFillInk(style)) require('tile-ink');
+      if (usesGlyphTint(style)) require('state-style-glyph-tint');
     });
     issues.push(...checkStateStyleLibrary(document.stateStyles, '/document/stateStyles'));
   }
