@@ -13,7 +13,8 @@ import type { CompositionPublication } from '../../../src/shared/composition/sch
 import { canonicalCompositionJSON, CompositionValidationError } from '../../../src/shared/composition/json';
 import { expandDocument } from '../../../src/shared/composition/components';
 import { liftJSON, type LiftOptions } from '../../../src/shared/composition/graph/lift';
-import { atPointer, readStudioCanvas, replacePointer } from '../../../src/shared/composition/studio-logic';
+import type { LogicAnchor } from '../../../src/shared/composition/graph/types';
+import { atPointer, readStudioCanvas, replacePointer, resolveLogicAnchor } from '../../../src/shared/composition/studio-logic';
 import { fakeHomeAssistant } from '../../fake-ha-publication';
 import { componentDocument, draftDocument, labelTemplate, read } from './fixtures';
 
@@ -73,6 +74,29 @@ async function lab() {
   await draft();
   return { fake, store, directory, request, draft, prepare, close };
 }
+
+function positionedCanvas(before: ReturnType<typeof liftJSON>, field: string, encoding: 'relative' | 'absolute') {
+  return {
+    version: 1, canvases: [{
+      id: 'round-trip', roots: before.graph.roots.map(root => root.anchor),
+      nodes: before.graph.nodes.map((node, index) => ({
+        id: node.id, origins: node.origins.map(origin => encoding === 'absolute' ? `${field}${origin}` : origin),
+        x: 384 + index * 17, y: 240 + index * 11,
+      })),
+    }],
+  };
+}
+async function reopenDraft(f: Awaited<ReturnType<typeof lab>>) {
+  await f.close();
+  await f.store.close();
+  const reopened = await StudioStore.open(f.directory);
+  cleanups.push(() => reopened.close());
+  return reopened.native.getDraft().document;
+}
+const positionedTemplate = {
+  ...labelTemplate, id: 'positioned-label', params: [],
+  body: { type: 'format', pattern: '{value}', args: { value: read('source-a') } },
+};
 
 describe('D-layout / D-binding / D-strip: mounted real draft and publication routes', () => {
   it('serves HTTP and persists state in the configured port and data root', async () => {
@@ -138,27 +162,83 @@ describe('D-layout / D-binding / D-strip: mounted real draft and publication rou
     const field = '/logicLibrary/1/body/args/value', kind = scope === 'document' ? 'document' : 'operand';
     const options: LiftOptions = { kind, ...(scope === 'document' ? {} : { anchor: { kind: 'logic', id: nested.id, field: '/body/args/value' } }) };
     const before = liftJSON(Buffer.from(canonicalCompositionJSON(scope === 'document' ? document : atPointer(document, field))), options);
-    const studioCanvas = {
-      version: 1, canvases: [{
-        id: 'round-trip', roots: before.graph.roots.map(root => root.anchor),
-        nodes: before.graph.nodes.map((node, index) => ({
-          id: node.id, origins: node.origins.map(origin => encoding === 'absolute' ? `${field}${origin}` : origin),
-          x: 384 + index * 17, y: 240 + index * 11,
-        })),
-      }],
-    };
+    const studioCanvas = positionedCanvas(before, field, encoding);
     const saved = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
     expect(saved.status).toBe(200);
-    await f.close();
-    await f.store.close();
-    const reopened = await StudioStore.open(f.directory);
-    cleanups.push(() => reopened.close());
-    const restored = reopened.native.getDraft().document, layout = readStudioCanvas(restored);
+    const restored = await reopenDraft(f), layout = readStudioCanvas(restored);
     expect(layout.raw).toEqual(studioCanvas);
     expect(layout.warnings).toEqual([]);
     const after = liftJSON(Buffer.from(canonicalCompositionJSON(scope === 'document' ? restored : atPointer(restored, field))), { ...options, metadata: layout.metadata });
     expect(after.warnings.filter(warning => warning.code === 'invalid_layout')).toEqual([]);
     expect(after.graph.nodes.map(node => node.position)).toEqual(studioCanvas.canvases[0].nodes.map(({ x, y }) => ({ x, y })));
+    expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
+  });
+
+  it.each([
+    ['fragment', 'relative'], ['fragment', 'absolute'],
+    ['nested fragment', 'relative'], ['nested fragment', 'absolute'],
+    ['tile fragment', 'relative'], ['tile fragment', 'absolute'],
+  ] as const)('retains a moved %s with %s origins through save, reopen and lift', async (scope, encoding) => {
+    const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
+    const document = { ...base, logicLibrary: [positionedTemplate, ...base.logicLibrary] };
+    const anchor: LogicAnchor = scope === 'tile fragment'
+      ? { kind: 'page', id: 'page-home', nodeId: 'tile-a', field: '/props/subtitle/value' }
+      : { kind: 'logic', id: positionedTemplate.id, field: scope === 'fragment' ? '/body' : '/body/args/value' };
+    const field = scope === 'tile fragment' ? `/pages/0/components/0${anchor.field}` : `/logicLibrary/0${anchor.field}`;
+    const options: LiftOptions = { kind: 'operand', anchor };
+    const before = liftJSON(Buffer.from(canonicalCompositionJSON(atPointer(document, field))), options);
+    const studioCanvas = positionedCanvas(before, field, encoding);
+    const first = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
+    expect(first.status).toBe(200);
+    const saved: CompositionDraft = await first.json();
+    const moved = scope === 'tile fragment'
+      ? { ...document, pages: [{ ...document.pages[0], components: [...document.pages[0].components].reverse() }], studioCanvas }
+      : { ...document, logicLibrary: [...base.logicLibrary, positionedTemplate], studioCanvas };
+    if (scope !== 'tile fragment') {
+      expect((await f.prepare(moved)).publicationDocumentSha256).toBe((await f.prepare(document)).publicationDocumentSha256);
+    }
+    expect((await f.request('native/api/draft', 'PUT', { expectedRevision: saved.revision, document: moved })).status).toBe(200);
+    const restored = await reopenDraft(f), layout = readStudioCanvas(restored), root = resolveLogicAnchor(restored, anchor);
+    if (!root) throw new Error('Expected the stable fragment owner after moving');
+    expect(root.pointer).not.toBe(field);
+    expect(layout.raw).toEqual(studioCanvas);
+    expect(layout.warnings).toEqual([]);
+    const after = liftJSON(Buffer.from(canonicalCompositionJSON(root.value)), { ...options, metadata: layout.metadata });
+    expect(after.warnings.filter(warning => warning.code === 'invalid_layout')).toEqual([]);
+    expect(after.graph.nodes.map(node => node.id)).toEqual(before.graph.nodes.map(node => node.id));
+    expect(after.graph.nodes.map(node => node.position)).toEqual(studioCanvas.canvases[0].nodes.map(({ x, y }) => ({ x, y })));
+    expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
+  });
+
+  it.each([
+    ['removed', 'relative'], ['removed', 'absolute'], ['replaced', 'relative'], ['replaced', 'absolute'],
+  ] as const)('does not attach %s fragment positions (%s origins) to another owner after save, reopen and lift', async (change, encoding) => {
+    const f = await lab(), initial = await f.draft(), base = draftDocument(initial.document.id);
+    const other = { ...positionedTemplate, id: 'other-label' }, replacement = { ...positionedTemplate, id: 'replacement-label' };
+    const document = { ...base, logicLibrary: [positionedTemplate, other, ...base.logicLibrary] };
+    const anchor: LogicAnchor = { kind: 'logic', id: positionedTemplate.id, field: '/body/args/value' };
+    const field = `/logicLibrary/0${anchor.field}`, options: LiftOptions = { kind: 'operand', anchor };
+    const before = liftJSON(Buffer.from(canonicalCompositionJSON(atPointer(document, field))), options);
+    const studioCanvas = positionedCanvas(before, field, encoding);
+    const first = await f.request('native/api/draft', 'PUT', { expectedRevision: initial.revision, document: { ...document, studioCanvas } });
+    expect(first.status).toBe(200);
+    const saved: CompositionDraft = await first.json();
+    const changed = { ...document, logicLibrary: [...(change === 'removed' ? [] : [replacement]), other, ...base.logicLibrary], studioCanvas };
+    expect((await f.request('native/api/draft', 'PUT', { expectedRevision: saved.revision, document: changed })).status).toBe(200);
+    const restored = await reopenDraft(f), layout = readStudioCanvas(restored);
+    expect(resolveLogicAnchor(restored, anchor)).toBeUndefined();
+    expect(layout.raw).toEqual(studioCanvas);
+    expect(layout.metadata).toBeUndefined();
+    expect(layout.warnings).toEqual([expect.objectContaining({ code: 'invalid_layout' })]);
+    const newAnchor: LogicAnchor = { ...anchor, id: change === 'removed' ? other.id : replacement.id };
+    const root = resolveLogicAnchor(restored, newAnchor);
+    if (!root) throw new Error('Expected another owner at the old array position');
+    expect(root.pointer).toBe(field);
+    const automatic = liftJSON(Buffer.from(canonicalCompositionJSON(root.value)), { ...options, anchor: newAnchor });
+    const after = liftJSON(Buffer.from(canonicalCompositionJSON(root.value)), { ...options, anchor: newAnchor, metadata: layout.metadata });
+    expect(after.graph.nodes.map(node => node.id)).toEqual(before.graph.nodes.map(node => node.id));
+    expect(after.graph.nodes.map(node => node.position)).toEqual(automatic.graph.nodes.map(node => node.position));
+    expect(after.graph.nodes.map(node => node.position)).not.toEqual(studioCanvas.canvases[0].nodes.map(({ x, y }) => ({ x, y })));
     expect(atPointer(restored, '/studioCanvas')).toEqual(studioCanvas);
   });
 

@@ -13,8 +13,12 @@ published.
   metadata. Pass usable metadata to graph `lift`; its content-and-origin IDs
   check individual associations and auto-layout unmatched nodes. Stored origins
   may be document-relative or relative to their canvas root. The reader resolves
-  each root anchor and returns fragment-relative origins for `lift`, without
-  changing `raw`. Whole-document origins remain document-relative, and the
+  each root's stable owner/node identity and returns fragment-relative origins
+  for `lift`, without changing `raw`. Historical absolute array addresses are
+  decoded against that anchor, not against whichever owner now occupies an old
+  index. Reordering owners or nodes retains positions; a removed/replaced owner
+  cannot transfer them to another owner, even with identical fragment content.
+  Whole-document origins remain document-relative, and the
   whole-document fingerprint excludes root layout, as in `lift`. Ambiguous
   coordinate frames warn instead of guessing. Layout reset must be an explicit
   authoring transaction.

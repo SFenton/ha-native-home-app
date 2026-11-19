@@ -40,7 +40,7 @@ describe('D-layout: presentation is expendable, authored JSON is not', () => {
     for (const metadata of [
       { ...stored, canvases: [stored.canvases[0], stored.canvases[0]] },
       { ...stored, canvases: [{ ...stored.canvases[0], roots: [{ ...anchor, id: 'removed' }] }] },
-      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ id: 'stale', origins: ['/logicLibrary/99/body'], x: 10, y: 20 }] }] },
+      { ...stored, canvases: [{ ...stored.canvases[0], nodes: [{ id: 'stale', origins: ['/logicLibrary/99/body/removed-node'], x: 10, y: 20 }] }] },
     ]) {
       expect(readStudioCanvas({ ...document, studioCanvas: metadata })).toMatchObject({ raw: metadata, warnings: [{ code: 'invalid_layout' }] });
       expect(prepared({ ...document, studioCanvas: metadata })).toEqual(prepared(document));
