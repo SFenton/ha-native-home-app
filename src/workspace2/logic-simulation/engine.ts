@@ -122,6 +122,7 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
   readonly scenario?: SimulationCase;
   readonly pins?: readonly SimulationPin[];
   readonly clock?: SimulationClock;
+  readonly liveClock?: boolean;
   readonly observe?: boolean;
   readonly runId?: string;
   /** Explicit per-source Live selection reads the held capture, never the network. Run All never supplies this. */
@@ -139,7 +140,7 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
     base.reads = base.reads.filter(capture => sourceKey(capture) !== sourceKey(read));
     base.reads.push(...held.base.reads.filter(capture => sourceKey(capture) === sourceKey(read)).map(clone));
   }
-  const clock = clockSchema.parse(options.clock ?? scenario?.clock ?? base.clock);
+  const clock = clockSchema.parse(options.liveClock ? held.base.clock : options.clock ?? scenario?.clock ?? base.clock);
   const simulated = Boolean(scenario || pins.length || options.clock);
   const outputs: OutputAnswer[] = [];
   const flowAnswers = new Map<string, { result?: RunResult; trace: ObservationReport; issues: string[] }>(), pending = new Set<string>();
@@ -211,7 +212,7 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
         const node = nodeFor(root, originalPointer(at));
         const source = node ? sourceCaptureForNode(node, program) : undefined;
         if (source && pins.some(pin => pin.kind === 'source' && sourceKey(pin) === sourceKey(source))) return 'pin';
-        if (node?.payload.kind === 'operand' && node.payload.value.type === 'clock' && (options.clock || scenario?.clock)) return 'pin';
+        if (node?.payload.kind === 'operand' && node.payload.value.type === 'clock' && !options.liveClock && (options.clock || scenario?.clock)) return 'pin';
         if (source && liveSources.some(read => sourceKey(read) === sourceKey(source))) return 'live';
         return scenario ? 'scenario' : 'live';
       },
@@ -254,12 +255,12 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
     }
     rootIssues.push(...gaps);
     const rootNode = root.graph.nodes.find(node => root.graph.roots.some(graphRoot => graphRoot.nodeId === node.id && anchorKey(graphRoot.anchor) === anchorKey(root.anchor)));
-    const sources = rootNode ? blockSources(program, rootNode, pins, Boolean(scenario), Boolean(options.clock || scenario?.clock), options.liveBlocks) : new Set(['live']);
+    const sources = rootNode ? blockSources(program, rootNode, pins, Boolean(scenario), Boolean(!options.liveClock && (options.clock || scenario?.clock)), options.liveBlocks) : new Set(['live']);
     const source: OutputAnswer['source'] = sources.size > 1 ? 'Mixed' : sources.has('pin') ? 'Pinned' : sources.has('scenario') ? 'Scenario'
       : held.origin === 'sample' ? 'Sample' : held.stale ? 'Held/stale' : 'Live';
     outputs.push({ output: root.anchor, result, source, at: scenario?.capturedAt ?? held.at, issues: [...new Set(rootIssues)], trace, ...(flow ? { flow } : {}) });
   }
-  return { mode: simulated ? 'Simulated' : 'Live', modified: Boolean(scenario && ((options.pins?.length ?? 0) > 0 || options.clock)), outputs, issues };
+  return { mode: simulated ? 'Simulated' : 'Live', modified: Boolean(scenario && ((options.pins?.length ?? 0) > 0 || options.clock || options.liveClock)), outputs, issues };
 }
 export interface ScenarioResult {
   readonly id: string;

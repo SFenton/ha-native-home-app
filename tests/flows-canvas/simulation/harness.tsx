@@ -5,26 +5,34 @@ import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/Workspace
 import { SimulationHost } from '../../../src/workspace2/logic-simulation/SimulationHost';
 import { saveScenarios } from '../../../src/workspace2/logic-simulation/storage';
 import { FIXTURE_CLOCK, simulationFixture } from './fixture';
+import { useStudioTheme } from '../../../src/workspace2/useStudioTheme';
+import { Tag } from '../../../src/workspace2/kit';
+import '../../../src/styles.css';
+import '../../../src/workspace2/workspace2.css';
 
-const fixture = simulationFixture(), live = new LiveHouse();
+const fixture = simulationFixture(true), live = new LiveHouse();
 live.applySnapshot(fixture.states, fixture.held.base.viewer);
 function Harness() {
+  useStudioTheme(true);
   const [session, setSession] = useState<'open' | 'closing' | 'closed'>('open'), [key, setKey] = useState(0);
   const [message, setMessage] = useState('');
+  const [selectedBlockId, setSelectedBlockId] = useState(fixture.bedroomPin.blockId);
   useEffect(() => { if (session === 'closing') setSession('closed'); }, [session]);
-  return <main style={{ maxWidth: 1100, margin: 'auto', padding: 12, fontFamily: 'system-ui' }}>
-    <h1>Isolated fake-HA simulation harness</h1>
-    <p>Fixture entities only. No HA connection or device controls.</p>
+  return <div className="w2-scope" style={{ background: 'var(--w2-bg)', minHeight: '100dvh' }}>
+    <header className="w2-topbar" style={{ height: 'auto', minHeight: 56, flexWrap: 'wrap', paddingBlock: 10 }}><strong className="w2-wordmark">S+H Studio</strong><Tag>Simulation harness · fake HA</Tag>
+    <div className="w2-trailing" style={{ flexWrap: 'wrap' }}>
     <button onClick={() => {
-      const saved = saveScenarios(fixture.document.id, 'acceptance', fixture.scenarios);
+      const saved = saveScenarios(fixture.document.id, 'acceptance', [...fixture.scenarios, fixture.offline]);
       setMessage(saved.ok ? 'Fixture scenarios loaded.' : saved.error); setKey(value => value + 1);
     }}>Load fixture scenarios</button>
     <button onClick={() => setSession(session === 'closed' ? 'open' : 'closing')}>{session === 'closed' ? 'Reopen canvas' : 'Close canvas'}</button>
-    <p role="status">{message}</p>
+    </div></header>
+    <p role="status" style={{ margin: 0 }}>{message}</p>
     <WorkspaceDataProvider document={fixture.document} house={live.house} live={live}>
       {session !== 'closed' && <SimulationHost key={key} active={session === 'open'} program={fixture.program} document={fixture.document}
-        canvasId="acceptance" blockNames={fixture.blockNames} liveClock={FIXTURE_CLOCK} />}
+        canvasId="acceptance" blockNames={fixture.blockNames} presentation={fixture.presentation} liveClock={FIXTURE_CLOCK} clockTimeZone="UTC"
+        selectedBlockId={selectedBlockId} onSelectBlock={setSelectedBlockId} previousText={fixture.held.base.previousText} />}
     </WorkspaceDataProvider>
-  </main>;
+  </div>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

@@ -41,27 +41,96 @@ as a flaky CI assertion.
 
 ## Recorded checks and artifacts
 
-`npm test -- --maxWorkers=2`: 268 files, 12,179 passed and one existing skip.
-`npm run build`: passed. Focused Playwright: four passed across desktop
-(1440 x 900) and phone (390 x 844). `npm run scan:house`: zero findings.
-Temporary browser servers were stopped after each run.
+`npm test -- --maxWorkers=2`: 269 files, 12,183 passed and one existing skip.
+`npm run build`: passed. Focused Playwright: six passed across desktop
+(1440 x 900; design scene 1440 x 1100) and phone (390 x 844, 2x capture).
+The permanent corpus comparison and observer invariants remain in those tests.
+`npm run scan:house`: zero findings. Temporary browser servers were stopped.
 
-- [Desktop pinned](desktop-pinned.png), [phone pinned](phone-pinned.png);
-  [desktop Live restored](desktop-live.png), [phone Live restored](phone-live.png).
-- [Desktop scenarios](desktop-scenarios.png), [phone scenarios](phone-scenarios.png).
 - [Desktop pin traffic](desktop-pins-network.json),
   [phone pin traffic](phone-pins-network.json),
   [desktop scenario traffic](desktop-scenarios-network.json),
-  [phone scenario traffic](phone-scenarios-network.json).
+  [phone scenario traffic](phone-scenarios-network.json),
+  [desktop design-scene traffic](desktop-design-network.json),
+  [phone design-scene traffic](phone-design-network.json).
 - [Actual drawer observations](drawers.json), generated from one shared-evaluator
-  run against the same fake fixture.
+  run of Sensor offline against the same fake fixture. Eight chores become
+  six after Keep Where; First Few separately cuts six to five. These are actual
+  observations, not reconstructed drawer evidence.
+
+## Design comparison
+
+Read and compared the actual approved
+[`13-sim.png`](../../design/flows/13-sim.png) light/dark reference and
+[`14-preview.png`](../../design/flows/14-preview.png) preview/lens reference,
+linked from the binding [flows contract](../../flows-canvas.md).
+The previous browser-default screenshots have been replaced, not retained as
+current evidence. Each capture below is next to its reference. Click for full
+resolution; the simulation reference contains both light and dark scenes.
+
+| Scene | Approved reference | Revised capture |
+| --- | --- | --- |
+| Sensor offline, desktop light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved simulation reference"> | <img src="desktop-sensor-offline-light.png" width="420" alt="Desktop light Sensor offline"> |
+| Sensor offline, desktop dark | <img src="../../design/flows/13-sim.png" width="330" alt="Approved simulation reference"> | <img src="desktop-sensor-offline-dark.png" width="420" alt="Desktop dark Sensor offline"> |
+| Inspector and full trace, desktop light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector and trace"> | <img src="desktop-sensor-offline-inspector-light.png" width="420" alt="Light source inspector and actual trace"> |
+| Inspector and full trace, desktop dark | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector and trace"> | <img src="desktop-sensor-offline-inspector-dark.png" width="420" alt="Dark source inspector and actual trace"> |
+| Scenarios bottom sheet, phone light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios reference"> | <img src="phone-sensor-offline-light.png" width="260" alt="Phone light scenarios bottom sheet"> |
+| Scenarios bottom sheet, phone dark | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios reference"> | <img src="phone-sensor-offline-dark.png" width="260" alt="Phone dark scenarios bottom sheet"> |
+| Source bottom sheet, phone light | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector reference"> | <img src="phone-sensor-offline-inspector-light.png" width="260" alt="Phone light source inspector"> |
+| Source bottom sheet, phone dark | <img src="../../design/flows/13-sim.png" width="330" alt="Approved source inspector reference"> | <img src="phone-sensor-offline-inspector-dark.png" width="260" alt="Phone dark source inspector"> |
+| Pin 25, Too Warm, desktop | <img src="../../design/flows/14-preview.png" width="330" alt="Approved compact values lens"> | <img src="desktop-pinned.png" width="420" alt="Desktop pin produces Too Warm"> |
+| Pin 25, Too Warm, phone | <img src="../../design/flows/14-preview.png" width="330" alt="Approved compact values lens"> | <img src="phone-pinned.png" width="260" alt="Phone pin produces Too Warm"> |
+| Live 21.9 restored, desktop | <img src="../../design/flows/14-preview.png" width="330" alt="Approved compact values lens"> | <img src="desktop-live.png" width="420" alt="Desktop Live restored"> |
+| Live 21.9 restored, phone | <img src="../../design/flows/14-preview.png" width="330" alt="Approved compact values lens"> | <img src="phone-live.png" width="260" alt="Phone Live restored"> |
+| Saved cases after reload, desktop | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios table"> | <img src="desktop-scenarios.png" width="420" alt="Desktop explicit scenario results"> |
+| Saved cases after reload, phone | <img src="../../design/flows/13-sim.png" width="330" alt="Approved scenarios table"> | <img src="phone-scenarios.png" width="260" alt="Phone saved scenarios table"> |
+
+### Intentional deviations and reasons
+
+- The main surface is **Just the Values**, not a counterfeit canvas. W2-C owns
+  blocks, port values, hatching, wires and kept badges; no canvas file changed.
+  The block/port observation API is documented in the
+  [mounting/observation seam](../../../src/workspace2/logic-simulation/README.md).
+- The harness is visibly labelled fake HA, not the integrated workspace.
+  It loads the real Studio theme, segmented controls, fields, buttons, tags
+  and sheet primitives. The reference's purple pin semantic has no existing
+  Studio theme token, so a single scoped light/dark purple token was added.
+- The authored fixture uses the approved native Add/Divide average recipe,
+  so the trace includes its real Add and If/Otherwise results instead of
+  concealing them or inventing a native Aggregate block. Subtitle kept is
+  proved by the real text-slot result and saved keep seed. Badge Hidden is
+  an authored fixture expression, not a simulated native badge consumer.
+- Numeric/state edits keep an explicit **Apply pin** action so incomplete or
+  invalid field edits cannot silently become overlays. Typed computed/stream
+  pins and explicit JSON import/export remain available in styled disclosures.
+- The clock includes the requested normal date picker. The fake live clock is
+  11:59 PM UTC for the midnight acceptance edge, rather than the illustration's
+  9:41 PM; Sensor offline pins 11:30 PM. Its zone is stated. DST gaps are
+  rejected locally and no offset input or clock lookup request is exposed.
+- Scenario values are **live at capture**, not falsely labelled fresh HA
+  readings during an offline replay. Their neutral Live tags and explanation
+  distinguish them from purple overlays. While a saved case is selected,
+  unobserved Live-row outputs say Not run: the table does not cause a hidden
+  extra evaluation. Run All still compares every output, including outputs
+  outside the focused Subtitle/Badge table lens.
+- The cases include a deliberate wrong expectation and a missing-input case,
+  retaining explicit red failure and neutral Incomplete evidence. On phones
+  the table scrolls internally with a sticky name column; source/clock/trace
+  content scrolls within the inspector sheet rather than being squeezed.
 
 The final reservation check used origin/main
 `427eaba6236804275de58d3759c467f4bfcf3798` and fetched all open heads:
-#27 `4a01bde04ca3c8af3854cd9f7615b940b6fdbfd3` (21 paths),
-#28 `971f928e3091159b985c864c774168e68d3f4a58` (4 paths), and
-#29 `14a35db1e2f1d5c956c5bfc2b6f94b5def6d2616` (43 paths).
+#27 `f069fe5b0af48092722d9d7eb2f8506d77e8c534` (26 paths),
+#28 `7c634668b4d55831e3e81ccb933151537bf33907` (8 paths), and
+#29 `196cac8653b0b9e910f5bc3fedd3b5829510eba7` (62 paths).
 The full diff-derived reservation sets had zero intersections with this lane.
+
+The pre-revision CI e2e shard 6 failed during **browser dependency installation**,
+before any tests: the Ubuntu 26.04 runner could not locate its font packages
+([job log](https://github.com/SFenton/ha-native-home-app/actions/runs/44490049920/job/135443080632)).
+That workflow/runner configuration is outside W2-S ownership. The isolated
+local desktop/phone run above completed; it is not represented as a passing
+remote CI run.
 
 ## Scope and limitations
 

@@ -1,15 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlaskConical, List, Play, X } from 'lucide-react';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { GraphNode, SimulationCase, SimulationClock, SimulationPin } from '../../shared/composition/graph/types';
 import { allocateGraphId } from '../../shared/composition/graph/recipes';
-import { canonicalCompositionJSON } from '../../shared/composition/json';
+import { Field, TextField } from '../../ui';
+import { Overlay, Tag, useNarrow } from '../kit';
 import { captureScenario, mergePins, runAll, runSimulation, type ScenarioResult } from './engine';
-import { anchorKey, caseSchema, clockSchema, parseScenarios, pinSchema, sourceKey, STORE_COUNT } from './contracts';
-import { blockMode, blockSources, pinProblems, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
+import { anchorKey, caseSchema, parseScenarios, pinSchema, readKey, sourceKey, STORE_COUNT } from './contracts';
+import { pinProblems, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
 import { loadScenarios, saveScenarios } from './storage';
 import { sharedFlowRequests, SimulationFlowBridge, useSimulationSnapshot, type FlowState } from './live';
 import { SimulationDrawers } from './Drawers';
-import { resultText } from './words';
+import { ClockInspector, SourceInspector, type PinChoice } from './Inspector';
+import { ScenariosDrawer } from './Scenarios';
+import { canvasObservations, type CanvasObservations } from './observations';
+import { changedAgo, clockInstant, displayValue, type SimulationPresentation, type ValuePresentation } from './presentation';
 import './simulation.css';
 
 export interface SimulationHostProps {
@@ -17,7 +22,13 @@ export interface SimulationHostProps {
   readonly document: Pick<CompositionDocument, 'id' | 'dataSources'>;
   readonly canvasId: string;
   readonly blockNames?: Readonly<Record<string, string>>;
+  readonly presentation?: SimulationPresentation;
+  readonly selectedBlockId?: string;
+  readonly onSelectBlock?: (blockId: string) => void;
+  readonly onObservation?: (observations: CanvasObservations) => void;
   readonly liveClock?: SimulationClock;
+  /** IANA zone matching liveClock. Required for home-clock editing; device defaults to the browser's zone. */
+  readonly clockTimeZone?: string;
   readonly previousText?: SimulationCase['base']['previousText'];
   /** The existing connection owner supplies freshness; LiveHouse alone cannot detect transport failures. */
   readonly freshness?: { readonly stale: boolean; readonly error?: string };
@@ -28,25 +39,23 @@ export interface SimulationHostProps {
 export function SimulationHost(props: SimulationHostProps) {
   return <HostSession key={`${props.document.id}:${props.canvasId}`} {...props} />;
 }
-function HostSession({ program, document, canvasId, blockNames = {}, liveClock, previousText, freshness, active = true }: SimulationHostProps) {
+function HostSession({ program, document, canvasId, blockNames = {}, presentation, selectedBlockId, onSelectBlock, onObservation, liveClock, clockTimeZone, previousText, freshness, active = true }: SimulationHostProps) {
+  const narrow = useNarrow();
   const [loaded] = useState(() => loadScenarios(document.id, canvasId));
   const [scenarios, setScenarios] = useState<SimulationCase[]>(loaded.ok ? loaded.value : []);
   const [message, setMessage] = useState(loaded.ok ? '' : loaded.error);
-  const [pins, setPins] = useState<SimulationPin[]>([]);
-  const [scenarioId, setScenarioId] = useState('');
+  const [pins, setPins] = useState<SimulationPin[]>([]), [scenarioId, setScenarioId] = useState('');
   const [muted, setMuted] = useState<ReadonlySet<string>>(new Set());
   const [clock, setClock] = useState<SimulationClock>();
-  const [clockText, setClockText] = useState(liveClock?.now ?? '');
-  const [offset, setOffset] = useState(liveClock?.utcOffsetMinutes ?? 0);
+  const [clockLive, setClockLive] = useState(false);
   const [flows, setFlows] = useState<Readonly<Record<string, FlowState>>>({});
-  const [paused, setPaused] = useState(false);
-  const [editingPin, setEditingPin] = useState<GraphNode>();
-  const [pinText, setPinText] = useState('');
-  const [pinStatus, setPinStatus] = useState('value');
-  const [capture, setCapture] = useState('');
-  const [captureName, setCaptureName] = useState('');
-  const [results, setResults] = useState<readonly ScenarioResult[]>([]);
-  const [exchange, setExchange] = useState('');
+  const [paused, setPaused] = useState(false), [simulating, setSimulating] = useState(false);
+  const [selection, setSelection] = useState<string>(), [inspecting, setInspecting] = useState(false);
+  const [pinChoice, setPinChoice] = useState<PinChoice>(), [numeric, setNumeric] = useState('25'), [state, setState] = useState('unavailable');
+  const [pinText, setPinText] = useState(''), [pinStatus, setPinStatus] = useState('value');
+  const [capture, setCapture] = useState(''), [captureName, setCaptureName] = useState('');
+  const [results, setResults] = useState<readonly ScenarioResult[]>([]), [exchange, setExchange] = useState('');
+  const [drawer, setDrawer] = useState<'scenarios' | 'evidence'>();
   const selected = scenarios.find(scenario => scenario.id === scenarioId);
   const scenario = useMemo(() => {
     const live = program.roots.flatMap(root => root.graph.nodes.filter(node => muted.has(node.id))).flatMap(node => {
@@ -56,7 +65,12 @@ function HostSession({ program, document, canvasId, blockNames = {}, liveClock, 
   }, [selected, muted, program]);
   const activePins = useMemo(() => mergePins(scenario?.pins ?? [], pins), [scenario, pins]);
   const snapshot = useSimulationSnapshot(program, document, flows, { clock: liveClock, previousText, ...freshness });
-  const run = useMemo(() => runSimulation(program, snapshot, { scenario, pins, clock, liveBlocks: muted }), [program, snapshot, scenario, pins, clock, muted]);
+  const run = useMemo(() => runSimulation(program, snapshot, { scenario, pins, clock, liveClock: clockLive, liveBlocks: muted }), [program, snapshot, scenario, pins, clock, clockLive, muted]);
+  const observation = useMemo(() => canvasObservations(program, run, {
+    pins: activePins, localPins: pins, scenario, clockPinned: Boolean(!clockLive && (clock || scenario?.clock)), localClockPinned: Boolean(clock), liveClock: clockLive,
+    freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText,
+  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale]);
+  useEffect(() => onObservation?.(observation), [onObservation, observation]);
   const onRun = useCallback((ids: readonly string[], state: FlowState) => {
     setFlows(previous => {
       if (ids.every(id => previous[id]?.fingerprint === state.fingerprint
@@ -65,17 +79,42 @@ function HostSession({ program, document, canvasId, blockNames = {}, liveClock, 
     });
   }, []);
   const requests = useMemo(() => sharedFlowRequests(program), [program]);
-  const enabled = active && run.mode === 'Live' && !paused;
+  const enabled = active && run.mode === 'Live' && !paused && !simulating;
   const nodes = useMemo(() => [...new Map(program.roots.flatMap(root => root.graph.nodes).filter(node =>
-    ['operand', 'condition', 'logic-ref', 'source-selection', 'step', 'request'].includes(node.payload.kind)).map(node => [node.id, node])).values()], [program]);
+    ['operand', 'condition', 'logic-ref', 'source-selection', 'step', 'request', 'slot'].includes(node.payload.kind)).map(node => [node.id, node])).values()], [program]);
+  const inputNodes = nodes.filter(node => {
+    const source = sourceCaptureForNode(node, program);
+    return node.payload.kind !== 'source-selection' && source && program.reads.some(read => sourceKey(read) === sourceKey(source));
+  });
+  const inputMap = new Map<string, GraphNode>();
+  for (const node of inputNodes) {
+    const key = sourceKey(sourceCaptureForNode(node, program)!);
+    if (!inputMap.has(key)) inputMap.set(key, node);
+  }
+  const uniqueInputs = [...inputMap.values()];
+  const editingPin = nodes.find(node => node.id === (selectedBlockId ?? selection)) ?? inputNodes[0] ?? nodes[0];
+  const blockLabel = (node: GraphNode): ValuePresentation => presentation?.blocks?.[node.id] ?? { name: blockNames[node.id] ?? 'Value' };
+  const outputLabel = (index: number): ValuePresentation => presentation?.outputs?.[anchorKey(program.roots[index].anchor)]
+    ?? { name: program.roots[index].name === program.roots[index].anchor.id ? `Output ${index + 1}` : program.roots[index].name };
+  const issueText = (issue: string) => {
+    const read = program.reads.find(read => issue.includes(readKey(read)));
+    if (read) {
+      const node = inputNodes.find(node => { const source = sourceCaptureForNode(node, program); return source && sourceKey(source) === sourceKey(read); });
+      return `Missing captured input: ${node ? blockLabel(node).name : 'a required value'}.`;
+    }
+    if (issue.startsWith('Unresolved')) return 'A pin points to a block or port that no longer exists. Edit the scenario before running.';
+    const flowIndex = program.roots.findIndex(root => root.body.kind === 'flow' && issue.includes(root.body.sourceId));
+    return flowIndex < 0 ? issue : issue.replace(program.roots[flowIndex].anchor.id, outputLabel(flowIndex).name);
+  };
+  const selectBlock = (node: GraphNode) => { setSelection(node.id); setPinChoice(undefined); setInspecting(true); setDrawer(undefined); onSelectBlock?.(node.id); };
   const stalePins = scenarios.flatMap(scenario => pinProblems(program, scenario.pins));
-  const nameOf = (node: GraphNode) => blockNames[node.id] ?? node.catalogKey;
   const returnLive = () => {
-    setPins([]); setScenarioId(''); setMuted(new Set()); setClock(undefined); setPaused(false); setResults([]); setEditingPin(undefined);
+    setPins([]); setScenarioId(''); setMuted(new Set()); setClock(undefined); setClockLive(false); setPaused(false); setSimulating(false); setResults([]); setPinChoice(undefined);
     setMessage('Live restored. Saved scenarios were not changed.');
   };
   const selectScenario = (id: string) => {
-    setScenarioId(id); setPins([]); setClock(undefined); setMuted(new Set()); setPaused(Boolean(id)); setResults([]);
+    if (!id) { returnLive(); return; }
+    setScenarioId(id); setPins([]); setClock(undefined); setClockLive(false); setMuted(new Set()); setPaused(true); setSimulating(true); setPinChoice(undefined);
   };
   const persist = (next: SimulationCase[]) => {
     setScenarios(next);
@@ -88,15 +127,14 @@ function HostSession({ program, document, canvasId, blockNames = {}, liveClock, 
       const candidate = caseSchema.parse(JSON.parse(capture));
       const updated = caseSchema.parse({ ...candidate, name: captureName });
       if (scenarios.length >= STORE_COUNT && !scenarios.some(scenario => scenario.id === updated.id)) throw new Error('A canvas can keep at most 20 scenarios. Delete one before saving.');
-      const next = [...scenarios.filter(scenario => scenario.id !== updated.id), updated];
-      if (persist(next)) { setCapture(''); setCaptureName(''); }
+      if (persist([...scenarios.filter(scenario => scenario.id !== updated.id), updated])) { setCapture(''); setCaptureName(''); }
     } catch (error) { setMessage(error instanceof Error ? `Scenario not saved: ${error.message}` : 'Scenario data is invalid.'); }
   };
-  const startCapture = () => {
+  const startCapture = (empty = false) => {
     try {
       const candidate = captureScenario(program, snapshot, {
         id: allocateGraphId('scenario', new Set(scenarios.map(scenario => scenario.id))),
-        name: 'New scenario', pins: activePins, clock,
+        name: 'New scenario', pins: empty ? [] : activePins, clock: empty ? undefined : clockLive ? snapshot.base.clock : clock ?? scenario?.clock,
       });
       setCapture(JSON.stringify(candidate, null, 2)); setCaptureName(candidate.name);
       setMessage('Review the captured values before saving. Household states may be personal.');
@@ -107,126 +145,124 @@ function HostSession({ program, document, canvasId, blockNames = {}, liveClock, 
     try {
       const source = sourceCaptureForNode(editingPin, program), port = editingPin.outputs[0], type = simulationPort(program, editingPin)!;
       let candidate: SimulationPin;
-      const json: unknown = pinStatus === 'value' ? JSON.parse(pinText) : undefined;
+      const json: unknown = pinChoice === 'number' ? Number(numeric) : pinChoice === 'state' ? state : pinStatus === 'value' ? JSON.parse(pinText) : undefined;
+      if (pinChoice === 'number' && (!numeric.trim() || !Number.isFinite(json))) throw new Error('Enter a finite number.');
       if (source) {
-        const answer = pinStatus === 'value' ? { status: 'value' as const, value: json } : { status: pinStatus };
-        const state = source.access === 'raw-state' || source.path?.length === 1 && source.path[0] === 'state';
-        const raw = state && answer.status === 'value' && typeof answer.value === 'number' ? { status: 'value', value: String(answer.value) } : answer;
+        const answer = pinChoice === 'number' || pinChoice === 'state' || pinStatus === 'value' ? { status: 'value' as const, value: json } : { status: pinStatus };
+        const rawState = source.access === 'raw-state' || source.path?.length === 1 && source.path[0] === 'state';
+        const raw = rawState && answer.status === 'value' && typeof answer.value === 'number' ? { status: 'value', value: String(answer.value) } : answer;
         candidate = pinSchema.parse({ kind: 'source', blockId: editingPin.id, ...source, answer: raw });
       } else {
-        candidate = pinSchema.parse({
-          kind: 'output', blockId: editingPin.id, portId: port.id,
+        candidate = pinSchema.parse({ kind: 'output', blockId: editingPin.id, portId: port.id,
           result: type.representation === 'condition' ? { kind: 'condition', answer: json }
-            : { kind: 'operand', answer: pinStatus === 'value' ? { status: 'value', value: json } : { status: pinStatus } },
-        });
+            : { kind: 'operand', answer: pinStatus === 'value' ? { status: 'value', value: json } : { status: pinStatus } } });
       }
       const errors = pinProblems(program, [candidate]);
       if (errors.length) throw new Error(errors.join(' '));
-      setPins(previous => mergePins(previous, [candidate])); setPaused(true); setEditingPin(undefined);
-      setMessage(`${nameOf(editingPin)} pinned. No device was operated.`);
+      setPins(previous => mergePins(previous, [candidate])); setPaused(true); setSimulating(true);
+      setMessage(`${blockLabel(editingPin).name} pinned. No device was operated.`);
     } catch (error) { setMessage(error instanceof Error ? `Pin not applied: ${error.message}` : 'Pin data is invalid.'); }
   };
-  return <section className="w2-simulation" aria-label="Flow simulation">
-    {requests.map(request => <SimulationFlowBridge key={request.id} {...request} enabled={enabled} onRun={onRun} />)}
-    <header>
-      <h2>Simulation</h2>
-      <p><strong>{run.mode}</strong>{scenario ? ` - ${scenario.name}${run.modified || muted.size ? ' - Modified' : ''}` : ''}{paused && run.mode === 'Live' ? ' - refresh paused' : ''}</p>
-      <p>Studio only. This preview never operates real devices. Replay from history - Later.</p>
-      <button type="button" onClick={returnLive}>Return to Live</button>
-      <button type="button" disabled title="Replay from history is not available">Replay from history - Later</button>
-      {snapshot.stale && <p role="note">Held/stale. {snapshot.error ?? 'Live refresh is paused or a newer response has not arrived.'}</p>}
-      {!snapshot.stale && snapshot.error && <p role="alert">{snapshot.error}</p>}
-      <p role="status" aria-live="polite">{message}</p>
+  const source = editingPin ? sourceCaptureForNode(editingPin, program) : undefined;
+  const clockZone = [...program.flows.values()][0]?.clock?.zone ?? 'device';
+  const sourceCapture = source ? snapshot.base.reads.find(read => sourceKey(read) === sourceKey(source)) : undefined;
+  const inherited = source ? scenario?.pins.find(pin => pin.kind === 'source' && sourceKey(pin) === sourceKey(source)) : undefined;
+  const local = source ? pins.find(pin => pin.kind === 'source' && sourceKey(pin) === sourceKey(source)) : pins.find(pin => pin.blockId === editingPin?.id);
+  const choice: PinChoice = pinChoice ?? (local ? local.kind === 'source' && local.answer.status === 'value' && Number.isFinite(Number(local.answer.value)) ? 'number' : source ? 'state' : 'typed' : scenario && !muted.has(editingPin?.id ?? '') ? 'scenario' : 'live');
+  const inspector = editingPin && <>
+    <header className="w2-props-head"><span className="w2-props-icon"><FlaskConical size={20} aria-hidden /></span>
+      <div className="w2-props-titles"><h2>{blockLabel(editingPin).name}</h2><p>Block · {source ? 'From Home' : 'Computed value'}</p></div>
+      {narrow && <button type="button" className="w2-primary" onClick={() => setInspecting(false)}>Done</button>}
     </header>
-    {run.issues.length > 0 && <p role="alert">{run.issues.join(' ')}</p>}
-    <section aria-label="Just the Values">
-      <h3>Just the Values</h3>
-      {run.outputs.map((output, index) => <article key={anchorKey(output.output)} aria-label={`Output ${program.roots[index].name}`}>
-        <h4>{program.roots[index].name}</h4>
-        <output>{resultText(output.result)}</output>
-        <p>{output.source} - captured <time>{output.at}</time></p>
-        {program.roots[index].body.kind === 'flow' && <p>Flow clock zone: {program.roots[index].body.value.clock?.zone ?? 'device'}</p>}
-        {output.issues.map(issue => <p role="note" key={issue}>{issue}</p>)}
-      </article>)}
+    <SourceInspector name={blockLabel(editingPin).name} presentation={blockLabel(editingPin)} source={Boolean(source)} choice={choice}
+      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin)) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
+      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin)) : 'Captured live value' } : undefined}
+      onChoice={value => {
+        setPinChoice(value);
+        if (value !== 'live' && value !== 'scenario') return;
+        setPins(previous => previous.filter(pin => pin.blockId !== editingPin.id && !(source && pin.kind === 'source' && sourceKey(pin) === sourceKey(source))));
+        setMuted(previous => { const next = new Set(previous); if (value === 'live') next.add(editingPin.id); else next.delete(editingPin.id); return next; });
+      }} numeric={numeric} onNumeric={setNumeric} state={state} onState={setState} typed={pinText} onTyped={setPinText} status={pinStatus} onStatus={setPinStatus} onApply={pin} />
+    <ClockInspector live={snapshot.base.clock} clock={clockLive ? undefined : clock ?? scenario?.clock} zone={clockZone}
+      timeZone={clockTimeZone ?? (clockZone === 'device' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined)}
+      onClock={value => { setClock(value); setClockLive(!value); if (value) { setPaused(true); setSimulating(true); } }} onError={setMessage} />
+    <section className="sec w2-group w2-sim-trace" aria-label="Evaluation trace">
+      <h3 className="w2-group-title">Trace · in the order the app works it out</h3>
+      <div className="w2-sim-trace-chips">{observation.order.map(id => {
+        const block = observation.blocks[id], node = nodes.find(node => node.id === id);
+        if (!node || !block?.observed || presentation?.traceBlocks && !presentation.traceBlocks.includes(id)) return null;
+        return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`}
+          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : block.state === 'cant-tell' ? "Can't tell" : displayValue(block.result, blockLabel(node))}</strong></button>;
+      })}</div>
+      {observation.truncated && <p className="w2-caption">Trace truncated. Unrecorded values are not evidence.</p>}
+      <div className="w2-sim-actions"><button type="button" onClick={() => { setInspecting(false); setDrawer('evidence'); }}>Each Run &amp; Items</button></div>
     </section>
-    <section aria-label="Block sources">
-      <h3>Per-block sources</h3>
-      <ul>{nodes.map(node => {
-        const local = pins.find(pin => pin.blockId === node.id), inherited = scenario?.pins.find(pin => pin.blockId === node.id);
-        const events = run.outputs.flatMap(output => output.trace.events).filter(event => event.blockId === node.id);
-        const mode = blockMode(program, node, activePins, Boolean(scenario), Boolean(clock || scenario?.clock), muted);
-        const sources = blockSources(program, node, activePins, Boolean(scenario), Boolean(clock || scenario?.clock), muted);
-        const source = sources.size > 1 ? 'Mixed' : sources.has('pin') ? 'Pinned' : sources.has('scenario') ? 'Scenario' : snapshot.origin === 'sample' ? 'Sample' : snapshot.stale ? 'Held/stale' : 'Live';
-        return <li key={node.id}>
-          <strong>{nameOf(node)}</strong> <span>{mode} - {source}</span>
-          <p>{resultText(events.filter(event => event.output).slice(-1)[0]?.output)}</p>
-          <label>Source for {nameOf(node)} <select value={local ? 'pin' : scenario && !muted.has(node.id) ? 'scenario' : 'live'} onChange={event => {
-            if (event.target.value === 'pin') { setEditingPin(node); setPinText(''); setPinStatus('value'); return; }
-            setPins(previous => previous.filter(pin => pin.blockId !== node.id));
-            setMuted(previous => { const next = new Set(previous); if (event.target.value === 'live') next.add(node.id); else next.delete(node.id); return next; });
-          }}>
-            <option value="live">Live</option><option value="scenario" disabled={!selected}>Scenario</option>
-            <option value="pin">Pin a typed value</option><option disabled>Replay from history - Later</option>
-          </select></label>
-        </li>;
-      })}</ul>
-      {editingPin && <fieldset>
-        <legend>Pin {nameOf(editingPin)}</legend>
-        <p>{sourceCaptureForNode(editingPin, program) ? 'Source overlay - related reads agree.' : 'Computed-output override - upstream values are not forged.'}</p>
-        <label>Pin status <select value={pinStatus} onChange={event => setPinStatus(event.target.value)}><option value="value">Value</option><option value="loading">Loading</option><option value="unavailable">Unavailable</option></select></label>
-        <label>Typed value (JSON) <input value={pinText} onChange={event => setPinText(event.target.value)} placeholder={editingPin.outputs[0]?.type.representation === 'condition' ? '"yes", "no" or "unknown"' : '25 or "on"'} /></label>
-        <button type="button" onClick={pin}>Apply pin</button><button type="button" onClick={() => setEditingPin(undefined)}>Cancel pin</button>
-      </fieldset>}
-    </section>
-    <section aria-label="Clock simulation">
-      <h3>Pinned clock</h3>
-      <p>Today and Now use one frozen clock. The authored flow zone is unchanged.</p>
-      <label>ISO local clock <input value={clockText} placeholder={snapshot.base.clock.now} onChange={event => setClockText(event.target.value)} /></label>
-      <label>UTC offset minutes <input type="number" min={-840} max={840} value={offset} onChange={event => setOffset(event.target.valueAsNumber)} /></label>
-      <button type="button" onClick={() => {
-        const parsed = clockSchema.safeParse({ now: clockText, utcOffsetMinutes: offset });
-        if (!parsed.success) { setMessage('Enter a valid ISO local clock including seconds and UTC offset minutes.'); return; }
-        setClock(parsed.data); setPaused(true); setMessage('Clock pinned for every block in this run.');
-      }}>Pin clock</button>
-    </section>
-    <section aria-label="Scenarios">
-      <h3>Scenarios</h3>
-      <label>Active scenario <select value={scenarioId} onChange={event => selectScenario(event.target.value)}><option value="">Live now</option>
-        {scenarios.map(scenario => <option key={scenario.id} value={scenario.id}>{scenario.name}{scenario.fingerprint !== program.fingerprint ? ' - Needs review' : ''}</option>)}
-      </select></label>
-      <div className="w2-sim-actions">
-        <button type="button" onClick={startCapture}>Save Live Values as Scenario</button>
-        <button type="button" disabled={!scenarios.length || stalePins.length > 0} onClick={() => { setPaused(true); setResults(runAll(program, scenarios, snapshot)); setMessage('Run All complete. No network reads or device writes.'); }}>Run All</button>
-        <button type="button" disabled={!selected} onClick={() => { if (selected) { setCaptureName(selected.name); setCapture(JSON.stringify(selected, null, 2)); } }}>Edit scenario</button>
-        <button type="button" disabled={!selected} onClick={() => { persist(scenarios.filter(scenario => scenario.id !== scenarioId)); selectScenario(''); }}>Delete scenario</button>
+  </>;
+  return <section className="w2-scope w2-simulation w2-simulation-surface" aria-label="Flow simulation">
+    {requests.map(request => <SimulationFlowBridge key={request.id} {...request} enabled={enabled} onRun={onRun} />)}
+    <header className="w2-sim-toolbar">
+      <div className="w2-sim-heading"><FlaskConical size={18} aria-hidden /><h2>Simulation</h2><span className="w2-caption">Studio only · no device controls</span></div>
+      <div className="w2-sim-toolbar-cluster">
+        <div className="w2-segment-pill" role="group" aria-label="Simulation mode">
+          <button type="button" aria-pressed={!simulating && run.mode === 'Live'} onClick={returnLive}><span className="w2-sim-live-dot" />Live</button>
+          <button type="button" aria-pressed={simulating || run.mode === 'Simulated'} onClick={() => { setSimulating(true); setPaused(true); }}>Simulated</button>
+        </div>
+        {(scenario || activePins.length > 0) && <Tag className="tag pinned"><FlaskConical size={12} aria-hidden />{scenario?.name ?? `${activePins.length} pinned`}{run.modified || muted.size ? ' · Modified' : ''}</Tag>}
+        <button type="button" className="w2-tonal" onClick={() => { setInspecting(false); setDrawer('scenarios'); }}><FlaskConical size={15} aria-hidden />Scenarios</button>
       </div>
-      {stalePins.length > 0 && <p role="alert">Unresolved pins block Run All. {stalePins.join(' ')}</p>}
-      <ul>{scenarios.map(scenario => <li key={scenario.id}>{scenario.name} - captured {scenario.capturedAt}{scenario.fingerprint !== program.fingerprint ? ' - Needs review' : ''}</li>)}</ul>
-      {capture && <fieldset>
-        <legend>Review scenario before saving</legend>
-        <p>Household states may be personal. Stored only in this browser; never in draft or native exports. Delete any scenario you no longer need.</p>
-        <label>Scenario name <input value={captureName} onChange={event => setCaptureName(event.target.value)} /></label>
-        <label>Scenario data (JSON) <textarea rows={12} value={capture} onChange={event => setCapture(event.target.value)} /></label>
-        <p>Previous-text seeds are separate base.previousText entries. Expected outputs include status and typed value; numeric tolerance is explicit.</p>
-        <button type="button" onClick={saveCapture}>Save scenario</button><button type="button" onClick={() => setCapture('')}>Discard capture</button>
+    </header>
+    {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Held/stale. {snapshot.error ?? 'Waiting for a newer live response.'}</p>}
+    {run.issues.length > 0 && <p role="alert" className="w2-sim-notice">{run.issues.map(issueText).join(' ')}</p>}
+    <p role="status" aria-live="polite" className="w2-sim-status">{message}</p>
+    <div className="w2-sim-body">
+      <main className="w2-sim-values-area">
+        <section className="sec w2-group" aria-label="Just the Values">
+          <h3 className="w2-group-title"><List size={15} aria-hidden />Just the Values</h3>
+          <p className="w2-caption">The preview is a lens. These are the actual outputs, not device actions.{scenario ? ' Unpinned Live values are frozen at capture.' : ''}</p>
+          <div className="w2-sim-values">{run.outputs.map((output, index) => <article className="kv2" key={anchorKey(output.output)} aria-label={`Output ${outputLabel(index).name}`}>
+            <span>{outputLabel(index).name}</span><output>{displayValue(output.result, outputLabel(index))}</output>
+            <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source}</Tag>
+            {output.issues.length > 0 && <p className="w2-caption">{output.issues.map(issueText).join(' ')}</p>}
+          </article>)}</div>
+        </section>
+        <section className="sec w2-group" aria-label="Block sources">
+          <h3 className="w2-group-title">Inputs</h3>
+          <div className="w2-sim-values">{uniqueInputs.map(node => {
+            const block = observation.blocks[node.id];
+            return <div key={node.id} className="kv2"><button type="button" className="w2-link-button" aria-label={`Inspect ${blockLabel(node).name}`} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>
+              <span>{displayValue(block?.result, blockLabel(node))}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Held/stale' : block?.freshness === 'sample' ? 'Sample' : 'Live'}</Tag></div>;
+          })}</div>
+          <details className="w2-sim-details"><summary>Other blocks</summary><div className="w2-sim-block-list">{nodes.filter(node => !sourceCaptureForNode(node, program)).map(node => <button type="button" key={node.id} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>)}</div></details>
+          <p className="w2-caption">Select a value to inspect its source, pin it, or try a scenario.</p>
+        </section>
+        <div className="w2-sim-actions w2-group"><button type="button" onClick={() => setDrawer('evidence')}><Play size={14} aria-hidden />Each Run &amp; Items</button></div>
+      </main>
+      {!narrow && <aside className="w2-sim-inspector w2-form" aria-label="Simulation inspector">{inspector}</aside>}
+    </div>
+    {narrow && <Overlay narrow open={inspecting} onOpenChange={setInspecting} label="Simulation inspector" className="w2-simulation-surface w2-form">{inspector}</Overlay>}
+    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot}
+      selectedId={scenarioId} run={run} results={results} inputNodes={uniqueInputs.filter(node => !presentation?.scenarioInputs || presentation.scenarioInputs.includes(node.id))} blockLabel={blockLabel} outputLabel={outputLabel}
+      outputKeys={presentation?.scenarioOutputs}
+      onSelect={selectScenario} onCapture={() => startCapture()} onCreate={() => startCapture(true)} blocked={stalePins.length > 0}
+      onRunAll={() => { setPaused(true); setSimulating(true); setResults(runAll(program, scenarios, snapshot)); setMessage('Run All complete. No network reads or device writes.'); }}
+      onEdit={scenario => { setCaptureName(scenario.name); setCapture(JSON.stringify(scenario, null, 2)); }}
+      onDelete={scenario => { persist(scenarios.filter(candidate => candidate.id !== scenario.id)); if (scenario.id === scenarioId) selectScenario(''); }}>
+      {stalePins.length > 0 && <p role="alert" className="w2-sim-notice">Unresolved pins block Run All. {stalePins.map(issueText).join(' ')}</p>}
+      {capture && <fieldset className="w2-sim-review w2-form">
+        <legend>Review scenario before saving</legend><p className="w2-caption">Household states may be personal. Stored only in this browser; never in draft or native exports.</p>
+        <TextField label="Scenario name" value={captureName} onChange={setCaptureName} />
+        <details><summary>Captured values and expectations</summary><Field label="Scenario data (JSON)"><textarea rows={10} value={capture} onChange={event => setCapture(event.target.value)} /></Field>
+          <p className="w2-caption">Previous-text seeds are separate base.previousText entries. Numeric tolerance is explicit.</p></details>
+        <div className="w2-sim-actions"><button type="button" className="w2-primary" onClick={saveCapture}>Save scenario</button><button type="button" onClick={() => setCapture('')}>Discard capture</button></div>
       </fieldset>}
-      <div aria-label="Scenario results">{results.map(result => <article key={result.id} aria-label={`Scenario result ${result.name}`}>
-        <h4>{result.name}: {result.status}</h4><p>Captured {result.at}</p>
-        {result.reasons.map(reason => <p key={reason}>{reason}</p>)}
-        {result.outputs.map(output => <p key={anchorKey(output.actual.output)}>
-          {output.actual.output.id}: {output.status}; expected {output.expected ? resultText(output.expected) : 'Not recorded'}; actual {resultText(output.actual.result)};
-          {' '}{output.actual.source}. {output.reasons.join(' ')}
-        </p>)}
-      </article>)}</div>
-      <details><summary>Explicit scenario import / export</summary>
-        <label>Scenario exchange JSON <textarea rows={6} value={exchange} onChange={event => setExchange(event.target.value)} /></label>
-        <button type="button" onClick={() => { setExchange(JSON.stringify({ version: 1, scenarios }, null, 2)); setMessage('Export prepared. This contains personal captured values, not configuration.'); }}>Prepare export</button>
-        <button type="button" onClick={() => {
-          try { const imported = parseScenarios(exchange); persist(imported); selectScenario(''); }
-          catch (error) { setMessage(error instanceof Error ? `Import refused: ${error.message}` : 'Import refused.'); }
-        }}>Import scenarios (replace browser list)</button>
+      <details className="w2-sim-exchange"><summary>Import or export scenarios</summary><Field label="Scenario exchange JSON"><textarea rows={6} value={exchange} onChange={event => setExchange(event.target.value)} /></Field>
+        <div className="w2-sim-actions"><button type="button" onClick={() => { setExchange(JSON.stringify({ version: 1, scenarios }, null, 2)); setMessage('Export prepared. This contains personal captured values, not configuration.'); }}>Prepare export</button>
+          <button type="button" onClick={() => { try { const imported = parseScenarios(exchange); persist(imported); selectScenario(''); } catch (error) { setMessage(error instanceof Error ? `Import refused: ${error.message}` : 'Import refused.'); } }}>Import scenarios (replace browser list)</button></div>
       </details>
-    </section>
-    <SimulationDrawers outputs={run.outputs} />
+    </ScenariosDrawer>
+    <Overlay narrow open={drawer === 'evidence'} onOpenChange={open => { if (!open) setDrawer(undefined); }} label="Run evidence" className="w2-simulation-surface">
+      <header className="w2-sim-drawer-head"><h2>Run evidence</h2><button type="button" className="w2-icon-button" aria-label="Close Run evidence" onClick={() => setDrawer(undefined)}><X size={18} aria-hidden /></button></header>
+      <SimulationDrawers outputs={run.outputs} program={program} presentation={presentation} blockNames={blockNames} />
+    </Overlay>
   </section>;
 }

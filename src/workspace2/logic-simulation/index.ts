@@ -6,3 +6,6 @@ export * from './live';
 export * from './SimulationHost';
 export * from './Drawers';
 export * from './words';
+export { canvasObservations } from './observations';
+export type { CanvasObservations, BlockObservation, PortObservation, ObservedValue } from './observations';
+export type { SimulationPresentation, ValuePresentation } from './presentation';

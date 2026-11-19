@@ -22,6 +22,11 @@ const program = useMemo(() => createSimulationProgram(graphs, {
   document={document}
   canvasId={stableCanvasId}
   blockNames={displayNamesByBlockId}
+  presentation={valuePresentation}
+  selectedBlockId={selectedBlock}
+  onSelectBlock={selectBlock}
+  onObservation={setCanvasObservations}
+  clockTimeZone={authoredClockIanaZone}
   freshness={{ stale: connectionIsStale, error: connectionError }}
   previousText={explicitKeepSeeds}
   active={canvasIsActive}
@@ -34,6 +39,35 @@ dependency flows and the source-ID -> literal HA entity-ID mapping. Graph IDs
 must be canvas-wide unique, including separately lifted roots. Root anchors,
 block IDs and source/port identities must survive layout-only changes. No
 position-based remapping is performed.
+
+The host inherits `workspace2.css`, `useStudioTheme` and its `--w2-*` variables
+from the workspace; the isolated harness mounts those same styles/theme.
+It reuses `SegmentRow`, `TextField`/`Field`, `SelectMenu`, `Tag`, Base UI Drawer
+and the Studio Overlay/sheet. Local `.sec`, `.kv2`, `.tag.live` and `.tag.pinned`
+classes adapt the reference's compact sections, value rows and provenance
+without changing global chrome. The only new semantic colour is the scoped,
+light/dark purple pin token; the existing theme has no pin-purple token.
+
+`presentation.blocks` is keyed by block ID; `presentation.outputs` by
+`anchorKey(root.anchor)`. Supply authored display names, units, optional
+numeric ranges, state labels, change times, and the date format hint.
+`entities` names the identities shown in Each Run. Missing names use "Value"
+or "Output N", never machine IDs. Optional `traceBlocks`, `scenarioInputs`
+(block IDs) and `scenarioOutputs` (anchor keys) focus a particular preview
+lens without changing evaluation or Run All's full comparison.
+
+`selectedBlockId`/`onSelectBlock` connect canvas selection to the inspector.
+On phones the inspector is the existing modal bottom sheet; Scenarios is a
+separate bottom drawer, never stacked with the inspector. Its comparison
+table scrolls inside the drawer and keeps scenario names sticky.
+
+For clock editing, supply an IANA `clockTimeZone` matching `liveClock` (for
+example the home's configured zone). Device clocks default to the browser's
+zone; home-clock editing is disabled if the host hasn't supplied its zone.
+Date/time controls and the 24-hour slider resolve offsets locally using Intl,
+reject DST gaps and retain the captured offset at an ambiguous time.
+No clock lookup fetches data. Clock Live explicitly restores the held Live
+clock even when the selected scenario has its own pinned clock.
 
 The connection owner must supply transport freshness: `LiveHouse` retains
 values during reconnect and cannot itself detect a transport error. Held-only
@@ -85,6 +119,65 @@ source and capture time. Missing inputs, unresolved pins, changed semantic
 fingerprints and truncated flow samples cannot become passing expectations.
 
 ## Observation seam
+
+### W2-C / W2-I block and port API
+
+`onObservation(CanvasObservations)` publishes the completed run projection;
+the same pure projection is exported as `canvasObservations(program, run,
+options)` for non-host integrations. It never evaluates, reads an environment,
+replays a scenario, requests data or spends budget.
+
+```ts
+interface CanvasObservations {
+  blocks: Readonly<Record<string, BlockObservation>>;
+  order: readonly string[];
+  truncated: boolean;
+}
+interface ObservedValue {
+  observed: boolean;
+  value?: Json;
+  result?: SimulationResult;
+  source: 'live' | 'pinned' | 'scenario' | 'mixed';
+  mode: 'Live' | 'Simulated' | 'Mixed';
+  state: 'known' | 'unavailable' | 'cant-tell' | 'loading' | 'not-observed';
+  freshness: 'live' | 'captured' | 'held' | 'sample';
+  pinned: boolean;
+  kept?: boolean;
+}
+interface PortObservation extends ObservedValue {
+  portId: string;
+  direction: 'input' | 'output';
+}
+interface BlockObservation extends ObservedValue {
+  blockId: string;
+  ports: readonly PortObservation[];
+}
+```
+
+`source` describes the value's dependencies, not whether a diagnostic happened.
+Scenario overrides report `scenario`; unpinned HA readings retain `live`
+origin with `freshness: 'captured'`. They are frozen historical captures, not
+fresh network readings. `pinned` identifies a direct source/output/clock
+overlay; do not colour every captured dependency purple. Mixed calculations
+remain Mixed. Source gaps are unavailable; an unanswered calculation/condition
+is `cant-tell`. Values and typed results remain exactly what was returned.
+
+Output ports use their actual observed callback (a single-output block is
+unambiguous). Input ports match recorded child-port identities; unsupported
+or unrecorded ports say `not-observed`, never borrow an unrelated value.
+Each input's provenance comes from its own upstream connection, not the
+block's combined provenance; live and pinned inputs remain distinct.
+Repeated evaluations use the last actual callback and its matching inputs.
+`order` follows actual completions, including each native text-slot result.
+`kept` is defined only when the exact slot expression was observed and its
+actual native resolved result and separate seed prove the keep decision.
+An unobserved/truncated decision has no keep flag. The API does not invent a
+badge consumer's hide/show policy.
+
+W2-C owns port badges, hatching, dashed unknown wires and kept badges. This
+lane does not render or edit any canvas block. The test harness's "Badge" is an
+authored native expression yielding Shown/Hidden, not a claim that the
+unintegrated host or unchanged iOS app renders a real badge.
 
 The only native evaluator changes are optional read-only hooks in `evaluator.ts`,
 `pipeline/evaluate.ts` and `pipeline/operands.ts`. `pipeline/compile.ts` is not
