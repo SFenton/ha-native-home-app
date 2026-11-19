@@ -29,7 +29,7 @@ export default function Inspector({ graph, node, host, send, close, locate, move
         <p>{value.type === 'all' ? 'All connected checks must match.' : 'Any connected check can match.'} And / Or are edited on the canvas, never as condition cards.</p>
         <button type="button" className="w2-canvas-primary" onClick={() => locate(node.id)}>Edit in Canvas</button>
       </> : <p>{node.payload.kind === 'condition' ? 'One check. Connect its typed values on the canvas.' : 'A typed output can feed any compatible field.'}</p>}
-      <p className="w2-canvas-caption">Only configured literal values are shown. Calculated and home values appear when an observation is available.</p>
+      <p className="w2-canvas-caption">Port values come only from the observation host and never change the draft.</p>
     </section>
     {node.payload.kind === 'source-selection' && <section><label>Entity<select value={typeof value === 'string' ? value : ''} onChange={event => send({ type: 'update', nodeId: node.id, value: event.target.value })}>
       {!host.data.sources.some(source => source.id === value) && <option value={String(value)}>{String(value)}</option>}

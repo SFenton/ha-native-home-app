@@ -1,7 +1,8 @@
 # Flows canvas interaction host
 
 `FlowCanvas` is an isolated interaction surface. W2-I mounts it; this lane does
-not modify workspace entry files. Pass a `CanvasHost`, an initial `LogicGraph`,
+not modify workspace entry files. Pass a `CanvasHostWithObservations` (a local,
+backward-compatible extension of `CanvasHost`), an initial `LogicGraph`,
 the existing `DerivedTheme`, a title, an `onClose` callback, and optionally the
 element to restore focus to on close and friendly output names for the meter.
 Remount for a different anchor/snapshot.
@@ -42,8 +43,8 @@ Styling uses existing workspace/HA tokens. Distinct Lucide block icons, named
 ports, accessible type descriptions and the Outline connection list supplement
 colored sockets/wires. The socket of an unresolved input uses its connected
 source's static port type for color, never a sampled value; compatibility still
-uses the original graph descriptor. Known values come only from literal nodes,
-including directly connected literals; no local evaluator was added.
+uses the original graph descriptor. Port values come only from optional host
+observations; there is no literal, connected-source or calculated-value fallback.
 Socket contrast retains 4.5:1 and focus retains 3:1 on the tested grounds.
 
 The compact bottom bar contains zoom, Tidy Up and a problems disclosure.
@@ -58,6 +59,53 @@ icons; the existing theme and graph helpers supply tokens, shapes and LAN-safe
 `getRandomValues` IDs. No graph-layout/editor dependency was added and no OSS
 license/notices changed. SVG wires are decorative; native HTML controls and the
 outline provide the full editing interface.
+
+## Optional observation input
+
+The owned `observations.tsx` exports the minimal display contract. W2-I supplies
+`host.observations`; the canvas never evaluates a graph, contacts HA, creates
+pins/scenarios, or persists observations. A normal `CanvasHost` without this
+optional property still works and shows **no port values**, even on literals.
+Authoring fields in the inspector remain editable configuration, not observations.
+
+```ts
+const observations: CanvasObservations = {
+  [nodeId]: {
+    scenarioPinned: true,
+    inputs: {
+      '/args/0': { state: 'known', source: 'live', value: 23.6 },
+    },
+    outputs: {
+      value: { state: 'cant-tell', source: 'scenario' },
+    },
+  },
+};
+const canvasHost: CanvasHostWithObservations = { ...host, observations };
+```
+
+Outer keys are graph node IDs. `inputs` and `outputs` use exact graph port IDs,
+including native paths such as `/args/0` and the output ID `value`. All maps and
+fields are readonly.
+`source` is `live | pinned | scenario`; `state` is
+`known | unavailable | cant-tell`. Known observations require a JSON `value`.
+Unknown observations omit `value`, unless `kept: true` explicitly supplies the
+retained value. `kept` badges appear only on outputs. `scenarioPinned` marks a
+direct scenario pin on the block; downstream provenance does not imply that flag.
+
+Known values use the port's type color; manual/scenario pins use purple.
+Unavailable and can't-tell rows are hatched, with dashed grey outgoing wires.
+State/source/value/kept information is in each port's accessible name; a scenario
+pin also has a dashed purple block outline and an accessible description.
+Observation-only updates preserve focus and do not compile or write the graph.
+Missing input observations remain empty even when their connected output has a
+known value. The host owns snapshot freshness and sanitization and must update or
+withdraw stale observations when the graph/simulation changes.
+
+PR #30 was checked at `845c8b670f1dc658807efc2f96a3836970672df7`: it is still open,
+and its documented contracts do not yet define this per-block/per-port display
+DTO. This local extension avoids editing W2-S or shared graph paths; W2-I/W2-S
+can align the exact field names above. The `observations` harness fixture is a
+scripted display snapshot shaped like this API, not simulation/runtime evidence.
 
 ## Accounting dependency (pending)
 

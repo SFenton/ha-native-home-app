@@ -5,7 +5,7 @@ import { lift } from '../../../src/shared/composition/graph';
 import { supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
 import { blockCatalog } from '../../../src/shared/composition/graph/catalog';
 import Palette from '../../../src/workspace2/canvas/Palette';
-import { fixedAverage, knownPortValue, nodeDetail, portLabel } from '../../../src/workspace2/canvas/blocks';
+import { fixedAverage, nodeDetail, portLabel } from '../../../src/workspace2/canvas/blocks';
 import { anchor, number } from './fixtures';
 
 afterEach(cleanup);
@@ -21,12 +21,9 @@ it('keeps categories closed, gives chips distinct icons and moves unavailable bl
   expect(screen.getByText(/Not available here/).closest('details')?.open).toBe(false);
   expect(blockCatalog.length).toBeGreaterThan(chips.length);
 });
-it('shows only actual literal values, never placeholder children or computed results', () => {
+it('uses human-readable port labels without raw operation subtitles', () => {
   const graph = lift({ type: 'math', op: 'add', args: [number(23.6), number(25)] }, { kind: 'operand', anchor }).graph;
   const root = graph.nodes[0];
-  expect(knownPortValue(graph, root, '/args/0')).toBe('23.6');
-  expect(knownPortValue(graph, root, 'value')).toBeUndefined();
-  expect(knownPortValue({ ...graph, edges: [] }, root, '/args/0')).toBeUndefined();
   expect(nodeDetail(root)).toBe('');
   expect(root.inputs.map(port => portLabel(port.id, root))).toEqual(['Value', 'Plus']);
 });

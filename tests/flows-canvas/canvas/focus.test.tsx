@@ -65,7 +65,7 @@ it('does not steal editing keys, preserves local edits on conflict, and keeps sa
   await waitFor(() => expect(host.compareConflict).toHaveBeenCalledOnce());
   expect(host.save).not.toHaveBeenCalled();
   expect(host.apply).toHaveBeenCalledWith(expect.objectContaining({ revision: 'r1', replacements: [expect.objectContaining({ ast: { type: 'math', op: 'add', args: [number(25), number(3)] } })] }));
-  expect(within(header.closest('li')!).getByText('25', { exact: true })).toBeTruthy();
+  expect(screen.getByDisplayValue('25')).toBeTruthy();
   expect(screen.getByText(/Conflict: canvas edits are preserved/)).toBeTruthy();
   expect(host.snapshot).toHaveBeenCalledOnce();
 });

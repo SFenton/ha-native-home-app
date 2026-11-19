@@ -152,10 +152,3 @@ export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources
   if (value.type === 'math' || value.type === 'compare' || value.type === 'all' || value.type === 'any') return '';
   return String(value.part ?? value.field ?? value.pattern ?? '');
 }
-export function knownPortValue(graph: LogicGraph, node: GraphNode, binding: string): string | undefined {
-  const source = binding === 'value' ? node : graph.nodes.find(held => held.id === graph.edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === binding)?.from.nodeId);
-  const value = source && copy(source.payload.value);
-  if (!record(value) || value.type !== 'literal') return undefined;
-  if (typeof value.value === 'boolean') return value.value ? 'Yes' : 'No';
-  return typeof value.value === 'number' || typeof value.value === 'string' ? String(value.value) : undefined;
-}

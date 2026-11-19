@@ -13,6 +13,7 @@ export function canvasTheme(theme: DerivedTheme): Record<string, string> {
     const color = ensureContrast(ensureContrast(parseColor(pair[theme.dark ? 1 : 0])!, ground, ink), card, ink);
     result[`--w2-wire-${kind}`] = toCss(color);
   }
+  result['--w2-observation-pinned'] = result['--w2-wire-time'];
   result['--w2-canvas-focus'] = toCss(ensureContrast(ensureContrast(parseColor(theme.selection)!, ground, ink, 3), card, ink, 3));
   return result;
 }

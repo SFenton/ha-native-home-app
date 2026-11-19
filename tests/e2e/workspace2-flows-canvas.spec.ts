@@ -120,6 +120,7 @@ test('C-themes: light, dark, custom HA tokens and narrow palette/canvas/summary 
     await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-palette.png`, fullPage: true });
     await activate(page, page.getByRole('button', { name: 'Close block palette' }));
     await expect(page.getByRole('list', { name: 'Flow graph blocks' })).toBeVisible();
+    await expect(page.locator('.w2-canvas-port-value')).toHaveCount(0);
     if (testInfo.project.name === 'phone') await overflow(page, 'Fit selection');
     await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-canvas.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -164,4 +165,38 @@ test('C-fidelity: Too Warm Warning recipe, compact chrome, outline wires and key
   await expect(page.getByRole('button', { name: 'More canvas controls' })).toBeFocused();
   await activate(page, page.getByRole('button', { name: 'Outline', exact: true }));
   await expect(page.getByRole('region', { name: 'Connections', exact: true })).toBeVisible();
+});
+test('C-observation: supplied values, pins, unavailable, unknown wires, kept outputs and scenario outlines', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'phone';
+  if (!phone) await page.setViewportSize({ width: 1920, height: 1120 });
+  for (const scheme of ['light', 'dark', 'custom'] as const) {
+    await page.emulateMedia({ colorScheme: scheme === 'custom' ? 'light' : scheme, reducedMotion: 'reduce' });
+    await page.goto(`${harness}?fixture=observations${scheme === 'custom' ? '&theme=custom' : ''}`);
+    if (phone) await activate(page, page.getByRole('button', { name: 'Close block palette' }));
+    await overflow(page, phone ? 'Fit selection' : 'Fit all');
+    const pinned = page.getByRole('button', { name: /^Number, Result output.*known, pinned, value 2$/ });
+    const live = page.getByRole('button', { name: /^Number, Result output.*known, live, value 23.6$/ });
+    const offline = page.getByRole('button', { name: /^Number, Result output.*unavailable, scenario$/ });
+    const kept = page.getByRole('button', { name: /^If \/ Otherwise, Result output.*known, live, value Too warm, kept$/ });
+    await expect(pinned).toContainText('2');
+    expect(await pinned.locator('.w2-canvas-port-value').evaluate(element => getComputedStyle(element).color)).not.toBe(await live.locator('.w2-canvas-port-value').evaluate(element => getComputedStyle(element).color));
+    await expect(offline).toHaveCSS('background-image', /repeating-linear-gradient/);
+    await expect(offline.locator('..')).toHaveCSS('outline-style', 'dashed');
+    await expect(page.getByRole('button', { name: /^Average, Result output.*can't tell, live$/ })).toContainText("Can't tell");
+    await expect(page.locator('.w2-canvas-wire[data-observation-state=cant-tell]').first()).toHaveCSS('stroke-dasharray', /4.*3/);
+    await expect(page.locator('.w2-canvas-wire[data-observation-state=known]').first()).toHaveCSS('stroke-dasharray', 'none');
+    await expect(kept).toContainText('kept');
+    if (phone) await expect(kept).toBeInViewport();
+    await page.screenshot({ path: `${evidence}/${testInfo.project.name}-${scheme}-observations.png`, fullPage: true });
+    if (phone) {
+      for (const [label, row] of [['unavailable', offline], ['pinned', pinned]] as const) {
+        await selectBlock(page, (await row.locator('..').getByRole('button', { name: /^Select / }).getAttribute('aria-label'))!);
+        await overflow(page, 'Fit selection');
+        await expect(row).toBeInViewport();
+        await page.screenshot({ path: `${evidence}/phone-${scheme}-observation-${label}.png`, fullPage: true });
+      }
+    }
+    await activate(page, page.getByRole('button', { name: 'Outline', exact: true }));
+    await expect(page.getByRole('region', { name: 'Connections', exact: true })).toContainText("Can't tell");
+  }
 });

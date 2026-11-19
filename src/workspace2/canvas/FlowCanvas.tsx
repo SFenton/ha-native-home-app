@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleCheck, CircleHelp, ChevronRight, Ellipsis, GitBranch, List, Maximize, Minus, Move, Plus, Redo2, SlidersHorizontal, Trash2, Undo2, WandSparkles, X } from 'lucide-react';
-import { autoLayout, lower, type BlockCatalogEntry, type CanvasHost, type GraphBudget, type GraphNode, type GraphPort, type LogicGraph } from '../../shared/composition/graph';
+import { autoLayout, lower, type BlockCatalogEntry, type GraphBudget, type GraphEdge, type GraphNode, type GraphPort, type LogicGraph } from '../../shared/composition/graph';
 import type { DerivedTheme } from '../theme';
-import { blockSeed, knownPortValue, nodeDetail, nodeName, portLabel } from './blocks';
+import { blockSeed, nodeDetail, nodeName, portLabel } from './blocks';
 import { detachedNodes, edit, initialEditState, orderedNodes, type CanvasFocus, type EditCommand } from './edit';
 import Palette from './Palette';
 import Inspector from './Inspector';
@@ -12,6 +12,7 @@ import LimitsMeter from './LimitsMeter';
 import { canvasTheme, wireKind } from './theme';
 import './canvas.css';
 import BlockIcon from './BlockIcon';
+import PortReading, { describeObservation, type CanvasHostWithObservations } from './observations';
 
 const focusKey = (focus: CanvasFocus) => JSON.stringify(focus);
 const editable = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
@@ -35,7 +36,7 @@ function Modal({ title, children, close, theme, sheet = false }: { title: string
   </Dialog.Root>;
 }
 export interface FlowCanvasProps {
-  readonly host: CanvasHost;
+  readonly host: CanvasHostWithObservations;
   readonly graph: LogicGraph;
   readonly title: string;
   readonly theme: DerivedTheme;
@@ -59,7 +60,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     return () => query.removeEventListener('change', update);
   }, []);
   const [zoom, setZoom] = useState(1), [moving, setMoving] = useState<{ nodeId: string; x: number; y: number }>();
-  const [wirePaths, setWirePaths] = useState<readonly { id: string; path: string; kind: string }[]>([]);
+  const [wirePaths, setWirePaths] = useState<readonly { id: string; path: string; kind: string; from: GraphEdge['from'] }[]>([]);
   const [initialSnapshot] = useState(() => host.snapshot());
   const snapshot = useRef(initialSnapshot), baseline = useRef(initialGraph), refs = useRef(new Map<string, HTMLButtonElement>());
   const viewport = useRef<HTMLDivElement>(null), board = useRef<HTMLUListElement>(null), addButton = useRef<HTMLButtonElement>(null), navigation = useRef<HTMLDivElement>(null);
@@ -102,7 +103,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
         const start = { x: (from.right - bounds.left) / zoom, y: (from.top + from.height / 2 - bounds.top) / zoom };
         const end = { x: (to.left - bounds.left) / zoom, y: (to.top + to.height / 2 - bounds.top) / zoom };
         const bend = Math.max(48, Math.abs(end.x - start.x) / 2), type = graph.nodes.find(node => node.id === edge.from.nodeId)?.outputs.find(port => port.id === edge.from.portId)?.type;
-        return [{ id: edge.id, path: `M${start.x},${start.y} C${start.x + bend},${start.y} ${end.x - bend},${end.y} ${end.x},${end.y}`, kind: type ? wireKind(type) : 'record' }];
+        return [{ id: edge.id, from: edge.from, path: `M${start.x},${start.y} C${start.x + bend},${start.y} ${end.x - bend},${end.y} ${end.x},${end.y}`, kind: type ? wireKind(type) : 'record' }];
       }));
     };
     measure();
@@ -163,17 +164,17 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       return `${other ? nodeName(other, graph) : 'missing block'} ${direction === 'input' ? 'output' : portLabel(endpoint.portId, other, graph) + ' input'}`;
     }).join(', ');
     const type = port.type.valueType === 'unresolved' ? 'Unresolved type' : port.type.valueType;
-    const label = portLabel(port.id, node, graph), value = knownPortValue(graph, node, port.id);
+    const label = portLabel(port.id, node, graph), observation = host.observations?.[node.id]?.[direction === 'input' ? 'inputs' : 'outputs']?.[port.id];
     const source = direction === 'input' ? graph.nodes.find(held => held.id === edges[0]?.from.nodeId)?.outputs.find(held => held.id === edges[0]?.from.portId) : undefined;
     const socketType = port.type.valueType === 'unresolved' && source ? source.type : port.type;
     return <button key={`${direction}:${port.id}`} type="button" ref={ref({ nodeId: node.id, portId: port.id, direction })} tabIndex={entered === node.id ? 0 : -1}
-      className="w2-canvas-port" data-direction={direction} data-wire-type={wireKind(socketType)} title={`${label} · ${type}`}
-      aria-label={`${nodeName(node, graph)}, ${label} ${direction}, ${type}, ${port.type.representation}${port.type.nullable ? ', nullable' : ''}, ${links ? `connected to ${links}` : direction === 'input' && port.required ? 'required, unconnected' : 'unconnected'}${value === undefined ? '' : `, value ${value}`}`}
+      className="w2-canvas-port" data-direction={direction} data-wire-type={wireKind(socketType)} data-observation-state={observation?.state} title={`${label} · ${type}${describeObservation(observation, direction === 'output')}`}
+      aria-label={`${nodeName(node, graph)}, ${label} ${direction}, ${type}, ${port.type.representation}${port.type.nullable ? ', nullable' : ''}, ${links ? `connected to ${links}` : direction === 'input' && port.required ? 'required, unconnected' : 'unconnected'}${describeObservation(observation, direction === 'output')}`}
       onClick={() => { connectionReturn.current = { nodeId: node.id, portId: port.id, direction }; setConnection({ socket: { nodeId: node.id, portId: port.id }, direction }); }}
       onKeyDown={event => {
         if ((event.key === 'Delete' || event.key === 'Backspace') && edges.length === 1) { event.preventDefault(); send({ type: 'disconnect', edgeId: edges[0].id }); }
       }}>
-      <span className="w2-canvas-port-glyph" aria-hidden/><span>{label}</span>{value !== undefined && <strong className="w2-canvas-port-value">{value}</strong>}
+      <span className="w2-canvas-port-glyph" aria-hidden/><span>{label}</span><PortReading observation={observation} output={direction === 'output'}/>
       {direction === 'input' && port.required && !edges.length && <span className="w2-canvas-error" aria-hidden>!</span>}
     </button>;
   };
@@ -230,11 +231,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           <div className="w2-canvas-scaled" style={view === 'graph' ? { width: width * zoom, height: height * zoom } : undefined}>
             <ul ref={board} className={`w2-canvas-nodes w2-canvas-${view}`} aria-label={view === 'graph' ? 'Flow graph blocks' : 'Flow outline blocks'} aria-describedby="w2-canvas-key-help"
               style={view === 'graph' ? { width, height, transform: `scale(${zoom})` } : undefined}>
-              {view === 'graph' && <li className="w2-canvas-wires" aria-hidden><svg width={width} height={height}>{wirePaths.map(wire => <path key={wire.id} d={wire.path} className={`w2-canvas-wire w2-canvas-wire-${wire.kind}`}/>)}</svg></li>}
+              {view === 'graph' && <li className="w2-canvas-wires" aria-hidden><svg width={width} height={height}>{wirePaths.map(wire => <path key={wire.id} data-observation-state={host.observations?.[wire.from.nodeId]?.outputs?.[wire.from.portId]?.state} d={wire.path} className={`w2-canvas-wire w2-canvas-wire-${wire.kind}`}/>)}</svg></li>}
               {ordered.map(node => {
                 const position = node.id === moving?.nodeId ? moving : node.position;
                 const controls = entered === node.id, active = selected?.id === node.id;
-                return <li key={node.id} className="w2-canvas-node" data-selected={active || undefined} data-node-id={node.id} style={view === 'graph' ? { left: position?.x ?? 24, top: position?.y ?? 24 } : undefined}
+                return <li key={node.id} className="w2-canvas-node" data-selected={active || undefined} data-node-id={node.id} data-scenario-pinned={host.observations?.[node.id]?.scenarioPinned || undefined} style={view === 'graph' ? { left: position?.x ?? 24, top: position?.y ?? 24 } : undefined}
                   onKeyDown={event => {
                     if (editable(event.target)) return;
                     if (event.target !== elementFor({ nodeId: node.id }) && ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
@@ -248,7 +249,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
                       (event.shiftKey ? addButton.current : navigation.current?.querySelector<HTMLButtonElement>('button'))?.focus();
                     }
                   }}>
-                  <button type="button" ref={ref({ nodeId: node.id })} className="w2-canvas-node-head" aria-label={`Select ${nodeName(node, graph)} ${graph.nodes.indexOf(node) + 1}`} aria-pressed={active}
+                  <button type="button" ref={ref({ nodeId: node.id })} className="w2-canvas-node-head" aria-label={`Select ${nodeName(node, graph)} ${graph.nodes.indexOf(node) + 1}`} aria-description={host.observations?.[node.id]?.scenarioPinned ? 'Pinned by scenario.' : undefined} aria-pressed={active}
                     tabIndex={active || !selected && ordered[0] === node ? 0 : -1} onFocus={() => setState(held => ({ ...held, focus: { nodeId: node.id } }))}
                     onClick={() => { focus({ nodeId: node.id }); setEntered(node.id); setPanel('inspector'); }} onKeyDown={event => headerKeys(event, node)}>
                     <span className="w2-canvas-block-icon" data-wire-type={wireKind(node.outputs[0].type)}><BlockIcon catalogKey={node.catalogKey}/></span><strong>{nodeName(node, graph)}</strong>{graph.roots.some(root => root.nodeId === node.id) && <small>Output</small>}
@@ -267,7 +268,8 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           </div>
           {view === 'outline' && <section className="w2-canvas-connections" aria-label="Connections"><h2>Connections</h2><ul aria-label="Wires">{graph.edges.map(edge => {
             const from = graph.nodes.find(node => node.id === edge.from.nodeId)!, to = graph.nodes.find(node => node.id === edge.to.nodeId)!, type = from.outputs.find(port => port.id === edge.from.portId)?.type.valueType;
-            return <li key={edge.id}><button type="button" aria-label={`${nodeName(from, graph)} Result, ${type}, to ${nodeName(to, graph)} ${portLabel(edge.to.portId, to, graph)}; disconnect`} onClick={() => send({ type: 'disconnect', edgeId: edge.id })}>{nodeName(from, graph)} → {nodeName(to, graph)} {portLabel(edge.to.portId, to, graph)} <small>Disconnect</small></button>
+            const observation = host.observations?.[from.id]?.outputs?.[edge.from.portId];
+            return <li key={edge.id}><button type="button" aria-label={`${nodeName(from, graph)} Result, ${type}, to ${nodeName(to, graph)} ${portLabel(edge.to.portId, to, graph)}${describeObservation(observation, true)}; disconnect`} onClick={() => send({ type: 'disconnect', edgeId: edge.id })}>{nodeName(from, graph)} → {nodeName(to, graph)} {portLabel(edge.to.portId, to, graph)}{observation?.state === 'cant-tell' && <small>Can't tell</small>} <small>Disconnect</small></button>
               <button type="button" onClick={() => locate(from.id)}>Go to source</button><button type="button" onClick={() => locate(to.id)}>Go to destination</button></li>;
           })}</ul></section>}
         </div>

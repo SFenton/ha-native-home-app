@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { lift, type CanvasHost, type CanvasSnapshot } from '../../../src/shared/composition/graph';
+import { lift, type CanvasSnapshot } from '../../../src/shared/composition/graph';
 import FlowCanvas, { arrangeCanvas, CanvasDialog } from '../../../src/workspace2/canvas/FlowCanvas';
 import Inspector from '../../../src/workspace2/canvas/Inspector';
 import { useStudioTheme } from '../../../src/workspace2/useStudioTheme';
@@ -10,6 +10,8 @@ import { anchor, choose, observedFixture } from './fixtures';
 import { blockCatalog } from '../../../src/shared/composition/graph/catalog';
 import type { CSSProperties } from 'react';
 import type { Json } from '../../../src/shared/types';
+import type { CanvasHostWithObservations } from '../../../src/workspace2/canvas/observations';
+import { observationFixture } from './observation-fixture';
 
 const params = new URLSearchParams(location.search);
 const fixture = params.get('fixture');
@@ -27,7 +29,7 @@ const warmPositions: Readonly<Record<string, { x: number; y: number }>> = {
   '/cases/0/then': { x: 944, y: 500 }, '/otherwise': { x: 944, y: 620 },
 };
 const ast: Json = fixture === 'summary' ? { type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer-person', in: ['home'] }] }
-  : fixture === 'warm' ? warm
+  : fixture === 'warm' || fixture === 'observations' ? warm
   : fixture === 'meter' ? choose
   : { type: 'math', op: 'add', args: [{ type: 'literal', value: 21 }, { type: 'literal', value: 3 }] };
 function Harness() {
@@ -39,17 +41,18 @@ function Harness() {
   const [closed, setClosed] = useState(false), [writes, setWrites] = useState(0);
   const graph = useMemo(() => {
     const graph = arrangeCanvas(lift(ast, { kind: fixture === 'summary' ? 'condition' : 'operand', anchor }).graph);
-    return fixture !== 'warm' ? graph : { ...graph, nodes: graph.nodes.map(node => {
+    return fixture !== 'warm' && fixture !== 'observations' ? graph : { ...graph, nodes: graph.nodes.map(node => {
       const position = warmPositions[node.origins[0]];
       if (!position) throw new Error(`Missing authored fixture position: ${node.origins[0]}`);
       return { ...node, position };
     }) };
   }, []);
-  const host = useMemo<CanvasHost>(() => {
+  const host = useMemo<CanvasHostWithObservations>(() => {
     let snapshot: CanvasSnapshot = { document: ast, revision: '1' };
     return {
       snapshot: () => snapshot, open: () => {}, openOutput: () => {}, compareConflict: () => {}, uses: () => [], preview: () => {},
       data: { sources: [{ id: 'light', name: 'Hallway Light' }] }, targetCapabilities: [...new Set(blockCatalog.flatMap(entry => entry.capabilities)), 'sh.operands@1', 'sh.conditions@1'],
+      ...(fixture === 'observations' ? { observations: observationFixture(graph) } : {}),
       apply: async transaction => {
         if (params.get('conflict')) return { status: 'conflict', remote: { document: ast, revision: 'remote-2' } };
         snapshot = { document: transaction.replacements[0].ast, revision: String(Number(snapshot.revision) + 1) };
@@ -66,6 +69,6 @@ function Harness() {
       {window.matchMedia('(max-width: 599px)').matches ? <CanvasDialog title="Block inspector" sheet theme={theme} close={() => setClosed(true)}>{meterInspector}</CanvasDialog> : meterInspector}
     </div>
   </div>;
-  return <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'summary' ? 'Hallway Light' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={['Subtitle']} onClose={() => setClosed(true)}/>;
+  return <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'summary' ? 'Hallway Light' : fixture === 'observations' ? 'Too Warm Warning (observation fixture)' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={['Subtitle']} onClose={() => setClosed(true)}/>;
 }
 createRoot(document.getElementById('root')!).render(<Harness/>);
