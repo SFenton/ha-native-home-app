@@ -23,6 +23,57 @@ npx vitest run tests/flows-canvas/graph/canvas-performance.test.ts \
   --maxWorkers=2 --reporter=verbose --silent=false
 ```
 
+## Round-four plain-data construction boundary
+
+The accessor probe now fails explicitly at construction, before a trusted
+handoff can be issued. Newly encountered objects must have only own data
+properties, no functions, and a prototype of `Object.prototype`,
+`Array.prototype` or `null`. Unsupported input throws `TypeError`, rather than
+evaluating getters or silently repairing data. Array-index, non-enumerable and
+symbol-keyed accessors are covered. Failed input may be partially frozen and
+must be discarded.
+
+Node's capability-detected `util.types.isProxy` rejects detectable proxies
+before their reflection traps run. Browsers have no reliable general proxy
+detector: each new object is therefore frozen before its child descriptors
+are read for traversal, and its own data/prototype constraints are checked
+again. The browser regression swaps in a fresh endpoint during a proxy's
+`preventExtensions` trap; that endpoint is also frozen, cannot subsequently
+change its port, and gives identical fresh/trusted lowering. Sealed data still
+takes only its O(1) check, with no repeated traversal or freezing.
+
+The reviewer's **prior-head `9593927`** hosted result is **36.35 ms** compiler
+median (validate 21.70, lower 14.55, adapter 9.86 ms), accepted by the owner;
+the original 50 ms gate is unchanged. Its desktop/phone mounts were
+**1,918.64 / 1,520.99 ms**, and all twelve checks passed. These are baseline
+figures, not measurements of this correction. New hosted figures remain
+pending the orchestrator's post-push CI report.
+
+Local verification of the correction:
+
+- `npm test`: **280 files / 14,426 tests passed**, one pre-existing skip;
+  unchanged corpus byte hashes and #24 differential passed. Production build
+  and typecheck passed.
+- All **30 standard-config desktop/phone browser cases passed**, including the
+  freeze-time proxy regression, keyboard editing and complete off-screen/Outline
+  reachability. Desktop mount/focus/edit: **1,119.47 / 90.14 / 155.25 ms**.
+  Phone: **1,064.65 / 127.62 / 185.11 ms**. Mount port reads: **99 / 96**;
+  edit geometry reads: **zero**. Raw timing JSONs are refreshed.
+- Final isolated observed compiler median: **15.24 ms**, with validate **9.70**,
+  lower **5.47**, adapter **3.31** and indexes **0.91 ms**; **34.76 ms** under the
+  unchanged 50 ms gate. Adapter/index timings are included in lower/validate,
+  respectively; independent medians are not additive. The unrestricted full
+  suite's compiler median was **21.76 ms**.
+- The isolated O(1) construction-seal check costs **25.51 ns/call**; the trusted
+  handoff read costs **29.50 ns/call**, each over one million calls after 10,000
+  warmups. No graph traversal or freezing occurs on these paths. Initial/edit
+  construction was **45.47 / 0.90 ms**; descriptor checks happen at construction,
+  not per lowering call, and remain included in end-to-end browser mount/edit.
+- Paired observed lower was **6.08 ms** versus unobserved **7.06 ms**, with median
+  paired net cost **-1.46 ms** over 51 alternating pairs after 30 paired warmups.
+  This includes capture/reduction and the avoided legacy scope-locator walk;
+  it is not an isolated callback-dispatch measurement.
+
 ## Single-pass compiler accounting
 
 Merged main at `897268f` (#28). The production `FlowCanvas` now opts into the

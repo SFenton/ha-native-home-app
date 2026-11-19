@@ -372,3 +372,23 @@ test('C-windowing: off-screen headers preserve reading order, reveal on focus, a
   await page.keyboard.press('End');
   await expect(entries.last().getByRole('button', { name: /^Select / })).toBeFocused();
 });
+test('C-data construction: an undetectable proxy cannot swap in mutable children while being frozen', async ({ page }) => {
+  await page.goto(harness);
+  const result = await page.evaluate(async () => {
+    const modulePath = '/src/shared/composition/graph/index.ts';
+    const api: typeof import('../../src/shared/composition/graph') = await import(modulePath);
+    const graph = api.lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+    const edge = graph.edges[0], late = { ...edge.to };
+    const proxy = new Proxy({ ...edge, to: { ...edge.to } }, {
+      preventExtensions(target) { target.to = late; return Reflect.preventExtensions(target); },
+    });
+    const changed = { ...graph, edges: graph.edges.map((held, index) => index ? held : proxy) };
+    const validation = api.validateForLowering(changed);
+    const frozen = Object.isFrozen(late), mutated = Reflect.set(late, 'portId', 'missing');
+    return {
+      frozen, mutated, diagnostics: validation.diagnostics,
+      trustedOK: api.lowerValidated(validation).ok, freshOK: api.lower(changed).ok,
+    };
+  });
+  expect(result).toEqual({ frozen: true, mutated: false, diagnostics: [], trustedOK: true, freshOK: true });
+});

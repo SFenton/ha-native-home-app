@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
-import { lift, lower, lowerValidated, prepareGraphRevision, readGraphValidation, validateForLowering, validateGraph } from '../../../src/shared/composition/graph';
+import { lift, lower, lowerValidated, prepareGraphRevision, readGraphValidation, validateForLowering, validateGraph, type GraphEdge } from '../../../src/shared/composition/graph';
 import { constructGraphRevision } from '../../../src/shared/composition/graph/validate';
 import { corpusCases, performanceParitySnapshot } from './fixtures/performance-parity';
 
@@ -56,7 +56,7 @@ it('does not traverse or refreeze constructed data when validating again or repl
   const serialized = JSON.stringify(raw), graph = constructGraphRevision(raw);
   expect(JSON.stringify(graph)).toBe(serialized);
   const node = graph.nodes[1], replacement = { ...node, payload: { kind: 'operand' as const, value: { type: 'literal' as const, value: 9 } } };
-  const names = vi.spyOn(Object, 'getOwnPropertyNames'), freeze = vi.spyOn(Object, 'freeze');
+  const names = vi.spyOn(Reflect, 'ownKeys'), freeze = vi.spyOn(Object, 'freeze');
   try {
     expect(lowerValidated(validateForLowering(graph)).ok).toBe(true);
     expect(lower(graph).ok).toBe(true);
@@ -93,6 +93,63 @@ it('constructs already non-extensible input without leaving writable graph field
   expect(Reflect.set(graph, 'nodes', [])).toBe(false);
   expect(Reflect.set(constructed, 'nodes', [])).toBe(false);
   expect(lowerValidated(validateForLowering(constructed)).ok).toBe(true);
+});
+it.each(['endpoint', 'array index', 'array symbol'] as const)('rejects the review accessor probe at the %s before issuing a trusted handoff', location => {
+  const graph = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+  let portId = graph.edges[0].to.portId, currentEdge = graph.edges[0], reads = 0;
+  const edges = location === 'endpoint' ? graph.edges.map((edge, index) => index ? edge : {
+    ...edge, to: { nodeId: edge.to.nodeId, get portId() { reads++; return portId; } },
+  }) : [...graph.edges];
+  if (location !== 'endpoint') Object.defineProperty(edges, location === 'array index' ? '0' : Symbol('extra data'), {
+    enumerable: true, configurable: true, get() { reads++; return currentEdge; },
+  });
+  const changed = { ...graph, edges };
+  expect(() => validateForLowering(changed)).toThrow(/own data properties; accessor/);
+  portId = 'missing';
+  currentEdge = { ...currentEdge, to: { ...currentEdge.to, portId } };
+  expect(() => lower(changed)).toThrow(/own data properties; accessor/);
+  expect(reads).toBe(0);
+});
+it.each(['nodes', Symbol('extra data')])('rejects a non-enumerable accessor %s on a non-extensible root without evaluating it', key => {
+  const graph = lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph, nodes = graph.nodes;
+  const get = vi.fn(() => nodes);
+  Object.defineProperty(graph, key, { get, configurable: true, enumerable: false });
+  Object.preventExtensions(graph);
+  expect(() => constructGraphRevision(graph)).toThrow(/own data properties; accessor/);
+  expect(get).not.toHaveBeenCalled();
+});
+it.each(['endpoint', 'array'] as const)('rejects a custom %s prototype rather than certifying class instances', location => {
+  const graph = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+  class Endpoint { constructor(readonly nodeId: string, readonly portId: string) {} }
+  class Edges extends Array<GraphEdge> {}
+  const edge = graph.edges[0], edges = location === 'array' ? new Edges(...graph.edges)
+    : graph.edges.map((held, index) => index ? held : { ...edge, to: new Endpoint(edge.to.nodeId, edge.to.portId) });
+  expect(() => validateForLowering({ ...graph, edges })).toThrow(/plain data with Object.prototype/);
+});
+it.each(['root', 'array', 'endpoint'] as const)('rejects a detectable %s proxy before executing its reflection traps', location => {
+  const graph = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+  const trap = vi.fn(() => { throw new Error('Proxy reflection must not run.'); });
+  const changed = location === 'root' ? new Proxy(graph, { getOwnPropertyDescriptor: trap })
+    : { ...graph, edges: location === 'array' ? new Proxy([...graph.edges], { getOwnPropertyDescriptor: trap })
+      : graph.edges.map((edge, index) => index ? edge : { ...edge, to: new Proxy(edge.to, { getOwnPropertyDescriptor: trap }) }) };
+  expect(() => validateForLowering(changed)).toThrow(/Proxy objects are not supported/);
+  expect(trap).not.toHaveBeenCalled();
+});
+it('rejects function-valued properties instead of freezing executable objects as graph data', () => {
+  const graph = lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph;
+  Object.defineProperty(graph, Symbol('extra data'), { value: () => 1 });
+  expect(() => constructGraphRevision(graph)).toThrow(/functions are not supported/);
+});
+it('constructs null-prototype data and freezes values held in symbol-keyed data properties', () => {
+  const graph = lift({ type: 'math', op: 'add', args: [{ type: 'literal', value: 1 }, { type: 'literal', value: 2 }] }, { kind: 'operand' }).graph;
+  const endpoint = { ...graph.edges[0].to }, extra = { value: 1 }, key = Symbol('extra data');
+  Object.setPrototypeOf(endpoint, null);
+  Object.defineProperty(endpoint, key, { value: extra });
+  const changed = { ...graph, edges: graph.edges.map((edge, index) => index ? edge : { ...edge, to: endpoint }) };
+  expect(lowerValidated(validateForLowering(changed)).ok).toBe(true);
+  expect(Object.isFrozen(endpoint)).toBe(true);
+  expect(Object.isFrozen(extra)).toBe(true);
+  expect(constructGraphRevision(changed)).toBe(changed);
 });
 it('preserves resource-boundary diagnostics when deeply nested input must be frozen before validation', () => {
   const lifted = lift({ type: 'literal', value: 1 }, { kind: 'operand' }).graph;

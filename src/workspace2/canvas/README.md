@@ -112,6 +112,23 @@ There is no module-level mutable registry. Already non-extensible external input
 is imported through a new sealed root, and its original fields are also frozen.
 Post-validation edge, node and literal mutations fail. An outer `Object.freeze`
 alone is never treated as proof that its children are immutable.
+Newly encountered data must have only own data properties (including array
+indices, non-enumerable and symbol-keyed properties), no functions, and a
+prototype of `Object.prototype`, `Array.prototype` or `null`. Accessors and
+other prototypes throw a clear `TypeError`; getters are never invoked and no
+validation token is issued. Unsupported inputs are rejected, not repaired or
+evaluated. A failed construction can leave ancestors partially frozen, so
+discard the rejected input rather than reusing it.
+
+Node runtimes exposing `process.getBuiltinModule` also reject proxies using
+`node:util.types.isProxy`, before invoking their reflection traps. This is
+capability-detected without importing a Node module into the browser bundle.
+Browser JavaScript cannot reliably identify every proxy. Construction therefore
+freezes each new parent before re-reading its descriptors/prototype and walking
+its now-stable child values; an undetectable proxy cannot swap in unsealed data
+during freezing. The batch is trusted only after every reachable child passes.
+Already sealed objects retain their O(1) identity check with no descriptor walk.
+
 Standalone `validateGraph(graph)` remains a non-freezing diagnostic query;
 `prepareGraphRevision`, `validateForLowering` and direct `lower` construct
 uncertified input for compatibility. Constructed revisions take only an O(1)

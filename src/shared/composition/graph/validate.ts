@@ -23,6 +23,8 @@ function readonlyMap<K, V>(map: Map<K, V>): ReadonlyMap<K, V> {
 }
 const constructionSeal = Symbol('immutable graph data');
 const constructionAuthority = Symbol();
+const isProxy = typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function'
+  ? process.getBuiltinModule('node:util').types.isProxy : undefined;
 class ConstructionSeal {
   readonly #value: object;
   readonly #batch: Readonly<{ complete: boolean }>;
@@ -33,35 +35,38 @@ class ConstructionSeal {
     Object.freeze(this);
   }
   static holds(value: object): boolean {
+    if (isProxy?.(value)) throw new TypeError('Graph revisions require plain data; Proxy objects are not supported.');
     const seal: unknown = Object.getOwnPropertyDescriptor(value, constructionSeal)?.value;
     return seal instanceof ConstructionSeal && #value in seal && seal.#value === value && seal.#batch.complete;
   }
 }
 Object.freeze(ConstructionSeal.prototype);
 Object.freeze(ConstructionSeal);
+function plainData(value: object, pending?: object[]): void {
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) {
+    throw new TypeError('Graph revisions require plain data with Object.prototype, Array.prototype or null.');
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor)) throw new TypeError(`Graph revisions require own data properties; accessor ${String(key)} is not supported.`);
+    const child: unknown = descriptor.value;
+    if (typeof child === 'function') throw new TypeError('Graph revisions require plain data; functions are not supported.');
+    if (pending && key !== constructionSeal && child !== null && typeof child === 'object') pending.push(child);
+  }
+}
 function freezeRevision(graph: LogicGraph): void {
   if (ConstructionSeal.holds(graph)) return;
-  const seen = new Set<object>(), pending: object[] = [graph], created: object[] = [];
+  const seen = new Set<object>(), pending: object[] = [graph], batch = { complete: false };
   while (pending.length) {
     const value = pending.pop()!;
     if (ConstructionSeal.holds(value) || seen.has(value)) continue;
     seen.add(value);
-    created.push(value);
-    if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i++) {
-        const child: unknown = value[i];
-        if (child !== null && typeof child === 'object') pending.push(child);
-      }
-    } else for (const key of Object.getOwnPropertyNames(value)) {
-      const child = (value as Record<string, unknown>)[key];
-      if (child !== null && typeof child === 'object') pending.push(child);
-    }
-  }
-  const batch = { complete: false };
-  for (let i = created.length - 1; i >= 0; i--) {
-    const value = created[i];
+    plainData(value);
     if (Object.isExtensible(value)) Object.defineProperty(value, constructionSeal, { value: new ConstructionSeal(value, batch, constructionAuthority) });
     Object.freeze(value);
+    // Freeze first: even an undetectable proxy cannot swap the child values being certified.
+    plainData(value, pending);
   }
   // Cycles and shared children become trusted only after the whole batch is frozen.
   batch.complete = true;
@@ -70,9 +75,10 @@ function freezeRevision(graph: LogicGraph): void {
 /** Constructs immutable data once; later revisions reuse sealed nodes and payloads. */
 export function constructGraphRevision(graph: LogicGraph): LogicGraph {
   if (ConstructionSeal.holds(graph)) return graph;
-  const revision = Object.isExtensible(graph) ? graph : { ...graph };
+  freezeRevision(graph);
+  if (ConstructionSeal.holds(graph)) return graph;
+  const revision = { ...graph };
   freezeRevision(revision);
-  if (revision !== graph) Object.freeze(graph);
   return revision;
 }
 function sameUnboundJSON(left: GraphJSON, right: GraphJSON, bindings: ReadonlyMap<string | undefined, readonly GraphPort[]>, at = ''): boolean {
