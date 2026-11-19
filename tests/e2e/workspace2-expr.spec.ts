@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { isPhone, openWorkspace, previewRoot, seed, selectTile, snap } from './workspace2-helpers';
+import type { CompositionDocument } from '../../src/shared/composition/schema';
+import { buildDocumentIndex } from '../../src/preview2/model';
+import { replaceAt } from '../../src/composition-editor';
 
-const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: { navigation: Record<string, unknown> } };
+const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 /** The fixture opened on its Climate tab, where a navigation tile holds a text slot. */
 const climate = { ...fixture.document, navigation: { ...fixture.document.navigation, initialTabId: 'hc-tab-climate', initialPageId: 'page-climate' } };
 test.beforeEach(async ({ request }) => { await seed(request); });
@@ -301,6 +304,34 @@ test('While unavailable works in Rules and survives rule edits, mode changes and
   await panel.getByRole('button', { name: /^Subtitle:/ }).click();
   await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
   await expect(panel.getByRole('textbox', { name: 'If unavailable', exact: true })).toHaveValue('No reading');
+  await done(page).click();
+});
+
+test('While unavailable survives Rules to Fixed, apply, and inline editing', async ({ page, request }) => {
+  const tile = [...buildDocumentIndex(climate).entries.values()].find(entry => entry.node?.title === 'Room Thermostats');
+  expect(tile).toBeDefined();
+  const document = replaceAt(climate, [...tile!.path, 'props', 'subtitle'], {
+    type: 'expr', value: { type: 'choose', cases: [{ when: { type: 'viewer', isAdmin: true }, then: { type: 'literal', value: 'Administrator' } }],
+      otherwise: { type: 'literal', value: 'Guest' } },
+    fallback: 'No reading', whenUnavailable: 'keep',
+  });
+  await seed(request, document);
+  await stubHouse(page);
+  await openWorkspace(page);
+  const panel = await selectTile(page, 'Room Thermostats');
+  await full(page);
+  await panel.getByRole('button', { name: /^Subtitle: 1 rule/ }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await panel.getByRole('radio', { name: 'Fixed', exact: true }).click();
+  await done(page).click();
+  const inline = panel.getByRole('textbox', { name: 'Subtitle', exact: true });
+  await expect(inline).toHaveValue('Guest');
+  await inline.fill('Guest updated inline');
+  await panel.getByRole('button', { name: 'Subtitle value: Fixed', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: /From Entity/ }).click();
+  await expect(panel.getByRole('combobox', { name: 'While unavailable' })).toHaveText('Keep last');
+  await expect(panel.getByRole('textbox', { name: 'If unavailable', exact: true })).toHaveValue('No reading');
+  await expect(panel.getByRole('textbox', { name: 'Subtitle', exact: true })).toHaveText('Guest updated inline');
   await done(page).click();
 });
 

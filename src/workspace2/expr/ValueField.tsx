@@ -10,7 +10,7 @@ import { useRows } from '../rowsContext';
 import LookControl, { LookGlyph, type LookKind } from './LookControl';
 import ValueEditor, { type ValueMode } from './ValueEditor';
 import { operandName } from './condition';
-import { modeOf, rulesOf, rulesProblem, ruleStatus, type Kind, type RulesDraft } from './value';
+import { modeOf, rulesOf, rulesProblem, ruleStatus, toSlot, type Kind, type RulesDraft } from './value';
 import { parseLine, slotOperand } from './tokens';
 import { ValueButton } from './ui';
 import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
@@ -82,7 +82,8 @@ export default function ValueField({ label, path, kind, look, itemName, modes = 
     head={start => <div className="w2-expr-valuerow" data-field-path={key} data-mode={mode}>
       {mode === 'fixed' && slot && <>
         {kind === 'text'
-          ? <div className="w2-picker-row"><span className="w2-row-label">{label}</span><TextInput label={label} value={String(slotOperand(slot)?.type === 'literal' ? (slotOperand(slot) as { value: unknown }).value : '')} maxLength={maxLength} onCommit={text => onChange(replaceAt(document, path, { type: 'literal', value: text }))}/></div>
+          ? <div className="w2-picker-row"><span className="w2-row-label">{label}</span><TextInput label={label} value={String(slotOperand(slot)?.type === 'literal' ? (slotOperand(slot) as { value: unknown }).value : '')} maxLength={maxLength}
+            onCommit={text => onChange(replaceAt(document, path, toSlot('fixed', { fixed: { type: 'literal', value: text } }, kind, slot)))}/></div>
           : <LookControl look={look ?? 'fill'} value={slot as unknown as Json} label={label} path={key} onChange={(next, live) => onChange(replaceAt(document, path, next), live ? `look:${key}` : undefined)}/>}
         {choices.length > 1 && <ValueButton label={label} mode={mode as ValueMode} choices={choices} onPick={next => { if (next === 'fixed') return; pending.current = next; start(); }}/>}
       </>}

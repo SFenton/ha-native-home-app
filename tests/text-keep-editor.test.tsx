@@ -5,7 +5,7 @@ import fixture from './fixtures/composition-first-slice.json';
 import { valueAt } from '../src/composition-editor';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CompositionNode } from '../src/shared/composition/schema';
-import { createDraft } from '../src/workspace2/editors/draft';
+import { createDraft, useDraftDocument } from '../src/workspace2/editors/draft';
 import { lineOperand, writeParts } from '../src/workspace2/expr/TokenField';
 import { parseLine } from '../src/workspace2/expr/tokens';
 import { PushStack } from '../src/workspace2/kit';
@@ -15,6 +15,8 @@ import type { Draft } from '../src/workspace2/editors/draft';
 import type { TextSlot } from '../src/shared/composition/evaluator';
 import { LogicScopeProvider } from '../src/workspace2/data/logic/logicScope';
 import type { Operand } from '../src/shared/composition/expression';
+import ValueField from '../src/workspace2/expr/ValueField';
+import { RowsProvider } from '../src/workspace2/rowsContext';
 
 afterEach(cleanup);
 
@@ -33,6 +35,12 @@ function draftWith(slot: TextSlot) {
 }
 function mount(draft: Draft) {
   return render(<ToastHost><PushStack rootTitle="Reading" root={<ValueEditor draft={draft} path={path} kind="text" modes={['fixed', 'entity', 'rules']} label="Reading"/>}/></ToastHost>);
+}
+function InlineField({ draft }: { draft: Draft }) {
+  const document = useDraftDocument(draft);
+  return <RowsProvider value={{ document, onChange: next => draft.set(next), onError: message => { throw new Error(message); } }}>
+    <PushStack rootTitle="Reading" root={<ValueField label="Reading" path={path} kind="text" itemName="Reading"/>}/>
+  </RowsProvider>;
 }
 function expectKept(draft: Draft) {
   expect(valueAt(draft.get(), path)).toMatchObject(settings);
@@ -61,6 +69,20 @@ describe('editing text slots', () => {
   });
 
   describe('preserving text settings through root rewrites', () => {
+    it('keeps settings after Rules to Fixed, applying the editor, and editing inline', () => {
+      const draft = draftWith({ type: 'expr', value: { ...choose, otherwise: { type: 'literal', value: 'Guest' } }, ...settings });
+      render(<ToastHost><InlineField draft={draft}/></ToastHost>);
+      fireEvent.click(screen.getByRole('button', { name: /^Reading: 1 rule/ }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Fixed' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expectKept(draft);
+      expect(valueAt(draft.get(), path)).toEqual({ type: 'expr', value: { type: 'literal', value: 'Guest' }, ...settings });
+      const inline = screen.getByRole('textbox', { name: 'Reading' });
+      fireEvent.change(inline, { target: { value: 'Guest updated inline' } });
+      expectKept(draft);
+      expect(valueAt(draft.get(), path)).toEqual({ type: 'expr', value: { type: 'literal', value: 'Guest updated inline' }, ...settings });
+    });
+
     it('keeps settings when duplicating on the rules list and page, editing a Then, and removing a rule', async () => {
       const draft = draftWith({ type: 'expr', value: choose, ...settings });
       mount(draft);
