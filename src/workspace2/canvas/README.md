@@ -3,7 +3,8 @@
 `FlowCanvas` is an isolated interaction surface. W2-I mounts it; this lane does
 not modify workspace entry files. Pass a `CanvasHost`, an initial `LogicGraph`,
 the existing `DerivedTheme`, a title, an `onClose` callback, and optionally the
-element to restore focus to on close. Remount for a different anchor/snapshot.
+element to restore focus to on close and friendly output names for the meter.
+Remount for a different anchor/snapshot.
 `arrangeCanvas` supplies an initial readable layout without reordering node IDs.
 
 The host provides sources, target capabilities, an immutable revision snapshot,
@@ -15,8 +16,11 @@ silently dropping or repairing user content.
 
 ## Editing
 
-- Search the two-column palette, then use arrows and Enter to add. Disabled
-  variants disclose their scope/capability or missing-host-setting requirement.
+- Categories start collapsed, with counts and preview names. Expand a category
+  or search the two-column palette, then use arrows and Enter to add. Unavailable
+  blocks and their reasons live in one **Not available here** disclosure.
+  Paired comparison chips use their first variant; the inspector's Check select
+  exposes every operation, and searching also finds individual variants.
 - Graph and Outline expose the same blocks, ports, actions and transactions.
   Headers use roving focus: arrows/Home/End select, Enter enters controls,
   arrows traverse ports/actions, Escape returns to the header, Tab exits the
@@ -26,18 +30,28 @@ silently dropping or repairing user content.
   inputs require explicit Replace; replacement is one undoable transaction.
   Refusals are named and announced inside the dialog.
 - Move uses 8 px arrow steps, Shift uses 32 px, Enter commits and Escape cancels.
-  Inspector numeric coordinates, pan/zoom, fit and Auto Arrange are alternatives.
+  Inspector numeric coordinates and **Tidy Up** are alternatives. Fit, pan,
+  Undo/Redo and Keyboard help live under **More canvas controls**.
 - Delete confirms affected wires. Undo/redo restore the graph, selection and
   originating port/header. Inspector rule moves preserve If/Then wiring and
   Otherwise; new rule inputs remain visibly disconnected until authored.
 - And/Or always edit on canvas. The inspector supplies a noninteractive summary
   and **Edit in Canvas**, not nested condition cards.
 
-Styling is scoped to the canvas and existing workspace/HA tokens. Type labels,
-glyphs and named connection lists supplement wire colors. Wire glyphs retain
-4.5:1 contrast and focus retains 3:1 on the tested light/dark/custom grounds.
-Narrow layouts show one side panel at a time; the outline avoids spatial
-navigation. Reduced-motion and forced-colors modes are supported.
+Styling uses existing workspace/HA tokens. Distinct Lucide block icons, named
+ports, accessible type descriptions and the Outline connection list supplement
+colored sockets/wires. The socket of an unresolved input uses its connected
+source's static port type for color, never a sampled value; compatibility still
+uses the original graph descriptor. Known values come only from literal nodes,
+including directly connected literals; no local evaluator was added.
+Socket contrast retains 4.5:1 and focus retains 3:1 on the tested grounds.
+
+The compact bottom bar contains zoom, Tidy Up and a problems disclosure.
+Keyboard instructions remain associated with the graph for assistive technology,
+but their visible version opens on demand. Below 600 CSS pixels, palette and
+inspector use Base UI modal bottom sheets with dismissal/focus restoration.
+Toolbars do not wrap; the outline avoids spatial navigation. Reduced-motion and
+forced-colors modes are supported.
 
 Existing Base UI Dialog owns modal focus trapping and dismissal; Lucide supplies
 icons; the existing theme and graph helpers supply tokens, shapes and LAN-safe
@@ -51,8 +65,12 @@ outline provide the full editing interface.
 `BudgetAccountingEvent`. `budgetFromCompilation` reduces those snapshots when
 present; it never replays the checker or derives parallel AST counters.
 `LimitsMeter` consumes only the resulting `GraphBudget`. Compact figures appear
-strictly **above** 75%; null limits stay uncapped and every root has its own
-details. Counts/depths include the first refused entry, not unvisited descendants.
+strictly **above** 75%, in the inspector's **Fits in the phone app** section.
+Each field has one thin bar with plain-word steps/deep text, using its most
+constrained compiler counter rather than adding different scopes together.
+All scopes, pointers, resets, runtime limits, capabilities and unavailability
+explanations are behind one initially collapsed **Details** disclosure.
+Null limits stay uncapped. Counts/depths include the first refused entry, not unvisited descendants.
 Compiler acceptance and ordered diagnostics remain authoritative, including
 both CHK-nested-choose-budget outcomes.
 

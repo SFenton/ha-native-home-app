@@ -27,18 +27,19 @@ function mount(conflict = false) {
 }
 it('restores DOM focus and selection after add, connect/replace, undo and redo', () => {
   mount();
+  fireEvent.click(screen.getByRole('button', { name: /^Values, \d+ blocks$/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Add Number, number' }));
   const header = screen.getByRole('button', { name: 'Select Number 4' });
   expect(document.activeElement).toBe(header);
   fireEvent.keyDown(header, { key: 'Enter' });
   const block = header.closest('li')!;
-  const output = within(block).getByRole('button', { name: /^Number, Value output/ });
+  const output = within(block).getByRole('button', { name: /^Number, Result output/ });
   expect(document.activeElement).toBe(output);
   fireEvent.click(output);
   const dialog = within(screen.getByRole('dialog'));
-  fireEvent.click(dialog.getByRole('button', { name: /Add 1, Value 1 input/ }));
+  fireEvent.click(dialog.getByRole('button', { name: /Add 1, Value input/ }));
   fireEvent.click(dialog.getByRole('button', { name: 'Replace connection' }));
-  const input = screen.getByRole('button', { name: /^Add, Value 1 input/ });
+  const input = screen.getByRole('button', { name: /^Add, Value input/ });
   expect(document.activeElement).toBe(input);
   fireEvent.keyDown(input, { key: 'z', ctrlKey: true });
   expect(document.activeElement).toBe(output);
@@ -64,7 +65,7 @@ it('does not steal editing keys, preserves local edits on conflict, and keeps sa
   await waitFor(() => expect(host.compareConflict).toHaveBeenCalledOnce());
   expect(host.save).not.toHaveBeenCalled();
   expect(host.apply).toHaveBeenCalledWith(expect.objectContaining({ revision: 'r1', replacements: [expect.objectContaining({ ast: { type: 'math', op: 'add', args: [number(25), number(3)] } })] }));
-  expect(screen.getByText('25', { exact: true })).toBeTruthy();
+  expect(within(header.closest('li')!).getByText('25', { exact: true })).toBeTruthy();
   expect(screen.getByText(/Conflict: canvas edits are preserved/)).toBeTruthy();
   expect(host.snapshot).toHaveBeenCalledOnce();
 });

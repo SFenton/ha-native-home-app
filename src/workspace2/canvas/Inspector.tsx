@@ -1,30 +1,35 @@
 import { useState } from 'react';
 import { Braces, X } from 'lucide-react';
 import { z } from 'zod/v4';
-import type { CanvasHost, GraphNode, LogicGraph } from '../../shared/composition/graph';
+import type { CanvasHost, GraphBudget, GraphNode, LogicGraph } from '../../shared/composition/graph';
 import { compareOperations } from '../../shared/composition/expression';
 import { parseCompositionJSON } from '../../shared/composition/json';
 import { copy, record } from '../../shared/composition/graph/json';
-import { nodeName, portLabel } from './blocks';
+import { blockCatalog } from '../../shared/composition/graph';
+import { blockGroup, nodeName, portLabel } from './blocks';
 import type { EditCommand } from './edit';
+import BlockIcon from './BlockIcon';
+import LimitsMeter from './LimitsMeter';
 
-export default function Inspector({ graph, node, host, send, close, locate, move, remove }: {
+export default function Inspector({ graph, node, host, send, close, locate, move, remove, budgets, onLocate, outputNames }: {
   graph: LogicGraph; node: GraphNode; host: CanvasHost; send: (command: EditCommand) => void; close: () => void; locate: (nodeId: string) => void; move: () => void; remove: () => void;
+  budgets: readonly GraphBudget[]; onLocate: (pointer: string) => void; outputNames?: readonly string[];
 }) {
   const [error, setError] = useState('');
   const value = copy(node.payload.value);
   const update = (patch: Record<string, import('../../shared/types').Json>) => record(value) && send({ type: 'update', nodeId: node.id, value: { ...value, ...patch } });
   const combined = record(value) && (value.type === 'all' || value.type === 'any');
   const connected = graph.edges.filter(edge => edge.to.nodeId === node.id);
+  const entry = blockCatalog.find(entry => entry.key === node.catalogKey);
   return <aside className="w2-canvas-inspector" aria-label="Block inspector">
-    <div className="w2-canvas-panel-head"><div><strong>{nodeName(node)}</strong><small>Block · {node.payload.kind}</small></div><button type="button" aria-label="Close block inspector" onClick={close}><X size={16}/></button></div>
+    <div className="w2-canvas-panel-head"><span className="w2-canvas-block-icon"><BlockIcon catalogKey={node.catalogKey}/></span><div><strong>{nodeName(node, graph)}</strong><small>Block · {entry ? blockGroup(entry) : 'Preserved data'}</small></div><button type="button" aria-label="Close block inspector" onClick={close}><X size={16}/></button></div>
     <section aria-label="Rule summary">
       {combined ? <>
         <div className="w2-canvas-summary-map" aria-hidden><span>Check</span><span>Check</span><strong>{value.type === 'all' ? 'And' : 'Or'}</strong><span>Result</span></div>
         <p>{value.type === 'all' ? 'All connected checks must match.' : 'Any connected check can match.'} And / Or are edited on the canvas, never as condition cards.</p>
         <button type="button" className="w2-canvas-primary" onClick={() => locate(node.id)}>Edit in Canvas</button>
       </> : <p>{node.payload.kind === 'condition' ? 'One check. Connect its typed values on the canvas.' : 'A typed output can feed any compatible field.'}</p>}
-      <p className="w2-canvas-caption">Result: Can't Tell - this interaction harness does not run live evaluation or devices.</p>
+      <p className="w2-canvas-caption">Only configured literal values are shown. Calculated and home values appear when an observation is available.</p>
     </section>
     {node.payload.kind === 'source-selection' && <section><label>Entity<select value={typeof value === 'string' ? value : ''} onChange={event => send({ type: 'update', nodeId: node.id, value: event.target.value })}>
       {!host.data.sources.some(source => source.id === value) && <option value={String(value)}>{String(value)}</option>}
@@ -60,18 +65,19 @@ export default function Inspector({ graph, node, host, send, close, locate, move
     </section>}
     {!!node.inputs.length && <section><h3>Inputs</h3><ul>{node.inputs.map(port => {
       const edge = connected.find(edge => edge.to.portId === port.id), source = graph.nodes.find(held => held.id === edge?.from.nodeId);
-      return <li key={port.id}>{portLabel(port.id)}: {source ? <button type="button" onClick={() => locate(source.id)}>{nodeName(source)}</button> : 'Required, unconnected'}</li>;
+      return <li key={port.id}>{portLabel(port.id, node, graph)}: {source ? <button type="button" onClick={() => locate(source.id)}>{nodeName(source, graph)}</button> : 'Required, unconnected'}</li>;
     })}</ul></section>}
     {node.outputs[0]?.type.representation === 'condition' && <section className="w2-canvas-actions">
       <button type="button" onClick={() => send({ type: 'combine', nodeId: node.id, operation: 'all' })}>+ And</button>
       <button type="button" onClick={() => send({ type: 'combine', nodeId: node.id, operation: 'any' })}>+ Or</button>
     </section>}
-    <section><h3>Position</h3><form onSubmit={event => {
+    <LimitsMeter budgets={budgets} onLocate={onLocate} outputNames={outputNames}/>
+    <section><details><summary>Position</summary><form onSubmit={event => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
       send({ type: 'move', nodeId: node.id, x: Number(data.get('x')), y: Number(data.get('y')) });
     }}><div className="w2-canvas-actions"><label>X<input name="x" type="number" step="any" defaultValue={node.position?.x ?? 0}/></label><label>Y<input name="y" type="number" step="any" defaultValue={node.position?.y ?? 0}/></label></div><button type="submit">Set position</button></form>
       <button type="button" onClick={move}>Move with arrow keys</button>
-    </section>
+    </details></section>
     {node.payload.kind !== 'opaque' && <section><details><summary><Braces size={14} aria-hidden/> Advanced block fields</summary><p>Data only. Required child expressions still use the visible ports; disconnected inputs are never silently repaired.</p>
       <form onSubmit={event => {
         event.preventDefault();

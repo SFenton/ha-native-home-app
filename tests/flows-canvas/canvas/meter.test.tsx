@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as expression from '../../../src/shared/composition/expression';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import LimitsMeter from '../../../src/workspace2/canvas/LimitsMeter';
 import type { CallService, Operand, Predicate } from '../../../src/shared/composition/expression';
 import { predicateBudgetFixtures } from '../graph/fixtures';
@@ -78,7 +78,7 @@ describe('C-meter uses real checker accounting, not canvas AST counts', () => {
   });
   it('keeps production accounting explicitly unavailable until observer integration', () => {
     render(<LimitsMeter budgets={[measureBudget(choose, anchor, { kind: 'operand' })]}/>);
-    fireEvent.click(screen.getByText('Limits'));
+    fireEvent.click(screen.getByText('Details'));
     expect(screen.getByText(/Accounting unavailable pending observer/)).toBeTruthy();
     expect(screen.queryByRole('meter')).toBeNull();
   });
@@ -97,8 +97,18 @@ describe('C-meter uses real checker accounting, not canvas AST counts', () => {
     try {
       const budget = observedFixture(choose, 'operand');
       render(<LimitsMeter budgets={[budget]}/>);
-      fireEvent.click(screen.getByText('Limits'));
+      fireEvent.click(screen.getByText('Details'));
       expect(check).toHaveBeenCalledOnce();
     } finally { check.mockRestore(); }
+  });
+  it('shows one plain-word field row, with all accounting detail collapsed initially', () => {
+    const budget = observedFixture(choose, 'operand');
+    render(<LimitsMeter budgets={[budget, budget]} outputNames={['Subtitle']}/>);
+    expect(screen.getAllByRole('meter')).toHaveLength(1);
+    expect(screen.getByRole('meter').getAttribute('value')).toBe('0.8125');
+    expect(within(screen.getByLabelText('Limits above 75 percent')).getByText(/52 of 64 steps/).textContent).toBe('52 of 64 steps · 4 of 8 deep');
+    expect(screen.getByText('Details').closest('details')?.open).toBe(false);
+    expect(screen.queryByText('Expression nodes')).toBeNull();
+    expect(screen.queryByText('Predicate nodes')).toBeNull();
   });
 });

@@ -13,7 +13,7 @@ export default function ConnectionDialog({ graph, request, onConnect, announce }
   const candidates = graph.nodes.flatMap(candidate => (request.direction === 'output' ? candidate.inputs : candidate.outputs).map(port => {
     const socket = { nodeId: candidate.id, portId: port.id }, from = request.direction === 'output' ? request.socket : socket, to = request.direction === 'output' ? socket : request.socket;
     const check = canConnect(graph, from, to, true);
-    return { socket, from, to, check, label: `${nodeName(candidate)} ${graph.nodes.indexOf(candidate) + 1}, ${request.direction === 'output' ? portLabel(port.id) : port.label} ${request.direction === 'output' ? 'input' : 'output'}, ${port.type.valueType}` };
+    return { socket, from, to, check, label: `${nodeName(candidate, graph)} ${graph.nodes.indexOf(candidate) + 1}, ${portLabel(port.id, candidate, graph)} ${request.direction === 'output' ? 'input' : 'output'}, ${port.type.valueType}` };
   })).filter(candidate => candidate.label.toLowerCase().includes(query.toLowerCase()));
   const choice = candidates.find(candidate => candidate.socket.nodeId === selected?.nodeId && candidate.socket.portId === selected.portId);
   return <>
