@@ -7,6 +7,7 @@ import {
 import { PIPELINE_LIMITS, type PipelineInputs, type PipelineOperand, type PipelineSource, type ReadKind } from './schema';
 import { requestShape, subscriptionDomains } from './sources';
 import { checkSegments, newFacts, typeOperand, typeSteps, type TypeFacts, type TypeScope } from './typing';
+import type { BudgetAccountingObserver } from '../expression';
 
 /**
  * The compiler rules of `sh.pipeline@1` that need only the flow itself: every reference inside it, the acyclic parameters, each step's typing,
@@ -53,7 +54,7 @@ function entity(facts: TypeFacts & Pick<PipelineFacts, 'entities'>, value: strin
 // MARK: The flow
 
 /** Compiles one pipeline source. `at` is the source's pointer, such as `/document/dataSources/3`. */
-export function checkPipelineSource(source: PipelineSource, at: string): PipelineFacts {
+export function checkPipelineSource(source: PipelineSource, at: string, accountingObserver?: BudgetAccountingObserver): PipelineFacts {
   const inputs = source.inputs, base = join(at, 'inputs');
   const facts = { ...newFacts(), entities: [] as PipelineFacts['entities'] };
   const issue = (code: CompositionIssue['code'], pointer: string) => facts.issues.push({ code, pointer });
@@ -69,7 +70,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
   inputs.parameters.forEach((parameter, index) => {
     const own = join(join(join(base, 'parameters'), index), 'value');
     const local = newFacts();
-    const shape = typeOperand(parameter.value, parameterScope, own, local);
+    const shape = typeOperand(parameter.value, parameterScope, own, local, undefined, 1, accountingObserver);
     facts.issues.push(...local.issues); facts.reads.push(...local.reads); facts.newOperands ||= local.newOperands; facts.wordsCase ||= local.wordsCase; facts.usesRules ||= local.usesRules; facts.flowExtras ||= local.flowExtras; facts.usesRepeat ||= local.usesRepeat; local.edge.forEach(name => facts.edge.add(name));
     local.paramRefs.forEach(ref => { facts.paramRefs.push(ref); parameterRefs.push({ from: parameter.name, ...ref }); });
     const have = kindsOf(withoutNull(shape));
@@ -98,7 +99,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
     if (request.target && !targets.length) issue('invalid_value', join(requestAt, 'target'));
     for (const [key, operand] of targets) {
       const own = join(join(requestAt, 'target'), key);
-      typeOperand(operand!, requestScope, own, local);
+      typeOperand(operand!, requestScope, own, local, undefined, 1, accountingObserver);
       if (operand!.type === 'literal') {
         const value = operand!.value;
         if (key === 'entity_id') for (const id of Array.isArray(value) ? value : [value]) if (typeof id === 'string') facts.entities.push({ id, path: own });
@@ -108,7 +109,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
       }
       if (request.data && Object.hasOwn(request.data.fields, key)) issue('invalid_combination', own);
     }
-    if (request.data) typeOperand(request.data, requestScope, join(requestAt, 'data'), local);
+    if (request.data) typeOperand(request.data, requestScope, join(requestAt, 'data'), local, undefined, 1, accountingObserver);
     absorb(local);
     shapeCheck(request.responseShape, join(requestAt, 'responseShape'));
   } else if (request.type === 'entity-attribute') {
@@ -131,7 +132,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
     });
   } else if (request.type === 'none') {
     const local = newFacts();
-    typeOperand(request.value, requestScope, join(requestAt, 'value'), local);
+    typeOperand(request.value, requestScope, join(requestAt, 'value'), local, undefined, 1, accountingObserver);
     absorb(local);
   } else {
     entity(facts, request.entityId.value, join(requestAt, 'entityId'), subscriptionDomains[request.kind]);
@@ -166,8 +167,8 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
   });
   const before = facts.issues.length;
   const stepFacts = newFacts();
-  const input = request.type === 'none' ? typeOperand(request.value, requestScope, join(requestAt, 'value'), newFacts()) : requestShape(request);
-  const shapes = typeSteps(inputs.steps, input, kinds, base, stepFacts);
+  const input = request.type === 'none' ? typeOperand(request.value, requestScope, join(requestAt, 'value'), newFacts(), undefined, 1, accountingObserver) : requestShape(request);
+  const shapes = typeSteps(inputs.steps, input, kinds, base, stepFacts, accountingObserver);
   absorb(stepFacts);
   const final = shapes.length ? shapes[shapes.length - 1] : input;
   const clean = facts.issues.length === before;
@@ -185,7 +186,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
           const operand = output.row[key];
           if (!operand) continue;
           const own = join(join(outputAt, 'row'), key);
-          const shape = typeOperand(operand, rowScope(element), own, local);
+          const shape = typeOperand(operand, rowScope(element), own, local, undefined, 1, accountingObserver);
           const have = kindsOf(withoutNull(shape));
           if (have.size && !['boolean', 'number', 'string'].some(kind => have.has(kind as 'string'))) issue('binding_type', own);
         }

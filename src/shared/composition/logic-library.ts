@@ -1,7 +1,8 @@
 import { z } from 'zod/v4';
 import { identifierSchema } from '../validation';
-import { operandBase, parameterName, predicateBase } from './expression';
+import { operandBase, parameterName, predicateBase, type BudgetAccountingObserver } from './expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, reject, type CompositionIssue } from './json';
+import { observeStructuralRefusals } from './studio-logic/accounting';
 
 /**
  * Reusable named logic, for the Studio only. A document's draft holds a `logicLibrary` and `logic-ref` uses; {@link expandLogic} works every use out
@@ -115,13 +116,18 @@ const zodIssues = (error: z.ZodError, base: string): CompositionIssue[] => error
 });
 
 /** Whether `value` is an acceptable argument for a parameter of `kind`. */
-export function argFits(kind: LogicParamKind, value: unknown): boolean {
+export function argFits(kind: LogicParamKind, value: unknown, observer?: BudgetAccountingObserver, at = ''): boolean {
   switch (kind) {
     case 'source-id': return identifierSchema.safeParse(value).success;
     case 'text': return typeof value === 'string' && value.length <= 2000;
     case 'number': return typeof value === 'number' && Number.isFinite(value);
-    case 'operand': return operandBase.safeParse(value).success;
-    case 'condition': return predicateBase.safeParse(value).success;
+    case 'operand':
+    case 'condition': {
+      const schema = kind === 'operand' ? operandBase : predicateBase;
+      const parsed = schema.safeParse(value);
+      if (!parsed.success && observer) observeStructuralRefusals(schema, value, parsed.error.issues, observer, at);
+      return parsed.success;
+    }
   }
 }
 
@@ -159,6 +165,9 @@ interface Frame {
   collapse?: string;
 }
 
+interface LogicAccounting { observer: BudgetAccountingObserver; at: string }
+let expansionAccounting: WeakMap<Expander, LogicAccounting> | undefined;
+
 class Expander {
   readonly issues: CompositionIssue[] = [];
   readonly origins: LogicOrigin[] = [];
@@ -168,7 +177,9 @@ class Expander {
   /** Names of holes that stay as they are where no use fills them (a template's own settings, while a use inside its body is worked out). */
   keep?: ReadonlySet<string>;
   private marks = 0;
-  constructor(private readonly library: ReadonlyMap<string, LogicEntry>) {}
+  constructor(private readonly library: ReadonlyMap<string, LogicEntry>, accounting?: LogicAccounting) {
+    if (accounting) (expansionAccounting ??= new WeakMap()).set(this, accounting);
+  }
 
   private report(code: CompositionIssue['code'], at: string, frame: Frame) { this.issues.push({ code, pointer: frame.collapse ?? at }); }
 
@@ -224,7 +235,8 @@ class Expander {
       if (!Object.hasOwn(rawArgs, param.name)) { this.report('missing_required', slot, frame); ok = false; continue; }
       const arg = this.walk(rawArgs[param.name], slot, frame);
       // While a template's own body is worked out, an argument that is one of its settings (a kept hole) is checked when the template is used.
-      if (!(this.keep && holdsKeptHole(arg, this.keep)) && !argFits(param.kind, arg)) { this.report('invalid_value', slot, frame); ok = false; continue; }
+      const accounting = expansionAccounting?.get(this);
+      if (!(this.keep && holdsKeptHole(arg, this.keep)) && !argFits(param.kind, arg, accounting?.observer, accounting ? `${accounting.at}${slot}` : undefined)) { this.report('invalid_value', slot, frame); ok = false; continue; }
       real[param.name] = arg; env[param.name] = arg; sizes[param.name] = valueCount(arg);
     }
     if (!ok) return value;
@@ -304,9 +316,12 @@ function replaceMark(value: unknown, mark: string, replacement: unknown): unknow
 // MARK: Library check
 
 /** Problems in the library itself, reported at the entry: ids, parameter names, holes, recursion, and a body that is not an operand or condition. */
-function checkLibrary(raw: unknown): { issues: CompositionIssue[]; entries: LogicEntry[]; expander?: Expander } {
+function checkLibrary(raw: unknown, observer?: BudgetAccountingObserver, at = ''): { issues: CompositionIssue[]; entries: LogicEntry[]; expander?: Expander } {
   const parsed = logicLibrarySchema.safeParse(raw);
-  if (!parsed.success) return { issues: zodIssues(parsed.error, '/logicLibrary'), entries: [] };
+  if (!parsed.success) {
+    if (observer) observeStructuralRefusals(logicLibrarySchema, raw, parsed.error.issues, observer, `${at}/logicLibrary`);
+    return { issues: zodIssues(parsed.error, '/logicLibrary'), entries: [] };
+  }
   const entries = parsed.data, issues: CompositionIssue[] = [];
   const seen = new Set<string>();
   entries.forEach((entry, index) => {
@@ -316,20 +331,20 @@ function checkLibrary(raw: unknown): { issues: CompositionIssue[]; entries: Logi
     entry.params.forEach((param, offset) => {
       if (names.has(param.name)) issues.push({ code: 'duplicate_id', pointer: `/logicLibrary/${index}/params/${offset}/name` });
       names.add(param.name);
-      if (param.sample !== undefined && !argFits(param.kind, param.sample)) issues.push({ code: 'invalid_value', pointer: `/logicLibrary/${index}/params/${offset}/sample` });
+      if (param.sample !== undefined && !argFits(param.kind, param.sample, observer, observer ? `${at}/logicLibrary/${index}/params/${offset}/sample` : undefined)) issues.push({ code: 'invalid_value', pointer: `/logicLibrary/${index}/params/${offset}/sample` });
     });
   });
   if (issues.length) return { issues, entries };
   const map = new Map(entries.map(entry => [entry.id, entry]));
   // One budget for the whole check, and the document's expansion goes on spending it: what a sample or a body copies is charged wherever it is copied.
-  const expander = new Expander(map);
+  const expander = new Expander(map, observer ? { observer, at } : undefined);
   for (const [index, entry] of entries.entries()) {
     const body = `/logicLibrary/${index}/body`;
     const env = logicSampleArguments(entry);
     const sizes = Object.fromEntries(Object.entries(env).map(([name, value]) => [name, valueCount(value)]));
     const result = expander.walk(entry.body, body, { env, sizes, stack: [entry.id], collapse: body });
     if (expander.issues.length) { issues.push(...expander.issues.splice(0)); if (expander.exhausted) break; continue; }
-    const fits = entry.kind === 'operand' ? operandBase.safeParse(result).success : predicateBase.safeParse(result).success;
+    const fits = argFits(entry.kind, result, observer, observer ? `${at}${body}` : undefined);
     if (!fits) issues.push({ code: 'invalid_value', pointer: body });
   }
   return { issues, entries, expander };
@@ -376,9 +391,9 @@ function bindingHooks(entry: Rec): Map<object, Hook[]> {
  * working: the binding is re-pointed to every field the argument lands in, so the component expands as the hand-written one would. More bindings than
  * a component may hold is `limit_exceeded` at the component's `bindings`.
  */
-export function expandLogic(document: unknown): LogicExpansion {
+export function expandLogic(document: unknown, observer?: BudgetAccountingObserver, accountingAt = ''): LogicExpansion {
   assertCompositionBounds(document);
-  return expandBounded(document);
+  return expandBounded(document, observer, accountingAt);
 }
 
 /**
@@ -396,9 +411,9 @@ export function expandKeepingHoles(library: readonly LogicEntry[], value: unknow
 }
 
 /** {@link expandLogic} for a document whose bounds were already asserted. */
-export function expandBounded(document: unknown): LogicExpansion {
+export function expandBounded(document: unknown, observer?: BudgetAccountingObserver, accountingAt = ''): LogicExpansion {
   if (!isRecord(document) || !usesLogic(document)) return { document, origins: [], bindings: {} };
-  const checked = checkLibrary(document.logicLibrary === undefined ? [] : document.logicLibrary);
+  const checked = checkLibrary(document.logicLibrary === undefined ? [] : document.logicLibrary, observer, accountingAt);
   if (checked.issues.length) throw new CompositionValidationError(checked.issues);
   const expander = checked.expander ?? new Expander(new Map());
   const top: Frame = { stack: [] };
