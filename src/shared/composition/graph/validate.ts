@@ -3,7 +3,7 @@ import { atPointer, copy, copyShape, fingerprint, replaceAt, sameJSON } from './
 import { expressionPort, expressionScope, inputType, portsCompatible, scopesCompatible } from './ports';
 import { grammarChildren, type FragmentKind } from './grammar';
 import type { Json } from '../../types';
-import type { GraphDiagnostic, GraphEdge, GraphNode, LogicGraph } from './types';
+import type { GraphDiagnostic, GraphEdge, GraphJSON, GraphNode, LogicGraph } from './types';
 import { assertCompositionBounds, CompositionValidationError } from '../json';
 import { elementOf, type Shape } from '../pipeline/shape';
 import { requestShape } from '../pipeline/sources';
@@ -46,6 +46,24 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     incoming.set(key, [...incoming.get(key) ?? [], edge]);
     dependencies.set(edge.to.nodeId, [...dependencies.get(edge.to.nodeId) ?? [], edge]);
   }
+  const originalValues = new Map<string, GraphJSON | undefined>([['', graph.original]]);
+  const originalAt = (at: string): GraphJSON | undefined => {
+    const cached = originalValues.get(at);
+    if (cached !== undefined || originalValues.has(at)) return cached;
+    if (!at.startsWith('/') || at.includes('~')) return atPointer(graph.original, at);
+    const pending: string[] = [];
+    let parent = at;
+    while (!originalValues.has(parent)) {
+      if (pending.length === 40) return atPointer(graph.original, at);
+      pending.push(parent); parent = parent.slice(0, parent.lastIndexOf('/'));
+    }
+    let value = originalValues.get(parent);
+    for (const own of pending.reverse()) {
+      value = value === undefined ? undefined : atPointer(value, own.slice(parent.length));
+      originalValues.set(own, value); parent = own;
+    }
+    return value;
+  };
   const unchangedNodes = new Map<string, boolean>(), checkingUnchanged = new Set<string>();
   const isUnchanged = (node: GraphNode): boolean => {
     const cached = unchangedNodes.get(node.id);
@@ -53,7 +71,7 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     if (!node.origins.length || node.provenance !== 'lifted' && node.provenance !== 'opaque') return false;
     if (checkingUnchanged.has(node.id)) return false;
     checkingUnchanged.add(node.id);
-    const original = atPointer(graph.original, node.origins[0]);
+    const original = originalAt(node.origins[0]);
     const omitted = node.inputs.length ? new Set(node.inputs.flatMap(input => input.binding === undefined ? [] : [input.binding])) : undefined;
     const unchanged = (node.provenance === 'lifted' || node.provenance === 'opaque') && original !== undefined
       && sameJSON(node.payload.value, original, omitted)
@@ -180,8 +198,9 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     if (!options.projection && entry && scope && !entry.scopes.includes(scope.kind)) report('invalid_combination', `This block is not available in ${scope.kind} scope.`, node.id, undefined, true);
     if (entry?.disabledReason) report('recipe_disabled', entry.disabledReason, node.id, undefined, true);
     if (node.payload.kind === 'opaque') {
-      if (node.inputs.length || node.provenance !== 'opaque' || atPointer(graph.original, node.payload.pointer) === undefined
-        || fingerprint(node.payload.value) !== fingerprint(atPointer(graph.original, node.payload.pointer)!)) report('opaque_region', 'An opaque region cannot be edited or interpreted.', node.id);
+      const original = originalAt(node.payload.pointer);
+      if (node.inputs.length || node.provenance !== 'opaque' || original === undefined
+        || fingerprint(node.payload.value) !== fingerprint(original)) report('opaque_region', 'An opaque region cannot be edited or interpreted.', node.id);
     }
   }
   const active = new Set<string>(), visited = new Set<string>();

@@ -421,6 +421,19 @@ describe('synthetic fragment native pipeline limits', () => {
 });
 
 describe('single-pass graph checker reuse', () => {
+  it('reuses original path prefixes only within a validation, not across same-object edits', () => {
+    const source: Json = { ...flow('cached'), inputs: { ...flow('cached').inputs, steps: [{ id: 'later', op: 'future-operation' }] } };
+    const graph = lift(source, { kind: 'flow' }).graph, original = copy(graph.original);
+    const step = atPointer(original, '/inputs/steps/0');
+    if (!record(step)) throw new Error('Expected opaque future step.');
+    const live = { ...graph, original };
+    expect(validateGraph(live).filter(issue => issue.severity === 'error')).toEqual([]);
+    step.op = 'another-future-operation';
+    expect(validateGraph(live)).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'opaque_region', severity: 'error' })]));
+    step.op = 'future-operation';
+    expect(validateGraph(live).filter(issue => issue.severity === 'error')).toEqual([]);
+  });
+
   it('does not assemble a structural root to return its existing output type', () => {
     const graph = lift(largeGraphFlow(), { kind: 'flow' }).graph;
     const copied = vi.spyOn(graphJSON, 'copy');

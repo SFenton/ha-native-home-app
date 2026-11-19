@@ -143,7 +143,9 @@ standalone source/flow inputs, recipe bundles and cycles, mixed-source native li
 success/failure expansion provenance and lift round trips. The 32-step, 2,341-node
 edited-flow fixture also checks that lowering invokes its native checker once.
 Structural roots do not assemble their descendants merely to return an existing
-port type. Regression checks also forbid checker replays during budget
+port type. Original pointer prefixes are reused only within each validation;
+same-object mutations in the next check cannot reuse the prior index.
+Regression checks also forbid checker replays during budget
 construction and the lenient call-schema pass during scoped call compilation.
 
 Hosts still own stable-anchor resolution, use-bound arguments, whole-document
