@@ -127,7 +127,9 @@ export function pinProblems(program: SimulationProgram, candidates: readonly Sim
         if (!source || readKey(source) !== readKey(pin)) return false;
         if (pin.answer.status !== 'value') return true;
         const value = projectedNodeValue(program, node);
-        if ((pin.access && pin.access !== 'read' || program.sourceEntities[pin.sourceId] && pin.path?.length === 1 && pin.path[0] === 'state') && typeof pin.answer.value !== 'string') return false;
+        const state = Boolean(program.sourceEntities[pin.sourceId] && 'path' in pin && pin.path.length === 1 && pin.path[0] === 'state');
+        if ((pin.access && pin.access !== 'read' || state) && typeof pin.answer.value !== 'string') return false;
+        if (state) return true;
         if (value && typeof value === 'object' && !Array.isArray(value) && value.type === 'read') {
           const parsed = operandSchema.safeParse(value);
           return parsed.success && parsed.data.type === 'read' && coerce(pin.answer.value, parsed.data.as) !== undefined;

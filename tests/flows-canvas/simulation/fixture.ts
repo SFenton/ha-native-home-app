@@ -41,7 +41,7 @@ export function simulationFixture() {
   const count: Operand = { type: 'count', of: [
     { test: { type: 'state', sourceId: 'lamp', path: ['state'], in: ['on'] } },
     { test: { type: 'state', sourceId: 'window', path: ['state'], in: ['on'] } },
-    { test: { type: 'state', sourceId: 'lamp', path: ['state'], in: ['on'] }, viewer: { personEntityIds: ['person.someone_else'] } },
+    { test: { type: 'state', sourceId: 'lamp', path: ['state'], in: ['on'] }, viewer: { personEntityIds: ['person.demo_someone_else'] } },
   ] };
   const common: PipelineInputs = {
     title: 'Chores', parameters: [], request: { type: 'ha-subscription', kind: 'todo-items', entityId: { type: 'literal', value: 'todo.example_chores' } },

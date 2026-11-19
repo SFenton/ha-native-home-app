@@ -30,14 +30,38 @@ are checked before timing.
 
 | Unobserved implementation | Median per 3,000 runs | Approx. per flow |
 | --- | ---: | ---: |
-| origin/main | 519.553 ms | 173.184 us |
-| W2-S | 523.624 ms | 174.541 us |
+| origin/main | 523.126 ms | 174.375 us |
+| W2-S | 525.844 ms | 175.281 us |
 
-The measured median difference is **+0.78% (+1.36 us per 64-entity flow)**,
+The measured median difference is **+0.52% (+0.91 us per 64-entity flow)**,
 not a claim of literally zero timing overhead or a statistically isolated
 hardware result. No diagnostic event objects/copies or observer-only item
 loops are allocated/executed without an observer. Timing is reported, not used
 as a flaky CI assertion.
+
+## Recorded checks and artifacts
+
+`npm test -- --maxWorkers=2`: 268 files, 12,179 passed and one existing skip.
+`npm run build`: passed. Focused Playwright: four passed across desktop
+(1440 x 900) and phone (390 x 844). `npm run scan:house`: zero findings.
+Temporary browser servers were stopped after each run.
+
+- [Desktop pinned](desktop-pinned.png), [phone pinned](phone-pinned.png);
+  [desktop Live restored](desktop-live.png), [phone Live restored](phone-live.png).
+- [Desktop scenarios](desktop-scenarios.png), [phone scenarios](phone-scenarios.png).
+- [Desktop pin traffic](desktop-pins-network.json),
+  [phone pin traffic](phone-pins-network.json),
+  [desktop scenario traffic](desktop-scenarios-network.json),
+  [phone scenario traffic](phone-scenarios-network.json).
+- [Actual drawer observations](drawers.json), generated from one shared-evaluator
+  run against the same fake fixture.
+
+The final reservation check used origin/main
+`427eaba6236804275de58d3759c467f4bfcf3798` and fetched all open heads:
+#27 `4a01bde04ca3c8af3854cd9f7615b940b6fdbfd3` (21 paths),
+#28 `971f928e3091159b985c864c774168e68d3f4a58` (4 paths), and
+#29 `14a35db1e2f1d5c956c5bfc2b6f94b5def6d2616` (43 paths).
+The full diff-derived reservation sets had zero intersections with this lane.
 
 ## Scope and limitations
 

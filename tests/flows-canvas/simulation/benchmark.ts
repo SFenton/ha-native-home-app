@@ -7,7 +7,7 @@ import { pipelineInputsSchema, type PipelineInputs } from '../../../src/shared/c
 import type { evaluatePipeline } from '../../../src/shared/composition/pipeline/evaluate';
 import type { Json } from '../../../src/shared/types';
 
-const response = Array.from({ length: 64 }, (_, index) => ({ entityId: `sensor.benchmark_${index}`, state: 'on', temperature: index, room: `room-${index % 8}` }));
+const response = Array.from({ length: 64 }, (_, index) => ({ entityId: `sensor.demo_benchmark_${index}`, state: 'on', temperature: index, room: `room-${index % 8}` }));
 const item = (name: string) => ({ type: 'item' as const, path: [name] });
 const inputs: PipelineInputs = pipelineInputsSchema.parse({
   title: '64 entity observation benchmark', parameters: [],

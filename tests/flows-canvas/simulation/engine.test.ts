@@ -33,11 +33,15 @@ describe('S-pins immutable Studio overlays', () => {
     expect(pinProblems(program, [{ ...pin, blockId: 'deleted' }])[0]).toContain('Unresolved');
   });
   it('shares a state pin with raw-state reads, preserving missing and literal unavailable distinctions', () => {
-    const { held, bedroomPin } = simulationFixture();
+    const { program, held, bedroomPin } = simulationFixture();
     const env = capturedEnvironment(held.base, [bedroomPin], held.base.clock, new Set());
     expect(env.read('bedroom', ['state'])).toEqual(env.readRaw?.('bedroom'));
     expect(capturedEnvironment(held.base, [{ ...bedroomPin, answer: { status: 'value', value: 'unavailable' } }], held.base.clock, new Set()).read('bedroom', ['state']))
       .toEqual({ status: 'value', value: 'unavailable' });
+    const offline = { ...bedroomPin, answer: { status: 'value' as const, value: 'unavailable' } };
+    expect(pinProblems(program, [offline])).toEqual([]);
+    expect(runSimulation(program, held, { pins: [offline] }).outputs.find(output => output.output.id === 'bedroom')?.result)
+      .toEqual({ kind: 'operand', answer: { status: 'unavailable' } });
   });
   it('pins real step outputs without executing their upstream prefix or mutating the graph', () => {
     const { program, held } = simulationFixture(), root = program.roots.find(root => root.anchor.id === 'chores-count')!;
