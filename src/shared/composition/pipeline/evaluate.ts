@@ -180,6 +180,16 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
       const items = list(value); each(items);
       return extreme(step.op, items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter)));
     }
+    case 'average': {
+      const items = list(value); each(items);
+      const numbers = items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter))
+        .filter((part): part is number => typeof part === 'number' && Number.isFinite(part));
+      if (!numbers.length) return null;
+      const total = numbers.reduce((sum, part) => sum + part, 0);
+      // Divide before summing only when finite parts overflow their total.
+      const mean = Number.isFinite(total) ? total / numbers.length : numbers.reduce((sum, part) => sum + part / numbers.length, 0);
+      return mean === 0 ? 0 : mean;
+    }
     case 'running-sum': {
       const items = list(value); each(items);
       // The native scan (`WeatherPrecipitationTimeline.points`, `WeatherPrecipitationTimeline.swift:14-19`): a total that has gone unknown stays unknown when

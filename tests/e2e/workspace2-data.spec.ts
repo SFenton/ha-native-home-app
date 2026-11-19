@@ -138,6 +138,17 @@ test.describe('the flow editor', () => {
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(props.getByRole('button', { name: /^Step 3, Count/ })).toBeVisible();
   });
+  test('Average is selectable and says it needs a newer app', async ({ page }) => {
+    const panel = await openData(page);
+    await panel.getByRole('button', { name: /^Overdue Chores/ }).click();
+    const props = page.getByLabel('Properties');
+    await props.getByRole('button', { name: 'Add Step' }).click();
+    await page.getByRole('menuitem', { name: 'Average · Needs a newer app', exact: true }).click();
+    await props.getByRole('button', { name: /^Step 3, Average/ }).click();
+    await expect(props.getByRole('button', { name: 'Average of' })).toBeVisible();
+    await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toBeVisible();
+    await props.getByRole('button', { name: 'Cancel' }).click();
+  });
 });
 
 test.describe('the List', () => {

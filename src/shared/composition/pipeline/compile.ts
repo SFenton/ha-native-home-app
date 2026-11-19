@@ -23,6 +23,7 @@ export const PIPELINE_OPERANDS_CAPABILITY = 'sh.pipeline-operands@1';
 export const REPEAT_CAPABILITY = 'sh.repeat@1';
 /** Capability of the steps `min`, `max`, `running-sum` and `annotate`, the date styles `hour` and `weekday`, and the `progress` operation of a `date` operand. */
 export const FLOW_EXTRAS_CAPABILITY = 'sh.flow-extras@1';
+export const FLOW_AVERAGE_CAPABILITY = 'sh.flow-average@1';
 
 /** Capability of the rule value `choose`, shared with documents. */
 export const RULES_CAPABILITY = 'sh.rules@1';
@@ -215,6 +216,7 @@ export function checkPipelineSource(source: PipelineSource, at: string): Pipelin
 
   const capabilities = [PIPELINE_CAPABILITY, ...(facts.newOperands ? [PIPELINE_OPERANDS_CAPABILITY] : []), ...(facts.wordsCase ? [TEXT_CASE_WORDS_CAPABILITY] : []), ...(facts.usesRules ? [RULES_CAPABILITY] : []),
     ...(output.kind === 'records' || facts.usesRepeat ? [REPEAT_CAPABILITY] : []), ...(facts.flowExtras ? [FLOW_EXTRAS_CAPABILITY] : []),
+    ...(inputs.steps.some(step => step.op === 'average') ? [FLOW_AVERAGE_CAPABILITY] : []),
     ...[...facts.edge].sort().map(name => `sh.${name}@1`)];
   const dependencies = facts.reads.map(entry => ({ from: source.id, to: entry.read.from.sourceId, path: join(join(entry.pointer, 'from'), 'sourceId') }));
   return { issues: facts.issues, reads: facts.reads.map(entry => ({ read: entry.read, path: entry.pointer })), dependencies, capabilities };

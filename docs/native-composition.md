@@ -1066,6 +1066,12 @@ Swift evaluator is later work and must pass `contract/corpus/pipelines`.
   below 1e15), a tie rounds away from zero, and dates are whole calendar days on the viewer's clock.
 
 
+### Average flow step (`sh.flow-average@1`, pending)
+
+`{ "id": "mean", "op": "average", "value": <operand> }` reduces a list to the mean of its finite numeric parts. Like `min` and `max`, it requires a numeric-compatible operand (`binding_type` for typed text) and gives a number or null. Null and non-number parts, including numeric text, are skipped; no numeric parts or an empty list gives null. The answer is not rounded and prints with the Data Flow number rules above. Cost is `1 + item count + operand nodes per item`, as for `sum`.
+
+The Data Flow editor offers **Average** alongside Lowest and Highest, marked **Needs a newer app**. The publication declares the pending `sh.flow-average@1`; the shipped app refuses it until native support ships. `scripts/wgflow-corpus.ts` generates the `flow-average-*` publication and pipeline-evaluation cases.
+
 ### Expressions, rules and app state
 
 One operand grammar and one condition grammar (`src/shared/composition/expression.ts`) serve four consumers: a Data Flow's operands and `where`, a
@@ -1102,7 +1108,7 @@ node's `visibleWhen` and other predicates, rule-based values and authored string
 - **Data Flow additions.** Two request kinds: `entities` (1 to 64 literal entity ids and up to 8 named attributes; rows are
   `{ entityId, state, ...attributes }`; no `refresh`, the flow runs when an observed entity changes) and `none` (no data; `value` is an operand over
   the parameters, the viewer and the clock). A document holds up to 128 flows.
-- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.fold-sides@1`, `sh.shell-profile@1` and `sh.tile-ink-default@1` remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09` are shipped in `capabilities.json` (verified against native-home main and that release tag). An id is
+- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.flow-average@1`, `sh.fold-sides@1`, `sh.shell-profile@1` and `sh.tile-ink-default@1` remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09` are shipped in `capabilities.json` (verified against native-home main and that release tag). An id is
   mutable until a publication that uses it has been served, so changes fold into `@1`; after that, a change of meaning is `@2` beside `@1`.
 
 ### Generic parts (lane TC3)
