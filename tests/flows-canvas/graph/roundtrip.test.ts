@@ -219,6 +219,28 @@ describe('G-roundtrip shared contract corpus', () => {
   const read = (file: string): Json => JSON.parse(readFileSync(path.join(directory, file), 'utf8'));
   const index: { cases: { file: string; outcome: string; pending?: boolean; studioIssue?: unknown }[] } = JSON.parse(readFileSync(path.join(directory, 'index.json'), 'utf8'));
   const cases = index.cases.filter(entry => entry.outcome === 'accept' || entry.pending && !entry.studioIssue);
+  it.each<{ file: string; pointer: string; slot: Json; accepted: boolean }>([
+    { file: 'accept/rules-conditional-look.json', pointer: '/pages/2/components/0/props/states/0/appearance/icon', slot: { type: 'bound-symbol', value: { type: 'literal', value: 'lightbulb' }, fallback: null }, accepted: false },
+    { file: 'accept/tile-look-all.json', pointer: '/pages/1/components/0/props/value', slot: { type: 'expr', value: { type: 'object', fields: {} } }, accepted: false },
+    { file: 'accept/tile-look-all.json', pointer: '/pages/1/components/0/props/value', slot: { type: 'literal', value: 'Ready' }, accepted: true },
+    { file: 'accept/tile-look-all.json', pointer: '/pages/1/components/0/props/value', slot: { type: 'read', from: { type: 'source', sourceId: 'source-entity', path: ['state'] }, as: 'string', missing: 'unavailable', fallback: 'No answer' }, accepted: true },
+  ])('matches native destination validation for $slot.type, accepted=$accepted', ({ file, pointer, slot, accepted }) => {
+    const envelope = read(file);
+    if (!record(envelope) || atPointer(envelope.document, pointer) === undefined) throw new Error('Expected native slot destination.');
+    const document = replaceAt(envelope.document, pointer, slot);
+    let native: CompositionValidationError | undefined;
+    try { compileCompositionDocument(document); }
+    catch (error) { if (!(error instanceof CompositionValidationError)) throw error; native = error; }
+    expect(native === undefined).toBe(accepted);
+    const graph = lift(slot, { kind: 'slot' }).graph, result = lower(graph), budget = measureBudget(slot, graph.roots[0].anchor, { kind: 'slot' });
+    expect(result.ok).toBe(accepted);
+    expect(budget.accepted).toBe(accepted);
+    if (native && !result.ok) {
+      const expected = { ...native.issues[0], pointer: native.issues[0].pointer.replace(`/document${pointer}`, '') };
+      expect(result.errors[0]).toMatchObject(expected);
+      expect(budget.compilerIssues[0]).toEqual(expected);
+    }
+  });
   it.each(index.cases.filter(entry => entry.outcome === 'reject' && (!entry.pending || entry.studioIssue)))('retains the compiler rejection boundary for $file', entry => {
     const bytes = readFileSync(path.join(directory, entry.file));
     let envelope: unknown;

@@ -28,12 +28,13 @@ function finish(ast: Operand | Predicate, sources: GraphPipelineSource[] = [], c
   const condition = predicateBase.safeParse(ast);
   const facts = condition.success ? checkPredicate(condition.data, '') : checkOperand(operandBase.parse(ast), '');
   const issues: CompositionIssue[] = [...facts.issues];
-  for (const [index, source] of sources.entries()) issues.push(...checkGraphPipeline(source, `/dataSources/${index}`).issues);
+  const sourceFacts = sources.map((source, index) => checkGraphPipeline(source, `/dataSources/${index}`));
+  issues.push(...sourceFacts.flatMap(facts => facts.issues));
   if (issues.length) return { ok: false, errors: issues.map(issue => ({ severity: 'error', code: issue.code, pointer: issue.pointer, anchor: recipeAnchor, message: `Recipe does not fit the existing grammar: ${issue.code}.` })) };
-  const required = [...new Set([...capabilities, ...expressionCapabilities(facts)])].sort();
+  const required = [...new Set([...capabilities, ...expressionCapabilities(facts), ...sourceFacts.flatMap(facts => facts.capabilities)])].sort();
   const budgets = [
     measureBudget(ast, recipeAnchor, { capabilities: required }),
-    ...sources.map(source => measureBudget(source, { kind: 'flow', id: source.id, field: '' }, { kind: 'flow', capabilities: checkGraphPipeline(source, '').capabilities })),
+    ...sources.map((source, index) => measureBudget(source, { kind: 'flow', id: source.id, field: '' }, { kind: 'flow', capabilities: sourceFacts[index].capabilities })),
   ];
   const sourceMap: GraphSourceLocation[] = [];
   const map = (value: Json, pointer: string) => {
@@ -119,7 +120,7 @@ export function lowerForEach(recipe: FixedForEach | FlowForEach): RecipeResult {
   const test = checkedTest?.data;
   const make = (id: string, filtered: boolean): GraphPipelineSource => ({
     id, kind: 'model', model: 'pipeline@1',
-    inputs: { ...prefix, steps: [...prefix.steps, ...(filtered && test ? [{ id: 'matching', op: 'filter' as const, where: test }] : []), { id: 'count', op: 'count' }] },
+    inputs: { ...prefix, steps: [...prefix.steps, ...(filtered && test ? [{ id: 'matching', op: 'filter' as const, where: test }] : []), { id: 'count', op: 'count' }], output: { kind: 'scalar' }, schema: { kind: 'number' } },
   });
   const sources = [make(`${recipe.id}-matching`, true)];
   const countRead = read(sources[0].id);

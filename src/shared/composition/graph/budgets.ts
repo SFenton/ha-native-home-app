@@ -7,15 +7,14 @@ import { expandLogic, type LogicEntry } from '../logic-library';
 import { PIPELINE_BUDGET } from '../pipeline/evaluate';
 import { PIPELINE_LIMITS } from '../pipeline/schema';
 import { newFacts, typeOperand, typeWhere } from '../pipeline/typing';
-import { conditional } from '../slots';
-import { checkGraphPipeline, expressionCapabilities, graphInputsSchema, graphSourceSchema, graphTextSlotSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
+import { checkGraphPipeline, checkGraphSlot, expressionCapabilities, graphInputsSchema, graphSourceSchema } from './capabilities';
 import { describeGrammar, expressionChildren, inferFragment, type FragmentKind } from './grammar';
 import { record, withoutCanvasMetadata } from './json';
 import type { BudgetMeter, GraphBudget, LogicAnchor } from './types';
 
-export function budgetMeter(kind: string, used: number, limit: number, pointer = ''): BudgetMeter {
-  const ratio = used / limit;
-  return { kind, pointer, used, limit, ratio, visible: ratio > 0.75, exceeded: used > limit };
+export function budgetMeter(kind: string, used: number, limit: number | null, pointer = ''): BudgetMeter {
+  const ratio = limit === null ? null : used / limit;
+  return { kind, pointer, used, limit, ratio, visible: ratio !== null && ratio > 0.75, exceeded: limit !== null && used > limit };
 }
 export interface BudgetOptions {
   readonly kind?: FragmentKind;
@@ -24,7 +23,7 @@ export interface BudgetOptions {
   readonly allowControl?: boolean;
   readonly library?: readonly LogicEntry[];
 }
-export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: expose read-only expression/call and flow accounting from the actual checker, including totals, depths, counter scopes/resets, structural limits and expansion provenance; preserve CHK-nested-choose-budget unchanged.';
+export const ACCOUNTING_FOLLOW_UP = 'Owner follow-up: consume the shared read-only expression/call and flow accounting observer for totals, depths, counter scopes/resets, structural limits and expansion provenance; preserve CHK-nested-choose-budget unchanged.';
 
 export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOptions = {}): GraphBudget {
   assertCompositionBounds(ast);
@@ -67,8 +66,11 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
   const walk = (value: Json, hint: FragmentKind, at: string, validate: boolean, flow = false): void => {
     const kind = inferFragment(value, hint);
     try {
-      if (validate && kind === 'slot' && record(value) && value.type === 'conditional') parseCompositionShape(conditional(z.json()), value);
-      if (validate && kind === 'slot' && record(value) && (value.type === 'read' || value.type === 'expr')) parseCompositionShape(graphTextSlotSchema, value);
+      if (validate && kind === 'slot') {
+        const facts = checkGraphSlot(value, at);
+        report(facts.issues); facts.capabilities.forEach(capability => capabilities.add(capability));
+        if (facts.issues.length) return;
+      }
       if (kind === 'operand' || kind === 'condition') {
         if (flow) { flowScopes(value, kind, at); return; }
         unknownScope(at, MAX_EXPRESSION_NODES);
@@ -100,14 +102,9 @@ export function measureBudget(ast: Json, anchor: LogicAnchor, options: BudgetOpt
         flow = true;
       }
       if (kind === 'slot' && record(value) && value.type === 'read') {
-        if (Object.hasOwn(value, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
         const { fallback: _fallback, whenUnavailable: _policy, ...operand } = value;
         walk(operand, 'operand', at, validate);
         return;
-      }
-      if (kind === 'slot' && record(value)) {
-        if (['expr', 'conditional', 'bound-symbol'].includes(String(value.type))) capabilities.add('sh.rules@1');
-        if (Object.hasOwn(value, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
       }
       const description = describeGrammar(value, kind);
       if (validate && description.payload.kind === 'opaque') { report([{ code: 'unknown_variant', pointer: at }]); return; }

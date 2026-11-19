@@ -15,6 +15,8 @@ actions, or UI dependencies.
   flow parameters remain available in descendant scopes of their own flow.
   Grammar descriptors and edge lookups are reused within a check or projection,
   never cached across edits.
+  Edited flow step/output item shapes are retyped from the currently assembled
+  prefix, not retained from the lifted snapshot.
 - `lower(graph, {library, targetCapabilities, itemScope})` validates before
   returning atomic replacements. Failures retain `original`; they never return
   a partially modified document. Complete documents use the existing compiler.
@@ -23,6 +25,8 @@ actions, or UI dependencies.
   Document destinations always run the document compiler, including documents
   missing required fields. Synthetic multi-field examples must explicitly use
   `kind: "fragment"`; fragment checks are not whole-document validation.
+  Explicit text/symbol slots use the shared schemas and native operand-kind
+  checks, including untouched imports. Read fallbacks require `sh.rules@1`.
   Source maps retain authored entries and add `stage: "expanded"` entries for
   native template landings. `authoredPointer` and `usePointer` keep each copied
   argument tied to its block and use, including failing expanded budget paths.
@@ -31,12 +35,14 @@ actions, or UI dependencies.
 - `validateGraph`, `portsCompatible`, `autoLayout`, `measureBudget`, and
   `budgetMeter` are usable independently. Meters appear strictly above 75%.
   Runtime budget is a separate bound, not an estimate from step count.
+  An uncapped scope limit is `null`; its meter ratio is also `null`, with no
+  threshold visibility or exceeded state.
   `GraphBudget.accepted`, `compilerIssues`, and `firstExceedingPointer` come
   from running the compiler/checker on the lowered fragment. In particular,
   CHK-nested-choose-budget is neither fixed nor simulated with a parallel counter.
   Flow node meters consume the public `typeOperand`/`typeWhere` counters.
   No graph code increments AST counters, walks depths, or predicts resets.
-  Counts that are not exported by the checker are **null**, never zero or an
+  Counts not yet consumed from the checker are **null**, never zero or an
   estimate: document/call counts, depths, totals, cases/steps, duplication costs,
   generated-flow accounting and reset events. Document scopes explicitly report
   `nodeAccounting: "unavailable"`; overall accounting is `partial` or `unavailable`.
@@ -50,6 +56,8 @@ actions, or UI dependencies.
   use an existing source-id template hole; no item or frame opcode is emitted.
   Entity mode requires resolved literal IDs, never a dynamic area selector.
   Generic lists accept a typed existing flow prefix; empty Any is No and All Yes.
+  Generated count flows declare scalar/number output regardless of the prefix
+  declaration. Recipe requirements include every generated source's native needs.
 - `averageFixed` is strict arithmetic. `lowerListAverage` creates an explicit
   average-step or sum/filter-count edit; it never migrates an authored average
   during publish. `lowerFlowBranches` materializes each terminal flow separately.
@@ -81,12 +89,9 @@ Never install a recipe's generated sources separately from its root replacement.
 
 ## Owner follow-up: compiler accounting
 
-Lane A reserves `expression.ts`; this lane does not edit it. Request an additive,
-read-only accounting export on the actual Checker (`enter`, predicate checks,
-condition resets/restores and shared call budgets), preserving traversal,
-short-circuiting, diagnostics and CHK-nested-choose-budget exactly. Also expose
-depth/scope accounting from `pipeline/typing.ts`, propagate it through pipeline
-and document compilation, and include structural limits and expansion
-provenance. Once supplied, the graph can consume complete figures without an
-independent formula. This is observation only, not authorization to reconcile
-the checker with native behavior or change any limit.
+PR #25 supplies read-only expression/flow accounting observers. This lane accepts
+their nullable limit shapes but does not subscribe to the observer yet.
+Integration is follow-up work: consume the actual counter scopes and reset
+events, preserving traversal, short-circuiting, diagnostics and
+CHK-nested-choose-budget exactly. Do not introduce an independent formula,
+reconcile the checker with native behavior, or change any limit.

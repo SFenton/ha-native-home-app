@@ -4,8 +4,7 @@ import { compileCompositionDocument, parseCompositionShape } from '../compiler';
 import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandBase, predicateBase, type ItemScope } from '../expression';
 import { assertCompositionBounds, CompositionValidationError, pointer, type CompositionIssue } from '../json';
 import { expandLogic, type LogicEntry } from '../logic-library';
-import { conditional } from '../slots';
-import { AVERAGE_CAPABILITY, checkGraphPipeline, expressionCapabilities, graphInputsSchema, graphSourceSchema, graphTextSlotSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
+import { AVERAGE_CAPABILITY, checkGraphPipeline, checkGraphSlot, expressionCapabilities, graphInputsSchema, graphSourceSchema, TEXT_KEEP_CAPABILITY } from './capabilities';
 import { measureBudget } from './budgets';
 import { copy, fingerprint, record, replaceAt, withoutCanvasMetadata } from './json';
 import { expressionPort, portsCompatible } from './ports';
@@ -70,8 +69,11 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
     let expanded = value;
     const report = (issue: CompositionIssue) => errors.push(diagnostic(issue, root, sourceMap));
     const check = (candidate: Json, kind: FragmentKind, at = '', itemScope = options.itemScope): void => {
-      if (kind === 'slot' && record(candidate) && candidate.type === 'conditional') parseCompositionShape(conditional(z.json()), candidate);
-      if (kind === 'slot' && record(candidate) && (candidate.type === 'read' || candidate.type === 'expr')) parseCompositionShape(graphTextSlotSchema, candidate);
+      if (kind === 'slot') {
+        const facts = checkGraphSlot(candidate, at);
+        facts.issues.forEach(report); facts.capabilities.forEach(capability => capabilities.add(capability));
+        if (facts.issues.length) return;
+      }
       if (kind === 'operand') {
         const facts = checkOperand(parseCompositionShape(operandBase, candidate), at, root.destination.allowControl, false, itemScope);
         facts.issues.forEach(report); expressionCapabilities(facts).forEach(capability => capabilities.add(capability));
@@ -96,8 +98,6 @@ export function lower(graph: LogicGraph, options: LowerOptions = {}): LoweringRe
         if (description.payload.kind === 'opaque') { report({ code: 'unknown_variant', pointer: at }); return; }
         for (const child of description.children) check(child.value, child.kind, at + child.binding, itemScope);
       }
-      if (kind === 'slot' && record(candidate) && ['expr', 'conditional', 'bound-symbol'].includes(String(candidate.type))) capabilities.add('sh.rules@1');
-      if (record(candidate) && Object.hasOwn(candidate, 'whenUnavailable')) capabilities.add(TEXT_KEEP_CAPABILITY);
     };
     try {
       if (root.destination.kind === 'document') {

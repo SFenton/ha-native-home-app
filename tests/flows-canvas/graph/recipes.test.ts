@@ -51,6 +51,33 @@ describe('explicit For Each and strict arithmetic recipes', () => {
     expect(large.sources).toHaveLength(2);
     for (const source of large.sources) expect(checkGraphPipeline(source, '').issues).toEqual([]);
   });
+  it('includes compiler requirements from generated filters in the recipe requirements', () => {
+    const result = value(lowerForEach({
+      mode: 'flow', id: 'exists', entityIds: ['light.demo_a'], attributes: [], reducer: 'count',
+      test: { type: 'exists', value: { type: 'item', path: [] } },
+    }));
+    expect(checkGraphPipeline(result.sources[0], '').capabilities).toContain('sh.pipeline-operands@1');
+    expect(result.budgets[1].capabilities).toContain('sh.pipeline-operands@1');
+    expect(result.capabilities).toContain('sh.pipeline-operands@1');
+    for (const source of result.sources) for (const capability of checkGraphPipeline(source, '').capabilities) expect(result.capabilities).toContain(capability);
+  });
+  it.each(['count', 'any', 'all'] as const)('declares scalar output for %s on a valid records-output prefix', reducer => {
+    const prefix = pipelineSourceSchema.parse({
+      id: 'prefix', kind: 'model', model: 'pipeline@1',
+      inputs: {
+        title: 'Records', parameters: [], request: { type: 'none', value: { type: 'literal', value: [{ n: 3 }] } },
+        steps: [], output: { kind: 'records', max: 100 }, schema: { kind: 'array', of: { kind: 'object', fields: { n: { shape: { kind: 'number' } } } } },
+      },
+    });
+    expect(checkGraphPipeline(prefix, '').issues).toEqual([]);
+    const result = value(lowerForEach({ mode: 'flow', id: 'records', prefix: prefix.inputs, reducer }));
+    for (const source of result.sources) {
+      expect(checkGraphPipeline(source, '').issues).toEqual([]);
+      expect(source.inputs).toMatchObject({ output: { kind: 'scalar' }, schema: { kind: 'number' } });
+      const run = evaluatePipeline(pipelineSourceSchema.parse(source).inputs, null, { clock: { now: '2026-11-18T16:00:00', utcOffsetMinutes: 0 } });
+      expect(run).toMatchObject({ status: 'ok', value: 1 });
+    }
+  });
   it('strict fixed averages do not skip missing inputs or coerce text sockets', () => {
     const result = value(averageFixed([{ type: 'literal', value: 23.6 }, { type: 'literal', value: 25 }]));
     expect(result.budgets[0].accepted).toBe(true);

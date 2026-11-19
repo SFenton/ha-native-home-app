@@ -1,11 +1,10 @@
-import { z } from 'zod/v4';
 import type { Json } from '../../types';
 import { callServiceSchema, operandBase, predicateBase, type Operand } from '../expression';
 import { logicEntrySchema, logicHoleSchema, logicRefSchema } from '../logic-library';
 import { outputSchema, pipelineInputsSchema, pipelineSourceSchema, requestSchema, stepSchema } from '../pipeline/schema';
 import type { GraphPayload } from './types';
 import { atPointer, copy, join, record, replaceAt } from './json';
-import { graphInputsSchema, graphSourceSchema, graphStepSchema, graphTextSlotSchema } from './capabilities';
+import { graphInputsSchema, graphSlotSchema, graphSourceSchema, graphStepSchema } from './capabilities';
 import { identifierSchema } from '../../validation';
 
 export type FragmentKind = 'operand' | 'condition' | 'call' | 'source-selection' | 'flow' | 'flow-inputs' | 'request' | 'step' | 'output' | 'logic-entry' | 'slot' | 'document' | 'fragment' | 'auto';
@@ -15,13 +14,6 @@ const operandNames = new Set(['literal', 'read', 'control', 'viewer', 'format', 
 const predicateNames = new Set(['state', 'numeric', 'viewer', 'viewer-person', 'all', 'any', 'not', 'compare', 'in', 'exists']);
 const literal: Operand = { type: 'literal', value: 0 };
 const condition = { type: 'compare' as const, op: 'eq' as const, left: literal, right: literal };
-const [, readTextSlot, expressionTextSlot] = graphTextSlotSchema.options;
-const slotSchema = z.discriminatedUnion('type', [
-  readTextSlot,
-  expressionTextSlot,
-  z.strictObject({ type: z.literal('bound-symbol'), value: operandBase, fallback: z.json() }),
-  z.strictObject({ type: z.literal('conditional'), cases: z.array(z.strictObject({ when: predicateBase, then: z.json() })), otherwise: z.json() }),
-]);
 
 export function inferFragment(value: Json, hint: FragmentKind = 'auto'): FragmentKind {
   if (hint !== 'auto') return hint;
@@ -207,7 +199,7 @@ export function describeGrammar(value: Json, hint: FragmentKind = 'auto'): Gramm
     if (value.type === 'conditional' && Array.isArray(value.cases)) value.cases.forEach((_, i) => take(join('', 'cases', i, 'when'), 'condition'));
     let skeleton: Json = value;
     for (const child of children) skeleton = replaceAt(skeleton, child.binding, child.kind === 'condition' ? condition : literal);
-    const parsed = slotSchema.safeParse(skeleton);
+    const parsed = graphSlotSchema.safeParse(skeleton);
     return parsed.success ? { payload: { kind, value: skeleton }, key: value.type === 'conditional' ? 'destination.look-rules' : value.type === 'bound-symbol' ? 'destination.bound-symbol' : 'destination.text', children } : opaque("Can't show this as blocks: unknown slot variant or field.");
   }
   if (kind !== 'document' && kind !== 'fragment') return opaque("Can't show this as blocks: unsupported fragment.");

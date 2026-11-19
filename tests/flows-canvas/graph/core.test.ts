@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkCallService, checkOperand, checkPredicate, compareOperations, dateOperations, mathOperations, operandBase, predicateBase, type CallService, type Operand, type Predicate } from '../../../src/shared/composition/expression';
 import { flowExtrasSteps, pipelineSourceSchema, stepOperations } from '../../../src/shared/composition/pipeline/schema';
-import { blockCatalog, budgetMeter, catalogAvailability, lift, lower, measureBudget, portType, portsCompatible, projectGraph, validateGraph, type LogicAnchor, type LogicGraph } from '../../../src/shared/composition/graph';
+import { blockCatalog, budgetMeter, catalogAvailability, checkGraphPipeline, lift, lower, measureBudget, portType, portsCompatible, projectGraph, validateGraph, type GraphBudget, type LogicAnchor, type LogicGraph } from '../../../src/shared/composition/graph';
 import type { Json } from '../../../src/shared/types';
 import { predicateBudgetFixtures } from './fixtures';
 
@@ -54,7 +54,7 @@ describe('G-catalog exhaustive named grammar traces', () => {
 
 describe.each(['read', 'expr'] as const)('shared %s text slots', type => {
   const slot = (whenUnavailable: string, fallback = 'No answer'): Json => type === 'read'
-    ? { type, from: { type: 'source', sourceId: 'light', path: ['state'] }, as: 'number', missing: 'unavailable', fallback, whenUnavailable }
+    ? { type, from: { type: 'source', sourceId: 'light', path: ['state'] }, as: 'string', missing: 'unavailable', fallback, whenUnavailable }
     : { type, value: scalar(), fallback, whenUnavailable };
   it.each(['fallback', 'keep'])('retains the native %s policy and requires the actual target capability', policy => {
     const ast = slot(policy), graph = lift(ast, { kind: 'slot', anchor }).graph;
@@ -73,6 +73,36 @@ describe.each(['read', 'expr'] as const)('shared %s text slots', type => {
     const budget = measureBudget(ast, anchor, { kind: 'slot' });
     expect(budget.accepted).toBe(false);
     expect(budget.compilerIssues[0].pointer).toBe(pointer);
+  });
+});
+
+describe('native slot fragment destinations', () => {
+  it('accepts an explicitly lifted literal text slot without inventing operand requirements', () => {
+    const ast: Json = { type: 'literal', value: 'Ready' };
+    expect(lower(lift(ast, { kind: 'slot' }).graph, { targetCapabilities: [] })).toMatchObject({ ok: true, ast });
+    expect(measureBudget(ast, anchor, { kind: 'slot' })).toMatchObject({ accepted: true, capabilities: [] });
+  });
+  it.each<{ ast: Json; pointer: string }>([
+    { ast: { type: 'bound-symbol', value: { type: 'literal', value: 'lightbulb' }, fallback: null }, pointer: '/fallback' },
+    { ast: { type: 'expr', value: { type: 'object', fields: { n: scalar() } } }, pointer: '/value' },
+    { ast: { type: 'bound-symbol', value: scalar(), fallback: { type: 'sf-symbol', name: 'lightbulb', rendering: 'canonical', unavailable: 'fallback' } }, pointer: '/value' },
+    { ast: { type: 'read', from: { type: 'source', sourceId: 'light', path: ['state'] }, as: 'number', missing: 'unavailable' }, pointer: '/as' },
+  ])('refuses untouched invalid destination $ast.type at $pointer', ({ ast, pointer }) => {
+    expect(lower(lift(ast, { kind: 'slot' }).graph)).toMatchObject({ ok: false, original: ast, errors: expect.arrayContaining([expect.objectContaining({ pointer })]) });
+    const budget = measureBudget(ast, anchor, { kind: 'slot' });
+    expect(budget.accepted).toBe(false);
+    expect(budget.compilerIssues[0].pointer).toBe(pointer);
+  });
+  it('requires the read fallback wrapper capability in lowering and both budgets', () => {
+    const ast: Json = { type: 'read', from: { type: 'source', sourceId: 'light', path: ['state'] }, as: 'string', missing: 'unavailable', fallback: 'No answer' };
+    const graph = lift(ast, { kind: 'slot' }).graph;
+    expect(lower(graph, { targetCapabilities: ['sh.bindings@1', 'sh.operands@1'] })).toMatchObject({
+      ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'unsupported_capability', capability: 'sh.rules@1' })]),
+    });
+    const result = lower(graph, { targetCapabilities: ['sh.bindings@1', 'sh.operands@1', 'sh.rules@1'] });
+    expect(result.ok).toBe(true);
+    expect(result.budgets[0].capabilities).toContain('sh.rules@1');
+    expect(measureBudget(ast, anchor, { kind: 'slot' }).capabilities).toContain('sh.rules@1');
   });
 });
 
@@ -256,6 +286,15 @@ describe('G-limits exact existing boundaries', () => {
     expect(budget.scopes[0]).toMatchObject({ nodes, depth: null, nodeAccounting: 'compiler' });
     expect(budget.meters[0]).toMatchObject({ used: nodes, limit: 64, ratio: nodes / 64, visible });
   });
+  it('represents uncapped node and depth limits without a percentage or an exceeded meter', () => {
+    const scope: GraphBudget['scopes'][number] = {
+      id: 'uncapped', kind: 'predicate', pointer: '', nodes: 1000, depth: 100,
+      nodeLimit: null, depthLimit: null, entries: [''], nodeAccounting: 'compiler',
+    };
+    for (const [used, limit] of [[scope.nodes!, scope.nodeLimit], [scope.depth!, scope.depthLimit]] as const) {
+      expect(budgetMeter('uncapped', used, limit)).toMatchObject({ used, limit: null, ratio: null, visible: false, exceeded: false });
+    }
+  });
   it('exposes exact first exceeding node pointers', () => {
     const budget = measureBudget({ type: 'list', items: Array.from({ length: 64 }, () => scalar()) }, anchor);
     expect(budget.firstExceedingPointer).toBe('/items/63');
@@ -305,6 +344,35 @@ describe('typed connections, structural refusals and fan-out', () => {
       ? { ...edge, from: { nodeId: item.id, portId: 'value' } } : edge) });
     expect(lower(wire(0))).toMatchObject({ ok: true });
     expect(lower(wire(1))).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.objectContaining({ code: 'scope_mismatch' })]) });
+  });
+  it.each(['sum', 'output'] as const)('types %s items from an edited map prefix without relifting', terminal => {
+    const build = (field: 'n' | 'm') => {
+      const source = pipelineSourceSchema.parse(flow());
+      source.inputs.request = { type: 'none', value: { type: 'literal', value: [{ value: 3 }] } };
+      source.inputs.steps = [{ id: 'map', op: 'map', fields: { [field]: { type: 'item', path: ['value'] } } }];
+      if (terminal === 'sum') source.inputs.steps.push({ id: 'sum', op: 'sum', value: { type: 'item', path: [field] } });
+      else {
+        source.inputs.output = { kind: 'rows', max: 100, row: { id: { type: 'literal', value: 'row' }, title: { type: 'item', path: [field] } } };
+        source.inputs.schema = { kind: 'array', of: { kind: 'object', fields: { [field]: { shape: { kind: 'number' } } } } };
+      }
+      return source;
+    };
+    const source = build('n'), expected = build('m');
+    const graph = lift(source, { kind: 'flow' }).graph, map = graph.nodes.find(node => node.origins[0] === '/inputs/steps/0')!;
+    const itemPointer = terminal === 'sum' ? '/inputs/steps/1/value' : '/inputs/output/row/title';
+    const edited: LogicGraph = {
+      ...graph,
+      nodes: graph.nodes.map(node => node.id === map.id && node.payload.kind === 'step' && node.payload.value.op === 'map' ? {
+        ...node, payload: { kind: 'step', value: { ...node.payload.value, fields: { m: node.payload.value.fields.n } } },
+        inputs: node.inputs.map(input => ({ ...input, id: '/fields/m', binding: '/fields/m' })),
+      } : node.origins[0] === itemPointer ? { ...node, payload: { kind: 'operand', value: { type: 'item', path: ['m'] } } }
+        : node.payload.kind === 'flow-inputs' ? { ...node, payload: { kind: 'flow-inputs', value: { ...node.payload.value, schema: expected.inputs.schema } } } : node),
+      edges: graph.edges.map(edge => edge.to.nodeId === map.id ? { ...edge, to: { ...edge.to, portId: '/fields/m' }, binding: '/fields/m' } : edge),
+    };
+    expect(checkGraphPipeline(source, '').issues).toEqual([]);
+    expect(checkGraphPipeline(expected, '').issues).toEqual([]);
+    expect(lower(lift(expected, { kind: 'flow' }).graph).ok).toBe(true);
+    expect(lower(edited)).toMatchObject({ ok: true, ast: expected });
   });
   it('refuses occupied inputs, disconnections, cycles and wrong edge binding without mutating the original', () => {
     const graph = base(), edge = graph.edges[0];

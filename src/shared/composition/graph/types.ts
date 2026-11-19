@@ -121,8 +121,8 @@ export interface BudgetMeter {
   readonly kind: string;
   readonly pointer: string;
   readonly used: number;
-  readonly limit: number;
-  readonly ratio: number;
+  readonly limit: number | null;
+  readonly ratio: number | null;
   readonly visible: boolean;
   readonly exceeded: boolean;
 }
@@ -137,8 +137,8 @@ export interface GraphBudget {
     readonly pointer: string;
     readonly nodes: number | null;
     readonly depth: number | null;
-    readonly nodeLimit: number;
-    readonly depthLimit: number;
+    readonly nodeLimit: number | null;
+    readonly depthLimit: number | null;
     readonly entries: readonly string[];
     readonly nodeAccounting: 'compiler' | 'unavailable';
   }[];

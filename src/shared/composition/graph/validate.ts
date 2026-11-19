@@ -5,6 +5,10 @@ import { describeGrammar, type FragmentKind } from './grammar';
 import type { Json } from '../../types';
 import type { GraphDiagnostic, GraphEdge, GraphNode, LogicGraph } from './types';
 import { assertCompositionBounds, CompositionValidationError } from '../json';
+import { elementOf, type Shape } from '../pipeline/shape';
+import { requestShape } from '../pipeline/sources';
+import { newFacts, typeOperand, typeSteps, type TypeScope } from '../pipeline/typing';
+import { graphInputsSchema } from './capabilities';
 
 export function validateGraph(graph: LogicGraph, options: { readonly projection?: boolean } = {}): readonly GraphDiagnostic[] {
   try {
@@ -60,14 +64,35 @@ function validateGraphChecked(graph: LogicGraph, options: { readonly projection?
     assembling.delete(id); assembled.set(id, value);
     return value;
   };
+  const typedFlows = new Map<string, { params: TypeScope['params']; initial: Shape; steps: Shape[] } | undefined>();
   const actualOutput = (node: GraphNode) => {
     const output = node.outputs[0]?.type;
     if (!output) return undefined;
     const current = assemble(node.id), scope = scopes.get(node.scopeId);
     const owner = scope?.ownerNodeId ? nodes.get(scope.ownerNodeId) : undefined;
-    const params = owner?.payload.kind === 'flow-inputs' ? new Map(owner.payload.value.parameters.map(parameter => [parameter.name, parameter.type])) : new Map();
+    let params: TypeScope['params'] = new Map();
+    let item = scope?.itemShape ? copyShape(scope.itemShape) : undefined;
+    if (owner?.payload.kind === 'flow-inputs') {
+      if (!typedFlows.has(owner.id)) {
+        const parsed = graphInputsSchema.safeParse(assemble(owner.id));
+        if (parsed.success) {
+          const inputs = parsed.data, params = new Map(inputs.parameters.map(parameter => [parameter.name, parameter.type])), facts = newFacts();
+          const initial = inputs.request.type === 'none' ? typeOperand(inputs.request.value, { params, allowRead: false, allowViewer: true }, '', facts) : requestShape(inputs.request);
+          typedFlows.set(owner.id, { params, initial, steps: typeSteps(inputs.steps, initial, params, '', facts) });
+        } else typedFlows.set(owner.id, undefined);
+      }
+      const flow = typedFlows.get(owner.id), binding = owner.inputs.find(input => input.type.scopeId === scope?.id)?.binding;
+      params = flow?.params ?? new Map();
+      item = undefined;
+      if (flow && binding) {
+        const step = /^\/steps\/(\d+)$/.exec(binding);
+        const shape = step ? Number(step[1]) === 0 ? flow.initial : flow.steps[Number(step[1]) - 1]
+          : binding === '/output' ? flow.steps.at(-1) ?? flow.initial : undefined;
+        if (shape) item = elementOf(shape) ?? shape;
+      }
+    }
     return current !== undefined && (node.payload.kind === 'operand' || node.payload.kind === 'condition')
-      ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(scope?.itemShape ? { item: copyShape(scope.itemShape) } : {}) }, expressionScope(current, node.scopeId, graph.scopes)) : output;
+      ? expressionPort(current, node.payload.kind === 'condition', { params, allowRead: true, allowViewer: true, ...(item ? { item } : {}) }, expressionScope(current, node.scopeId, graph.scopes)) : output;
   };
   if (scopes.size !== graph.scopes.length) report('duplicate_id', 'Scope IDs must be unique.');
   for (const scope of graph.scopes) {
