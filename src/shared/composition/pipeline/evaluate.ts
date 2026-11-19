@@ -1,7 +1,7 @@
 import type { Json } from '../../types';
 import { compareText, scalarText } from './text';
 import { instant, wallTime } from './dates';
-import { coerceRead, evaluateOperand, evaluateWhere, Meter, OverBudget, valueAt, type FlowContext, type Scope } from './operands';
+import { coerceRead, evaluateOperand, evaluateWhere, Meter, notifyPipeline, OverBudget, valueAt, type FlowContext, type Scope } from './operands';
 import type { PipelineInputs, PipelineStep } from './schema';
 
 /**
@@ -100,10 +100,12 @@ function setDefault(item: Json, path: readonly string[], fill: Json): Json {
 }
 
 /** The lowest or highest of the numbers among `parts`; `null` when there is none. A part that is not a finite number is skipped, as `sum` skips it. */
-function extreme(kind: 'min' | 'max', parts: Json[]): number | null {
+function extreme(kind: 'min' | 'max', parts: Json[], observe?: (value: Json, index: number, included: boolean) => void): number | null {
   let found: number | null = null;
-  for (const part of parts) {
-    if (typeof part !== 'number' || !Number.isFinite(part)) continue;
+  for (let index = 0; index < parts.length; index++) {
+    const part = parts[index];
+    if (typeof part !== 'number' || !Number.isFinite(part)) { observe?.(part, index, false); continue; }
+    observe?.(part, index, true);
     found = found === null ? part : kind === 'min' ? Math.min(found, part) : Math.max(found, part);
   }
   return found === 0 ? 0 : found;
@@ -122,7 +124,11 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
     }
     case 'filter': {
       const items = list(value); each(items);
-      return items.filter((item, at) => evaluateWhere(step.where, withItem(item, at), context, meter));
+      return items.filter((item, at) => {
+        const kept = evaluateWhere(step.where, withItem(item, at), context, meter);
+        if (context.observe) notifyPipeline(context.observe, { kind: 'filter', step, item, index: at, kept, used: meter.spent, limit: meter.limit });
+        return kept;
+      });
     }
     case 'sort': {
       const items = list(value); each(items);
@@ -136,11 +142,16 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
         }
         return a.index - b.index;
       });
+      if (context.observe) keyed.forEach((entry, position) => notifyPipeline(context.observe!, { kind: 'sort', step, item: entry.item, index: entry.index, position, used: meter.spent, limit: meter.limit }));
       return keyed.map(entry => entry.item);
     }
     case 'limit': return list(value).slice(0, step.count);
     case 'map': {
-      const build = (item: Json, at = 0): Json => Object.fromEntries(Object.entries(step.fields).map(([name, operand]) => [name, evaluateOperand(operand, withItem(item, at), context, meter)]));
+      const build = (item: Json, at = 0): Json => {
+        const output = Object.fromEntries(Object.entries(step.fields).map(([name, operand]) => [name, evaluateOperand(operand, withItem(item, at), context, meter)]));
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: output, included: true, reason: 'Mapped record' });
+        return output;
+      };
       if (Array.isArray(value)) { each(value); return value.map(build); }
       return isRecord(value) ? build(value) : null;
     }
@@ -151,39 +162,62 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
         const key = evaluateOperand(step.by, withItem(item, at), context, meter), slot = identity(key);
         const group = groups.get(slot) ?? { key: typeof key === 'object' ? null : key, items: [] };
         group.items.push(item); groups.set(slot, group);
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: group.key, included: true, reason: 'Included in this group key' });
       }
       return [...groups.values()].map(group => ({ key: group.key, count: group.items.length, items: group.items }));
     }
-    case 'count': return list(value).length;
+    case 'count': {
+      const items = list(value);
+      if (context.observe) items.forEach((item, index) => notifyPipeline(context.observe!, { kind: 'item', step, item, index, value: 1, included: true, reason: 'Counted' }));
+      return items.length;
+    }
     case 'sum': {
       const items = list(value); each(items);
       let total = 0;
-      for (const [at, item] of items.entries()) { const part = evaluateOperand(step.value, withItem(item, at), context, meter); if (typeof part === 'number') total += part; }
+      for (const [at, item] of items.entries()) {
+        const part = evaluateOperand(step.value, withItem(item, at), context, meter);
+        if (typeof part === 'number') total += part;
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: part, included: typeof part === 'number', reason: typeof part === 'number' ? 'Number added' : 'Not a number - skipped' });
+      }
       return total === 0 ? 0 : total;
     }
     case 'first': return list(value)[0] ?? null;
     case 'flatten': {
       const items = list(value); each(items);
-      return items.flatMap(item => list(valueAt(item, step.path)));
+      return items.flatMap((item, index) => {
+        const rows = list(valueAt(item, step.path));
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index, value: rows, included: rows.length > 0, reason: rows.length ? 'Expanded these items' : 'No list items to expand' });
+        return rows;
+      });
     }
     case 'unique': {
       const items = list(value); each(items);
       const seen = new Set<string>();
       return items.filter((item, at) => {
-        const slot = identity(evaluateOperand(step.by, withItem(item, at), context, meter));
-        if (seen.has(slot)) return false;
-        seen.add(slot); return true;
+        const key = evaluateOperand(step.by, withItem(item, at), context, meter), slot = identity(key);
+        if (seen.has(slot)) {
+          if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: key, included: false, reason: 'Duplicate key - dropped' });
+          return false;
+        }
+        seen.add(slot);
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: key, included: true, reason: 'First occurrence of this key - kept' });
+        return true;
       });
     }
     // `sh.flow-extras@1`
     case 'min': case 'max': {
       const items = list(value); each(items);
-      return extreme(step.op, items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter)));
+      return extreme(step.op, items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter)),
+        context.observe ? (part, index, included) => notifyPipeline(context.observe!, { kind: 'item', step, item: items[index], index, value: part, included, reason: included ? 'Finite number considered' : 'Not a finite number - skipped' }) : undefined);
     }
     case 'average': {
       const items = list(value); each(items);
       const numbers = items.map((item, at) => evaluateOperand(step.value, withItem(item, at), context, meter))
-        .filter((part): part is number => typeof part === 'number' && Number.isFinite(part));
+        .filter((part, index): part is number => {
+          const included = typeof part === 'number' && Number.isFinite(part);
+          if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item: items[index], index, value: part, included, reason: included ? 'Included in the mean' : 'Not a finite number - skipped' });
+          return included;
+        });
       if (!numbers.length) return null;
       const total = numbers.reduce((sum, part) => sum + part, 0);
       let mean = total / numbers.length;
@@ -206,6 +240,7 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
         const number = typeof part === 'number' && Number.isFinite(part) ? part : undefined;
         if (step.nullPropagates) total = total !== null && number !== undefined ? total + number : null;
         else if (number !== undefined && total !== null) total += number;
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: { part, total }, included: number !== undefined && total !== null, reason: total === null ? 'Running total unknown' : number === undefined ? 'Not a finite number - skipped' : 'Number added' });
         return isRecord(item) ? { ...item, [step.into]: total === 0 ? 0 : total } : item;
       });
     }
@@ -213,11 +248,16 @@ export function runStep(step: PipelineStep, value: Json, scope: Scope, context: 
       const items = list(value); each(items);
       // Each aggregate is taken over the whole list first, then written onto every object in it, so every item carries the same list-wide value.
       const written = Object.entries(step.fields).map(([name, field]) =>
-        [name, extreme(field.aggregate, items.map((item, at) => evaluateOperand(field.value, withItem(item, at), context, meter)))] as const);
+        [name, extreme(field.aggregate, items.map((item, at) => evaluateOperand(field.value, withItem(item, at), context, meter)),
+          context.observe ? (part, index, included) => notifyPipeline(context.observe!, { kind: 'item', step, item: items[index], index, value: part, field: name, included, reason: included ? 'Finite number considered' : 'Not a finite number - skipped' }) : undefined)] as const);
       return items.map(item => isRecord(item) ? { ...item, ...Object.fromEntries(written) } : item);
     }
     case 'default': {
-      const fill = (item: Json, at = 0) => setDefault(item, step.path, evaluateOperand(step.value, withItem(item, at), context, meter));
+      const fill = (item: Json, at = 0) => {
+        const output = setDefault(item, step.path, evaluateOperand(step.value, withItem(item, at), context, meter));
+        if (context.observe) notifyPipeline(context.observe, { kind: 'item', step, item, index: at, value: output, included: true, reason: 'Default step output (existing fields retained)' });
+        return output;
+      };
       if (Array.isArray(value)) { each(value); return value.map(fill); }
       return isRecord(value) ? fill(value) : value;
     }
@@ -265,7 +305,9 @@ export function evaluatePipeline(inputs: PipelineInputs, response: Json, context
     const trace: StepTrace[] = [];
     for (const step of inputs.steps) {
       stepId = step.id;
+      const input = value;
       value = runStep(step, value, scope, context, meter);
+      if (context.observe) notifyPipeline(context.observe, { kind: 'step', step, input, output: value, used: meter.spent, limit: meter.limit });
       trace.push({ id: step.id, op: step.op, size: Array.isArray(value) ? value.length : null });
     }
     stepId = null;

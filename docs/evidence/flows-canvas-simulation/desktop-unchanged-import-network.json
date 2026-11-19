@@ -1,0 +1,12 @@
+{
+  "change": "unchanged",
+  "activeCaptureUnchangedUntilSelection": true,
+  "persistedImport": true,
+  "simulationFetches": 0,
+  "requests": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:4823/native/api/ha/flow-run"
+    }
+  ]
+}

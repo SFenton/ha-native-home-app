@@ -1,7 +1,7 @@
 import type { Json } from '../../types';
 import {
   coerce, evaluateOperand as evaluateShared, evaluatePredicate, unavailable, value as found, valueAt,
-  type Environment, type Viewer,
+  type Environment, type EvaluationObserver, type Viewer,
 } from '../evaluator';
 import type { Clock } from './dates';
 import type { PipelineOperand, ReadKind, Where } from './schema';
@@ -24,6 +24,19 @@ export interface FlowContext {
   viewer?: Viewer;
   /** The value at `path` of a declared source, as the app's operand evaluator reads it (a parameter's `read`). */
   read?: (sourceId: string, path: string[]) => Json | undefined;
+  observe?: {
+    readonly evaluation?: EvaluationObserver;
+    readonly pipeline: (event: PipelineObservation) => void;
+  };
+}
+export type PipelineObservation =
+  | { readonly kind: 'step'; readonly step: import('./schema').PipelineStep; readonly input: Json; readonly output: Json; readonly used: number; readonly limit: number }
+  | { readonly kind: 'filter'; readonly step: import('./schema').PipelineStep; readonly item: Json; readonly index: number; readonly kept: boolean; readonly used: number; readonly limit: number }
+  | { readonly kind: 'item'; readonly step: import('./schema').PipelineStep; readonly item: Json; readonly index: number; readonly value: Json; readonly included: boolean; readonly reason: string; readonly field?: string }
+  | { readonly kind: 'sort'; readonly step: import('./schema').PipelineStep; readonly item: Json; readonly index: number; readonly position: number; readonly used: number; readonly limit: number };
+export function notifyPipeline(observer: NonNullable<FlowContext['observe']>, event: PipelineObservation): void {
+  try { observer.pipeline(event); }
+  catch { console.warn('Studio pipeline observation failed; the answer is unchanged.'); }
 }
 /** The names an operand can see: the item a step is looking at and the evaluated parameters. */
 export interface Scope { item?: Json; /** The 0-based position of `item` in the list a step is visiting (`index` operands, `sh.repeat@1`). */ index?: number; params: { get(name: string): Json | undefined } }
@@ -43,7 +56,7 @@ export function coerceRead(v: Json | undefined, kind: ReadKind): Json {
 }
 
 function environment(scope: Scope, context: FlowContext, meter: Meter): Environment {
-  return {
+  const env: Environment = {
     flow: true,
     spend: () => meter.spend(),
     clock: context.clock,
@@ -56,6 +69,8 @@ function environment(scope: Scope, context: FlowContext, meter: Meter): Environm
       return read === undefined ? unavailable : found(read);
     },
   };
+  if (context.observe) { env.observe = context.observe.evaluation; env.observationCost = meter; }
+  return env;
 }
 
 /** The value of an operand; `null` when it has none. */

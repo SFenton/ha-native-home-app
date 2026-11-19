@@ -1,0 +1,3844 @@
+{
+  "minimum": 5.161750366955982,
+  "samples": 6848,
+  "pairs": [
+    {
+      "theme": "light",
+      "scene": "Live values and toolbar",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Live values and toolbar",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Live values and toolbar",
+      "text": "Simulated",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Live values and toolbar",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Live values and toolbar",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Live values and toolbar",
+      "text": "Live",
+      "foreground": {
+        "r": 36,
+        "g": 107,
+        "b": 47,
+        "a": 1
+      },
+      "background": {
+        "r": 232,
+        "g": 244,
+        "b": 233,
+        "a": 1
+      },
+      "ratio": 5.761812079074953,
+      "classes": "w2-tag w2-tag-success tag live"
+    },
+    {
+      "theme": "dark",
+      "scene": "Live values and toolbar",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Live values and toolbar",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Live values and toolbar",
+      "text": "Simulated",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Live values and toolbar",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Live values and toolbar",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Live values and toolbar",
+      "text": "Live",
+      "foreground": {
+        "r": 145,
+        "g": 212,
+        "b": 154,
+        "a": 1
+      },
+      "background": {
+        "r": 33,
+        "g": 44,
+        "b": 33,
+        "a": 1
+      },
+      "ratio": 8.354382561186133,
+      "classes": "w2-tag w2-tag-success tag live"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Run All",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 5.978418756356778,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 36,
+        "g": 107,
+        "b": 47,
+        "a": 1
+      },
+      "background": {
+        "r": 225,
+        "g": 240,
+        "b": 226,
+        "a": 1
+      },
+      "ratio": 5.51816619400979,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 168,
+        "g": 42,
+        "b": 35,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 229,
+        "b": 227,
+        "a": 1
+      },
+      "ratio": 5.754737190663333,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 13.90258818033684,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 6.0478639977438595,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Run All",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.996320912976502,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 145,
+        "g": 212,
+        "b": 154,
+        "a": 1
+      },
+      "background": {
+        "r": 34,
+        "g": 49,
+        "b": 35,
+        "a": 1
+      },
+      "ratio": 7.892316738340723,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 255,
+        "g": 180,
+        "b": 171,
+        "a": 1
+      },
+      "background": {
+        "r": 55,
+        "g": 34,
+        "b": 32,
+        "a": 1
+      },
+      "ratio": 8.758901876812777,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 10.908999554491833,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Selected scenario, all status badges and drawer actions",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.577847933494401,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Run All",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 5.978418756356778,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 36,
+        "g": 107,
+        "b": 47,
+        "a": 1
+      },
+      "background": {
+        "r": 225,
+        "g": 240,
+        "b": 226,
+        "a": 1
+      },
+      "ratio": 5.51816619400979,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 168,
+        "g": 42,
+        "b": 35,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 229,
+        "b": 227,
+        "a": 1
+      },
+      "ratio": 5.754737190663333,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 244,
+        "g": 244,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 14.640130707466394,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 6.0478639977438595,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Hovered scenario row",
+      "text": "Too Warm",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 13.90258818033684,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Run All",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.996320912976502,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 145,
+        "g": 212,
+        "b": 154,
+        "a": 1
+      },
+      "background": {
+        "r": 34,
+        "g": 49,
+        "b": 35,
+        "a": 1
+      },
+      "ratio": 7.892316738340723,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 255,
+        "g": 180,
+        "b": 171,
+        "a": 1
+      },
+      "background": {
+        "r": 55,
+        "g": 34,
+        "b": 32,
+        "a": 1
+      },
+      "ratio": 8.758901876812777,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 38,
+        "g": 38,
+        "b": 38,
+        "a": 1
+      },
+      "ratio": 11.572713953542864,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.577847933494401,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Hovered scenario row",
+      "text": "Too Warm",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 10.908999554491833,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Run All",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 5.978418756356778,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 36,
+        "g": 107,
+        "b": 47,
+        "a": 1
+      },
+      "background": {
+        "r": 225,
+        "g": 240,
+        "b": 226,
+        "a": 1
+      },
+      "ratio": 5.51816619400979,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 168,
+        "g": 42,
+        "b": 35,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 229,
+        "b": 227,
+        "a": 1
+      },
+      "ratio": 5.754737190663333,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 13.90258818033684,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Review fields, warnings and JSON",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 6.0478639977438595,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Run All",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.996320912976502,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 145,
+        "g": 212,
+        "b": 154,
+        "a": 1
+      },
+      "background": {
+        "r": 34,
+        "g": 49,
+        "b": 35,
+        "a": 1
+      },
+      "ratio": 7.892316738340723,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 255,
+        "g": 180,
+        "b": 171,
+        "a": 1
+      },
+      "background": {
+        "r": 55,
+        "g": 34,
+        "b": 32,
+        "a": 1
+      },
+      "ratio": 8.758901876812777,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 10.908999554491833,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Review fields, warnings and JSON",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.577847933494401,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Bedroom",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 244,
+        "g": 244,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 14.640130707466394,
+      "classes": "w2-link-button"
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Source radios, disabled replay, clock, ticks and trace chips",
+      "text": "Bedroom",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 38,
+        "g": 38,
+        "b": 38,
+        "a": 1
+      },
+      "ratio": 11.572713953542864,
+      "classes": "w2-link-button"
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Number field and direct pin tags",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Number field and direct pin tags",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "State field",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "State field",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin fields",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin fields",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Value",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 244,
+        "g": 244,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 14.640130707466394,
+      "classes": "w2-select-text"
+    },
+    {
+      "theme": "light",
+      "scene": "Typed pin status menu",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Value",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 38,
+        "g": 38,
+        "b": 38,
+        "a": 1
+      },
+      "ratio": 11.572713953542864,
+      "classes": "w2-select-text"
+    },
+    {
+      "theme": "dark",
+      "scene": "Typed pin status menu",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Each Run evidence",
+      "text": "Bedroom pinned. No device was operated.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-sim-status"
+    },
+    {
+      "theme": "light",
+      "scene": "Each Run evidence",
+      "text": "Run evidence",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Each Run evidence",
+      "text": "Items",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Each Run evidence",
+      "text": "Bedroom pinned. No device was operated.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-sim-status"
+    },
+    {
+      "theme": "dark",
+      "scene": "Each Run evidence",
+      "text": "Run evidence",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Each Run evidence",
+      "text": "Items",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Items evidence",
+      "text": "Bedroom pinned. No device was operated.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-sim-status"
+    },
+    {
+      "theme": "light",
+      "scene": "Items evidence",
+      "text": "Run evidence",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Items evidence",
+      "text": "Each Run",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Items evidence",
+      "text": "Bedroom pinned. No device was operated.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-sim-status"
+    },
+    {
+      "theme": "dark",
+      "scene": "Items evidence",
+      "text": "Run evidence",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Items evidence",
+      "text": "Each Run",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Trace evidence",
+      "text": "Bedroom pinned. No device was operated.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-sim-status"
+    },
+    {
+      "theme": "light",
+      "scene": "Trace evidence",
+      "text": "Run evidence",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Trace evidence",
+      "text": "Each Run",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Trace evidence",
+      "text": "Bedroom pinned. No device was operated.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-sim-status"
+    },
+    {
+      "theme": "dark",
+      "scene": "Trace evidence",
+      "text": "Run evidence",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Trace evidence",
+      "text": "Each Run",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Simulation",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 16.102191704447957,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 7.004729208035935,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Live",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 239,
+        "g": 239,
+        "b": 239,
+        "a": 1
+      },
+      "ratio": 14.003650006988055,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 5.161750366955982,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 15.427024555796525,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 250,
+        "b": 250,
+        "a": 1
+      },
+      "ratio": 6.71101993334393,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 117,
+        "g": 64,
+        "b": 219,
+        "a": 1
+      },
+      "background": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 1
+      },
+      "ratio": 5.978418756356778,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 36,
+        "g": 107,
+        "b": 47,
+        "a": 1
+      },
+      "background": {
+        "r": 225,
+        "g": 240,
+        "b": 226,
+        "a": 1
+      },
+      "ratio": 5.51816619400979,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 168,
+        "g": 42,
+        "b": 35,
+        "a": 1
+      },
+      "background": {
+        "r": 250,
+        "g": 229,
+        "b": 227,
+        "a": 1
+      },
+      "ratio": 5.754737190663333,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 13.90258818033684,
+      "classes": ""
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 89,
+        "g": 89,
+        "b": 89,
+        "a": 1
+      },
+      "background": {
+        "r": 241,
+        "g": 236,
+        "b": 251,
+        "a": 1
+      },
+      "ratio": 6.0478639977438595,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "light",
+      "scene": "Import/export fields",
+      "text": "Prepare export",
+      "foreground": {
+        "r": 33,
+        "g": 33,
+        "b": 33,
+        "a": 1
+      },
+      "background": {
+        "r": 244,
+        "g": 244,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 14.640130707466394,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Simulation",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 13.032185638319493,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Studio only · no device controls",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.8580748804447556,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Live",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 42,
+        "g": 42,
+        "b": 42,
+        "a": 1
+      },
+      "ratio": 10.976148586534096,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.693571109111593,
+      "classes": "w2-tag w2-tag-neutral tag pinned"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Just the Values",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 14.44000650517117,
+      "classes": "w2-group-title"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "The preview is a lens. These are the actual outputs, not device actions.",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 17,
+        "g": 17,
+        "b": 17,
+        "a": 1
+      },
+      "ratio": 8.706954883922027,
+      "classes": "w2-caption"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Apply pin",
+      "foreground": {
+        "r": 6,
+        "g": 34,
+        "b": 46,
+        "a": 1
+      },
+      "background": {
+        "r": 3,
+        "g": 169,
+        "b": 244,
+        "a": 1
+      },
+      "ratio": 6.258113046066024,
+      "classes": "w2-sim-apply w2-primary"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "25.0 °C",
+      "foreground": {
+        "r": 192,
+        "g": 162,
+        "b": 255,
+        "a": 1
+      },
+      "background": {
+        "r": 28,
+        "g": 28,
+        "b": 28,
+        "a": 1
+      },
+      "ratio": 7.996320912976502,
+      "classes": "w2-sim-pinned-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "✓ Matches",
+      "foreground": {
+        "r": 145,
+        "g": 212,
+        "b": 154,
+        "a": 1
+      },
+      "background": {
+        "r": 34,
+        "g": 49,
+        "b": 35,
+        "a": 1
+      },
+      "ratio": 7.892316738340723,
+      "classes": "w2-tag w2-tag-success "
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "✗ Expected Too Warm",
+      "foreground": {
+        "r": 255,
+        "g": 180,
+        "b": 171,
+        "a": 1
+      },
+      "background": {
+        "r": 55,
+        "g": 34,
+        "b": 32,
+        "a": 1
+      },
+      "ratio": 8.758901876812777,
+      "classes": "w2-tag w2-tag-error "
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Sensor offline",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 10.908999554491833,
+      "classes": ""
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "23.6 °C",
+      "foreground": {
+        "r": 176,
+        "g": 176,
+        "b": 176,
+        "a": 1
+      },
+      "background": {
+        "r": 44,
+        "g": 41,
+        "b": 51,
+        "a": 1
+      },
+      "ratio": 6.577847933494401,
+      "classes": "w2-sim-live-value"
+    },
+    {
+      "theme": "dark",
+      "scene": "Import/export fields",
+      "text": "Prepare export",
+      "foreground": {
+        "r": 225,
+        "g": 225,
+        "b": 225,
+        "a": 1
+      },
+      "background": {
+        "r": 38,
+        "g": 38,
+        "b": 38,
+        "a": 1
+      },
+      "ratio": 11.572713953542864,
+      "classes": ""
+    }
+  ]
+}
