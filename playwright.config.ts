@@ -25,7 +25,7 @@ export default defineConfig({
     // S1 (`sim-blank`): the Duo rig in WebKit, on demand only (`STUDIO_E2E_WEBKIT=1 npx playwright test --project=webkit`); CI keeps Chromium.
     ...(process.env.STUDIO_E2E_WEBKIT ? [{ name: 'webkit', testMatch: /preview2-(duo-webkit|rails-evidence)\.spec\.ts/, use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 } } }] : []),
     // The workspace specs also run at phone size with touch; the preview story page is a desktop study.
-    { name: 'phone', testMatch: /workspace2-.*\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'phone', testMatch: /(?:workspace2-.*|flows-tab.*|data-tab.*)\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 } },
   ],
   webServer: {
     // STUDIO_E2E_PROD=1 runs the built app (after `npm run build`): frame pacing is measured on it, not on React's development build.

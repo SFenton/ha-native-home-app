@@ -1,6 +1,8 @@
 import { test, expect, panelDocument } from './data-tab-harness';
-import { openLibrary, openWorkspace, seed } from './workspace2-helpers';
+import { openLibrary, openWorkspace, seed, snap } from './workspace2-helpers';
 
+// These assert the desktop library rail; the phone's pushed editors are covered by workspace2-data/logic and its Data sheet by data-tab.
+test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'The library rail is desktop-only');
 test.beforeEach(async ({ request }) => { await seed(request, panelDocument()); });
 
 test('Flows is between Controls and Data and opens existing templates, flows and component fields', async ({ page }) => {
@@ -74,6 +76,6 @@ for (const scheme of ['light', 'dark'] as const) {
     const panel = page.getByTestId('flows-panel');
     await panel.getByRole('button', { name: 'Templates, 3' }).click();
     await panel.getByRole('button', { name: 'Flows, 3' }).click();
-    await page.screenshot({ path: `test-results/lane-b/flows-${scheme}.png`, animations: 'disabled' });
+    await snap(page, `desktop-${scheme}-flows`);
   });
 }
