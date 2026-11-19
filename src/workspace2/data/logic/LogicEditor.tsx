@@ -47,7 +47,7 @@ function BodyResult({ document, entry }: { document: CompositionDocument; entry:
   const said = evaluateOperand(worked as Operand, env);
   const text = said.status === 'value' ? scalarText(said.value) : undefined;
   if (said.status !== 'value' || text === undefined || (text === '' && (entry.body as Rec).type === 'literal')) return <ResultLine marker="unknown" head={said.status === 'value' ? logicWords.resultNothing : "Can't tell yet."} tag={tag}>{logicWords.resultTry}</ResultLine>;
-  return <ResultLine marker="check" head={`Shows ${text}`} tag={tag}>{logicWords.resultTry}</ResultLine>;
+  return <ResultLine marker="check" head={`Shows ${typeof said.value === 'string' ? JSON.stringify(text) : text},`} tag={tag}>{logicWords.resultTry.charAt(0).toLowerCase() + logicWords.resultTry.slice(1)}</ResultLine>;
 }
 
 /** The body's own field: a value opens the value editor (in Rules the first time), a condition the condition editor. Both are the built editors. */

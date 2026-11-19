@@ -115,6 +115,7 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await expect(single.locator('.w2-picker-secondary')).toHaveCount(0);
   await expect(single.getByRole('combobox', { name: 'Read', exact: true })).toHaveCount(0);
   await expect(props(page).getByRole('radiogroup', { name: 'Condition view' })).toHaveCount(0);
+  await expect(props(page).getByRole('radiogroup', { name: /If it can.t tell/ })).toBeVisible();
   await single.getByRole('button', { name: '+ And…', exact: true }).scrollIntoViewIfNeeded();
   await expect(single.getByTestId('simple-condition')).toBeInViewport();
   await shot(page, scheme, 'one-check-inline');
@@ -138,17 +139,28 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await expect(many.getByRole('img', { name: /^Logic mini-map:/ })).toBeVisible();
   await expect(many.locator('figcaption')).toContainText('Window is Open and the person using the app is an admin');
   await expect(many.locator('.w2-logic-map-label strong', { hasText: 'Window' }).first()).toBeVisible();
-  await expect(many.getByLabel('Logic status')).toContainText(/Live.*0 pinned.*of 64 blocks/);
+  await expect(many.getByLabel('Logic status')).toHaveText('Uses 3 blocks');
   if (isPhone(page)) await page.evaluate(() => window.dispatchEvent(new CustomEvent('w2:sheet-snap', { detail: 'full' })));
   await many.getByRole('button', { name: 'Edit in Canvas', exact: true }).scrollIntoViewIfNeeded();
   await expect(many.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeInViewport({ ratio: 1 });
   await expect(many.getByTestId('logic-field-summary')).toBeInViewport();
+  const viewerLabel = many.locator('.w2-logic-map-label strong', { hasText: /^Viewer Matches$/ });
+  await expect(viewerLabel).toBeVisible();
+  const labelSize = await viewerLabel.evaluate(element => ({
+    width: element.clientWidth, contentWidth: element.scrollWidth, height: element.clientHeight,
+    contentHeight: element.scrollHeight, lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight),
+  }));
+  expect(labelSize.contentWidth).toBeLessThanOrEqual(labelSize.width);
+  expect(labelSize.contentHeight).toBeLessThanOrEqual(labelSize.height);
+  expect(labelSize.height).toBeLessThanOrEqual(labelSize.lineHeight * 2 + 1);
+  await expect(many.getByRole('img', { name: /Logic mini-map:.*Viewer Matches/ })).toBeVisible();
   await shot(page, scheme, 'multi-check-summary');
   await closeProperties(page);
 
   const editor = await template(page);
   await expect(editor.getByText('Used by', { exact: true })).toBeVisible();
   await expect(editor.getByTestId('logic-body')).toBeVisible();
+  await expect(editor.getByTestId('result-line')).toContainText('Shows "closed", worked out with each setting’s Try With value.');
   await expect(editor.getByRole('img', { name: /^Logic mini-map:/ })).toBeVisible();
   await expect(editor.locator('.w2-logic-map')).not.toContainText('graph-setting');
   await editor.getByRole('button', { name: 'Edit in Canvas', exact: true }).first().scrollIntoViewIfNeeded();
@@ -157,8 +169,17 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await editor.getByRole('button', { name: 'Edit in Canvas', exact: true }).first().click();
   await expect(canvas(page)).toBeVisible();
   await closePalette(page);
+  const backdrop = page.locator('.w2-logic-backdrop');
+  const backdropStyle = await backdrop.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { color: style.backgroundColor, opacity: style.opacity };
+  });
+  expect(parseColor(backdropStyle.color)?.a).toBe(1);
+  expect(backdropStyle.opacity).toBe('1');
+  expect(await backdrop.boundingBox()).toEqual({ x: 0, y: 0, ...page.viewportSize()! });
   await canvas(page).getByText('Simulation · Studio only', { exact: true }).click();
   await expect(canvas(page).getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Live', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(canvas(page).getByText('Waiting for Home Assistant. Showing the last values.', { exact: true })).toBeVisible();
   await expect(canvas(page).getByText('Canvas preview', { exact: true })).toHaveCount(0);
   const block = canvas(page).getByRole('button', { name: /^Select Attribute/ });
   const initialPosition = await block.locator('..').getAttribute('style');

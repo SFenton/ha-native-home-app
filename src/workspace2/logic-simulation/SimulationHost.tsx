@@ -221,7 +221,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
         <button type="button" className="w2-tonal" onClick={() => { setInspecting(false); setDrawer('scenarios'); }}><FlaskConical size={15} aria-hidden />Scenarios</button>
       </div>
     </header>
-    {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Waiting for Home Assistant.{snapshot.error && <> {snapshot.error}</>}</p>}
+    {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Waiting for Home Assistant.{run.outputs.some(output => output.source === 'Held/stale') && ' Showing the last values.'}{snapshot.error && <> {snapshot.error}</>}</p>}
     {run.issues.length > 0 && <p role="alert" className="w2-sim-notice">{run.issues.map(issueText).join(' ')}</p>}
     <p role="status" aria-live="polite" className="w2-sim-status">{message}</p>
     {savedVersionDiffers && drawer !== 'scenarios' && <p role="note" className="w2-sim-notice">Saved version differs. Reselect to apply.</p>}

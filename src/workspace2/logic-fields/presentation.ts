@@ -127,10 +127,10 @@ export function miniMapModel(graph: LogicGraph, ctx: NameContext) {
   const rows = new Map<number, number>();
   const nodes = graph.nodes.map(node => {
     const column = depth(node.id), row = rows.get(column) ?? 0; rows.set(column, row + 1);
-    return { id: node.id, x: 8 + column * 100, y: 10 + row * 52, ...graphBlockLabel(node, graph, ctx, index),
+    return { id: node.id, x: 8 + column * 100, y: 10 + row * 64, ...graphBlockLabel(node, graph, ctx, index),
       kind: node.outputs[0] ? wireKind(node.outputs[0].type) : 'record' };
   });
   const byId = new Map(nodes.map(node => [node.id, node]));
-  return { nodes, width: Math.max(220, ...nodes.map(node => node.x + 94)), height: Math.max(76, ...nodes.map(node => node.y + 48)),
+  return { nodes, width: Math.max(220, ...nodes.map(node => node.x + 94)), height: Math.max(76, ...nodes.map(node => node.y + 60)),
     edges: graph.edges.map(edge => ({ id: edge.id, from: byId.get(edge.from.nodeId)!, to: byId.get(edge.to.nodeId)! })) };
 }

@@ -47,7 +47,7 @@ function InlineResult({ draft, predicate }: { draft: Draft; predicate: Predicate
 export function LogicField({ draft, path, kind, label, inline, children, showLabel = true }: {
   draft: Draft; path: EditorPath; kind: LogicFieldKind; label: string; inline?: ReactNode; children?: ReactNode; showLabel?: boolean;
 }) {
-  const api = useLogicFields(), document = useDraftDocument(draft), ctx = useNameContext(document), data = useWorkspaceData();
+  const api = useLogicFields(), document = useDraftDocument(draft), ctx = useNameContext(document);
   const [error, setError] = useState(''), [settings, setSettings] = useState(false);
   const value = valueAt(document, path), adapter = fieldAdapters[kind];
   const predicate = kind === 'condition' ? value as Predicate | undefined : undefined;
@@ -91,11 +91,9 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
         <MiniMap graph={summary.graph} ctx={ctx} description={summary.description}/>
         <figcaption>{summary.description}</figcaption>
       </figure>
-      <div className="w2-logic-status" aria-label="Logic status">
-        <span>{data.tried.count ? 'Simulated' : data.connected ? 'Live' : 'Waiting for Home Assistant'}</span>
-        <span>{data.tried.count} pinned</span>
-        {summary.meter && <span>{summary.meter.used}{summary.meter.limit !== null ? ` of ${summary.meter.limit}` : ''} {summary.meter.kind.endsWith(' nodes') ? 'blocks' : summary.meter.kind.toLowerCase()}</span>}
-      </div>
+      {summary.meter && <div className="w2-logic-status" aria-label="Logic status">
+        Uses {summary.meter.used} block{summary.meter.used === 1 ? '' : 's'}
+      </div>}
     </> : summary?.error ? <p role="alert" className="w2-error-text">{summary.error}</p> : null}
     {use && <div className="w2-logic-template" data-testid={settings ? undefined : 'logic-use'}>
       <p>From the template: <strong>{entry?.name ?? 'Missing template'}</strong></p>

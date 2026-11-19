@@ -89,6 +89,7 @@ it('renders every actual mini-map block with its name and typed wires, without c
   const model = miniMapModel(graph, ctx);
   expect(model.nodes.map(node => node.id)).toEqual(graph.nodes.map(node => node.id));
   const view = render(<MiniMap graph={graph} ctx={ctx} description={graphSentence(graph, ctx)}/>);
+  expect(screen.getByRole('img', { name: /All Of/ })).toBeTruthy();
   const labels = [...view.container.querySelectorAll('.w2-logic-map-label')].map(node => node.textContent);
   expect(labels.join(' ')).not.toContain('graph-setting');
   for (const name of ['Window', 'Living Room', 'Bedroom', 'Thermostat', 'Average', 'All Of']) expect(labels.some(label => label?.includes(name)), `${name}: ${labels.join(', ')}`).toBe(true);
@@ -125,7 +126,7 @@ it('labels retained simulation answers plainly without changing their stale prov
   render(<WorkspaceDataProvider document={document} house={live.house} live={live}>
     <SimulationHost program={program} document={document} canvasId="presentation-copy-test" freshness={{ stale: true }}/>
   </WorkspaceDataProvider>);
-  expect(await screen.findByText('Waiting for Home Assistant.')).toBeTruthy();
+  expect(await screen.findByText('Waiting for Home Assistant. Showing the last values.')).toBeTruthy();
   expect((await screen.findAllByText('Last value kept')).length).toBeGreaterThan(0);
   expect(screen.queryByText(/Held\/stale/)).toBeNull();
 });

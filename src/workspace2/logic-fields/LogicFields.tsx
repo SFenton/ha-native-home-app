@@ -218,7 +218,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
   useEffect(() => { if (!active) onClose(); }, [active, onClose]);
   const warnings = readStudioCanvas(document).warnings;
   return <Dialog.Root open modal onOpenChange={() => {}}>
-    <Dialog.Portal><Dialog.Backdrop className="w2-logic-backdrop"/><Dialog.Popup className="w2-scope w2-logic-overlay" style={theme.variables} aria-label={`${field.label} canvas`} finalFocus={() => field.returnFocus}>
+    <Dialog.Portal><Dialog.Backdrop className="w2-logic-backdrop" style={theme.variables}/><Dialog.Popup className="w2-scope w2-logic-overlay" style={theme.variables} aria-label={`${field.label} canvas`} finalFocus={() => field.returnFocus}>
       <Dialog.Title className="w2-logic-sr">{field.label}</Dialog.Title>
       <div className="w2-logic-work">
         <FlowCanvas host={{ ...host, observations }} graph={field.graph} title={field.label} theme={theme} onClose={close} returnFocus={field.returnFocus}

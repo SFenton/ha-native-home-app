@@ -53,7 +53,7 @@ export default function ConditionEditor({ draft, path, place, scope = 'document'
   const canvas = useLogicFields();
   if (canvas) return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">
     <LogicField draft={draft} path={path} kind="condition" label={label ?? (place === 'filter' ? 'Keep items when' : 'When')} showLabel={label === undefined}/>
-    {policy && <details className="w2-data-fold"><summary>{words.ifUnknown}</summary><PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/></details>}
+    {policy && <PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/>}
     <TryValues document={document} inputs={inputsOf(rule)}/>
   </div>;
   return <div className="w2-editor-section w2-expr-editor" data-testid="condition-editor">

@@ -31,12 +31,26 @@ function setup(child: ReactNode, document = integrationDocument()) {
 }
 
 it('keeps the Only show when disclosure and Done for one check, without legacy condition cards', async () => {
-  const state = setup(<ConditionField label="Only show when" path={['pages', 0, 'components', 2, 'visibleWhen']} place="show" itemName="One check"/>);
+  const state = setup(<ConditionField label="Only show when" path={['pages', 0, 'components', 2, 'visibleWhen']} place="show" policy="show" itemName="One check"/>);
   fireEvent.click(screen.getByRole('button', { name: /^Only show when:/ }));
   const editor = await screen.findByRole('dialog', { name: 'Only Show When' });
   expect(within(editor).getByRole('button', { name: 'Entity' }).textContent).toBe('Window');
   expect(within(editor).queryByRole('radiogroup', { name: 'Condition view' })).toBeNull();
   expect(within(editor).queryByRole('button', { name: /^Condition 1:/ })).toBeNull();
+  expect(within(editor).getByRole('radiogroup', { name: /If it can.t tell/ })).toBeTruthy();
+  fireEvent.click(within(editor).getByRole('button', { name: 'Done' }));
+  expect(state.onChange).not.toHaveBeenCalled();
+  state.unchanged();
+});
+
+it('omits the fallback heading when there is no condition to choose a policy for', async () => {
+  const path = ['pages', 0, 'components', 2, 'visibleWhen'];
+  const document = replaceAt(integrationDocument(), path, undefined);
+  const state = setup(<ConditionField label="Only show when" path={path} place="show" policy="show" itemName="One check"/>, document);
+  fireEvent.click(screen.getByRole('button', { name: /^Only show when:/ }));
+  const editor = await screen.findByRole('dialog', { name: 'Only Show When' });
+  expect(within(editor).queryByText(/If it can.t tell/)).toBeNull();
+  expect(within(editor).queryByRole('radiogroup', { name: /If it can.t tell/ })).toBeNull();
   fireEvent.click(within(editor).getByRole('button', { name: 'Done' }));
   expect(state.onChange).not.toHaveBeenCalled();
   state.unchanged();
@@ -87,6 +101,7 @@ it('uses the summary only for a condition field with more than one check', () =>
   expect(screen.getByTestId('logic-field-summary')).toBeTruthy();
   expect(screen.queryByRole('button', { name: /^Only show when:/ })).toBeNull();
   expect(screen.getByRole('button', { name: 'Edit in Canvas' })).toBeTruthy();
+  expect(screen.getByLabelText('Logic status').textContent).toBe('Uses 3 blocks');
   state.unchanged();
 });
 
