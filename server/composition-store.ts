@@ -129,7 +129,7 @@ export class CompositionStore {
     const { document, capabilities } = compileCompositionDocument(input);
     return this.validateDraft({
       envelopeVersion: '2.0', publisherId, revision, updatedAt: new Date().toISOString(),
-      capabilities, assetManifestSha256: compositionAssetManifestHash(document.assets), document,
+      capabilities, assetManifestSha256: compositionAssetManifestHash(document.assets), document: structuredClone(document),
     });
   }
   private persist(draft: CompositionDraft, publishedRevision: number | null) {

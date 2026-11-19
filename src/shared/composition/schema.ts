@@ -1,4 +1,4 @@
-import { logicLibrarySchema } from './logic-library';
+import { logicLibrarySchema } from './studio-logic/library-schema';
 import { appStateSourceSchema } from './app-state';
 import { MAX_RULE_CASES, operandBase, predicateBase } from './expression';
 import { pipelineSourceSchema } from './pipeline/schema';
@@ -22,6 +22,7 @@ import { gridGroupsSchema } from './grid-groups';
 import { avatarLooks, avatarPersonSchema, avatarSizes, badgeSchema, shellProfileSchema } from './profile-badges';
 import { dialControlPropsSchema } from './dial-control';
 import { foldSideSchema, foldSidesSchema, type FoldSide } from './fold-sides';
+import { logicUseBindingsSchema } from './studio-logic/schemas';
 
 export { badgeSchema };
 
@@ -1189,6 +1190,8 @@ export const compositionDocumentSchema = object({
   componentLibrary: z.array(componentEntrySchema).max(100).optional(),
   /** Reusable named logic, in a draft only (`logic-library.ts`): worked out into plain operands and conditions before compiling, and refused in a publication. */
   logicLibrary: logicLibrarySchema.optional(),
+  studioCanvas: z.json().optional(),
+  logicUseBindings: logicUseBindingsSchema.optional(),
   bootstrap: object({
     type: z.literal('native-bootstrap@1'), arrivalAnnouncement: title,
     recovery: object({ loadingTitle: title, unavailableTitle: title, unavailableMessage: text(2000), retryLabel: label }),
