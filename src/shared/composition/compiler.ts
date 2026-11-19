@@ -14,7 +14,7 @@ import { deviceControlModel, isRoomDeviceSource, validateDeviceControl, validate
 import { bedroomCapabilities, bedroomProviders, bedroomWeekdays } from './bedroom';
 import { remoteCapabilities, remoteControlIssues } from './remote';
 import { deviceProviderCapabilities, isDeviceProvider, deviceProviderIssues, remoteUsesSpeakerTargets } from './device-providers';
-import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
+import { callServiceSchema, checkCallService, checkOperand, checkPredicate, operandKind, operandSchema, predicateSchema, type BudgetAccountingObserver, type CallService, type EnabledWhen, type ExpressionFacts, type ItemScope, type Operand, type Predicate, type WhenUnknown } from './expression';
 import { checkStateStyleLibrary, checkStateTileBinding, usesFillInk, usesStateFills } from './state-styles';
 import { identifierSchema } from '../validation';
 import { APP_STATE_CAPABILITY } from './app-state';
@@ -61,16 +61,16 @@ export function compositionDependencyIssues(dependencies: readonly { from: strin
 }
 
 /** A source needs its binding envelope as well as the pipeline's local requirements. */
-export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1): ReturnType<typeof checkPipelineSource> {
-  const facts = checkPipelineSource(source, at);
+export function checkCompositionPipelineSource(source: PipelineSource, at: string, ordinal = 1, accountingObserver?: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> {
+  const facts = checkPipelineSource(source, at, accountingObserver);
   if (ordinal > PIPELINE_LIMITS.pipelines) facts.issues.push({ code: 'limit_exceeded', pointer: at });
   return { ...facts, capabilities: [...new Set(['sh.bindings@1', ...facts.capabilities])].sort() };
 }
 
 /** Fragment checking permits external reads; a consuming document additionally resolves those reads. */
-export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources'): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
+export function checkCompositionPipelineBundle(sources: readonly PipelineSource[], at = '/dataSources', accountingObserver?: BudgetAccountingObserver): ReturnType<typeof checkPipelineSource> & { sources: ReturnType<typeof checkPipelineSource>[] } {
   const facts = sources.map((source, index): ReturnType<typeof checkPipelineSource> => {
-    try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1); }
+    try { return checkCompositionPipelineSource(parseCompositionShape(pipelineSourceSchema, source), `${at}/${index}`, index + 1, accountingObserver); }
     catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
       return { issues: error.issues.map(issue => ({ ...issue, pointer: `${at}/${index}${issue.pointer}` })), entities: [], reads: [], dependencies: [], capabilities: [] };
@@ -283,7 +283,11 @@ function plainDerivedIds<T>(value: T, names = new Map<string, string>()): T {
 
 /** Pure first-slice compiler. No requests, actions, asset-byte checks, or native fidelity claims. */
 /** What a compile may be asked: `tileInkDefault` overrides the Studio's gate ({@link tileInkDefault}); a test or a publication check passes it. */
-export interface CompileOptions { tileInkDefault?: boolean }
+export interface CompileOptions {
+  tileInkDefault?: boolean;
+  /** Synchronous snapshots of the existing checker pass; no accounting state is added to results. */
+  accountingObserver?: BudgetAccountingObserver;
+}
 /** Native diagnostics keep their public authored pointers and the compiler's corresponding expansion landings. */
 export class CompositionExpansionError extends CompositionValidationError {
   readonly expandedIssues: readonly CompositionIssue[];
@@ -479,7 +483,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (route.visibleWhen) {
         require('visible-when');
         // The catalog is built without entity state, so only a viewer-only rule is checked; it holds no source references.
-        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`).issues);
+        if (asksOnlyAboutViewer(route.visibleWhen)) issues.push(...checkPredicate(route.visibleWhen, `/document/extensions/routes/${index}/visibleWhen`, false, undefined, options.accountingObserver).issues);
         else add('invalid_combination', `/document/extensions/routes/${index}/visibleWhen`);
       }
       refs.push({ kind: 'page', id: route.pageId, path: `/document/extensions/routes/${index}/pageId` });
@@ -567,7 +571,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
   /** The records the walk is inside while it draws the template of a `repeat` (`sh.repeat@1`); `item` and `index` mean something only there. */
   let repeatScope: ItemScope | undefined;
   function useCall(call: CallService, path: string, control: boolean) {
-    absorb(checkCallService(call, path, control, repeatScope), 'call');
+    absorb(checkCallService(call, path, control, repeatScope, undefined, options.accountingObserver), 'call');
     const target = call.target?.entity_id;
     if (target?.type === 'literal') {
       for (const id of Array.isArray(target.value) ? target.value : [target.value]) if (typeof id === 'string') collected.entity(id, `${path}/target/entity_id`);
@@ -620,8 +624,8 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     if (!rule) return;
     require('enabled-when'); usePredicate(rule.condition, `${path}/enabledWhen/condition`);
   }
-  function useOperand(operand: Operand, path: string) { absorb(checkOperand(operand, path, false, false, repeatScope)); }
-  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path, false, repeatScope)); }
+  function useOperand(operand: Operand, path: string) { absorb(checkOperand(operand, path, false, false, repeatScope, options.accountingObserver)); }
+  function usePredicate(predicate: Predicate, path: string) { absorb(checkPredicate(predicate, path, false, repeatScope, options.accountingObserver)); }
   /** A node's or tab's `visibleWhen`; its policy means nothing without one. */
   function visibility(item: Visibility, path: string) {
     if (item.visibleWhen === undefined) { if (item.whenUnknown !== undefined) add('invalid_combination', `${path}/whenUnknown`); return; }
@@ -816,7 +820,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       expandedSources += owned.length;
       if (references) expandSources(ref, entry).forEach((source, index) => {
         const at = `${path}/sources/${index}`;
-        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1' ? checkPipelineSource(source, at).entities : []);
+        collected.define(source, at, { path: [], value: source }, source.kind === 'model' && source.model === 'pipeline@1' ? checkPipelineSource(source, at, options.accountingObserver).entities : []);
       });
     }
     if ((keys.length || valueKeys.length) && entry.bindings?.length || owned.length) argUses.push({ ref, entry, path });
@@ -1145,13 +1149,13 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (stopper.limit?.min) dialNumber(stopper.limit.min, `${at}/limit/min`);
       if (stopper.limit?.max) dialNumber(stopper.limit.max, `${at}/limit/max`);
       if (stopper.action) {
-        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope);
+        const facts = checkCallService(stopper.action, `${at}/action`, true, repeatScope, undefined, options.accountingObserver);
         require('call-service'); absorb(facts);
         if (!facts.usesControl) add('invalid_combination', `${at}/action`);
       }
     });
     if (item.action) {
-      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids);
+      const facts = checkCallService(item.action, `${p}/action`, true, repeatScope, ids, options.accountingObserver);
       require('call-service'); absorb(facts);
       if (!facts.usesControl) add('invalid_combination', `${p}/action`);
     }
@@ -1263,7 +1267,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
       if (kind !== undefined && kind !== 'number') add('binding_type', `${at}/value`);
     }
     if (found.action) {
-      const facts = checkCallService(found.action, `${at}/action`, true);
+      const facts = checkCallService(found.action, `${at}/action`, true, undefined, undefined, options.accountingObserver);
       require('call-service'); absorb(facts);
       if (!facts.usesControl) add('invalid_combination', `${at}/action`);
       if (found.action.confirmation?.type === 'additional') add('invalid_combination', `${at}/action/confirmation`);
@@ -1921,7 +1925,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false, 
     require('bindings');
     register('source', source.id, `${p}/id`);
     if (source.kind === 'model' && source.model === 'pipeline@1') {
-      const found = checkCompositionPipelineSource(source, p, ++pipelines);
+      const found = checkCompositionPipelineSource(source, p, ++pipelines, options.accountingObserver);
       collected.define(source, p, undefined, found.entities);
       issues.push(...found.issues);
       for (const name of found.capabilities) capabilities.add(name);
