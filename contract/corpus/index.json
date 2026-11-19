@@ -3681,50 +3681,6 @@
       }
     },
     {
-      "file": "reject/pending-tile-ink-default-state-tile.json",
-      "outcome": "reject",
-      "note": "A state tile with no family and no tint: its glyph and its state line draw the primary ink when idle.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/16",
-        "capability": "sh.tile-ink-default@1"
-      },
-      "pending": true
-    },
-    {
-      "file": "reject/pending-tile-ink-default-light-group-tile.json",
-      "outcome": "reject",
-      "note": "A light group tile: the idle bulb and its \"Off\" line draw the primary ink.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/16",
-        "capability": "sh.tile-ink-default@1"
-      },
-      "pending": true
-    },
-    {
-      "file": "reject/pending-tile-ink-default-room-overview-tile.json",
-      "outcome": "reject",
-      "note": "A room overview tile: the idle glyph and its count line draw the primary ink.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/16",
-        "capability": "sh.tile-ink-default@1"
-      },
-      "pending": true
-    },
-    {
-      "file": "reject/pending-tile-ink-default-action-tile.json",
-      "outcome": "reject",
-      "note": "A power action tile with the neutral family: its glyph and state line draw the primary ink when off.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/15",
-        "capability": "sh.tile-ink-default@1"
-      },
-      "pending": true
-    },
-    {
       "file": "reject/pending-fold-sides-auto-strip-and-four-sections.json",
       "outcome": "reject",
       "note": "The page switch on, a status strip and four sections: the strip spans, the sections lead and trail in turn.",
@@ -14974,6 +14930,26 @@
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/0/args/target"
       }
+    },
+    {
+      "file": "accept/tile-ink-default-state-tile.json",
+      "outcome": "accept",
+      "note": "A state tile with no family and no tint: its glyph and its state line draw the primary ink when idle."
+    },
+    {
+      "file": "accept/tile-ink-default-light-group-tile.json",
+      "outcome": "accept",
+      "note": "A light group tile: the idle bulb and its \"Off\" line draw the primary ink."
+    },
+    {
+      "file": "accept/tile-ink-default-room-overview-tile.json",
+      "outcome": "accept",
+      "note": "A room overview tile: the idle glyph and its count line draw the primary ink."
+    },
+    {
+      "file": "accept/tile-ink-default-action-tile.json",
+      "outcome": "accept",
+      "note": "A power action tile with the neutral family: its glyph and state line draw the primary ink when off."
     }
   ]
 }

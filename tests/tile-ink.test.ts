@@ -5,21 +5,23 @@ import { decodeCompositionPublication, validateCompositionPublication } from '..
 import { compileCompositionDocument, INK_DEFAULT_CAPABILITY, legacyManifest } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import { pendingCompositionCapabilities } from '../src/shared/composition/pending';
-import { tileInkDefault } from '../src/shared/composition/tile-ink-gate';
 
 const ON = { tileInkDefault: true }, OFF = { tileInkDefault: false };
 
 const corpus = path.resolve(import.meta.dirname, '../contract/corpus');
 const index: { cases: { file: string; outcome: string; pending?: boolean; issue?: { code: string } }[] } = JSON.parse(readFileSync(path.join(corpus, 'index.json'), 'utf8'));
-const ours = index.cases.filter(item => item.file.startsWith('reject/pending-tile-ink-default-'));
+const ours = index.cases.filter(item => item.file.startsWith('accept/tile-ink-default-'));
 const envelope = (file: string) => JSON.parse(readFileSync(path.join(corpus, file), 'utf8'));
 
 describe('sh.tile-ink-default@1', () => {
-  it('is pending, sorted, and has one compiling case for each tile that draws a glyph and a state line', () => {
-    expect(pendingCompositionCapabilities).toContain(INK_DEFAULT_CAPABILITY);
-    expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
+  it('is shipped and has one accepted case for each tile that draws a glyph and a state line', () => {
+    expect(pendingCompositionCapabilities).not.toContain(INK_DEFAULT_CAPABILITY);
     expect(ours.map(item => item.file.replace(/^.*ink-default-|\.json$/g, '')).sort()).toEqual(['action-tile', 'light-group-tile', 'room-overview-tile', 'state-tile']);
-    for (const item of ours) expect(item.issue?.code).toBe('unsupported_capability');
+    for (const item of ours) {
+      expect(item.outcome).toBe('accept');
+      expect(item.pending).toBeUndefined();
+      expect(item.issue).toBeUndefined();
+    }
   });
   it.each(ours)('compiles $file with the id and nothing else new', item => {
     const published = envelope(item.file);
@@ -27,17 +29,15 @@ describe('sh.tile-ink-default@1', () => {
     expect(compileCompositionDocument(published.document, ON).capabilities).toEqual(published.capabilities);
     expect(() => decodeCompositionPublication(new TextEncoder().encode(JSON.stringify(published)))).not.toThrow();
   });
-  it('is held off: the Studio gate is false, so a compile declares no id and a document cannot opt in', () => {
-    expect(tileInkDefault).toBe(false);
+  it('declares the shipped id by default, while an authored capabilities field remains invalid', () => {
     const plain = envelope('accept/fixture-composition-first-slice.json');
     const compiled = compileCompositionDocument(plain.document).capabilities;
-    expect(compiled).not.toContain(INK_DEFAULT_CAPABILITY);
-    expect(compiled).toEqual(plain.capabilities);
-    expect(compileCompositionDocument(plain.document, OFF).capabilities).toEqual(compiled);
+    expect(compiled).toEqual([...plain.capabilities, INK_DEFAULT_CAPABILITY].sort());
+    expect(compileCompositionDocument(plain.document, OFF).capabilities).toEqual(plain.capabilities);
     // There is no field to opt in with: a document that names the id in its own text is refused as an unknown field.
-    expect(() => compileCompositionDocument({ ...plain.document, capabilities: [INK_DEFAULT_CAPABILITY] }, OFF)).toThrow(CompositionValidationError);
+    expect(() => compileCompositionDocument({ ...plain.document, capabilities: [INK_DEFAULT_CAPABILITY] })).toThrow(CompositionValidationError);
   });
-  it('is declared by every document once the gate is on, and only that id is added', () => {
+  it('can explicitly request primary ink, adding only that id', () => {
     const plain = envelope('accept/fixture-composition-first-slice.json');
     const compiled = compileCompositionDocument(plain.document, ON).capabilities;
     expect(compiled).toContain(INK_DEFAULT_CAPABILITY);
@@ -63,12 +63,12 @@ describe('sh.tile-ink-default@1', () => {
     }
     expect(checked).toBeGreaterThan(300);
   });
-  it('with the gate on, the same corpus compiles to the recorded manifest plus the id and nothing else', () => {
+  it('by default, the same corpus compiles to the recorded manifest plus the id and nothing else', () => {
     let checked = 0;
     for (const item of index.cases.filter(entry => entry.outcome === 'accept' || (entry.pending && !(entry as { studioIssue?: unknown }).studioIssue))) {
       const published = envelope(item.file);
       if (published.capabilities.includes(INK_DEFAULT_CAPABILITY)) continue;
-      expect(compileCompositionDocument(published.document, ON).capabilities, item.file).toEqual([...published.capabilities, INK_DEFAULT_CAPABILITY].sort());
+      expect(compileCompositionDocument(published.document).capabilities, item.file).toEqual([...published.capabilities, INK_DEFAULT_CAPABILITY].sort());
       checked++;
     }
     expect(checked).toBeGreaterThan(300);

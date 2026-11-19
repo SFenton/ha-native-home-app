@@ -42,7 +42,7 @@ export const firstSliceCapabilities = [
 /**
  * `sh.tile-ink-default@1`: a capability with no field. While the gate {@link tileInkDefault} is on, every document the Studio compiles declares it, because the Studio's tiles draw the primary ink
  * (white on a page and in a dark sheet) for an icon with no colour of its own and for the state line; an app that predates it draws the muted grey.
- * The gate is off until the native app ships the id: a document then declares nothing (`src/shared/composition/tile-ink-gate.ts`).
+ * The native app ships the id, so the shared default is on (`src/shared/composition/tile-ink-gate.ts`).
  * A publication made before it lists no such id: {@link legacyManifest} is what that manifest looked like (`build/design/sim-fidelity-contract.md`, section 1).
  */
 export const INK_DEFAULT_CAPABILITY = 'sh.tile-ink-default@1';
@@ -90,6 +90,7 @@ export const supportedCompositionCapabilities: readonly string[] = [
   'sh.duration-format@1', 'sh.entity-time@1', 'sh.flow-extras@1', 'sh.grid-state-groups@1', 'sh.linear-gauge@1',
   'sh.math-truncate@1', 'sh.repeat@1', 'sh.stack@1', 'sh.state-words@1', 'sh.surface-controls@1',
   'sh.surface-orientation@1', 'sh.symbol-part@1', 'sh.text-style@1', 'sh.tile-swipe@1',
+  INK_DEFAULT_CAPABILITY,
   ...pendingCompositionCapabilities,
 ];
 /** A Home Assistant entity id: `domain.object`. */
@@ -1962,7 +1963,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   function checkArgUses() {
     if (!argUses.length) return;
     let found: CompositionIssue[] = [];
-    try { for (const name of compileCompositionDocument(plainDerivedIds(expanded)).capabilities) capabilities.add(name); }
+    try { for (const name of compileCompositionDocument(plainDerivedIds(expanded), options).capabilities) capabilities.add(name); }
     catch (error) { if (error instanceof CompositionValidationError) found = error.issues; else throw error; }
     const known = new Set(issues.map(issue => `${issue.code}\0${issue.pointer}`));
     for (const { ref, entry, path } of argUses) {

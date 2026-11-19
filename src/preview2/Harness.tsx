@@ -24,7 +24,7 @@ import { emptyOverlay, type Overlay } from './projections';
  * A story page for the 2.0 preview, mounted only in development at `/?preview2=1` until the workspace shell hosts it. It
  * loads the `home-domains` fixture (`fixture=devices` loads `device-controls` over its own house; any other `fixture=<name>` loads that
  * document of the contract corpus, for the node types the home fixture lacks) and offers the mode, the surface and the bezel as query parameters:
- * `?preview2=1&mode=use&surface=page:page-home&bezel=0&select=node:hc-chip-0`; `window=<name>` picks a device window by its name (`Duo open, sideways`). `ink=muted` draws the grey tile ink of an app that predates `sh.tile-ink-default@1` and `ink=primary` the primary ink; absent, the gate in `tile-ink-gate.ts` decides (off today: grey).
+ * `?preview2=1&mode=use&surface=page:page-home&bezel=0&select=node:hc-chip-0`; `window=<name>` picks a device window by its name (`Duo open, sideways`). `ink=muted` draws the grey tile ink of an app that predates `sh.tile-ink-default@1` and `ink=primary` the primary ink; absent, the shipped default in `tile-ink-gate.ts` draws primary ink.
  */
 export default function Harness() {
   const query = useMemo(() => new URLSearchParams(location.search), []);

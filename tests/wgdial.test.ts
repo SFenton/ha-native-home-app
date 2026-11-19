@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { wgdialStory } from '../src/preview2/fixtures/wgdial-story';
-import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { compileCompositionDocument, INK_DEFAULT_CAPABILITY } from '../src/shared/composition/compiler';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import { pendingCompositionCapabilities } from '../src/shared/composition/pending';
 
@@ -76,13 +76,13 @@ describe('the two WG-S4 ids', () => {
 
 describe('documents that do not use the new nodes', () => {
   const names = (folder: string) => readdirSync(path.join(corpus, folder)).filter(name => name.endsWith('.json') && !/^(pending-)?(dial|arc-track)-/.test(name));
-  it('declare exactly the capabilities the corpus recorded for them, none of the new ids', () => {
+  it('declare the recorded capabilities plus shipped tile ink, none of the new node ids', () => {
     let count = 0;
     for (const name of names('accept')) {
       const envelope = JSON.parse(readFileSync(path.join(corpus, 'accept', name), 'utf8')) as { capabilities: string[]; document: J };
       if (!envelope.document?.pages) continue;
       const compiled = compileCompositionDocument(envelope.document);
-      expect(compiled.capabilities, name).toEqual(envelope.capabilities);
+      expect(compiled.capabilities, name).toEqual([...new Set([...envelope.capabilities, INK_DEFAULT_CAPABILITY])].sort());
       for (const id of ids) expect(compiled.capabilities, name).not.toContain(id);
       count += 1;
     }

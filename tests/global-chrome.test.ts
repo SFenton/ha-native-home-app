@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { compileCompositionDocument } from '../src/shared/composition/compiler';
+import { compileCompositionDocument, INK_DEFAULT_CAPABILITY } from '../src/shared/composition/compiler';
 import { CompositionValidationError, type CompositionIssue } from '../src/shared/composition/json';
 import { expandDocument } from '../src/shared/composition/components';
 import {
@@ -67,9 +67,9 @@ describe('global-chrome corpus cases', () => {
   });
 
   // The twelve whose envelope the Studio refuses (`capability_manifest_mismatch`) hold a header button with a drawn badge, which the Studio lists `sh.badge-nodes@1` for.
-  it.each(cases.filter(item => !item.studioIssue || item.studioIssue.code === 'capability_manifest_mismatch'))('the document of $file compiles, to the declared list but for the badge id', item => {
+  it.each(cases.filter(item => !item.studioIssue || item.studioIssue.code === 'capability_manifest_mismatch'))('the document of $file compiles, to the declared list plus shipped ink and the badge id', item => {
     const declared: string[] = JSON.parse(readFileSync(path.join(directory, item.file), 'utf8')).capabilities;
-    expect(capabilities(documentOf(item.file)).filter(name => name !== 'sh.badge-nodes@1')).toEqual(declared);
+    expect(capabilities(documentOf(item.file)).filter(name => name !== 'sh.badge-nodes@1')).toEqual([...new Set([...declared, INK_DEFAULT_CAPABILITY])].sort());
   });
 
   it('names the pending capabilities in the Studio list', () => {

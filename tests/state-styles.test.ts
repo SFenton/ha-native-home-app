@@ -204,11 +204,11 @@ describe('the style library', () => {
     expect(result.binding.styleId).toBe(result.library.styles[1].id);
     const saved = result.library.styles[1];
     expect(ruleFor(saved, 'cleaning')).toMatchObject({ text: 'Vacuuming', indicator: 'pulse' });
-    // `docked` shared a rule with `idle`; an override of one of them splits it off.
-    const split = saveAsNewStyle({ stateStyles: undefined }, { entityId: 'vacuum.demo_robot', builtIn: 'robot', overrides: [{ state: 'idle', text: 'Resting' }] }, 'Split')!;
+    // Cleaning and mowing share a rule; overriding one splits it off.
+    const split = saveAsNewStyle({ stateStyles: undefined }, { entityId: 'vacuum.demo_robot', builtIn: 'robot', overrides: [{ state: 'mowing', text: 'Cutting' }] }, 'Split')!;
     const style = split.library.styles[0];
-    expect(ruleFor(style, 'idle')).toMatchObject({ text: 'Resting', states: ['idle'] });
-    expect((ruleFor(style, 'docked') as { states: string[] }).states).toEqual(['docked']);
+    expect(ruleFor(style, 'mowing')).toMatchObject({ text: 'Cutting', states: ['mowing'] });
+    expect((ruleFor(style, 'cleaning') as { states: string[] }).states).toEqual(['cleaning']);
   });
   it('resolves a tile\'s style, falling back to its built-in style', () => {
     const library = document().stateStyles as StateStyleLibrary;

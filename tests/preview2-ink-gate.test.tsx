@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fidtilesStory } from '../src/preview2/fixtures/fidtiles-story';
 import { emptyOverlay } from '../src/preview2/projections';
 import Preview2, { previewWindows, type Preview2Props } from '../src/preview2/Preview2';
-import { tileInkDefault } from '../src/shared/composition/tile-ink-gate';
 
 afterEach(cleanup);
 
@@ -16,11 +15,10 @@ function mount(over: Partial<Preview2Props> = {}) {
 }
 
 describe('the tile ink gate in the simulator (sh.tile-ink-default@1)', () => {
-  it('is off today, so the preview draws the muted grey of an app that predates the id', () => {
-    expect(tileInkDefault).toBe(false);
-    expect(mount().dataset.ink).toBe('muted');
+  it('draws the shipped primary ink by default', () => {
+    expect(mount().dataset.ink).toBe('primary');
   });
-  it('draws the primary ink when asked, which is what the gate does once it is on', () => {
+  it('draws the primary ink when asked explicitly', () => {
     expect(mount({ ink: 'primary' }).dataset.ink).toBe('primary');
   });
   it('lets a caller ask for the grey explicitly', () => {

@@ -632,7 +632,8 @@ A tile applies a style by id:
   copy of the style's first action. The preview (`ruleFor`, `unknownRuleFor`) draws the same.
 - **Built-in styles** (`garage-door`, `lock`, `blind`, `alarm`, `robot`, `detector`, `notice`, `switch`) are data in
   `state-styles.ts` and in `contract/corpus/state-styles/built-in.json`. The app decodes that file and tests it equal to its own
-  `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Regenerate with `scripts/generate-state-style-corpus.ts`.
+  `StateStyle.builtIn`; the Studio tests it equal to `builtInStyles`. Robot draws `house` while docked and `robotic.vacuum` in every other
+  state, including unavailable, unknown and the fallback. Regenerate with `scripts/generate-state-style-corpus.ts`.
 
 #### Fills and hidden words (`sh.state-style-fills@1`)
 
@@ -1120,7 +1121,7 @@ For Studio limits meters, `checkOperand`, `checkPredicate`, and `checkCallServic
 - **Data Flow additions.** Two request kinds: `entities` (1 to 64 literal entity ids and up to 8 named attributes; rows are
   `{ entityId, state, ...attributes }`; no `refresh`, the flow runs when an observed entity changes) and `none` (no data; `value` is an operand over
   the parameters, the viewer and the clock). A document holds up to 128 flows.
-- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.flow-average@1`, `sh.fold-sides@1`, `sh.shell-profile@1`, `sh.text-keep@1` and `sh.tile-ink-default@1`, and the four global-chrome ids `sh.sheet-levels@1`, `sh.page-chrome-hide@1`, `sh.page-wide-open@1` and `sh.tabs-visibility@1` (see [global chrome](#global-chrome-sheet-levels-page-hides-wide-open-and-tab-bar-visibility-lane-gc-studio-schema)) remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09` are shipped in `capabilities.json` (verified against native-home main and that release tag). An id is
+- **Pending.** `sh.avatar@1`, `sh.badge-nodes@1`, `sh.badge-spoken@1`, `sh.component-values@1`, `sh.dial-control@1`, `sh.dial-text-place@1`, `sh.flow-average@1`, `sh.fold-sides@1`, `sh.shell-profile@1` and `sh.text-keep@1`, and the four global-chrome ids `sh.sheet-levels@1`, `sh.page-chrome-hide@1`, `sh.page-wide-open@1` and `sh.tabs-visibility@1` (see [global chrome](#global-chrome-sheet-levels-page-hides-wide-open-and-tab-bar-visibility-lane-gc-studio-schema)) remain in `contract/corpus/capabilities.pending.json`. The twenty style, data, surface, tile and operand ids promoted at `ios/v2611.18.09`, plus `sh.tile-ink-default@1` (native `ServerUIIngestedCapabilities.tileContract`), are shipped in `capabilities.json`. An id is
   mutable until a publication that uses it has been served, so changes fold into `@1`; after that, a change of meaning is `@2` beside `@1`.
 
 ### Generic parts (lane TC3)
@@ -1279,19 +1280,16 @@ in one lane. `sh.state-style-fills@1` has shipped, so `fillInk` cannot fold into
 
 #### The tile contract ids and the ink gate (lanes TC6, TC7 and integ11)
 
-`sh.tile-swipe@1`, `sh.state-words@1` and `sh.grid-state-groups@1` shipped at `ios/v2611.18.09`. `sh.tile-ink-default@1` remains pending (`src/shared/composition/pending.ts`, `contract/corpus/capabilities.pending.json`).
-The first three are declared only by a document that uses their field. `sh.tile-ink-default@1` has no field, so the compiler once declared it for every document, and the native app does not list it yet:
-a publication that declares an id the app does not know is refused by every phone. It is therefore held behind one gate.
+`sh.tile-swipe@1`, `sh.state-words@1` and `sh.grid-state-groups@1` shipped at `ios/v2611.18.09`. `sh.tile-ink-default@1` is also shipped:
+native `apple/Sources/HassCore/ServerUIComposition/ServerUIIngestedCapabilities.swift:64` lists it in `tileContract` through `ServerUITileInkDefault.capability`.
+The first three are declared only by a document that uses their field. `sh.tile-ink-default@1` has no field and is declared by every newly compiled document.
 
-- **The gate.** `tileInkDefault` in `src/shared/composition/tile-ink-gate.ts`, a constant, `false`. While it is `false`: `compileCompositionDocument` adds no `sh.tile-ink-default@1` (a
-  document cannot opt in; the id has no field, and a document that names it is refused as an unknown field); the simulator draws today's muted grey ink (`data-ink="muted"` on the preview root);
-  and the whole corpus compiles to exactly its recorded manifests (1075 documents, 0 differences).
-- **What the gate does not change.** `validateCompositionPublication` accepts a manifest with the id and one without it, whatever the gate says, because it compiles with the id
-  on and accepts `legacyManifest` of that. A corpus case that records the id (`reject/pending-tile-ink-default-*`) stays valid.
-- **Tests and overrides.** `compileCompositionDocument(document, { tileInkDefault })` overrides the gate for one call; `<Preview2 ink="primary" | "muted"/>` and the harness query `ink=primary|muted` override the simulator.
-  `tests/tile-ink.test.ts` holds both states: gate off, no id and the recorded manifests; gate on, the id and the primary ink.
-- **Turning it on.** When the native app ships `sh.tile-ink-default@1`: set `tileInkDefault` to `true`, move the id from `pending.ts` to the app's list (`supportedCompositionCapabilities`, `contract/corpus/capabilities.json`),
-  and let the generators in `scripts/corpus-handshake.ts` move its cases. The orchestrator turns it on; a lane does not.
+- **The default.** `tileInkDefault` in `src/shared/composition/tile-ink-gate.ts` is `true`: the compiler declares the id and the simulator draws primary ink
+  (`data-ink="primary"` on the preview root). A document cannot set it as a field; an authored `capabilities` key is still refused as an unknown field.
+- **Legacy publications.** `validateCompositionPublication` accepts a manifest with the id and one without it, because it compiles with the id
+  on and accepts `legacyManifest` of that. Existing corpus envelopes keep their original manifests; the four promoted `accept/tile-ink-default-*` cases declare the id.
+- **Tests and overrides.** `compileCompositionDocument(document, { tileInkDefault })` overrides the default for one call; `<Preview2 ink="primary" | "muted"/>` and the harness query
+  `ink=primary|muted` override the simulator. `tests/tile-ink.test.ts` checks that the default adds only this id and that legacy manifests remain valid.
 
 **Spacing.** The `section-header` spacing token is 10 points, as native `SpaceToken.sectionHeader` (`apple/Sources/HassCore/ServerUIComposition/ServerUICompositionDocument.swift:143`, native-home `fcbb4876`). The Studio
 read 20 before integ11; no recorded corpus case used the token, so no evaluation case moved.

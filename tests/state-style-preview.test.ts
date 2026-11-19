@@ -17,6 +17,14 @@ describe('state-style preview, resolved the way the app resolves', () => {
       }
     }
   });
+  it('draws the native Robot glyph per state, including unreadable and unlisted states', () => {
+    const robot = style('robot');
+    expect(previewTile(robot, 'docked', [], {}, 'fan').icon).toBe('house');
+    for (const state of ['idle', 'cleaning', 'mowing', 'paused', 'returning', 'error', 'unavailable', 'unknown', 'demo_new_state', undefined]) {
+      expect(previewTile(robot, state, [], {}, 'fan').icon, String(state)).toBe('robotic.vacuum');
+    }
+    expect(previewTile(robot, 'docked', [{ state: 'docked', icon: 'bolt' }]).icon).toBe('bolt');
+  });
   it('shows the arc in the disc place for a state with no tappable action, and dims it for VoiceOver', () => {
     const returning = previewTile(style('robot'), 'returning');
     expect(returning).toMatchObject({ stateClass: 'in-progress', indicator: 'arc-spinner', showsArc: true, discOpacity: 0, acceptsTaps: false });

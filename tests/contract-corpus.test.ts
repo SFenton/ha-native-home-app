@@ -30,7 +30,7 @@ const listed = (folder: string) => readdirSync(path.join(directory, folder)).fil
 function badgeNodesOnly(item: Case): boolean {
   if (item.studioIssue?.code !== 'capability_manifest_mismatch') return false;
   const envelope = JSON.parse(read(item.file).toString('utf8'));
-  const compiled = compileCompositionDocument(envelope.document).capabilities;
+  const compiled = compileCompositionDocument(envelope.document, { tileInkDefault: envelope.capabilities.includes('sh.tile-ink-default@1') }).capabilities;
   return !envelope.capabilities.includes('sh.badge-nodes@1') && JSON.stringify(compiled.filter(name => name !== 'sh.badge-nodes@1')) === JSON.stringify(envelope.capabilities);
 }
 

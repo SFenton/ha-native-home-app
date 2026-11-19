@@ -76,7 +76,7 @@ export interface Preview2Props {
   textScale?: number;
   /** The Studio's Appearance setting when it is Light or Dark: a sheet that declares `system` is drawn in it. Absent when the Studio follows the system. */
   appearance?: 'light' | 'dark';
-  /** The tile ink drawn: `primary` is the ink of `sh.tile-ink-default@1`, `muted` the grey of an app that predates it. Absent: the gate decides (`tile-ink-gate.ts`). */
+  /** The tile ink drawn: `primary` is the ink of `sh.tile-ink-default@1`, `muted` the grey of an app that predates it. Absent: the shipped primary default (`tile-ink-gate.ts`). */
   ink?: 'primary' | 'muted';
   /** Runs the flow of a source and gives its records, for `repeat` (`sh.repeat@1`). Absent: a repeat draws its placeholder. A hook, so it must not change between renders. */
   records?: UseRecords;

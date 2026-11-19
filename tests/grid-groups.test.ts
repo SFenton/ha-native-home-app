@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { decodeCompositionPublication } from '../server/composition';
-import { compileCompositionDocument, legacyManifest } from '../src/shared/composition/compiler';
+import { compileCompositionDocument, INK_DEFAULT_CAPABILITY, legacyManifest } from '../src/shared/composition/compiler';
 import { arrange, defaultGroups, groupIndexOf, groupProblems, type GridGroups } from '../src/shared/composition/grid-groups';
 import { CompositionValidationError } from '../src/shared/composition/json';
 import { pendingCompositionCapabilities } from '../src/shared/composition/pending';
@@ -10,7 +10,7 @@ import { pendingCompositionCapabilities } from '../src/shared/composition/pendin
 const corpus = path.resolve(import.meta.dirname, '../contract/corpus');
 const index: { cases: { file: string; outcome: string; pending?: boolean; studioIssue?: { code: string; pointer: string }; issue?: { code: string; pointer: string } }[] } = JSON.parse(readFileSync(path.join(corpus, 'index.json'), 'utf8'));
 const ours = index.cases.filter(item => /^(accept|reject)\/(pending-)?grid-groups-/.test(item.file));
-/** A refusal is a case with a Studio issue (a pending one) or a plain reject, whose own issue is the Studio's; with the ink id held back by its gate the manifest case is the second kind. */
+/** A refusal is a case with a Studio issue (a pending one) or a plain reject, whose own issue is the Studio's. */
 const refused = ours.filter(item => item.studioIssue || (item.outcome === 'reject' && !item.pending)).map(item => ({ ...item, studioIssue: item.studioIssue ?? item.issue }));
 const bytes = (file: string) => readFileSync(path.join(corpus, file));
 const envelope = (file: string) => JSON.parse(bytes(file).toString('utf8'));
@@ -26,7 +26,7 @@ describe('sh.grid-state-groups@1 corpus', () => {
   it.each(ours.filter(item => item.outcome === 'accept'))('compiles $file', item => {
     const document = envelope(item.file);
     expect(() => decodeCompositionPublication(bytes(item.file))).not.toThrow();
-    expect(compileCompositionDocument(document.document).capabilities).toEqual(document.capabilities);
+    expect(compileCompositionDocument(document.document).capabilities).toEqual([...new Set([...document.capabilities, INK_DEFAULT_CAPABILITY])].sort());
   });
   it.each(refused)('refuses $file with its own code at its own pointer', item => {
     let first: { code: string; pointer: string } | undefined;

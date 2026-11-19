@@ -191,12 +191,13 @@ const alarm: StateStyleDefinition = {
 const robot: StateStyleDefinition = {
   id: 'robot', name: 'Robot', domain: 'vacuum', actionId: 'robot',
   ...withFallback([
-    { states: ['docked', 'idle'], class: 'resting', active: false },
-    { states: ['cleaning', 'mowing'], class: 'resting', active: true, indicator: 'breathe' },
-    { states: ['paused'], class: 'warning', active: false },
-    { states: ['returning'], class: 'in-progress', active: false },
-    { states: ['error'], class: 'error', active: false },
-    { states: unknownStates, class: 'unknown', active: false },
+    { states: ['docked'], class: 'resting', active: false, icon: 'house' },
+    { states: ['idle'], class: 'resting', active: false, icon: 'robotic.vacuum' },
+    { states: ['cleaning', 'mowing'], class: 'resting', active: true, icon: 'robotic.vacuum', indicator: 'breathe' },
+    { states: ['paused'], class: 'warning', active: false, icon: 'robotic.vacuum' },
+    { states: ['returning'], class: 'in-progress', active: false, icon: 'robotic.vacuum' },
+    { states: ['error'], class: 'error', active: false, icon: 'robotic.vacuum' },
+    { states: unknownStates, class: 'unknown', active: false, icon: 'robotic.vacuum' },
   ]),
 };
 const detector: StateStyleDefinition = {

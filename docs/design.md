@@ -50,7 +50,7 @@ and the house states from `/api/native-home`; the workspace chrome is
 
 ## Tile contract
 
-Four capability ids, all pending in the shipped app (`contract/corpus/capabilities.pending.json`); each is generic and absent means today's tile, byte-identical.
+Four generic capability ids, all shipped in the app (`contract/corpus/capabilities.json`); an older publication without an id keeps its previous tile behaviour.
 
 - **Swipe to Adjust** (`sh.tile-swipe@1`, `props.swipe` on a state tile or a light group tile). Off by default. A row after Tap opens a page: the switch, Adjusts (Brightness, Cover Position, Fan Speed, Temperature, Volume or Custom), the range, Tick Every, Haptic Ticks, Level Band, Value Text and Name. The preview tracks the finger absolutely (band, bubble, a 1.03 lift, no scale with Reduce Motion) and sends one call on release; the tile is a slider for VoiceOver and the arrow keys. A tile in a row that scrolls sideways takes no swipe.
 - **State Words** (`sh.state-words@1`, `props.words` on a light group tile, a Custom Lights brightness tile and a room overview tile). A closed State Words fold after Tap: one text row for each word the tile draws, the app's word as the placeholder, an empty field stores nothing. Count Text needs `{count}`, Level Text `{value}`.

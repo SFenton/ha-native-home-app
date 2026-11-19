@@ -48,6 +48,7 @@ a per-state `fill` (the document's `solid-rgb`) on a rule or the fallback, and t
 fill that is not a `solid-rgb`, a fill on a tile override, a rule that gives `unavailable` a class other than unknown, and bad hidden words.
 `state-styles/built-in.json` is the eight built-in styles as data: not a case, but a fixture the Studio and the
 app both test their own built-in data against.
+Robot uses `house` while docked and `robotic.vacuum` for every other state and the fallback, matching native `StateStyle.robot`.
 
 The `component-values-*` files (8 pending accepts, `reject/pending-component-values-*`, and 13 refused) cover `sh.component-values@1`, pending: a parameter of the kind
 `value` and a `values` key on a `component-ref` that holds any JSON for it (a colour, a rule, `null` to remove an optional field, a field the body lacks,
@@ -105,6 +106,10 @@ The `fold-sides-` files (22 cases, written by `scripts/generate-fold-sides-corpu
 The `tile-ink-` files (and their `pending-` twins) cover `sh.tile-ink@1` (TC5, shipped): a state tile's `glyphTint` and `discGlyphTint` (each a `solid-rgb` or a `solid-appearance`
 pair, so a pair also declares `sh.solid-appearance@1`) a state tile's `cellFit` (`fill` or `natural`, only a state tile) and a state style rule's `fillInk` (`white` or `soft`, only beside a `fill`, which also needs `sh.state-style@1` and
 `sh.state-style-fills@1`). They are written by `scripts/grammar2-corpus.ts` through the same generator; there are no evaluation cases, since the fields only draw. No case encodes the drawing: the tint is ignored on a filled, error or unavailable face (an unavailable tile draws the default grey icon at 50%), and the corpus pins only decode and refusal.
+
+The four `accept/tile-ink-default-*` cases cover the shipped `sh.tile-ink-default@1`, declared by default on new compilations: primary ink on an idle
+state tile, light group tile, room overview tile and action tile. They are written by `scripts/generate-tile-ink-corpus.ts`; the accepted envelopes
+match the native corpus. Older envelopes without this no-field id remain valid and keep their original manifests.
 
 The `surface-orientation-` and `surface-controls-` files cover the shipped `sh.surface-orientation@1` (a vacuum's `orientation`: both flips, written once on the source) and `sh.surface-controls@1`
 (the `map` primitive's `controls`: up to four corner groups of up to eight buttons, a row or a column, each button a map action, a source command, a service call or navigation). The compiled cases are a flip, both flips, each corner,
