@@ -310,7 +310,14 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     else catalog.set(id, path);
     catalogs.set(kind, catalog);
   }
-  const refs: { kind: string; id: string; path: string }[] = [];
+  /**
+   * What kind of surface the walk is inside, for the one rule that depends on it (`sh.sheet-levels@1`): a `push` to a level of a sheet is valid only from a sheet or a level.
+   * `leaving` is the destination of a `dismiss-then-push`, which has left the sheet; `library` is a saved component's body, whose uses carry the check.
+   */
+  type SurfaceKind = 'page' | 'modal' | 'level' | 'leaving' | 'library';
+  let surfaceKind: SurfaceKind = 'page';
+  /** `from` is set on a `push` (the kind of surface it sits in) and on a `page-id` argument (`'argument'`): only those may name a level, a page reference of any other kind may not. */
+  const refs: { kind: string; id: string; path: string; from?: SurfaceKind | 'argument' }[] = [];
   document.liveActivities.forEach((activity, index) => {
     require('activity-presentation');
     register('activity', activity.id, `/document/liveActivities/${index}/id`);
@@ -560,14 +567,41 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     }
     require('actions.navigation');
     switch (value.type) {
-      case 'push': refs.push({ kind: 'page', id: value.pageId, path: `${path}/pageId` }); break;
+      case 'push': refs.push({ kind: 'page', id: value.pageId, path: `${path}/pageId`, from: surfaceKind }); break;
       case 'present':
         if (value.ifPresented === 'replace') require('modal-handoff');
         refs.push({ kind: 'modal', id: value.modalId, path: `${path}/modalId` });
         break;
       case 'select-tab': refs.push({ kind: 'tab', id: value.tabId, path: `${path}/tabId` }); break;
-      case 'dismiss-then-push': action(value.destination, `${path}/destination`); break;
+      case 'dismiss-then-push': {
+        // The destination has left the sheet: it may name a page, never a level.
+        const was = surfaceKind;
+        surfaceKind = 'leaving';
+        action(value.destination, `${path}/destination`);
+        surfaceKind = was;
+        break;
+      }
     }
+  }
+  /**
+   * A page's own chrome settings: `hides` (`sh.page-chrome-hide@1`) names `button` and `shell-header` items of the app's chrome, each once; the shell menu cannot be hidden,
+   * and a page that replaces the toolbar has no inherited items to drop (it may still hide the tab bar). `wideOpen` (`sh.page-wide-open@1`) needs nothing more than its capability.
+   */
+  function pageChrome(page: CompositionDocument['pages'][number], index: number) {
+    const at = `/document/pages/${index}`;
+    if (page.wideOpen !== undefined) require('page-wide-open');
+    if (page.hides === undefined) return;
+    require('page-chrome-hide');
+    const items = page.hides.items ?? [];
+    const hideable = new Set<string>(), menus = new Set<string>();
+    for (const item of document.navigation.chrome.groups.flatMap(group => group.items)) (item.type === 'shell-menu' ? menus : hideable).add(item.id);
+    const seen = new Set<string>();
+    items.forEach((item, offset) => {
+      if (seen.has(item)) add('duplicate_id', `${at}/hides/items/${offset}`);
+      seen.add(item);
+      if (!hideable.has(item)) add(menus.has(item) ? 'invalid_combination' : 'invalid_reference', `${at}/hides/items/${offset}`);
+    });
+    if (page.toolbar.type === 'replace' && items.length) add('invalid_combination', `${at}/hides/items`);
   }
   function chrome(groups: CompositionGroups, path: string) {
     groups.forEach((group, i) => {
@@ -631,7 +665,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
       if (param.kind === 'symbol') { if (value.length > 80) add('invalid_value', at); continue; }
       if (param.kind === 'entity-id') { if (!ENTITY_ID.test(value)) add('invalid_value', at); continue; }
       if (!identifierSchema.safeParse(value).success) { add('invalid_value', at); continue; }
-      refs.push({ kind: { 'source-id': 'source', 'page-id': 'page', 'modal-id': 'modal', 'state-id': 'local-state' }[param.kind], id: value, path: at });
+      refs.push({ kind: { 'source-id': 'source', 'page-id': 'page', 'modal-id': 'modal', 'state-id': 'local-state' }[param.kind], id: value, path: at, ...(param.kind === 'page-id' ? { from: 'argument' as const } : {}) });
     }
     const owned = ownedSources(entry);
     if (owned.length > 0) {
@@ -1675,15 +1709,17 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
   // Each entry's body is walked once, at its library pointer, whether or not anything uses it: its ids, bindings, actions and rules are checked here, not per use.
   document.componentLibrary?.forEach((entry, index) => {
     const at = `/document/componentLibrary/${index}`, before = nodes;
-    nodes = 0; inBody = true;
+    nodes = 0; inBody = true; surfaceKind = 'library';
     components([checkedBody(entry)], `${at}/node`, 1, false, true);
-    inBody = false; nodes = before;
+    inBody = false; surfaceKind = 'page'; nodes = before;
     checkParams(entry, at);
   });
   const expanded = expandDocument(document);
-  for (const [kind, surfaces] of [['page', document.pages], ['modal', document.modals]] as const) {
+  if (document.levels !== undefined) require('sheet-levels');
+  for (const [kind, surfaces] of [['page', document.pages], ['modal', document.modals], ['level', document.levels ?? []]] as const) {
     surfaces.forEach((surface, index) => {
       const p = `/document/${kind}s/${index}`;
+      surfaceKind = kind;
       register('surface', surface.id, `${p}/id`); register(kind, surface.id, `${p}/id`);
       if (surface.titleSourceId !== undefined) {
         require('surface-title-source');
@@ -1691,26 +1727,29 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
         const containsSource = (nodes: CompositionNode[]): boolean => nodes.some(node =>
           node.type === 'bedroom-control' && node.props.sourceId === surface.titleSourceId
           || containsSource(compositionChildren(node)));
-        if (!containsSource((kind === 'page' ? expanded.pages : expanded.modals)[index].components)) add('invalid_combination', `${p}/titleSourceId`);
+        if (!containsSource((kind === 'page' ? expanded.pages : kind === 'modal' ? expanded.modals : expanded.levels!)[index].components)) add('invalid_combination', `${p}/titleSourceId`);
       }
       if (surface.toolbar.type === 'replace') chrome(surface.toolbar.groups, `${p}/toolbar/groups`);
-      else if (kind === 'modal') add('invalid_combination', `${p}/toolbar`);
+      else if (kind !== 'page') add('invalid_combination', `${p}/toolbar`);
       if (kind === 'page') {
         const { foldSides } = (surface as CompositionDocument['pages'][number]).layout;
         if (foldSides !== undefined) require('fold-sides');
         // `span` is Across the Top: it has to come before the first section that takes a side. The expanded page holds each place's own words, so a saved component counts as what it is.
         for (const late of lateSpans(expanded.pages[index].components)) add('invalid_combination', `${p}/components/${late}/layout/foldSide`);
       }
+      if (kind === 'page') pageChrome(surface as CompositionDocument['pages'][number], index);
       onPage = kind === 'page';
       components(surface.components, `${p}/components`);
       onPage = false;
     });
   }
-  if (document.pages.length + document.modals.length > 512) add('limit_exceeded', '/document/pages');
+  surfaceKind = 'page';
+  if (document.pages.length + document.modals.length + (document.levels?.length ?? 0) > 512) add('limit_exceeded', '/document/pages');
   if (document.modals.length) require('sheet');
   if (document.modals.some(modal => modal.presentation.height.type === 'fitted')) require('sheet-fit');
   chrome(document.navigation.chrome.groups, '/document/navigation/chrome/groups');
   const navigation = document.navigation;
+  if (navigation.tabsVisibility !== undefined) require('tabs-visibility');
   if (document.bootstrap) {
     require('bootstrap-policy');
     const permissions = document.bootstrap.setup.map(step => step.permission);
@@ -1907,7 +1946,15 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
     binding(value, 'entity-id', path, power);
     if (value.type === 'read') dependencies.push({ from: source.id, to: value.from.sourceId, path: `${path}/from/sourceId` });
   });
-  for (const ref of refs) if (!catalogs.get(ref.kind)?.has(ref.id)) add('invalid_reference', ref.path);
+  for (const ref of refs) {
+    if (catalogs.get(ref.kind)?.has(ref.id)) continue;
+    // A `push` or a `page-id` argument may name a level (`sh.sheet-levels@1`); from a page, a chrome item or a `dismiss-then-push` it may not.
+    if (ref.kind === 'page' && ref.from !== undefined && catalogs.get('level')?.has(ref.id)) {
+      if (ref.from === 'page' || ref.from === 'leaving') add('invalid_combination', ref.path);
+      continue;
+    }
+    add('invalid_reference', ref.path);
+  }
   /**
    * An argument is checked as the field it fills: the expanded document is compiled and each issue at a bound field is reported at the reference's
    * `args/<name>`, with the code the field's own rule gave (a source of the wrong model is `binding_type`, a missing one `invalid_reference`).
@@ -2158,6 +2205,7 @@ function compilePlain(input: unknown, options: CompileOptions, bounded = false):
 
 function validateChromeContexts(document: CompositionDocument, add: (code: CompositionIssue['code'], path: string) => void) {
   const pages = new Map(document.pages.map((page, index) => [page.id, { page, index }]));
+  const levels = new Map((document.levels ?? []).map((level, index) => [level.id, { page: level, index, kind: 'levels' as const }]));
   const effective = (toolbar: CompositionDocument['pages'][number]['toolbar'], inherited: CompositionGroups) =>
     toolbar.type === 'replace' ? toolbar.groups : inherited;
   const visible = (groups: CompositionGroups, root: boolean, shell: boolean) => groups.flatMap(group => group.items)
@@ -2214,11 +2262,12 @@ function validateChromeContexts(document: CompositionDocument, add: (code: Compo
       }
       if (intent.type !== 'push' || seen.has(intent.pageId)) continue;
       seen.add(intent.pageId);
-      const entry = pages.get(intent.pageId);
+      const page = pages.get(intent.pageId), level = levels.get(intent.pageId);
+      const entry = page ? { ...page, kind: 'pages' as const } : level;
       if (!entry) continue;
       const childGroups = effective(entry.page.toolbar, groups);
       const hostItems = modal.presentation.close.visibility === 'all-depths' ? 2 : 1;
-      if (visible(childGroups, false, false).length + hostItems > 12) add('limit_exceeded', `/document/pages/${entry.index}/toolbar`);
+      if (visible(childGroups, false, false).length + hostItems > 12) add('limit_exceeded', `/document/${entry.kind}/${entry.index}/toolbar`);
       pending.push(...actions(entry.page.components), ...chromeActions(childGroups, false));
     }
   });

@@ -76,3 +76,22 @@ function rewriteTabs(input: unknown, change: (node: TabsNode) => TabsNode | unde
   };
   return { document: visit(document, ''), changes };
 }
+
+/**
+ * "Start a new column set here" (`standalone`) is "Full width" plus "Open pages beside this one" (`wideOpen: "full"`, `sh.page-wide-open@1`): each columns page with
+ * `standalone: true` and no `wideOpen` of its own gets `wideOpen: "full"`. The contract keeps accepting `standalone`, so it stays where it is. Pure and idempotent.
+ *
+ * Writing the field makes the document need `sh.page-wide-open@1`, which an older app refuses, so the Studio calls this only for a target that has the capability,
+ * never on load.
+ */
+export function standaloneToWideOpen(input: unknown): CompositionMigration {
+  const document = structuredClone(input);
+  const changes: string[] = [];
+  const pages = record(document) && Array.isArray(document.pages) ? document.pages : [];
+  pages.forEach((page, index) => {
+    if (!record(page) || !record(page.navigation) || page.navigation.type !== 'navigation-columns' || page.navigation.standalone !== true || page.wideOpen !== undefined) return;
+    page.wideOpen = 'full';
+    changes.push(`write wideOpen full at /pages/${index}/wideOpen`);
+  });
+  return { document, changes };
+}

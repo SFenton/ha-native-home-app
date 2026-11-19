@@ -927,10 +927,22 @@ const pageLayout = object({
   scroll: z.literal('content-fit@1'), chrome: z.literal('canonical-page@1'), ground: z.literal('host'),
   foldSides: foldSidesSchema.optional(),
 });
-const page = object({ ...surface, layout: pageLayout, navigation: z.discriminatedUnion('type', [
+/**
+ * What a page hides of the app's chrome while it is the top page (`sh.page-chrome-hide@1`): the tab bar, and the `button` and `shell-header` items of the app's
+ * header groups named by id. Hiding is the only direction. The shell menu cannot be hidden and a page that replaces the toolbar has no inherited items to drop.
+ */
+const pageHides = object({ tabs: z.boolean().optional(), items: z.array(id).max(32).optional() });
+/** How a page opens in a window wide enough for two columns (`sh.page-wide-open@1`): beside the page it came from, the whole window, or by the columns' own rule. */
+export const wideOpenValues = ['automatic', 'full', 'beside'] as const;
+const page = object({ ...surface, layout: pageLayout, hides: pageHides.optional(), wideOpen: z.enum(wideOpenValues).optional(), navigation: z.discriminatedUnion('type', [
   object({ type: z.literal('stack') }),
   object({ type: z.literal('navigation-columns'), placeholder: title, standalone: z.boolean(), onDemand: z.boolean().optional() }),
 ]) });
+/**
+ * A surface a sheet's `push` reaches without leaving the sheet (`sh.sheet-levels@1`). It is a surface with no route style, no presentation and none of the
+ * page-only fields: no tab, route, `initialPageId` or `present` names it, and a `push` to it is valid only from a sheet or another level.
+ */
+const level = object({ ...surface });
 const modal = object({
   ...surface,
   presentation: object({
@@ -1161,8 +1173,12 @@ export const compositionDocumentSchema = object({
       stackMotion: z.literal('canonical-stack@1'), restoration: z.literal('scene@1'), selectionWhileModal: z.literal('reject'),
     }),
     chrome: object({ groups }),
+    /** Whether the tab bar shows on every page or on a root page only (`sh.tabs-visibility@1`). Absent means `always`. */
+    tabsVisibility: z.enum(['always', 'root-only']).optional(),
   }),
   pages: z.array(page).min(1).max(256), modals: z.array(modal).max(256),
+  /** The surfaces a sheet's `push` reaches inside the sheet (`sh.sheet-levels@1`). Absent means none. */
+  levels: z.array(level).max(256).optional(),
   dataSources: z.array(source).max(1000), variables: empty, assets: z.array(asset).max(100),
   localState: z.array(localFieldSchema).max(100).optional(),
   liveActivities: z.array(activityPresentationSchema).max(16),

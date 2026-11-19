@@ -140,7 +140,8 @@ describe('the initials of a person', () => {
 
 describe('the four ids over the whole corpus', () => {
   const files = ['accept', 'reject'].flatMap(folder => readdirSync(path.join(root, folder)).map(name => `${folder}/${name}`));
-  const mine = /profile-badges-|badge-chrome-button/;
+  // The global-chrome cases carry a header button with a drawn badge, so they declare `sh.badge-nodes@1` too (their own lane compiles them: `tests/global-chrome.test.ts`).
+  const mine = /profile-badges-|badge-chrome-button|pending-global-chrome-/;
   // The corpus is compiled in slices of a few hundred files, each its own case, so no one case holds the whole run and a slow runner
   // stretches the file, not a case past its limit. The count of what compiled is judged once, after the last slice.
   const slice = 250, slices = Array.from({ length: Math.ceil(files.length / slice) }, (_, index) => index);

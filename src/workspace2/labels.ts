@@ -150,6 +150,9 @@ const authored: Record<string, FieldLabel> = {
   'page.navigation.type': entry('Open pages beside this one', { group: 'look', order: 1, options: { stack: 'Off', 'navigation-columns': 'On' } }),
   'page.navigation.placeholder': entry('Empty side text', { group: 'look', order: 2 }),
   'page.navigation.onDemand': advanced('Start with one pane'), 'page.navigation.standalone': advanced('Start a new column set here'),
+  // Global chrome (`sh.page-chrome-hide@1`, `sh.page-wide-open@1`): the contract fields exist, and the rows are the editor lane's (`gc-studio-editor`), so they stay hidden until then.
+  'page.hides.tabs': entry('Tabs', { group: 'look', order: 4, hidden: true }),
+  'page.wideOpen': entry('Opens', { group: 'look', order: 5, hidden: true, options: { automatic: 'Automatic', full: 'Full width', beside: 'Beside' } }),
   'page.toolbar': entry('Header buttons', { group: 'look', order: 3, options: { inherit: 'Same as app', replace: 'Custom' } }),
   'sheet.presentation.height': entry('Height', { group: 'look', order: 1, options: { full: 'Full', fitted: 'Fitted' } }),
   'sheet.presentation.height.follows': advanced('Fit to', { options: { root: 'First page', 'top-page': 'Top page' } }),

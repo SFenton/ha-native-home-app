@@ -88,6 +88,8 @@ describe('documents that do not use the new nodes', () => {
     for (const name of names('reject').filter(entry => entry.startsWith('pending-'))) {
       const envelope = JSON.parse(readFileSync(path.join(corpus, 'reject', name), 'utf8')) as { capabilities: string[]; document: J };
       if (!envelope.document?.pages) continue;
+      // The global-chrome cases carry a header badge that the Studio's badge lane lists `sh.badge-nodes@1` for and their declared list does not: `tests/global-chrome.test.ts` compiles them.
+      if (name.includes('global-chrome')) continue;
       try { expect(compileCompositionDocument(envelope.document, { tileInkDefault: envelope.capabilities.includes('sh.tile-ink-default@1') }).capabilities, name).toEqual(envelope.capabilities); } catch (error) { if (!(error instanceof CompositionValidationError)) throw error; continue; }
       for (const id of ids) expect(envelope.capabilities, name).not.toContain(id);
       count += 1;
