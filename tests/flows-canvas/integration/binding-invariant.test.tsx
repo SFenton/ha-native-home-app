@@ -6,6 +6,7 @@ import { compileCompositionDocument } from '../../../src/shared/composition/comp
 import { bodyNodes, derivedId, expandDocument, expandSources, fieldSteps, ownedSources, readField, renameSources } from '../../../src/shared/composition/components';
 import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic/anchors';
 import { resolveLogicUseBindings } from '../../../src/shared/composition/studio-logic/bindings';
+import * as bindingCompiler from '../../../src/shared/composition/studio-logic/bindings';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
 import { createDraft, type Draft } from '../../../src/workspace2/editors/draft';
 import { AddressedField } from '../../../src/workspace2/logic-fields/AddressedField';
@@ -13,7 +14,7 @@ import { RowsProvider } from '../../../src/workspace2/rowsContext';
 import { request } from '../../../src/api';
 import { useCompositionStudio } from '../../../src/useCompositionStudio';
 import { liftField } from '../../../src/workspace2/logic-fields/registry';
-import { saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
+import { rebaseCanvasLayout, saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
 import { projectGraph } from '../../../src/shared/composition/graph/lower';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../../src/workspace2/logic-fields/registry';
@@ -30,7 +31,7 @@ import { evaluateOperand, evaluatePredicate, resolveText, type TextSlot, type En
 import { operandBase } from '../../../src/shared/composition/expression';
 import { record } from '../../../src/shared/composition/studio-logic/anchors';
 import { encodeStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
-import { studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
+import { MAX_LOGIC_USE_BINDINGS, studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
 import { newToken, operandSlot, slotOperand } from '../../../src/workspace2/expr/tokens';
 import { toSlot } from '../../../src/workspace2/expr/value';
 import { authoredNodes } from '../../../src/workspace2/logic-fields/registry';
@@ -99,10 +100,10 @@ function fixture(kind: string) {
   }
   if (kind === 'nested operand') {
     const draft = createDraft(document), operand = valueAt(document, [...slot, 'value']);
-    draft.set({ ...replaceAt(document, [...slot, 'value'], { type: 'logic-ref', logicId: 'outer', args: { value: operand } }),
+    draft.set(editSubtrees(document, { ...replaceAt(document, [...slot, 'value'], { type: 'logic-ref', logicId: 'outer', args: { value: operand } }),
       logicLibrary: [...document.logicLibrary!, { id: 'outer', name: 'Outer', kind: 'operand', params: [{ name: 'value', kind: 'operand' }],
         body: { type: 'format', pattern: '{value}', args: { value: { type: 'hole', name: 'value' } } } }],
-    });
+    }));
     document = draft.get();
   }
   if (kind === 'rule cases') {
@@ -1145,26 +1146,167 @@ it.each(['automatic target', 'automatic metadata', 'component metadata', 'privat
     draft.undo(); draft.redo(); expect(draft.get()).toBe(before); valid(draft.get()); notice.mockRestore();
   });
 
-it.each([1, 16, 64])('measures strict per-edit overhead independently of the compiler (%i bound tiles)', count => {
+it.each([3, 18, 66, 256])('gates dependency-scoped per-edit overhead independently of the compiler (%i bindings)', count => {
   const fixture = meaningFixture('page tile');
   let before: CompositionDocument = withMeaningCanvas(fixture.document, fixture.slot);
-  for (let index = 1; index < count; index++) before = duplicateNode(before, ['pages', 0, 'components', 0]).document;
-  const samples: number[] = [], baseline: number[] = [], warmups = 10, measured = 31;
-  let result = before;
-  for (let index = -warmups; index < measured; index++) {
-    const start = performance.now(), proposed = { ...before, name: `Rename ${index}` }, constructed = performance.now();
-    result = documentEdit(before, proposed);
-    const elapsed = performance.now() - constructed;
-    expect(result.name).toBe(proposed.name);
-    expect(result.logicUseBindings).toBe(before.logicUseBindings);
-    expect(result.studioCanvas).toBe(before.studioCanvas);
-    if (index >= 0) { samples.push(elapsed); baseline.push(constructed - start); }
+  const root = ['pages', 0, 'components', 0], copied = [], pages = before.pages.map(page => ({ ...page, components: [...page.components] }));
+  const automaticCount = Math.min(count, MAX_LOGIC_USE_BINDINGS);
+  for (let index = before.logicUseBindings!.length; index < automaticCount; index++) {
+    const page = index < 64 ? 0 : 1, nodes = pages[page].components;
+    copied.push({ from: root, to: ['pages', page, 'components', nodes.length] });
+    nodes.push({ ...copySubtree(before.pages[0].components[0]), id: `perf-copy-${index}` });
   }
-  valid(result);
+  if (copied.length) before = documentEdit(before, { ...before, pages }, { copied });
+  expect(before.logicUseBindings).toHaveLength(automaticCount);
+  if (count > automaticCount) {
+    const childrenPath = ['componentLibrary', before.componentLibrary!.length - 1, 'node', 'children'];
+    const children = [...valueAt(before, childrenPath) as CompositionNode[]];
+    for (let index = 1; index < (count - automaticCount) / 2; index++) children.push({ ...copySubtree(children[0]), id: `perf-parameter-${index}` });
+    before = editSubtrees(before, replaceAt(before, childrenPath, children));
+    const placement = before.pages[0].components.find(node => node.type === 'component-ref' && node.componentId === before.componentLibrary!.at(-1)!.id)!;
+    before = forkPlace(before, placement.id, 'Performance parameters').document;
+    expect(before.componentLibrary!.flatMap(entry => entry.bindings ?? [])).toHaveLength(count - automaticCount);
+  }
   const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-  process.stdout.write(`Linked edit overhead: ${count} primary bound tiles; ${before.logicUseBindings!.length} bindings; ${studioCanvasMetadataSchema.parse(before.studioCanvas).canvases.flatMap(canvas => canvas.roots).length} canvas roots; boundary median ${median(samples).toFixed(2)} ms; raw edit median ${median(baseline).toFixed(4)} ms; 31 samples after 10 warmups; no compiler work included.\n`);
-  expect(median(samples)).toBeLessThan(1500);
+  const parameters = before.componentLibrary!.flatMap(entry => entry.bindings ?? []).length;
+  const roots = studioCanvasMetadataSchema.parse(before.studioCanvas).canvases.flatMap(canvas => canvas.roots).length;
+  const report = (edit: string, samples: number[], gate: number | undefined, detail: string) => process.stdout.write(`Linked edit overhead: ${count} binding data point (${automaticCount} automatic, ${parameters} parameter, ${roots} canvas roots); ${edit}; boundary median ${median(samples).toFixed(4)} ms; ${detail}; ${gate === undefined ? 'report-only' : `<=${gate}ms gate`}.\n`);
+  // Ordinary edits, applied as successive revisions so each one reuses (or rebuilds) the index its predecessor left.
+  const subtitle = [...root, 'props', 'subtitle'];
+  for (const edit of ['rename', 'unbound text', 'bound source', 'bound text'] as const) {
+    const samples: number[] = [], baseline: number[] = [], warmups = 10, measured = 31;
+    for (let index = -warmups; index < measured; index++) {
+      const start = performance.now();
+      if (edit === 'bound text') {
+        // The real field editor's transaction: rebuild the canvas-rooted slot with its declared provenance.
+        const result = rebuildField(before, [...subtitle, 'fallback'], `Typed ${index}`), elapsed = performance.now() - start;
+        expect(result).not.toBe(before);
+        expect(valueAt(result, [...subtitle, 'fallback'])).toBe(`Typed ${index}`);
+        expect(result.logicUseBindings).toBe(before.logicUseBindings);
+        before = result;
+        if (index >= 0) samples.push(elapsed);
+        continue;
+      }
+      const proposed = edit === 'rename' ? { ...before, name: `Rename ${index}` }
+        : replaceAt(before, [...root, ...edit === 'unbound text' ? ['title'] : ['props', 'titleProviderId']],
+          edit === 'unbound text' ? `Typed ${index}` : index % 2 ? 'source-a' : 'source-b');
+      const constructed = performance.now(), result = documentEdit(before, proposed), elapsed = performance.now() - constructed;
+      expect(result).toBe(proposed);
+      expect(result.logicUseBindings).toBe(before.logicUseBindings);
+      expect(result.studioCanvas).toBe(before.studioCanvas);
+      before = result;
+      if (index >= 0) { samples.push(elapsed); baseline.push(constructed - start); }
+    }
+    valid(before); layoutMeaning(before);
+    const gate = count === 256 ? undefined : edit === 'unbound text' ? 2 : 8;
+    report(edit, samples, gate, edit === 'bound text' ? 'whole rebuildField transaction; 31 successive revisions after 10 warmups'
+      : `raw edit median ${median(baseline).toFixed(4)} ms; 31 successive revisions after 10 warmups`);
+    if (gate !== undefined) expect(median(samples)).toBeLessThanOrEqual(gate);
+  }
+  // Report-only: the first edit of a revision nothing has indexed yet (as after a structural change), and an undeclared
+  // insertion at the top of the bound page, which shifts every binding and canvas root on it so all of them are reconciled.
+  for (const edit of ['first edit of an unindexed revision', 'insert before every bound tile'] as const) {
+    const samples: number[] = [];
+    for (let index = -5; index < 15; index++) {
+      const from = edit === 'first edit of an unindexed revision' ? { ...before, name: `Unindexed ${index}` } : before;
+      const proposed = edit === 'first edit of an unindexed revision' ? { ...from, name: `Edited ${index}` }
+        : replaceAt(from, ['pages', 0, 'components'], [{ ...tile(`spacer-${index}`, 'source-a'), props: { family: 'neutral', selected: 'navigation-path', titleProviderId: 'source-a' } }, ...from.pages[0].components]);
+      const start = performance.now(), result = documentEdit(from, proposed), elapsed = performance.now() - start;
+      expect(result).toBe(proposed);
+      expect(result.logicUseBindings).toBe(from.logicUseBindings);
+      if (index >= 0) samples.push(elapsed);
+    }
+    report(edit, samples, undefined, '15 samples after 5 warmups');
+  }
 }, 30_000);
+
+it('a distant unbound text edit cannot hide an undeclared valid binding retarget after index reuse', () => {
+  const fixture = meaningFixture('page tile');
+  let before = replaceAt(fixture.document, ['pages', 1, 'components'], [...fixture.document.pages[1].components, tile('distant-use', 'source-a')]);
+  before = documentEdit(before, { ...before, name: 'Prime cached dependencies' });
+  const draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
+  const after = replaceAt(before, ['pages', 1, 'title'], 'Unbound text');
+  const redirected = { ...after, logicUseBindings: after.logicUseBindings!.map((binding, at) => at ? binding : {
+    ...binding, use: { kind: 'page' as const, id: 'other-page', nodeId: 'distant-use', field: '/props/subtitle/value' },
+  }) };
+  valid(redirected);
+  draft.set(redirected);
+  expect(draft.get()).toBe(before);
+  expect(draft.canUndo()).toBe(false); expect(draft.canRedo()).toBe(false);
+  expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+  notice.mockRestore();
+});
+
+it('a distant unbound text edit cannot hide an undeclared valid component parameter retarget after index reuse', () => {
+  const { document, optionalIndex } = meaningFixture('page tile');
+  const before = documentEdit(document, { ...document, name: 'Prime cached dependencies' });
+  const draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
+  const after = replaceAt(before, ['pages', 1, 'title'], 'Unbound text');
+  const redirected = replaceAt(after, ['componentLibrary', optionalIndex, 'bindings'], [{ param: 'tint', nodeId: 'demo-fan', field: 'glyphTint' }]);
+  valid(redirected);
+  draft.set(redirected);
+  expect(draft.get()).toBe(before);
+  expect(draft.canUndo()).toBe(false);
+  expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+  notice.mockRestore();
+});
+
+it('scopes a component replaced in place by its new ID, so its unproven bindings are still checked', () => {
+  const { document, optionalIndex } = meaningFixture('page tile');
+  const plain = { ...document.componentLibrary![optionalIndex], id: 'plain-component', name: 'Plain', params: [], bindings: [] };
+  const before = documentEdit(document, { ...document, componentLibrary: [...document.componentLibrary!, plain] });
+  expect(before.componentLibrary).toHaveLength(document.componentLibrary!.length + 1);
+  const notice = vi.spyOn(toastManager, 'add');
+  const replaced = replaceAt(before, ['componentLibrary', before.componentLibrary!.length - 1], {
+    ...plain, id: 'replacement-component', params: [{ name: 'tint', kind: 'value' }], bindings: [{ param: 'tint', nodeId: 'no-such-node', field: 'glyphTint' }],
+  });
+  expect(documentEdit(before, replaced)).toBe(before);
+  expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+  notice.mockRestore();
+});
+
+it('after index reuse, an undeclared rebuild of a canvas-rooted slot is refused and the field editor\'s declared rebuild is kept', () => {
+  const { document, slot } = meaningFixture('page tile');
+  const canvas = withMeaningCanvas(document, slot), before = documentEdit(canvas, { ...canvas, name: 'Prime cached dependencies' });
+  const notice = vi.spyOn(toastManager, 'add');
+  // The canvas root's slot object is rebuilt for a sibling field; nothing declares where the root's content went.
+  expect(documentEdit(before, replaceAt(before, [...slot, 'fallback'], 'Rebuilt without provenance'))).toBe(before);
+  expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+  // The same change through the field editor declares its provenance and is kept.
+  const declared = rebuildField(before, [...slot, 'fallback'], 'Rebuilt with provenance');
+  expect(valueAt(declared, [...slot, 'fallback'])).toBe('Rebuilt with provenance');
+  notice.mockRestore();
+});
+
+it('splicing the reached canvas roots gives the same metadata as re-encoding every root', () => {
+  const fixture = meaningFixture('page tile');
+  const before = withMeaningCanvas(fixture.document, fixture.slot);
+  const stored = studioCanvasMetadataSchema.parse(before.studioCanvas);
+  const root = stored.canvases.flatMap(canvas => canvas.roots).find(root => resolveLogicAnchor(before, root.anchor)!.pointer === fieldPointer(fixture.slot))!;
+  const after = replaceAt(before, [...fixture.slot, 'fallback'], 'Changes the lifted node IDs');
+  const locate = (pointer: string) => valueAt(after, pointerPath(pointer)) === undefined ? [] : [pointerPath(pointer)];
+  const changes = { deleted: () => false, refuse: (): never => { throw new Error('refused'); } };
+  const whole = rebaseCanvasLayout(before, after, locate, changes);
+  const spliced = rebaseCanvasLayout(before, after, locate, { ...changes, affected: new Set([root.id]), stored, usable: true });
+  expect(whole.studioCanvas).not.toEqual(before.studioCanvas);
+  expect(sameJson(spliced.studioCanvas, whole.studioCanvas)).toBe(true);
+  expect(readStudioCanvas(spliced).warnings).toEqual([]);
+});
+
+it('reuses dependency indexes across unbound typing and validates only the affected binding on a source edit', () => {
+  const fixture = meaningFixture('page tile');
+  let before = documentEdit(fixture.document, { ...fixture.document, name: 'Prime cached dependencies' });
+  const resolve = vi.spyOn(bindingCompiler, 'resolveLogicUseBindings');
+  try {
+    for (let index = 0; index < 3; index++) before = documentEdit(before, replaceAt(before, ['pages', 0, 'components', 0, 'title'], `Typing ${index}`));
+    expect(resolve).not.toHaveBeenCalled();
+    const next = documentEdit(before, replaceAt(before, ['pages', 0, 'components', 0, 'props', 'titleProviderId'], 'source-a'));
+    expect(next).not.toBe(before);
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(resolve.mock.calls[0][0]).toMatchObject({ logicUseBindings: [before.logicUseBindings![0]] });
+    expect(next.logicUseBindings).toBe(before.logicUseBindings);
+  } finally { resolve.mockRestore(); }
+});
 
 it('reconciles an independently branched edit after an exact historical document is reapplied', () => {
   const { document } = meaningFixture('page tile');
