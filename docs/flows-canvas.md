@@ -435,6 +435,72 @@ surviving origins and are re-encoded against freshly lifted blocks. Only removed
 blocks lose their associations; invalid imported layout stays available for
 explicit reset/export.
 
+#### Dependency scoping and the equivalence contract
+
+`documentEdit()` does not reconcile the whole document on every edit. For each
+accepted revision it builds a dependency index (`editDependencies.ts`): every
+pointer the canonical resolvers read for each automatic binding, component
+parameter binding and canvas root, including owner-list ID scans and node
+scans recorded through a proxy over the resolver itself, plus retention
+witnesses (the deepest object on a located path that occurs exactly once). An
+edit reconciles only the keys its changed pointers reach, the keys whose
+witnesses it placed somewhere new, and canvas roots that a full rebase would not
+give back unchanged. A guarded read (an owner list, an ID, a binding array, a
+component's params or bindings, the canvas metadata) drops the index; the next
+edit builds a new one. Typing reuses the index it was carried to.
+
+Building an index is memoized by the identity of committed objects:
+
+- canvas metadata parses, by the stored `studioCanvas` object;
+- each owner's logic nodes by ID, and each owner's and walked node's recorded
+  scan reads (shared read tries mounted where the object sits), by the owner or
+  node object;
+- each canvas root's certification, by the node (or owner, or value) its anchor
+  resolves to and the root's stored content;
+- each lifted value's nodes, by the value object;
+- the automatic binding resolution, by the bindings array, reused only when the
+  library is the same object and every use resolves to the same node objects
+  (and component entries) on the same owners.
+
+Every read outside the memoized object is checked afresh on every build: owner
+list ID scans and node-ID uniqueness are rebuilt per build, root and binding
+memos apply only after the anchor resolves to the same object, and object
+multiplicity is counted over the whole revision. Candidate-built objects are
+never memo keys beyond one call.
+
+The scoped boundary is defined by equivalence with the whole-document
+reconciliation of `5b28fc4`, kept verbatim in
+`tests/flows-canvas/integration/oracle/`: for every edit to an accepted revision
+it must make the same accept/refuse decision and give the same output
+(`sameJson`, `studioCanvas` included). The one deliberate exception: where the
+oracle throws a raw error (a field without an unambiguous owner, an owner it
+cannot walk), the scoped boundary refuses and keeps `before`. A `before` that
+would itself be refused (a repeated component ID or a broken parameter binding,
+say) is outside the contract: the two can then disagree on its edits.
+
+Caches are keyed only by committed revisions: a `before` the caller holds, or a
+result the boundary accepted. **Committed revisions must not be mutated in
+place**; their objects may be shared by later revisions and candidates. A
+refused candidate belongs to its caller and may be mutated and resubmitted, so
+nothing it built is ever remembered beyond the call.
+
+`edit-oracle.test.ts` enforces the contract on seeded random edit sequences
+(alias, rebuild, move/copy provenance, ID and binding edits, canvas edits,
+malformed owners, owner-list reorders and repeated owner or node IDs, refused
+candidates mutated and resubmitted, accepted content adopted as a revision that
+never passed the boundary). CI runs seeds 1–256 with 14 steps. For long
+local runs on unused ranges, set `EDIT_ORACLE_FROM`, `EDIT_ORACLE_SEEDS` and
+`EDIT_ORACLE_STEPS`, for example
+`EDIT_ORACLE_FROM=10001 EDIT_ORACLE_SEEDS=10000 npx vitest run tests/flows-canvas/integration/edit-oracle.test.ts`;
+`EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the documented
+deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
+documents. `edit-boundary-cost.test.ts` reports the first edit after a
+structural change and gates it at 256 bindings.
+
+The `oracle/` copy is the specification. Never "fix" it to make a test pass: a
+disagreement is a bug in the scoped boundary unless the specification itself is
+being changed deliberately, which is a reviewed change of its own.
+
 The binding resolver is authoritative, not the cached authored argument.
 Save as Logic Template, duplication, Unlink and Delete Template read its resolved
 projection, as do inspector evaluation, setting displays and sentences.

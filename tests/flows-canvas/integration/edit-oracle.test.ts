@@ -11,7 +11,10 @@
  * objects of earlier revisions placed back, ID changes, `logicUseBindings` and component binding edits, canvas metadata
  * edits (with and without `layout`), `discardLayouts`, renames, reapplying an earlier revision, malformed owners in every
  * owner list (see `malformed`), links restored to a draft that had none, and resubmitting a refused candidate after
- * mutating it in place.
+ * mutating it in place, and adopting accepted content as a revision that never passed the boundary. Some keep every
+ * owner and node object but change a read across them (owner lists reordered, owners or node IDs repeated, the logic
+ * library rebuilt): the index build memoizes per owner, node and root by identity, and these are the reads such a memo
+ * must still check.
  *
  * Documented deviation: where the oracle throws (a field with no unambiguous owner, such as duplicate IDs; or an owner it
  * cannot walk or read, such as a page without `components`), the scoped implementation refuses (and keeps `before`)
@@ -415,6 +418,48 @@ const edits: Record<string, { weight: number; apply(document: Doc, rng: Rng, his
     return { document: replaceAt(document, parent, copy), references: declare ? { deleted: [path] } : {}, label: `${declare ? 'declared ' : ''}delete shared ${fieldPointer(path)}` };
   } },
   'malformed owner': { weight: 4, apply: malformed },
+  // Edits that keep every owner (and so every memoized owner and node) as it is but change what is read across them: an
+  // owner list reordered (every owner's pointer moves), an owner repeated by object or by ID (the owner list ID scan no
+  // longer finds one), or a new node taking an existing node's ID (inside the same owner, its node scan no longer does).
+  'owner list edit': { weight: 4, apply(document, rng) {
+    const list = pick(rng, ['pages', 'modals', 'componentLibrary'] as const), owners: unknown = Reflect.get(document, list);
+    if (!Array.isArray(owners) || !owners.length) return undefined;
+    const items = [...owners], at = Math.floor(rng() * items.length), owner = items[at] as { id?: unknown } | null;
+    const kind = pick(rng, ['swap', 'reverse', 'repeat the object', 'repeat the ID', 'move to the front'] as const);
+    if (kind === 'swap' && items.length > 1) {
+      const other = (at + 1 + Math.floor(rng() * (items.length - 1))) % items.length;
+      [items[at], items[other]] = [items[other], items[at]];
+    } else if (kind === 'reverse' || kind === 'swap') items.reverse();
+    else if (kind === 'repeat the object') items.splice(Math.floor(rng() * (items.length + 1)), 0, owner);
+    else if (kind === 'repeat the ID') {
+      if (!owner || typeof owner !== 'object') return undefined;
+      const twin = list === 'componentLibrary' ? { id: owner.id, name: 'Twin', node: tile(fresh('twin'), 'source-a') } : { id: owner.id, title: 'Twin', components: [tile(fresh('twin'), 'source-a')] };
+      items.splice(Math.floor(rng() * (items.length + 1)), 0, twin);
+    } else items.unshift(...items.splice(at, 1));
+    return { document: { ...document, [list]: items } as Doc, references: {}, label: `${kind} ${list}/${at}` };
+  } },
+  'repeat a node ID': { weight: 3, apply(document, rng) {
+    const lists = nodeLists(document), nodes = lists.flatMap(({ path, value }) => (value as { id: string }[]).map(node => ({ path, id: node.id })));
+    if (!nodes.length) return undefined;
+    const { path, id } = pick(rng, nodes);
+    // Mostly the same owner (its node scan), sometimes another one (which must not matter).
+    const same = lists.filter(list => list.path[0] === path[0] && list.path[1] === path[1]), target = pick(rng, rng() < 0.75 && same.length ? same : lists);
+    const items = [...target.value as object[]];
+    items.splice(Math.floor(rng() * (items.length + 1)), 0, { ...tile(fresh('twin'), 'source-a'), id });
+    return { document: replaceAt(document, target.path, items), references: {}, label: `repeat node ID ${id} in ${fieldPointer(target.path)}` };
+  } },
+  // The bindings' library, rebuilt equal (another object) or with a parameter's kind changed.
+  'logic library edit': { weight: 2, apply(document, rng) {
+    const library: unknown = document.logicLibrary;
+    if (!Array.isArray(library) || !library.length) return undefined;
+    const at = Math.floor(rng() * library.length), entry = library[at] as { params?: { kind?: string }[] } | null;
+    const kind = pick(rng, ['clone the library', 'clone an entry', 'change a parameter kind'] as const);
+    if (kind === 'clone the library') return { document: { ...document, logicLibrary: structuredClone(library) } as Doc, references: {}, label: kind };
+    if (kind === 'clone an entry' || !entry?.params?.length) return { document: replaceAt(document, ['logicLibrary', at], structuredClone(entry)), references: {}, label: `clone logicLibrary/${at}` };
+    const param = Math.floor(rng() * entry.params.length), old = entry.params[param]?.kind;
+    return { document: replaceAt(document, ['logicLibrary', at, 'params', param, 'kind'], old === 'source-id' ? 'text' : 'source-id'), references: {},
+      label: `logicLibrary/${at} parameter ${param} kind ${old} -> other` };
+  } },
   // Links put back (bindings, layout metadata or both), so a revision accepted while nothing was linked gets linked.
   'relink': { weight: 2, apply(document, rng) {
     const what = pick(rng, ['bindings', 'layout', 'both'] as const), next = { ...document };
@@ -635,6 +680,18 @@ function sequence(seed: number, steps: number): { disagreement?: Disagreement; a
       // A refused candidate is the caller's to change and offer again.
       if (rng() >= 0.35 || !retry(before, candidate, rng, history)) break;
       label = `${label} (refused, then mutated in place and resubmitted)`;
+    }
+    // Sometimes the caller adopts accepted content as a revision that never passed this boundary (a reload, say): a copy of
+    // the current revision sharing its objects, sometimes with one owner list rebuilt around the same elements. Neither
+    // implementation has indexed the copy, while both have seen its objects. (Only accepted content: a refused candidate is
+    // not a revision the contract covers.)
+    if (rng() < 0.04) {
+      const copy: Record<string, unknown> = { ...before }, lists = ['pages', 'modals', 'componentLibrary', 'logicUseBindings', 'logicLibrary']
+        .filter(key => Array.isArray(copy[key]));
+      const rebuilt = lists.length && rng() < 0.5 ? pick(rng, lists) : undefined;
+      if (rebuilt) copy[rebuilt] = [...copy[rebuilt] as unknown[]];
+      if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: adopt a copy of the revision${rebuilt ? ` with ${rebuilt} rebuilt` : ''}\n`);
+      before = copy as unknown as CompositionDocument; history.push(before);
     }
   }
   return { accepted, refused };
