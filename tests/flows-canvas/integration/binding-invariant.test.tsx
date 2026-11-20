@@ -34,7 +34,8 @@ import { encodeStudioCanvas } from '../../../src/shared/composition/studio-logic
 import { MAX_LOGIC_USE_BINDINGS, studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
 import { newToken, operandSlot, slotOperand } from '../../../src/workspace2/expr/tokens';
 import { toSlot } from '../../../src/workspace2/expr/value';
-import { authoredNodes } from '../../../src/workspace2/logic-fields/registry';
+import { authoredNodes, walkableList, walkableOwner, walkedOwnerLists } from '../../../src/workspace2/logic-fields/registry';
+import { documentEdit as wholeDocumentEdit } from './oracle/documentEdit';
 import { canvasReferences, copySubtree, editSubtrees, rebuildField } from '../../../src/workspace2/editors/provenance';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
@@ -1576,4 +1577,120 @@ it.each(['shared field', 'last value setting', 'private-source setting'])('Same 
   const after = draft.get();
   draft.undo(); expect(draft.get()).toBe(before); expect(placementValues(draft.get())).toEqual(old); valid(draft.get());
   draft.redo(); expect(draft.get()).toBe(after); expect(placementValues(draft.get())).toEqual(current); valid(draft.get());
+});
+
+describe('owners the whole-document reconciliation cannot walk (review 7)', () => {
+  const compiled = () => compileCompositionDocument(draftDocument()).document;
+  const refused = (before: CompositionDocument, candidate: CompositionDocument) => {
+    const notice = vi.spyOn(toastManager, 'add').mockImplementation(() => '');
+    try {
+      expect(documentEdit(before, candidate)).toBe(before);
+      expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    } finally { notice.mockRestore(); }
+  };
+
+  it('the shape check predicts exactly when authoredNodes throws, for every owner list and generated shape', () => {
+    let state = 7;
+    const rng = () => { state = (Math.imul(state, 1103515245) + 12345) >>> 0; return state / 4294967296; };
+    const pick = <T,>(items: readonly T[]) => items[Math.floor(rng() * items.length)];
+    // Values over every key the walk reads, including the near misses it walks safely (primitives, falsy children).
+    const value = (depth: number): unknown => {
+      const kind = depth > 3 ? pick(['scalar', 'scalar', 'empty']) : pick(['scalar', 'list', 'object', 'object', 'object', 'empty']);
+      if (kind === 'scalar') return pick([null, undefined, 0, 7, '', 'x', true, false]);
+      if (kind === 'empty') return pick([[], {}]);
+      if (kind === 'list') return Array.from({ length: Math.floor(rng() * 3) }, () => value(depth + 1));
+      const object: Record<string, unknown> = {};
+      if (rng() < 0.7) object.id = pick(['a', 'b', 7]);
+      if (rng() < 0.6) object.type = pick(['local-tabs', 'navigation-tile', 'section']);
+      for (const key of ['children', 'tabs', 'blocks', 'components', 'node']) if (rng() < 0.35) object[key] = value(depth + 1);
+      return object;
+    };
+    const throws = (document: unknown) => { try { authoredNodes(document as CompositionDocument); return false; } catch { return true; } };
+    const outcomes = new Map<string, number>();
+    for (let sample = 0; sample < 4000; sample++) for (const list of walkedOwnerLists) {
+      const owner = value(0), lists = { pages: [], modals: [], componentLibrary: [] };
+      const expected = throws({ ...lists, [list]: [owner] });
+      expect(walkableOwner(list, owner), `${list} owner ${JSON.stringify(owner)}`).toBe(!expected);
+      const whole = value(0), wholeExpected = throws({ ...lists, [list]: whole });
+      expect(walkableList(list, whole) && (!Array.isArray(whole) || whole.every(item => walkableOwner(list, item))), `${list} ${JSON.stringify(whole)}`).toBe(!wholeExpected);
+      for (const thrown of [expected, wholeExpected]) outcomes.set(`${list} ${thrown}`, (outcomes.get(`${list} ${thrown}`) ?? 0) + 1);
+    }
+    // Both outcomes occur for every list, so the agreement is not vacuous.
+    for (const list of walkedOwnerLists) for (const thrown of [true, false]) expect(outcomes.get(`${list} ${thrown}`)).toBeGreaterThan(200);
+  });
+
+  it.each([false, true])('refuses an unrelated component entry without a node, where the old reconciler throws (primed: %s)', primed => {
+    const initial = compiled();
+    const before = primed ? documentEdit(initial, { ...initial, name: 'Prime' }) : initial;
+    if (primed) expect(before).not.toBe(initial);
+    const candidate = { ...before, componentLibrary: [{ id: 'new-owner', name: 'New' }] } as CompositionDocument;
+    expect(() => wholeDocumentEdit(before, candidate)).toThrow("Cannot read properties of undefined (reading 'id')");
+    refused(before, candidate);
+  });
+
+  it.each([
+    ['a page without components', (document: CompositionDocument) => ({ ...document, pages: [...document.pages, { id: 'odd', title: 'Odd' }] })],
+    ['a null modal', (document: CompositionDocument) => ({ ...document, modals: [...document.modals, null] })],
+    ['a tile whose children are not a list', (document: CompositionDocument) => replaceAt(document, ['pages', 0, 'components', 0, 'children'], { 0: null })],
+    ['a local-tabs tab without children', (document: CompositionDocument) => replaceAt(document, ['pages', 0, 'components'],
+      [...document.pages[0].components, { id: 'tabs', type: 'local-tabs', tabs: [{ id: 'tab' }] }])],
+    ['component bindings that are not a list', (document: CompositionDocument) => ({ ...document, componentLibrary: [
+      { id: 'odd', name: 'Odd', params: [], node: tile('odd-body', 'source-a'), bindings: { 0: { param: 'x', nodeId: 'odd-body', field: 'title' } } }] })],
+  ])('refuses %s even when no binding is in scope', (_, change) => {
+    const before = documentEdit(compiled(), { ...compiled(), name: 'Prime' });
+    const candidate = change(before) as CompositionDocument;
+    expect(() => wholeDocumentEdit(before, candidate)).toThrow(TypeError);
+    refused(before, candidate);
+  });
+
+  it('accepts a malformed owner exactly while the old reconciler would not walk it, then refuses once it would', () => {
+    // Nothing linked: neither reconciler reads owners, so the malformed page is accepted.
+    const plain = { ...compiled(), logicUseBindings: [] } as CompositionDocument;
+    const layout = withMeaningCanvas(plain, ['pages', 0, 'components', 0, 'props', 'subtitle']).studioCanvas;
+    const malformed = { ...plain, pages: [...plain.pages, { id: 'odd', title: 'Odd' }] } as CompositionDocument;
+    expect(wholeDocumentEdit(plain, malformed)).toBe(malformed);
+    expect(documentEdit(plain, malformed)).toBe(malformed);
+    // Adding layout metadata: the old reconciler only rebases metadata `before` had, so nothing walks yet.
+    const framed = { ...malformed, studioCanvas: layout };
+    expect(wholeDocumentEdit(malformed, framed, { layout: [['pages', 0, 'components', 0, 'props', 'subtitle']] })).toBe(framed);
+    expect(documentEdit(malformed, framed, { layout: [['pages', 0, 'components', 0, 'props', 'subtitle']] })).toBe(framed);
+    // A rename touches no owner and no binding, but the old reconciler now rebases the root and walks every owner.
+    const renamed = { ...framed, name: 'Renamed' };
+    expect(() => wholeDocumentEdit(framed, renamed)).toThrow("Cannot read properties of undefined (reading 'forEach')");
+    refused(framed, renamed);
+    // Repairing the owner is reconciled like any edit.
+    const repaired = { ...framed, pages: plain.pages };
+    expect(wholeDocumentEdit(framed, repaired)).toBe(repaired);
+    expect(documentEdit(framed, repaired)).toBe(repaired);
+  });
+
+  it.each([false, true])('anchors a logic-library root without walking owners, so an unrelated malformed owner is accepted as before (primed: %s)', primed => {
+    // `fieldAnchor` walks owners only for a page, modal or component field; a logic entry's body is found by ID alone.
+    const plain = { ...compiled(), logicUseBindings: [] } as CompositionDocument, body: EditorPath = ['logicLibrary', 0, 'body'];
+    const graph = liftField(plain, body, 'operand').graph;
+    const framed = { ...plain, studioCanvas: encodeStudioCanvas(plain, [{ id: 'frame', roots: [{ anchor: graph.roots[0].anchor,
+      nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: 100 * at, y: 0 })) }] }]) };
+    const before = primed ? documentEdit(framed, { ...framed, name: 'Prime' }) : framed;
+    if (primed) expect(before).not.toBe(framed);
+    const candidate = { ...before, modals: [...before.modals, null] } as unknown as CompositionDocument;
+    expect(wholeDocumentEdit(before, candidate)).toBe(candidate);
+    expect(documentEdit(before, candidate)).toBe(candidate);
+  });
+
+  it('reconciles a revision holding an untouched malformed owner whole: a rename refuses once a binding walks it', () => {
+    const complete = compiled(), plain = { ...complete, logicUseBindings: [] } as CompositionDocument;
+    const malformed = { ...plain, modals: [...plain.modals, null] } as unknown as CompositionDocument;
+    expect(wholeDocumentEdit(plain, malformed)).toBe(malformed);
+    expect(documentEdit(plain, malformed)).toBe(malformed);
+    // A binding the old reconciler adds without locating it: nothing walks yet.
+    const bound = { ...malformed, logicUseBindings: complete.logicUseBindings!.slice(0, 1) };
+    expect(wholeDocumentEdit(malformed, bound)).toBe(bound);
+    expect(documentEdit(malformed, bound)).toBe(bound);
+    // Neither edit reaches the modal or the binding, but the old reconciler anchors every retained binding, walking every owner.
+    const renamed = { ...bound, name: 'Renamed' };
+    expect(() => wholeDocumentEdit(bound, renamed)).toThrow("Cannot read properties of null (reading 'components')");
+    refused(bound, renamed);
+    // Again with the revision's index already built.
+    refused(bound, { ...bound, name: 'Renamed again' });
+  });
 });

@@ -49,15 +49,61 @@ export function authoredNodes(document: CompositionDocument): AuthoredNode[] {
   document.componentLibrary?.forEach((entry, index) => visit(entry.node, ['componentLibrary', index, 'node'], `component:${entry.id}`));
   return nodes;
 }
-/** `nodes` may pass `authoredNodes(document)` already computed for this same document, to share one walk across calls. */
-export function fieldAnchor(document: CompositionDocument, path: EditorPath, nodes?: readonly AuthoredNode[]): LogicAnchor {
+/**
+ * Whether `authoredNodes` walks `node` (and everything below it) without throwing, for JSON values. It reads each node's
+ * `id`, so a missing (`null` or `undefined`) node throws; a primitive has no `id`, `type` or child lists and is walked.
+ * Then `childLists`: a `local-tabs` node's `tabs` and `blocks` must each be absent or a list (`(holder.tabs ?? []).map`),
+ * every entry an area whose `children` is a list (`tab.children`, then `list.nodes.forEach`); any other node's truthy
+ * `children` must be a list. Objects in `known` were walked before and are not walked again (a node's subtree is fixed
+ * by its identity once committed); objects walked are added to `walked`.
+ */
+export function walkableNode(node: unknown, known?: WeakSet<object>, walked?: object[]): boolean {
+  if (node === null || node === undefined) return false;
+  if (typeof node !== 'object' || known?.has(node)) return true;
+  const holder = node as { type?: unknown; children?: unknown; tabs?: unknown; blocks?: unknown };
+  const lists: unknown[][] = [];
+  if (holder.type === 'local-tabs') {
+    for (const areas of [holder.tabs ?? [], holder.blocks ?? []]) {
+      // `every` and `forEach` skip holes, as the walk's `map` does.
+      const area = (value: unknown) => value === null || value === undefined ? undefined : (value as { children?: unknown }).children;
+      if (!Array.isArray(areas) || !areas.every(value => Array.isArray(area(value)))) return false;
+      areas.forEach(value => lists.push(area(value) as unknown[]));
+    }
+  } else if (holder.children) {
+    if (!Array.isArray(holder.children)) return false;
+    lists.push(holder.children);
+  }
+  if (!lists.every(list => list.every(child => walkableNode(child, known, walked)))) return false;
+  walked?.push(node);
+  return true;
+}
+/** The owner lists `authoredNodes` walks: `pages` and `modals` must be lists, `componentLibrary` absent or a list. */
+export const walkedOwnerLists = ['pages', 'modals', 'componentLibrary'] as const;
+export type WalkedOwnerList = typeof walkedOwnerLists[number];
+export const walkableList = (list: WalkedOwnerList, value: unknown) => Array.isArray(value) || list === 'componentLibrary' && (value === null || value === undefined);
+/**
+ * Whether `authoredNodes` walks `owner`, an entry of `list`, without throwing: a page or modal must have a list of
+ * `components` (`surface.components.forEach`), a component entry a `node` (`entry.node`), and each node must be walkable.
+ * `known` and `walked` hold nodes, as for {@link walkableNode}.
+ */
+export function walkableOwner(list: WalkedOwnerList, owner: unknown, known?: WeakSet<object>, walked?: object[]): boolean {
+  if (owner === null || owner === undefined) return false;
+  if (list === 'componentLibrary') return walkableNode((owner as { node?: unknown }).node, known, walked);
+  const components = (owner as { components?: unknown }).components;
+  return Array.isArray(components) && components.every(node => walkableNode(node, known, walked));
+}
+/**
+ * `nodes` may give `authoredNodes(document)` for this same document, to share one walk across calls: computed already, or
+ * a function computing it, called only for a page, modal or component field (no other field walks the owners).
+ */
+export function fieldAnchor(document: CompositionDocument, path: EditorPath, nodes?: readonly AuthoredNode[] | (() => readonly AuthoredNode[])): LogicAnchor {
   const collection = path[0], index = path[1];
   if (typeof collection === 'string' && Object.hasOwn(ownerKinds, collection) && index !== undefined) {
     const owner = valueAt(document, path.slice(0, 2)) as { id?: string } | undefined;
     if (!owner?.id) throw new Error('The logic owner no longer exists.');
     const kind = ownerKinds[collection as keyof typeof ownerKinds];
     let nodeId: string | undefined, depth = 2;
-    if (kind === 'page' || kind === 'modal' || kind === 'component') for (const location of nodes ?? authoredNodes(document)) {
+    if (kind === 'page' || kind === 'modal' || kind === 'component') for (const location of (typeof nodes === 'function' ? nodes() : nodes) ?? authoredNodes(document)) {
       if (location.path.length <= path.length && location.path.length > depth
         && location.path.every((part, index) => String(part) === String(path[index]))) {
         nodeId = location.node.id; depth = location.path.length;

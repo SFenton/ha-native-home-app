@@ -53,7 +53,7 @@ function normalCanvas(canvas: StoredCanvas, byRoot: ReadonlyMap<string, readonly
 
 /** A field's anchor; a field that no longer has one owner (duplicate IDs, a removed owner) refuses the edit. */
 function anchorAt(document: CompositionDocument, path: EditorPath, nodes: () => readonly AuthoredNode[], refuse: () => never): LogicAnchor {
-  try { return fieldAnchor(document, path, nodes()); } catch { return refuse(); }
+  try { return fieldAnchor(document, path, nodes); } catch { return refuse(); }
 }
 
 /**

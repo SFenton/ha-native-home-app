@@ -5,14 +5,18 @@
  * implementations must agree on refusal and give the same JSON (including `studioCanvas`).
  *
  * Edits mix: sibling typing that rebuilds ancestors (declared through `fields` or not), placing an existing object at
- * extra places (also while rebuilding one of its original containers in the same edit), removing such aliases, undeclared clones, array reorder/insert/delete, moves and copies (declared through
- * `relocated`, `copied` and `deleted` or not), ID changes, `logicUseBindings` and component binding edits, canvas metadata
- * edits (with and without `layout`), `discardLayouts`, renames, reapplying an earlier revision, and resubmitting a
- * refused candidate after mutating it in place.
+ * extra places (also while rebuilding one of its original containers in the same edit), removing such aliases (by
+ * cloning, or by deleting one of the properties holding it), undeclared clones, array reorder/insert/delete, moves and
+ * copies (declared through `relocated`, `copied` and `deleted` or not), declared provenance that need not match the edit,
+ * objects of earlier revisions placed back, ID changes, `logicUseBindings` and component binding edits, canvas metadata
+ * edits (with and without `layout`), `discardLayouts`, renames, reapplying an earlier revision, malformed owners in every
+ * owner list (see `malformed`), links restored to a draft that had none, and resubmitting a refused candidate after
+ * mutating it in place.
  *
- * Documented deviation: where a field has no unambiguous owner (duplicate IDs, or an owner too malformed to walk), the
- * oracle lets `fieldAnchor`'s raw error escape; the scoped implementation refuses (and keeps `before`) instead. That pair
- * counts as agreement. Any other error must be the same error from both.
+ * Documented deviation: where the oracle throws (a field with no unambiguous owner, such as duplicate IDs; or an owner it
+ * cannot walk or read, such as a page without `components`), the scoped implementation refuses (and keeps `before`)
+ * instead. That pair counts as agreement; `EDIT_ORACLE_REPORT=1` tallies each such oracle error by message and site. Any
+ * other error must be the same error from both, and the scoped implementation must never accept where the oracle throws.
  *
  * CI runs seeds 1-256 (14 steps each, a few seconds). Each bug class reviews 5 and 6 found is caught within that range
  * when its fix is reverted. For a longer local run: `EDIT_ORACLE_SEEDS=2000 npx vitest run <this file>` (optionally
@@ -136,6 +140,19 @@ const fixtures: Record<string, () => Doc> = {
   'shared frame, missing origin': () => storedVariant('missing origin'),
   'shared frame, unreconcilable scalar origin': () => storedVariant('scalar origin'),
   'shared frame, reversed nodes': () => storedVariant('reversed nodes'),
+  // Nothing linked: neither reconciler reads any owner, so malformed ones are accepted until `relink` links the draft.
+  'unlinked draft': () => ({ ...compiled(), logicUseBindings: [] }),
+  // Starts with an owner the oracle cannot walk, which stays untouched once `relink` links the draft.
+  'unlinked draft with a null modal': () => ({ ...compiled(), logicUseBindings: [], modals: [...compiled().modals, null] }) as unknown as Doc,
+  'unlinked component draft': () => {
+    const document = compileCompositionDocument(componentDocument()).document;
+    return { ...document, logicUseBindings: [], componentLibrary: document.componentLibrary!.map(entry => ({ ...entry, bindings: [] })) };
+  },
+  // The only link is a root on a logic entry's body, which `fieldAnchor` finds by ID without walking any owner.
+  'logic body canvas': () => {
+    const document = { ...compiled(), logicUseBindings: [] }, graph = liftField(document, ['logicLibrary', 0, 'body'], 'operand').graph;
+    return framed(document, [{ anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 100, y: 0 })) }]);
+  },
 };
 
 // MARK: - Edits
@@ -178,6 +195,8 @@ const merge = (left: EditReferences, right: EditReferences): EditReferences => (
 });
 interface Step { readonly document: Doc; readonly references: EditReferences; readonly label: string }
 let counter = 0;
+/** The links `relink` restores: the sequence's own fixture, or for the unlinked draft its linked counterpart. */
+let links: Doc;
 const fresh = (prefix: string) => `${prefix}-${++counter}`;
 
 /** Place `source`'s object at a second place: a place of the same kind, or a new tile on some surface. */
@@ -356,7 +375,159 @@ const edits: Record<string, { weight: number; apply(document: Doc, rng: Rng, his
   'reapply earlier revision': { weight: 1, apply(_document, rng, history) {
     return history.length > 1 ? { document: pick(rng, history.slice(0, -1)), references: {}, label: 'reapply an earlier revision' } : undefined;
   } },
+  // An object of an older revision placed back into the current one: its identity is a witness the index may have retired.
+  'borrow an object from an earlier revision': { weight: 4, apply(document, rng, history) {
+    if (history.length < 2) return undefined;
+    const surveyed = survey(pick(rng, history.slice(0, -1)));
+    if (!surveyed.bound.length) return undefined;
+    const source = near(rng, surveyed), targets = survey(document).semantic.filter(({ path }) => path.at(-1) === source.path.at(-1));
+    if (!targets.length) return undefined;
+    const target = pick(rng, targets), pointer = fieldPointer(target.path);
+    return { document: replaceAt(document, target.path, source.value), references: rng() < 0.5 ? { fields: new Map([[pointer, [pointer]]]) } : {},
+      label: `borrow historical ${fieldPointer(source.path)} at ${pointer}` };
+  } },
+  // Declared provenance that need not match the edit: no destination, several, or ones holding something else.
+  'arbitrary field provenance': { weight: 3, apply(document, rng) {
+    const surveyed = survey(document);
+    if (!surveyed.bound.length) return undefined;
+    const from = near(rng, surveyed), same = surveyed.semantic.filter(({ path }) => path.at(-1) === from.path.at(-1));
+    const destinations = Array.from({ length: Math.floor(rng() * 4) }, () => fieldPointer(pick(rng, same).path));
+    const declared = new Map([[fieldPointer(from.path), destinations]]), fields = rng() < 0.5;
+    return { document: { ...document, name: fresh('provenance') }, references: fields ? { fields: declared } : { relocated: declared },
+      label: `declared ${fields ? 'fields' : 'relocated'} ${fieldPointer(from.path)} -> [${destinations.join(', ')}]` };
+  } },
+  'arbitrary copy provenance': { weight: 2, apply(document, rng) {
+    const surveyed = survey(document);
+    if (!surveyed.bound.length) return undefined;
+    const from = near(rng, surveyed), to = pick(rng, surveyed.semantic.filter(({ path }) => path.at(-1) === from.path.at(-1)));
+    return { document: { ...document, name: fresh('copy-provenance') }, references: { copied: [{ from: from.path, to: to.path }] },
+      label: `declare existing copy ${fieldPointer(from.path)} -> ${fieldPointer(to.path)}` };
+  } },
+  // One of an object's places removed, leaving the others (declared deleted or not).
+  'delete an aliased property': { weight: 2, apply(document, rng) {
+    const surveyed = survey(document), shared = surveyed.bound.filter(({ path, value }) => surveyed.counts.get(value)! > 1 && typeof path.at(-1) === 'string');
+    if (!shared.length) return undefined;
+    const { path } = pick(rng, shared), parent = path.slice(0, -1), holder = valueAt(document, parent);
+    if (!holder || typeof holder !== 'object' || Array.isArray(holder)) return undefined;
+    const copy = { ...holder };
+    Reflect.deleteProperty(copy, path.at(-1)!);
+    const declare = rng() < 0.5;
+    return { document: replaceAt(document, parent, copy), references: declare ? { deleted: [path] } : {}, label: `${declare ? 'declared ' : ''}delete shared ${fieldPointer(path)}` };
+  } },
+  'malformed owner': { weight: 4, apply: malformed },
+  // Links put back (bindings, layout metadata or both), so a revision accepted while nothing was linked gets linked.
+  'relink': { weight: 2, apply(document, rng) {
+    const what = pick(rng, ['bindings', 'layout', 'both'] as const), next = { ...document };
+    if (what !== 'layout') next.logicUseBindings = links.logicUseBindings;
+    if (what !== 'layout' && links.componentLibrary && Array.isArray(document.componentLibrary)) next.componentLibrary = document.componentLibrary.map(entry =>
+      links.componentLibrary!.find(linked => linked.id === entry?.id)?.bindings ? { ...entry, bindings: links.componentLibrary!.find(linked => linked.id === entry.id)!.bindings } : entry);
+    if (what !== 'bindings' && links.studioCanvas) next.studioCanvas = links.studioCanvas;
+    return { document: next, references: what !== 'bindings' ? { layout: rootTargets(next) } : {}, label: `relink ${what}` };
+  } },
 };
+
+// MARK: - Malformed owners
+
+/**
+ * Node shapes for `authoredNodes`' walk (`registry.ts`), named for what it reads: a node's `id`, then its child lists
+ * (`children`, or a `local-tabs` node's `tabs` and `blocks` and each one's `children`). The first group throws in the
+ * oracle wherever it walks; the second is walked safely (a primitive has no `id` or lists; falsy `children` is no list;
+ * `local-tabs` ignores `children`), so both implementations must accept it alike.
+ */
+const brokenNodes: Record<string, () => unknown> = {
+  'null node': () => null,
+  'children not a list': () => ({ ...tile(fresh('broken'), 'source-a'), children: { first: tile(fresh('inner'), 'source-a') } }),
+  'children a string': () => ({ ...tile(fresh('broken'), 'source-a'), children: 'x' }),
+  'null child': () => ({ ...tile(fresh('broken'), 'source-a'), children: [tile(fresh('inner'), 'source-a'), null] }),
+  'tabs not a list': () => ({ id: fresh('tabs'), type: 'local-tabs', tabs: {} }),
+  'null tab': () => ({ id: fresh('tabs'), type: 'local-tabs', tabs: [null] }),
+  'tab without children': () => ({ id: fresh('tabs'), type: 'local-tabs', tabs: [{ id: 'tab', title: 'Tab' }] }),
+  'blocks not a list': () => ({ id: fresh('tabs'), type: 'local-tabs', tabs: [], blocks: 'x' }),
+};
+const walkableNodes: Record<string, () => unknown> = {
+  'primitive node': () => 7,
+  'falsy children': () => ({ ...tile(fresh('odd'), 'source-a'), children: '' }),
+  'local-tabs children ignored': () => ({ id: fresh('tabs'), type: 'local-tabs', children: {}, tabs: [{ children: [] }] }),
+};
+const anyNode = (rng: Rng): [string, unknown] => {
+  const [name, make] = pick(rng, Object.entries(rng() < 0.75 ? brokenNodes : walkableNodes));
+  return [name, make()];
+};
+/** Owner shapes per owner list. `pages`, `modals` and `componentLibrary` entries are walked; the rest are only looked up. */
+const brokenOwners: Record<'pages' | 'modals' | 'componentLibrary' | 'logicLibrary' | 'dataSources', (rng: Rng) => [string, unknown]> = {
+  pages: rng => surface(rng, 'page'),
+  modals: rng => surface(rng, 'modal'),
+  componentLibrary: rng => {
+    const id = fresh('owner'), base = { id, name: 'Broken', params: [{ name: 'label', kind: 'text' }], node: tile(fresh('body'), 'source-a') };
+    const parameter = { param: 'label', nodeId: base.node.id, field: 'props/subtitle/value' }, source = { param: 'label', sourceId: 'own', field: 'entityId' };
+    const shapes: Record<string, () => unknown> = {
+      'null entry': () => null,
+      'primitive entry': () => 'component',
+      'entry without node': () => ({ id, name: 'Missing node' }),
+      'node not walkable': () => ({ ...base, node: anyNode(rng)[1] }),
+      'bindings not a list': () => ({ ...base, bindings: { 0: parameter } }),
+      'null binding': () => ({ ...base, bindings: [null] }),
+      'binding field not text': () => ({ ...base, bindings: [{ ...parameter, field: 7 }] }),
+      'params not a list': () => ({ ...base, params: { label: 'text' }, bindings: [parameter] }),
+      'null param': () => ({ ...base, params: [null], bindings: [parameter] }),
+      'sources not a list': () => ({ ...base, sources: { own: 'source' }, bindings: [source] }),
+      'null source': () => ({ ...base, sources: [null], bindings: [source] }),
+      'flows not a list': () => ({ ...base, flows: 5, bindings: [source] }),
+    };
+    const [name, make] = pick(rng, Object.entries(shapes));
+    return [name, make()];
+  },
+  logicLibrary: rng => pick(rng, [['null entry', null], ['primitive entry', 'logic'], ['entry without id', { name: 'No id', body: { type: 'literal', value: 1 } }],
+    ['entry without body', { id: fresh('logic'), name: 'No body' }], ['null body', { id: fresh('logic'), name: 'Null body', body: null }]] as [string, unknown][]),
+  dataSources: rng => pick(rng, [['null entry', null], ['primitive entry', 'source'], ['entry without id', { kind: 'ha-entity' }],
+    ['entities not a list', { id: fresh('source'), kind: 'ha-entity', entities: {} }]] as [string, unknown][]),
+};
+function surface(rng: Rng, kind: string): [string, unknown] {
+  const id = fresh(kind), shapes: Record<string, () => [string, unknown]> = {
+    'null entry': () => ['null entry', null],
+    'primitive entry': () => ['primitive entry', kind],
+    'entry without components': () => ['entry without components', { id, title: 'No components' }],
+    'components not a list': () => ['components not a list', { id, title: 'Odd', components: { 0: tile(fresh('tile'), 'source-a') } }],
+    'node': () => { const [name, node] = anyNode(rng); return [name, { id, title: 'Broken node', components: [tile(fresh('tile'), 'source-a'), node] }]; },
+  };
+  return pick(rng, Object.values(shapes))();
+}
+type OwnerList = keyof typeof brokenOwners;
+/**
+ * A malformed owner added, put in place of an existing one, or a broken node put inside an existing owner's tree; or an
+ * owner list replaced by something that is not a list. Unrelated to any binding, so the scoped reconciliation must notice
+ * the shape itself rather than through a binding in scope.
+ */
+function malformed(document: Doc, rng: Rng): Step | undefined {
+  const list = pick(rng, Object.keys(brokenOwners) as OwnerList[]), owners = (document as unknown as Record<string, unknown>)[list];
+  const items = Array.isArray(owners) ? owners as unknown[] : [];
+  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list'] as const);
+  if (mode === 'list') {
+    const value = pick(rng, [undefined, {}, 'list'] as const);
+    const next = { ...document } as Record<string, unknown>;
+    if (value === undefined) delete next[list]; else next[list] = value;
+    return { document: next as unknown as Doc, references: {}, label: `malformed ${list}: ${value === undefined ? 'removed' : `${JSON.stringify(value)} for the list`}` };
+  }
+  if (mode === 'nest' && (list === 'pages' || list === 'modals' || list === 'componentLibrary')) {
+    const holders = nodeLists(document).filter(({ path }) => path[0] === list);
+    const [name, node] = anyNode(rng);
+    if (list === 'componentLibrary' && (!holders.length || rng() < 0.4)) {
+      if (!items.length) return undefined;
+      const at = Math.floor(rng() * items.length);
+      return { document: replaceAt(document, [list, at, 'node'], node), references: {}, label: `malformed ${list}/${at} node: ${name}` };
+    }
+    if (!holders.length) return undefined;
+    const { path, value } = pick(rng, holders), nodes = [...value as unknown[]];
+    if (rng() < 0.5 || !nodes.length) nodes.push(node); else nodes[Math.floor(rng() * nodes.length)] = node;
+    return { document: replaceAt(document, path, nodes), references: {}, label: `malformed node in ${fieldPointer(path)}: ${name}` };
+  }
+  const [name, owner] = brokenOwners[list](rng);
+  if (mode === 'replace' && items.length) {
+    const at = Math.floor(rng() * items.length);
+    return { document: replaceAt(document, [list, at], owner), references: {}, label: `malformed ${list}/${at} replaced: ${name}` };
+  }
+  return { document: { ...document, [list]: [...items, owner] } as Doc, references: {}, label: `malformed ${list} added: ${name}` };
+}
 const weighted = Object.entries(edits).flatMap(([name, edit]) => Array.from({ length: edit.weight }, () => name));
 
 /** Make one step: one to three edits composed into a single candidate. */
@@ -403,17 +574,22 @@ function retry(before: Doc, candidate: Doc, rng: Rng, history: readonly Doc[]): 
 
 type Outcome = { kind: 'result'; document: Doc } | { kind: 'error'; error: unknown };
 const run = (edit: () => Doc): Outcome => { try { return { kind: 'result', document: edit() }; } catch (error) { return { kind: 'error', error }; } };
-/** `fieldAnchor`'s own errors, or one raised while it walks a malformed owner (an entry without a node, say). */
-const fromFieldAnchor = (error: unknown) => error instanceof Error && (['This field does not have an unambiguous logic owner.', 'The logic owner no longer exists.'].includes(error.message)
-  || /\/logic-fields\/registry\.ts:/.test(error.stack?.split('\n').find(line => line.includes('/src/') || line.includes('/oracle/')) ?? ''));
-const where = (error: unknown) => error instanceof Error ? ` at ${error.stack?.split('\n').find(line => line.includes('/src/') || line.includes('/oracle/'))?.trim() ?? '?'}` : '';
+const site = (error: unknown) => error instanceof Error ? error.stack?.split('\n').find(line => line.includes('/src/') || line.includes('/oracle/'))?.trim()
+  .replace(/^at /, '').replace(/\(?\/.*\/(src|oracle)\//, '$1/').replace(/\)$/, '') ?? '?' : '?';
+const where = (error: unknown) => error instanceof Error ? ` at ${site(error)}` : '';
 const describeOutcome = (outcome: Outcome, before: Doc, candidate: Doc) => outcome.kind === 'error' ? `throws ${String(outcome.error)}${where(outcome.error)}`
   : outcome.document === before ? 'refuses' : outcome.document === candidate ? 'accepts as proposed' : 'accepts with reconciled metadata';
+/** Each time the oracle threw and the scoped implementation refused instead (the documented deviation), by oracle message and site. */
+const deviations = new Map<string, number>();
 /** Agreement, or a description of the disagreement. */
 function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome): string | undefined {
   if (oracle.kind === 'error') {
     if (scoped.kind === 'error' && String(scoped.error) === String(oracle.error)) return undefined;
-    if (scoped.kind === 'result' && scoped.document === before && fromFieldAnchor(oracle.error)) return undefined;
+    if (scoped.kind === 'result' && scoped.document === before) {
+      const key = `${String(oracle.error)} at ${site(oracle.error)}`;
+      deviations.set(key, (deviations.get(key) ?? 0) + 1);
+      return undefined;
+    }
   } else if (scoped.kind === 'result') {
     const refused = scoped.document === before, oracleRefused = oracle.document === before;
     if (refused === oracleRefused && sameJson(scoped.document, oracle.document)) return undefined;
@@ -430,6 +606,8 @@ function sequence(seed: number, steps: number): { disagreement?: Disagreement; a
   const rng = random(seed), names = Object.keys(fixtures), fixture = names[seed % names.length];
   counter = 0;
   let before = fixtures[fixture]();
+  links = fixture.startsWith('unlinked draft') ? fixtures['automatic with canvas']()
+    : fixture === 'unlinked component draft' ? compileCompositionDocument(componentDocument()).document : before;
   const history = [before];
   let accepted = 0, refused = 0;
   for (let index = 0; index < steps; index++) {
@@ -482,7 +660,10 @@ describe('scoped documentEdit agrees with the whole-document oracle on seeded ra
       if (result.disagreement) disagreements.push(result.disagreement);
     }
     process.stdout.write(`Edit oracle: ${seeds} seeds from ${from}, ${steps} steps; ${accepted} accepted and ${refused} refused submissions; ${disagreements.length} disagreeing seeds.\n`);
-    if (process.env.EDIT_ORACLE_REPORT) for (const found of disagreements) process.stdout.write(`Edit oracle disagreement: ${JSON.stringify(found)}\n`);
+    if (process.env.EDIT_ORACLE_REPORT) {
+      for (const found of disagreements) process.stdout.write(`Edit oracle disagreement: ${JSON.stringify(found)}\n`);
+      for (const [error, count] of [...deviations].sort(([, left], [, right]) => right - left)) process.stdout.write(`Edit oracle deviation (oracle throws, scoped refuses) x${count}: ${error}\n`);
+    }
     expect(disagreements).toEqual([]);
   }, Math.max(120_000, seeds * steps * 50));
 });

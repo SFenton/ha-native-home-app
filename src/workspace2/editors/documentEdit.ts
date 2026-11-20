@@ -5,7 +5,7 @@ import { atPointer, resolveLogicAnchor } from '../../shared/composition/studio-l
 import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
 import { sameJson } from '../../sameJson';
 import { usesOf } from '../data/logic/logicModel';
-import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, type AuthoredNode } from '../logic-fields/registry';
+import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
 import { rebaseCanvasLayout, uncertifiedCanvasRoots } from '../logic-fields/layout';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { toastManager } from '../toasts';
@@ -59,6 +59,8 @@ interface ReferenceIndex {
   readonly always: ReadonlySet<string>;
   /** Canvas roots a full rebase would not give back unchanged; every edit rebases these. */
   readonly uncertified: ReadonlySet<string>;
+  /** The revision has an owner the whole-document reconciliation cannot read (see `ownerShaped`); every edit reconciles everything. */
+  readonly unshaped: boolean;
   /**
    * Known-usable layout metadata. Edits that keep this index either leave every root's reads untouched or rebase the reached
    * roots through a check that refuses unusable output, so usability carries forward. Unusable metadata is rechecked.
@@ -99,6 +101,50 @@ function objectCounts(document: CompositionDocument, members: WeakSet<object>): 
   };
   visit(document);
   return counts;
+}
+
+/**
+ * Owner shapes. The whole-document reconciliation (5b28fc4) walks every page, modal and component entry through
+ * `authoredNodes` whenever it anchors a field there (`fieldAnchor`: for each retained automatic binding, each located
+ * component node binding and each canvas root it rebases), and reads every component entry on every edit (`entry.id`, its
+ * `bindings` iterated with each binding's `param` and `field`, its `params` searched, and for a source binding its
+ * `sources` and `flows` spread and searched by `id`). On owners those reads cannot take they throw. Scoping skips the
+ * walk wherever no binding is in scope, so it checks those shapes itself: on every owner an edit reaches or places, and
+ * once per indexed revision on every owner. A revision or candidate with an owner of any other shape is reconciled whole,
+ * and anything that then throws refuses. `logicLibrary` and `dataSources` entries are only looked up (by
+ * `resolveLogicAnchor`, `usesOf` and a schema parse), never walked unguarded, so no shape of theirs throws.
+ */
+const present = (value: unknown) => value !== null && value !== undefined;
+const listOf = (value: unknown, item: (value: unknown) => boolean) => !present(value) || Array.isArray(value) && value.every(item);
+/** The component entry reads beyond the walk; a superset of the shapes they throw on (a binding without a text field, say). */
+const entryShaped = (entry: object) => {
+  const { bindings, params, sources, flows } = entry as Record<string, unknown>;
+  return listOf(bindings, binding => present(binding) && typeof (binding as { field?: unknown }).field === 'string')
+    && listOf(params, present) && listOf(sources, present) && listOf(flows, present);
+};
+/**
+ * Committed objects already checked: walkable nodes, and owners (by role) whose reads were checked too. Committed
+ * revisions are immutable, so identity keeps the result; a candidate's objects are added only once it is accepted.
+ */
+const shapedNodes = new WeakSet<object>(), shapedSurfaces = new WeakSet<object>(), shapedEntries = new WeakSet<object>();
+interface Checked { readonly nodes: object[]; readonly surfaces: object[]; readonly entries: object[] }
+const checking = (): Checked => ({ nodes: [], surfaces: [], entries: [] });
+function ownerShaped(list: WalkedOwnerList, owner: unknown, checked: Checked): boolean {
+  const entry = list === 'componentLibrary', known = entry ? shapedEntries : shapedSurfaces;
+  if (owner !== null && typeof owner === 'object' && known.has(owner)) return true;
+  // A walkable owner is an object: it holds `components` or a `node`.
+  if (!walkableOwner(list, owner, shapedNodes, checked.nodes) || entry && !entryShaped(owner as object)) return false;
+  (entry ? checked.entries : checked.surfaces).push(owner as object);
+  return true;
+}
+function listShaped(document: CompositionDocument, list: WalkedOwnerList, checked: Checked): boolean {
+  const owners: unknown = Reflect.get(document, list);
+  return walkableList(list, owners) && ((owners ?? []) as unknown[]).every(owner => ownerShaped(list, owner, checked));
+}
+function commitShapes(checked: Checked): void {
+  for (const node of checked.nodes) shapedNodes.add(node);
+  for (const surface of checked.surfaces) shapedSurfaces.add(surface);
+  for (const entry of checked.entries) shapedEntries.add(entry);
 }
 
 const ownerLists = { page: 'pages', modal: 'modals', component: 'componentLibrary', logic: 'logicLibrary', flow: 'dataSources' } as const;
@@ -196,6 +242,17 @@ export function documentEdit(before: CompositionDocument, edit: CompositionDocum
 }
 
 function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocument, references: EditReferences): CompositionDocument {
+  const shapes = { unshaped: false };
+  try {
+    return reconcile(before, edit, references, shapes);
+  } catch (error) {
+    // The whole-document reconciliation throws on owners it cannot read; this boundary refuses them instead.
+    if (shapes.unshaped && !(error instanceof LinkedEditRefusal) && !(error instanceof CompositionValidationError)) return refuse();
+    throw error;
+  }
+}
+
+function reconcile(before: CompositionDocument, edit: CompositionDocument, references: EditReferences, shapes: { unshaped: boolean }): CompositionDocument {
   if (before === edit || sameJson(before, edit) && !references.relocated?.size && !references.copied?.length) return edit;
   const linked = (document: CompositionDocument) => document.logicUseBindings?.length || document.componentLibrary?.some(entry => entry.bindings?.length) || document.studioCanvas;
   if (!linked(before) && !linked(edit)) return edit;
@@ -205,7 +262,7 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
   const locate = (pointer: string) => referencePaths(before, pathsOfEdit())(pointer);
   /** A field's anchor in the candidate; a field without one owner (duplicate IDs, say) refuses rather than throws. */
   const anchorAt = (path: EditorPath) => {
-    try { return fieldAnchor(edit, path, editNodes ??= authoredNodes(edit)); } catch { return refuse(); }
+    try { return fieldAnchor(edit, path, () => editNodes ??= authoredNodes(edit)); } catch { return refuse(); }
   };
   const deleted = (pointer: string) => (references.deleted ?? []).some(path => inside(pointer, fieldPointer(path)))
     || [...references.relocated ?? []].some(([from, to]) => !to.length && inside(pointer, from));
@@ -230,6 +287,10 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
   };
   let indexed = revisions.get(before);
   if (!indexed) {
+    // Set first: the index build below reads the owners too.
+    const checked = checking(), unshaped = !walkedOwnerLists.every(list => listShaped(before, list, checked));
+    commitShapes(checked);
+    if (unshaped) shapes.unshaped = true;
     const dependencies = new EditDependencies(), targets = new Map<string, string>();
     const evidence = new WeakMap<object, string[]>(), holders = new Map<string, string[]>(), members = new WeakSet<object>();
     const counts = objectCounts(before, members);
@@ -315,18 +376,38 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
       }
     }
     indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, always: new Set(),
-      uncertified: stored?.success ? uncertifiedCanvasRoots(before, stored.data) : new Set(), ...(stored?.success ? { stored: stored.data } : {}) };
+      uncertified: stored?.success ? uncertifiedCanvasRoots(before, stored.data) : new Set(), unshaped, ...(stored?.success ? { stored: stored.data } : {}) };
     revisions.set(before, indexed);
   }
   const index = indexed, scope = new Set<string>(), touch = (pointer: string) => index.dependencies.intersect(pointer, scope);
   // Objects at positions `before` did not hold them, counted per position; a witness among them was placed somewhere new.
   const placements = new Map<object, number>();
   let rewitnessed = false;
-  changedPaths(before, edit, touch, value => {
+  // Owner lists, and owners (`/pages/3`), a changed pointer falls in.
+  const reached = new Set<string>();
+  const reach = (pointer: string) => {
+    const end = pointer.indexOf('/', 1), list = end < 0 ? pointer.slice(1) : pointer.slice(1, end);
+    if (!(walkedOwnerLists as readonly string[]).includes(list)) return;
+    const below = end < 0 ? -1 : pointer.indexOf('/', end + 1);
+    reached.add(end < 0 ? list : below < 0 ? pointer : pointer.slice(0, below));
+  };
+  changedPaths(before, edit, pointer => { touch(pointer); reach(pointer); }, value => {
     placements.set(value, (placements.get(value) ?? 0) + 1);
     const keys = index.evidence.get(value);
     if (keys) { rewitnessed = true; for (const key of keys) scope.add(key); }
   });
+  const checked = checking();
+  if (index.unshaped || [...reached].some(at => {
+    const [list, owner] = at.startsWith('/') ? pointerPath(at) as [WalkedOwnerList, string] : [at as WalkedOwnerList];
+    if (owner === undefined) return !listShaped(edit, list, checked);
+    const owners: unknown = Reflect.get(edit, list);
+    // A list that changed kind or length is reached itself.
+    return Array.isArray(owners) && !ownerShaped(list, owners[Number(owner)], checked);
+  })) {
+    shapes.unshaped = true;
+    for (const key of ['guard', 'components', 'layout', 'added']) scope.add(key);
+    index.resolved.forEach((_, at) => { scope.add(`a:${at}`); scope.add(`r:${at}`); });
+  }
   for (const key of index.always) scope.add(key);
   index.dependencies.expand(scope);
   const guardChanged = scope.has('guard');
@@ -349,6 +430,7 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
    * witness placed somewhere new (which may now occur twice).
    */
   const finish = (document: CompositionDocument, rebased?: StoredStudioCanvasMetadata) => {
+    if (document === edit) commitShapes(checked);
     if (guardChanged || rewitnessed || document.logicUseBindings !== before.logicUseBindings) return document;
     let carried: ReferenceIndex | undefined;
     if (document === edit && document.studioCanvas === before.studioCanvas) carried = index;
