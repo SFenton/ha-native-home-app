@@ -7,6 +7,7 @@ import { readStudioCanvas } from '../../src/shared/composition/studio-logic/layo
 import { compileCompositionDocument } from '../../src/shared/composition/compiler';
 import type { CompositionPublication } from '../../src/shared/composition/schema';
 import { contrast, parseColor } from '../../src/workspace2/theme';
+import { replaceAt, valueAt } from '../../src/composition-editor';
 
 const mount = process.env.STUDIO_E2E_PROD ? '/api/hassio_ingress/w2-i/' : '/';
 const canvas = (page: Page) => page.locator('.w2-logic-overlay');
@@ -154,6 +155,12 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   expect(labelSize.contentHeight).toBeLessThanOrEqual(labelSize.height);
   expect(labelSize.height).toBeLessThanOrEqual(labelSize.lineHeight * 2 + 1);
   await expect(many.getByRole('img', { name: /Logic mini-map:.*Viewer Matches/ })).toBeVisible();
+  await expect(many.getByRole('radiogroup', { name: /If it can.t tell/ })).toBeVisible();
+  await expect(many.getByRole('radio', { name: 'Show', exact: true })).toBeChecked();
+  await many.getByRole('button', { name: 'Remove Condition', exact: true }).scrollIntoViewIfNeeded();
+  await expect(many.getByTestId('logic-field-summary')).toBeInViewport({ ratio: 1 });
+  await expect(many.getByRole('radiogroup', { name: /If it can.t tell/ })).toBeInViewport({ ratio: 1 });
+  await expect(many.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeInViewport({ ratio: 1 });
   await shot(page, scheme, 'multi-check-summary');
   await closeProperties(page);
 
@@ -261,6 +268,41 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   expect(deviceWrites).toEqual([]);
   expect(problems).toEqual([]);
   expect(routes.every(path => path.startsWith(mount))).toBe(true);
+});
+
+test('multi-check visibility and enabled policies remain editable and removable without condition cards', async ({ page, request }) => {
+  const document = integrationDocument();
+  await seed(request, replaceAt(document, ['pages', 0, 'components', 7, 'enabledWhen'], {
+    condition: valueAt(document, ['pages', 0, 'components', 3, 'visibleWhen']), whenUnknown: 'disabled',
+  }));
+  await open(page);
+  const draft = async () => (await (await request.get('/native/api/draft')).json()).document;
+  for (const [id, index, field, choice, value] of [
+    ['summary', 3, 'visibleWhen', 'Hide', 'hide'],
+    ['progress', 7, 'enabledWhen', 'Enabled', 'enabled'],
+  ] as const) {
+    await select(page, id);
+    const rule = props(page).locator(`[data-testid=logic-field][data-field-path$="/${field}${field === 'enabledWhen' ? '/condition' : ''}"]`);
+    const advanced = props(page).locator('.w2-advanced > button[aria-expanded=false]');
+    if (!await rule.isVisible() && await advanced.count()) await advanced.click();
+    await expect(rule.getByTestId('logic-field-summary')).toBeVisible();
+    await expect(rule.getByRole('img', { name: /^Logic mini-map:/ })).toBeVisible();
+    await expect(rule.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeVisible();
+    await expect(rule.getByTestId('condition-row')).toHaveCount(0);
+    await rule.getByRole('radio', { name: choice, exact: true }).click();
+    await expect.poll(async () => {
+      const node = (await draft()).pages[0].components[index];
+      return field === 'enabledWhen' ? node.enabledWhen.whenUnknown : node.whenUnknown;
+    }).toBe(value);
+    await rule.getByRole('button', { name: 'Remove Condition', exact: true }).click();
+    await expect(rule).toHaveCount(0);
+    await expect.poll(async () => (await draft()).pages[0].components[index][field]).toBeUndefined();
+    const saved = await draft();
+    expect(saved.logicUseBindings).toEqual(document.logicUseBindings);
+    compileCompositionDocument(saved);
+    if (field === 'visibleWhen') expect(saved.pages[0].components[index].whenUnknown).toBeUndefined();
+    await closeProperties(page);
+  }
 });
 
 test('a non-tile field uses explicit template arguments; tile uses resolve independently; unlink survives reload', async ({ page, request }) => {

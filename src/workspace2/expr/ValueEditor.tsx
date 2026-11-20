@@ -20,6 +20,7 @@ import { useLogicScope } from '../data/logic/logicScope';
 import { useLogicFields, type CanvasFieldRequest } from '../logic-fields/LogicFields';
 import { TemplatePicker } from '../logic-fields/TemplatePicker';
 import { operandSlot } from './tokens';
+import { editBoundField } from '../logic-fields/templates';
 
 type Slot = { type: string } & Record<string, unknown>;
 /** The words a Fixed field shows for a slot: its own text, or the text of a literal operand; nothing for logic that is not a plain value (a use, a rule, a read). */
@@ -71,7 +72,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     if (next === 'rules') { memo.rules ??= seedRules(currentValue); written = toSlot('rules', { rules: memo.rules }, kind, now); }
     else if (next === 'entity') { memo.entity ??= (kind === 'text' ? (was === 'fixed' ? memo.fixed : currentValue) as Operand : { type: 'literal', value: '' }); if (kind !== 'text') memo.fixed ??= currentValue; written = toSlot('entity', { entity: memo.entity, fixed: memo.fixed }, kind, now); }
     else { memo.fixed ??= was === 'rules' ? memo.rules!.otherwise : currentValue; written = toSlot('fixed', { fixed: memo.fixed }, kind, now); }
-    draft.set(replaceAt(current, path, written as unknown as Json));
+    draft.set(editBoundField(current, path, document => replaceAt(document, path, written as unknown as Json)));
   };
   // Opening in a mode the row's value button chose is one step, made once.
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     memo.entity = slotOperand(valueAt(draft.get(), path) as Slot);
     memo.rules = { cases: made.cases, otherwise: made.otherwise } as RulesDraft<Operand | Json>;
     memo.mode = 'rules'; setModeState('rules');
-    draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: memo.rules }, kind, valueAt(draft.get(), path)) as unknown as Json));
+    draft.set(editBoundField(draft.get(), path, document => replaceAt(document, path, toSlot('rules', { rules: memo.rules }, kind, valueAt(document, path)) as unknown as Json)));
   };
   const inputs = mode === 'rules' ? (rulesOf(slot, kind)?.cases ?? []).flatMap(entry => inputsOf(entry.when)) : kind === 'text' && slot ? (() => { const operand = slotOperand(slot); return operand ? operandInputs(operand) : []; })() : mode === 'entity' && slot && 'value' in slot ? operandInputs(slot.value as Operand) : [];
   const unique = [...new Map(inputs.map(input => [`${input.sourceId}|${input.path.join('/')}`, input])).values()];
@@ -123,7 +124,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
     <TryValues document={document} inputs={unique}/>
     {canvas && <div className="w2-logic-commands">
       {kind === 'text' && <TemplatePicker document={document} kind="operand" onUse={use => {
-        draft.set(replaceAt(draft.get(), path, operandSlot(use as unknown as Operand, slot)));
+        draft.set(editBoundField(draft.get(), path, document => replaceAt(document, path, operandSlot(use as unknown as Operand, slot))));
         memo.mode = 'entity'; setModeState('entity');
       }}/>}
       <button type="button" onClick={() => canvas.open(canvasRequest)}>Edit in Canvas</button>

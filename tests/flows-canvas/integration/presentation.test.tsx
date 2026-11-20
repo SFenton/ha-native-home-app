@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { lift, type LogicGraph } from '../../../src/shared/composition/graph';
 import type { Operand, Predicate } from '../../../src/shared/composition/expression';
-import { graphSentence, miniMapModel } from '../../../src/workspace2/logic-fields/presentation';
+import { graphSentence, miniMapModel, sourceLabel } from '../../../src/workspace2/logic-fields/presentation';
 import { MiniMap } from '../../../src/workspace2/logic-fields/MiniMap';
 import type { NameContext } from '../../../src/workspace2/expr/condition';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
@@ -72,6 +72,22 @@ it('generates the sentence from the average, target formula and nested condition
   const mixed = lift({ type: 'any', of: [condition, { type: 'viewer', isAdmin: true }] }, { kind: 'condition' }).graph;
   expect(graphSentence(mixed, ctx)).toContain('(the Average of Living Room and Bedroom');
   expect(graphSentence(mixed, ctx)).toContain(') or the person using the app is an admin');
+});
+
+it('uses configured flow titles and friendly model names in sentences and mini maps, never source IDs', () => {
+  const flow = document.dataSources[2];
+  const names: NameContext = { document: { dataSources: [...document.dataSources,
+    { id: 'private-model-id', kind: 'model', model: 'home-status@1', inputs: {} },
+  ] } };
+  for (const [sourceId, name] of [[flow.id, 'Existing formula'], ['private-model-id', 'Home status'], ['missing-private-id', 'Missing source']]) {
+    const graph = lift(read(sourceId), { kind: 'operand' }).graph;
+    expect(sourceLabel(sourceId, names)).toBe(name);
+    expect(graphSentence(graph, names)).toContain(name);
+    const model = miniMapModel(graph, names);
+    expect(JSON.stringify(model)).toContain(name);
+    expect(graphSentence(graph, names)).not.toContain(sourceId);
+    expect(model.nodes.map(node => node.name).join(' ')).not.toContain(sourceId);
+  }
 });
 
 it('describes current block values rather than a stale original expression', () => {

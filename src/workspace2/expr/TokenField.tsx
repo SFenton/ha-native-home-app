@@ -14,6 +14,8 @@ import { describeToken } from '../data/logic/logicTokens';
 import { MAX_TOKENS, newToken, operandSlot, parseLine, slotOperand, tokenCount, writeLine, type Part, type Token } from './tokens';
 import { useNameContext } from './useExpr';
 import { words } from './words';
+import { editBoundField } from '../logic-fields/templates';
+import type { CompositionDocument } from '../../shared/composition/schema';
 
 /** Where a line lives: a text slot (`literal`, `read` or `expr`) or a bare operand (a rule's Then). */
 export interface LineAddress { path: EditorPath; wrap: 'slot' | 'operand' }
@@ -23,9 +25,10 @@ export function lineOperand(value: unknown, wrap: LineAddress['wrap']): Operand 
   return value && typeof value === 'object' ? slotOperand(value as { type: string }) : undefined;
 }
 /** Writes parts to a line: one step, coalescing typing. */
-export function writeParts(draft: Draft, address: LineAddress, parts: readonly Part[], typing: boolean): void {
+export function writeParts(draft: Draft, address: LineAddress, parts: readonly Part[], typing: boolean, base = draft.get()): void {
   const operand = writeLine(parts);
-  draft.set(replaceAt(draft.get(), address.path, address.wrap === 'slot' ? operandSlot(operand, valueAt(draft.get(), address.path)) : operand), typing ? `line:${address.path.join('/')}` : undefined);
+  draft.set(editBoundField(base, address.path, document => replaceAt(document, address.path,
+    address.wrap === 'slot' ? operandSlot(operand, valueAt(document, address.path)) : operand)), typing ? `line:${address.path.join('/')}` : undefined);
 }
 
 /**
@@ -38,6 +41,7 @@ export default function TokenField({ draft, address, label, onWording }: { draft
   const parts = operand ? parseLine(operand) : undefined;
   const narrow = useNarrow(), push = usePush();
   const insert = useRef<(token: Token) => void>(() => {});
+  const insertionBase = useRef<CompositionDocument | undefined>(undefined);
   const [note, setNote] = useState('');
   const [open, setOpen] = useState<{ index: number; anchor: HTMLElement } | undefined>();
   const [asking, setAsking] = useState(false);
@@ -52,13 +56,17 @@ export default function TokenField({ draft, address, label, onWording }: { draft
     setOpen({ index, anchor });
   };
   const picker = (close: () => void, inline = false) => <ValuePicker draft={draft} groups={['templateSettings', 'logic', 'entities', 'counts', 'time', 'person', 'models']} onPick={picked => {
-    close(); draft.set(picked.document);
+    close();
     // A pushed page has unmounted the line, so the value goes at the end of what the draft holds.
-    if (narrow && push && !inline) writeParts(draft, address, tokenCount(parts) >= MAX_TOKENS ? parts : [...parts, { token: newToken(picked.operand) }], false); else add(newToken(picked.operand));
+    if (narrow && push && !inline) writeParts(draft, address, tokenCount(parts) >= MAX_TOKENS ? parts : [...parts, { token: newToken(picked.operand) }], false, picked.document);
+    else {
+      insertionBase.current = picked.document;
+      try { add(newToken(picked.operand)); } finally { insertionBase.current = undefined; }
+    }
   }}/>;
   return <div className="w2-token-field" data-testid="token-field">
     <div className="w2-token-row">
-      <TokenLine label={label} parts={parts} nameOf={token => operandName(token.operand, ctx)} describe={token => describeToken(token.operand, ctx)} onChange={(next, typing) => writeParts(draft, address, next, typing)}
+      <TokenLine label={label} parts={parts} nameOf={token => operandName(token.operand, ctx)} describe={token => describeToken(token.operand, ctx)} onChange={(next, typing) => writeParts(draft, address, next, typing, insertionBase.current)}
         onOpenToken={openToken} onAsk={() => setAsking(true)} onNote={setNote} register={fn => { insert.current = fn; }} describedBy={note ? noteId : undefined}/>
       <PickerRow stacked title={words.insertValue} primary={<Plus size={16} aria-hidden/>} popupClassName="w2-expr-addpop">
         {close => picker(close)}

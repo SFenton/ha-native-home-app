@@ -4,7 +4,7 @@ import type { Predicate } from '../../shared/composition/expression';
 import EditorRow from '../editors/EditorRow';
 import { useRows } from '../rowsContext';
 import { evaluatePredicate } from '../data/logic/logicEval';
-import ConditionEditor from './ConditionEditor';
+import ConditionEditor, { PolicyRow } from './ConditionEditor';
 import { conditionCount, groupOf, markerOf, missingEntity, resultText, summary, type Scope } from './condition';
 import { Marker } from './ui';
 import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
@@ -51,7 +51,10 @@ export default function ConditionField({ label, title = label.replace(/(^|\s)(\w
   const unknownPolicy = policy ? whenUnknownOf(document, path, policyKey) : undefined;
   const line2 = !rule ? '' : missing ? words.noEntity : tri === 'unknown' ? `${result} · ${unknownPolicy === 'hide' || unknownPolicy === 'disabled' ? (policy === 'enable' ? 'Disabled' : 'Hidden') : unknownPolicy === 'show' || unknownPolicy === 'enabled' ? (policy === 'enable' ? 'Enabled' : 'Shown') : 'Kept as it was'}` : env ? `${result} · ${tag}` : '';
   const name = rule ? `${label}: ${line1}.${missing ? ` ${words.noEntity}.` : tri === 'unknown' ? ` ${line2.replace(' · ', ', ')}.` : result && env ? ` ${result}, ${tag.toLowerCase()}.` : ''}` : `${label}: ${none}.`;
-  if (canvas && hasMultipleChecks(rule)) return <LogicField draft={draft} path={path} kind="condition" label={label}/>;
+  if (canvas && hasMultipleChecks(rule)) return <LogicField draft={draft} path={path} kind="condition" label={label}>
+    {policy && <PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/>}
+    <button type="button" className="w2-expr-remove" onClick={() => draft.set(removeRuleAt(draft.get(), path, policy ? policyKey : undefined))}>{words.removeCondition}</button>
+  </LogicField>;
   return <EditorRow label={label} title={title} summary={line1} itemName={itemName} document={document} onApply={onChange} path={path.join('/')}
     remove={rule ? { label: words.removeCondition, run: draft => draft.set(removeRuleAt(draft.get(), path, policy ? policyKey : undefined)) } : undefined}
     head={start => <div className="w2-expr-fieldrow" data-field-path={path.join('/')} data-has-condition={rule ? '' : undefined}>

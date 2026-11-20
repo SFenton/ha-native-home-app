@@ -20,7 +20,7 @@ type Mode = 'simple' | 'logic';
 const memory = new WeakMap<Draft, Map<string, Mode>>();
 
 /** The "If it can't tell" row, for a place that has a policy (`visibleWhen`, `enabledWhen`). */
-function PolicyRow({ draft, path, policyKey, kind, place }: { draft: Draft; path: EditorPath; policyKey: string; kind: 'show' | 'enable'; place: Place }) {
+export function PolicyRow({ draft, path, policyKey, kind, place }: { draft: Draft; path: EditorPath; policyKey: string; kind: 'show' | 'enable'; place: Place }) {
   const { document, rule } = useRule(draft, path, policyKey);
   const ctx = useNameContext(document);
   const parent = path.slice(0, -1), current = ((valueAt(document, parent) as Record<string, unknown> | undefined)?.[policyKey] as WhenUnknown | undefined) ?? 'keep';

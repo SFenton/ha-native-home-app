@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { compositionEditorSchema, fieldVariants, replaceAt, resolveField, valueAt, type SchemaField } from '../../../src/composition-editor';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
+import { expandDocument } from '../../../src/shared/composition/components';
 import { createCompositionDocument, compositionSymbol } from '../../../src/shared/composition/workspace';
 import { lower, lift, type GraphDestination } from '../../../src/shared/composition/graph';
 import { projectGraph } from '../../../src/shared/composition/graph/lower';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { fieldAdapters, fieldAnchor, fieldPointer, liftField, schemaFieldKind, type LogicFieldKind } from '../../../src/workspace2/logic-fields/registry';
-import { explicitTemplateUse, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
+import { editBoundField, explicitTemplateUse, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
 import { saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
-import { draftDocument } from '../draft/fixtures';
+import { componentDocument, draftDocument } from '../draft/fixtures';
 import type { Json } from '../../../src/shared/types';
 import { integrationDocument, reroutedFields } from './fixture';
 import { previewGraph, templateUses } from '../../../src/workspace2/logic-fields/lenses';
@@ -110,6 +111,19 @@ it('unlinks two bound uses with different tile values without leaving stale bind
   expect(valueAt(second, ['pages', 0, 'components', 1, 'props', 'subtitle', 'value', 'from', 'sourceId'])).toBe('source-b');
   expect(second.logicUseBindings).toEqual([]);
   expect(compileCompositionDocument(second).expanded).toEqual(compileCompositionDocument(document).expanded);
+});
+it('reanchors a moved component-owned use with its canonical owner and resolves each placed tile independently', () => {
+  const document = compileCompositionDocument(componentDocument()).document;
+  const path = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
+  const use = valueAt(document, [...path, 'value']);
+  const next = editBoundField(document, path, document => replaceAt(document, path, {
+    type: 'expr', value: { type: 'format', pattern: 'Room: {value}', args: { value: use } },
+  }));
+  expect(next.logicUseBindings![0].use).toEqual({ kind: 'component', id: 'saved-tile', nodeId: 'inner-tile', field: '/props/subtitle/value/args/value' });
+  const expanded = expandDocument(compileCompositionDocument(next).expanded);
+  for (const [index, sourceId] of ['source-a', 'source-b'].entries()) {
+    expect(valueAt(expanded, ['pages', 0, 'components', index, 'props', 'subtitle', 'value', 'args', 'value', 'from', 'sourceId'])).toBe(sourceId);
+  }
 });
 it('unlinks nested uses without filling the enclosing template holes', () => {
   const document = typed();

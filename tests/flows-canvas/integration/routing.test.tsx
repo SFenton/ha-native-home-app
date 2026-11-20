@@ -13,7 +13,11 @@ import { LogicField } from '../../../src/workspace2/logic-fields/Field';
 import { createDraft } from '../../../src/workspace2/editors/draft';
 import { DraftReadRow } from '../../../src/workspace2/expr/SimpleCondition';
 import { openSimple } from '../../../src/workspace2/expr/condition';
-import type { Predicate } from '../../../src/shared/composition/expression';
+import type { Operand, Predicate } from '../../../src/shared/composition/expression';
+import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
+import TokenField, { writeParts } from '../../../src/workspace2/expr/TokenField';
+import TokenSettings from '../../../src/workspace2/expr/TokenSettings';
+import { newToken } from '../../../src/workspace2/expr/tokens';
 
 const canvas = vi.hoisted(() => ({ suspended: false, open: vi.fn() }));
 vi.mock('../../../src/workspace2/logic-fields/LogicFields', async original => ({
@@ -103,6 +107,96 @@ it('uses the summary only for a condition field with more than one check', () =>
   expect(screen.getByRole('button', { name: 'Edit in Canvas' })).toBeTruthy();
   expect(screen.getByLabelText('Logic status').textContent).toBe('Uses 3 blocks');
   state.unchanged();
+});
+
+it.each([
+  { policy: 'show' as const, place: 'show' as const, field: 'visibleWhen', start: 'show', choice: 'Hide', value: 'hide' },
+  { policy: 'enable' as const, place: 'enable' as const, field: 'enabledWhen', start: 'disabled', choice: 'Enabled', value: 'enabled' },
+])('keeps the compound $policy policy and removal below the unchanged summary', ({ policy, place, field, start, choice, value }) => {
+  const base = integrationDocument(), root = ['pages', 0, 'components', policy === 'enable' ? 7 : 3];
+  const rule = valueAt(base, ['pages', 0, 'components', 3, 'visibleWhen']);
+  const path = [...root, field, ...(policy === 'enable' ? ['condition'] : [])];
+  const document = policy === 'enable' ? replaceAt(base, [...root, field], { condition: rule, whenUnknown: start }) : base;
+  compileCompositionDocument(document);
+  const state = setup(<ConditionField label="Condition" path={path} place={place} policy={policy} itemName="Multiple checks"/>, document);
+  expect(screen.getByTestId('logic-field-summary')).toBeTruthy();
+  expect(screen.getByRole('img', { name: /^Logic mini-map:/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Edit in Canvas' })).toBeTruthy();
+  expect(screen.queryByTestId('condition-row')).toBeNull();
+  expect(screen.getByRole('radio', { name: policy === 'show' ? 'Show' : 'Disabled' }).getAttribute('aria-checked')).toBe('true');
+  fireEvent.click(screen.getByRole('radio', { name: choice }));
+  const changed = state.onChange.mock.calls.at(-1)![0];
+  expect(valueAt(changed, [...path.slice(0, -1), 'whenUnknown'])).toBe(value);
+  expect(valueAt(changed, path)).toEqual(rule);
+  compileCompositionDocument(changed);
+  fireEvent.click(screen.getByRole('button', { name: 'Remove Condition' }));
+  const removed = state.onChange.mock.calls.at(-1)![0];
+  expect(valueAt(removed, [...root, field])).toBeUndefined();
+  if (policy === 'show') expect(valueAt(removed, [...root, 'whenUnknown'])).toBeUndefined();
+  expect(removed.logicUseBindings).toEqual(document.logicUseBindings);
+  compileCompositionDocument(removed);
+  expect(state.onChange).toHaveBeenCalledTimes(2);
+  state.unchanged();
+});
+
+it.each(['Remove use', 'Remove Value'])('%s removes only that use binding in one compiling, undoable edit', async label => {
+  const document = integrationDocument(), draft = createDraft(document), changed = vi.fn(() => compileCompositionDocument(draft.get()));
+  const path = ['pages', 0, 'components', 0, 'props', 'subtitle'];
+  draft.subscribe(changed);
+  setup(label === 'Remove use' ? <LogicField draft={draft} path={path} kind="slot" label="Subtitle"/>
+    : <TokenSettings draft={draft} address={{ path, wrap: 'slot' }} index={0} inline/>, document);
+  if (label === 'Remove use') fireEvent.click(screen.getByRole('button', { name: 'Change Settings' }));
+  fireEvent.click(await screen.findByRole('button', { name: label }));
+  expect(changed).toHaveBeenCalledTimes(1);
+  expect(draft.get().logicUseBindings).toEqual([document.logicUseBindings![1]]);
+  expect(draft.get().logicUseBindings![0]).toBe(document.logicUseBindings![1]);
+  expect(valueAt(draft.get(), path)).toEqual({ type: 'literal', value: '' });
+  act(() => draft.undo());
+  expect(draft.get()).toEqual(document);
+});
+
+it('reanchors a bound token when ordinary text wraps it, including after an equal-value draft refresh', () => {
+  const document = integrationDocument(), draft = createDraft(document), path = ['pages', 0, 'components', 0, 'props', 'subtitle'];
+  const changed = vi.fn(() => compileCompositionDocument(draft.get()));
+  draft.subscribe(changed);
+  setup(<TokenField draft={draft} address={{ path, wrap: 'slot' }} label="Subtitle"/>, document);
+  const textbox = screen.getByRole('textbox', { name: 'Subtitle' });
+  act(() => draft.set(compileCompositionDocument(JSON.parse(JSON.stringify(draft.get()))).document));
+  changed.mockClear();
+  textbox.prepend(globalThis.document.createTextNode('Room: '));
+  fireEvent.input(textbox);
+  expect(changed).toHaveBeenCalledTimes(1);
+  expect(draft.get().logicUseBindings![0].use.field).toBe('/props/subtitle/value/args/a');
+  expect(draft.get().logicUseBindings![1]).toEqual(document.logicUseBindings![1]);
+  expect(compileCompositionDocument(draft.get()).expanded.pages[0].components[0]).toMatchObject({
+    props: { subtitle: { value: { type: 'format', pattern: 'Room: {a}', args: { a: { from: { sourceId: 'source-a' } } } } } },
+  });
+  act(() => draft.undo());
+  expect(draft.get()).toEqual(document);
+});
+
+it.each(['remove', 'replace'])('can %s one of two equal-looking bound tokens and reanchor the survivor without moving unrelated bindings', change => {
+  const base = integrationDocument(), path = ['pages', 0, 'components', 0, 'props', 'subtitle'];
+  const first = valueAt(base, [...path, 'value']) as Operand, second: Operand = structuredClone(first);
+  const binding = base.logicUseBindings![0];
+  const document = { ...replaceAt(base, path, { type: 'expr', value: { type: 'format', pattern: '{a} {b}', args: { a: first, b: second } } }),
+    logicUseBindings: [
+      { ...binding, use: { ...binding.use, field: `${binding.use.field}/args/a` } },
+      { ...binding, use: { ...binding.use, field: `${binding.use.field}/args/b` } },
+      base.logicUseBindings![1],
+    ],
+  };
+  compileCompositionDocument(document);
+  const draft = createDraft(document), changed = vi.fn(() => compileCompositionDocument(draft.get()));
+  draft.subscribe(changed);
+  writeParts(draft, { path, wrap: 'slot' }, change === 'remove' ? [{ token: newToken(second) }]
+    : [{ token: newToken({ type: 'clock', part: 'now-second' }) }, { text: ' ' }, { token: newToken(second) }], false);
+  expect(changed).toHaveBeenCalledTimes(1);
+  expect(draft.get().logicUseBindings).toHaveLength(2);
+  expect(draft.get().logicUseBindings![0].use.field).toBe(`/props/subtitle/value${change === 'remove' ? '' : '/args/b'}`);
+  expect(draft.get().logicUseBindings![1]).toBe(base.logicUseBindings![1]);
+  draft.undo();
+  expect(draft.get()).toEqual(document);
 });
 
 it('reports the actual value of a one-check formula, not its first source reading', () => {

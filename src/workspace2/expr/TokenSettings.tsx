@@ -1,6 +1,6 @@
 import type { Operand } from '../../shared/composition/expression';
 import { dateStyles, durationStyles, durationUnits, operandKind, textCases, type DateStyle, type DurationStyle, type DurationUnit, type TextCase } from '../../shared/composition/expression';
-import { valueAt } from '../../composition-editor';
+import { replaceAt, valueAt } from '../../composition-editor';
 import { usePush } from '../kit';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import { SelectMenu } from '../SelectMenu';
@@ -17,7 +17,7 @@ import { useLogicFields } from '../logic-fields/LogicFields';
 import { DraftField } from '../logic-fields/AddressedField';
 import type { EditorPath } from '../../composition-editor';
 import { hasMultipleChecks } from '../logic-fields/checks';
-import { unlinkTemplate } from '../logic-fields/templates';
+import { editBoundField, unlinkTemplate } from '../logic-fields/templates';
 
 function tokenPath(value: unknown, operand: Operand, path: EditorPath): EditorPath | undefined {
   if (value === operand) return path;
@@ -49,7 +49,10 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
     const leaveUse = () => { onClose?.(); if (!onClose) push?.pop(); };
     const afterChange = () => { if (!inline) leaveUse(); };
     return <LogicUseSettings draft={draft} path={storedPath} use={asUse} kind="value" removeLabel={words.removeValue} onLeave={leaveUse}
-      onChange={(next, base) => { if (base) draft.set(base); writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: next as unknown as Operand } } : item), false); }}
+      onChange={(next, base) => {
+        if (storedPath) draft.set(editBoundField(base ?? draft.get(), [...storedPath, 'args'], document => replaceAt(document, storedPath, next)));
+        else writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: next as unknown as Operand } } : item), false, base);
+      }}
       onUnlink={() => {
         if (canvas && storedPath) draft.set(unlinkTemplate(draft.get(), storedPath));
         else { const plain = workedOut(draft.get(), asUse) as Operand | undefined; if (plain) writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: plain } } : item), false); }
@@ -71,7 +74,7 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
     <p className="w2-expr-tokenname"><strong>{operandName(token.operand, ctx)}</strong></p>
     {canvasField}
     <ValuePickerRow draft={draft} label={words.value} title={words.value} stacked={false} primary={operandName(token.operand, ctx)}
-      onPick={picked => { draft.set(picked.document); set(parts.map((item, i) => i === at ? { token: newToken(picked.operand) } : item)); }}/>
+      onPick={picked => writeParts(draft, address, parts.map((item, i) => i === at ? { token: newToken(picked.operand) } : item), false, picked.document)}/>
     {token.operand.type === 'read' && <div className="w2-row-segment"><span className="w2-row-label">Show as</span>
       <div className="w2-expr-control"><SelectMenu label="Show as" value={token.dateStyle ? 'date' : numeric ? 'number' : 'string'} options={[{ value: 'string', label: 'Text' }, { value: 'number', label: 'Number' }, { value: 'date', label: words.dateShow }]}
         onChange={next => update(next === 'date'

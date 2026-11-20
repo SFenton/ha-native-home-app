@@ -6,6 +6,7 @@ import { entityOfSource, type NameContext } from '../expr/condition';
 import { logicOperandName } from '../data/logic/logicNames';
 import type { Predicate } from '../../shared/composition/expression';
 import { indexGraph, type CanvasGraphIndex } from '../canvas/graph-index';
+import { modelName } from '../dialogs/sources';
 
 const object = (value: unknown): Record<string, unknown> | undefined =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
@@ -19,8 +20,13 @@ export function sourceLabel(sourceId: unknown, ctx: NameContext): string {
   if (typeof sourceId !== 'string') return 'Entity';
   const entityId = entityOfSource(ctx, sourceId);
   const source = ctx.document.dataSources.find(source => source.id === sourceId);
+  if (source?.kind === 'model') {
+    const title = object(source.inputs)?.title;
+    return source.model === 'pipeline@1' ? typeof title === 'string' && title.trim() ? title.trim() : 'Flow'
+      : typeof source.model === 'string' ? modelName(source.model) : 'Model';
+  }
   return entityId ? ctx.entityName?.(entityId) ?? words(entityId.split('.').at(-1) ?? entityId)
-    : source?.kind === 'model' && 'title' in source && typeof source.title === 'string' ? source.title : sourceId;
+    : source ? 'Entity' : 'Missing source';
 }
 
 function readLabel(from: unknown, ctx: NameContext): string {
