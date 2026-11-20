@@ -788,3 +788,9 @@ button.w2-tick, .w2-scope button.w2-tick { appearance: none; padding: 0; min-hei
 .w2-fold-actions .w2-link-button { padding: 0; min-height: 28px; text-align: start; }
 .w2-fold-actions .w2-link-button:disabled { opacity: .45; }
 .w2-caption .w2-inline-link { display: inline; padding: 0; min-height: 0; font: inherit; text-decoration: underline; }
+
+/* Global chrome editor: a disabled switch and its label at the kit's disabled strength; "Opens" with its label above three one-line choices. */
+.w2-switch-row:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.w2-switch-row input:disabled { cursor: not-allowed; }
+.w2-opens { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+.w2-scope .w2-opens .w2-segment-field button { white-space: nowrap; padding: 0 4px; }

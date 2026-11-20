@@ -135,13 +135,13 @@ test('Page settings: the split switch turns two panes on at iPad sideways and of
   const panel = await openPageSettings(page, 'Home');
   await expect(panel.getByText('Open pages beside this one')).toBeVisible();
   await panel.getByRole('switch', { name: 'Open pages beside this one' }).check();
-  await expect(panel.getByText('Used when the window is wide enough for two.')).toBeVisible();
+  await expect(panel.getByText('Used when the window is wide enough for two.', { exact: true })).toBeVisible();
   await expect(panel.getByLabel('Empty side text')).toBeVisible();
   await snap(page, `${tag(page)}-page-settings-split`);
   // On a phone the sheet opens at half height, so the Advanced row can sit below the screen: activate it without scrolling the page.
   await panel.getByRole('button', { name: 'Advanced' }).dispatchEvent('click');
   await expect(panel.getByText('Start with one pane')).toBeVisible();
-  await expect(panel.getByText('Start a new column set here')).toBeVisible();
+  await expect(panel.getByText('Start a new column set here')).toHaveCount(0);
   // iPad sideways: two panes and the read-out says on.
   await chooseWindow(page, 'iPad sideways');
   await expect(previewRoot(page).locator('.sh-pane')).toHaveCount(2);

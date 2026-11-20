@@ -71,7 +71,7 @@ function projectPart(document: CompositionDocument, path: Path): { place: string
       return { place: route ? `Link ${route.title}` : 'Links', go: { dialog: 'links' }, rel: route ? path.slice(3) : path.slice(1) };
     }
     case 'theme': case 'assets': return { place: 'Wallpaper', go: { panel: 'wallpaper' }, rel: path.slice(1) };
-    case 'navigation': return at === 'chrome' ? { place: 'Header Buttons', go: { panel: 'header' }, rel: path.slice(2) } : { place: 'Tabs', go: { panel: 'tabs' }, rel: path.slice(1) };
+    case 'navigation': return at === 'chrome' ? { place: 'Tabs and header buttons', go: { panel: 'header' }, rel: path.slice(2) } : { place: 'Tabs', go: { panel: 'tabs' }, rel: path.slice(1) };
     case 'stateStyles': return { place: 'State Styles', go: { panel: 'styles' }, rel: path.slice(1) };
     case 'name': return { place: 'Project name', go: { dialog: 'rename' }, rel: [] };
     default: return { place: 'Project', go: { dialog: 'json' }, rel: path };

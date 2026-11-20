@@ -42,7 +42,7 @@ describe('Page settings', () => {
     expect(last.pages.find(page => page.id === 'page-home')?.navigation).toEqual({ type: 'stack' });
   });
 
-  it('keeps "Start with one pane" and "Start a new column set here" under Advanced, only for a columns page', () => {
+  it('keeps "Start with one pane" under Advanced, only for a columns page, and no longer offers "Start a new column set here"', () => {
     render(<Harness kind="page" id="page-home" seen={() => {}}/>);
     fireEvent.click(screen.getByRole('button', { name: /Advanced/ }));
     expect(screen.queryByText('Start with one pane')).toBeNull();
@@ -51,7 +51,7 @@ describe('Page settings', () => {
     render(<Harness kind="page" id="page-home" seen={() => {}} initial={columns}/>);
     fireEvent.click(screen.getByRole('button', { name: /Advanced/ }));
     expect(screen.getByText('Start with one pane')).toBeTruthy();
-    expect(screen.getByText('Start a new column set here')).toBeTruthy();
+    expect(screen.queryByText('Start a new column set here')).toBeNull();
   });
 
   it('counts the links that open from outside the app and lists what opens the page', () => {

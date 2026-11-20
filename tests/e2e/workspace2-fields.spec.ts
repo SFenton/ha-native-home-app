@@ -242,7 +242,7 @@ test('acceptance 2: every editable field of the project is reachable from the Pr
     await part.close();
   }
   // The panels the menu opens in the properties surface: tabs (navigation), header buttons (chrome) and the wallpaper (theme).
-  for (const [item, path, value] of [['Tabs', ['navigation', 'tabs'], doc.navigation.tabs], ['Header Buttons', ['navigation', 'chrome'], doc.navigation.chrome], ['Wallpaper', ['theme'], doc.theme]] as [string, Path, unknown][]) {
+  for (const [item, path, value] of [['Tabs', ['navigation', 'tabs'], doc.navigation.tabs], ['Tabs and Header Buttons', ['navigation', 'chrome'], doc.navigation.chrome], ['Wallpaper', ['theme'], doc.theme]] as [string, Path, unknown][]) {
     await openFromMenu(item);
     const panel = page.getByLabel('Properties');
     // A tab's own fields sit one push in; open each row the same way a person would.

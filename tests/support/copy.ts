@@ -62,7 +62,7 @@ export function voiceIssues(root: ParentNode): string[] {
   for (const text of [...visibleStrings(root), ...accessibleNames(root)]) for (const [pattern, why] of banned) if (pattern.test(text)) issues.push(`“${text}” has ${why}`);
   for (const element of root.querySelectorAll('button, [role=menuitem], [role=tab]')) {
     // Rows, choices and the back button's page name are labels or data, not commands.
-    if (element.closest('[hidden]') || data(element) || element.closest('.w2-list, .w2-history, .w2-tab-list, .w2-check-row, .w2-choice, .w2-segment, .w2-add-tile, .w2-palette-cell, .w2-back, .w2-logic-settingbtn, .w2-crumb, .w2-disclosure-head, .w2-add-row, .w2-outline-row')) continue;
+    if (element.closest('[hidden]') || data(element) || element.closest('.w2-list, .w2-history, .w2-tab-list, .w2-check-row, .w2-choice, .w2-segment, .w2-segment-field, .w2-add-tile, .w2-palette-cell, .w2-back, .w2-logic-settingbtn, .w2-crumb, .w2-disclosure-head, .w2-add-row, .w2-outline-row')) continue;
     const text = plain(element);
     if (text && /\s/.test(text) && !/\d/.test(text) && !isTitleCase(text)) issues.push(`button “${text}” is not Title Case`);
   }

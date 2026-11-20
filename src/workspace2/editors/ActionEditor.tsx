@@ -27,6 +27,7 @@ import { AskFirstRow } from './AskFirst';
 import ActionRules, { ActionModeSwitch } from '../expr/ActionRules';
 import { useLogicFields } from '../logic-fields/LogicFields';
 import { DraftField } from '../logic-fields/AddressedField';
+import { linkResult } from '../navigation/chromeRules';
 
 // MARK: Value rows
 
@@ -145,6 +146,13 @@ function CallBody({ draft, path, itemName }: { draft: Draft; path: EditorPath; i
 
 // MARK: The editor
 
+/** What a link to a page, level, sheet or modal does, under its "Goes to" row (proposal section 3, the Result rows): a bold lead, then the rest. The link has no setting of its own. */
+function ResultLine({ doc, path, kind, id }: { doc: CompositionDocument; path: EditorPath; kind: 'page' | 'modal'; id: string | undefined }) {
+  const result = id ? linkResult(doc, path, { kind, id }) : undefined;
+  if (!result) return null;
+  return <p className="w2-caption w2-link-result" data-link-result role="note"><strong>{result.lead}</strong>{result.rest && ` ${result.rest}`}</p>;
+}
+
 /** Props shared by the action editor's body and its row. */
 export interface ActionEditorProps {
   /** The path of the action field in the document. */
@@ -191,10 +199,13 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId, itemN
     <div className="w2-kind-chips" role="group" aria-label="Kind">{kinds.map(item => <button type="button" key={item} className="w2-chip" aria-pressed={item === kind} disabled={disabled(item)}
       onClick={() => item !== kind && set(defaultAction(item, doc, boundSourceId))}>{kindWords[item]}</button>)}</div>
     {kind === 'call-service' && action && <CallBody draft={draft} path={path} itemName={itemName}/>}
-    {kind === 'push' && action && <ChoiceField label="Page" choices={pages} value={action.pageId} onPick={id => withDraftValue({ pageId: id })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
+    {kind === 'push' && action && <ChoiceField label="Page" choices={[...pages, ...(doc.levels ?? []).filter(level => level.id === action.pageId).map(level => ({ id: level.id, label: level.title }))]} value={action.pageId} onPick={id => withDraftValue({ pageId: id })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
+    {kind === 'push' && action && <ResultLine doc={doc} path={path} kind="page" id={action.pageId}/>}
     {kind === 'dismiss-then-push' && action && <ChoiceField label="Page" choices={pages} value={action.destination?.pageId} onPick={id => withDraftValue({ destination: { ...action.destination, pageId: id } })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
+    {kind === 'dismiss-then-push' && action && <ResultLine doc={doc} path={path} kind="page" id={action.destination?.pageId}/>}
     {kind === 'present' && action && <>
       <ChoiceField label="Sheet" choices={doc.modals.map(modal => ({ id: modal.id, label: modal.title }))} value={action.modalId} onPick={id => withDraftValue({ modalId: id })} create={onCreateSheet ? { label: 'New Sheet…', run: adopt(onCreateSheet, 'modals') } : undefined}/>
+      <ResultLine doc={doc} path={path} kind="modal" id={action.modalId}/>
       {present && <div className="w2-field-row"><span className="w2-field-label">If a sheet is already open</span><div className="w2-segment w2-field-control" role="group" aria-label="If a sheet is already open">
         {(['reject', 'replace'] as const).map(value => <button type="button" key={value} aria-pressed={action.ifPresented === value} onClick={() => withDraftValue({ ifPresented: value })}>{value === 'reject' ? 'Do nothing' : 'Replace it'}</button>)}</div></div>}
     </>}
