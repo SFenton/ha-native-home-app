@@ -150,6 +150,8 @@ export const supportedCompositionCapabilities: readonly string[] = [
   'sh.duration-format@1', 'sh.entity-time@1', 'sh.flow-extras@1', 'sh.grid-state-groups@1', 'sh.linear-gauge@1',
   'sh.math-truncate@1', 'sh.repeat@1', 'sh.stack@1', 'sh.state-words@1', 'sh.surface-controls@1',
   'sh.surface-orientation@1', 'sh.symbol-part@1', 'sh.text-style@1', 'sh.tile-swipe@1',
+  // Shipped at native-home ios/v2611.19.09 (fold-sides is promoted ahead of the app build that lists it).
+  'sh.flow-average@1', 'sh.fold-sides@1', 'sh.state-style-glyph-tint@1', 'sh.text-keep@1',
   INK_DEFAULT_CAPABILITY,
   ...pendingCompositionCapabilities,
 ];
