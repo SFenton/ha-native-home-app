@@ -4,6 +4,7 @@ import { evaluatePredicate } from '../data/logic/logicEval';
 import type { Json } from '../../shared/types';
 import { isLogicOperand, operandSlot, slotOperand } from './tokens';
 import { copySubtree, rebuiltFrom } from '../editors/provenance';
+import { record } from '../../shared/composition/studio-logic/anchors';
 
 /**
  * The value field's pure logic (spec "Files"): which mode a slot is in, what each mode seeds from the others, and the slot each mode
@@ -88,7 +89,8 @@ export function toSlot(mode: Exclude<Mode, 'custom'>, content: { fixed?: Operand
   if (mode === 'rules') {
     const rules = content.rules!;
     const cases = rules.cases.map(entry => (entry.when ? { when: entry.when, then: entry.then } : { then: entry.then }) as { when: Predicate; then: typeof entry.then });
-    if (kind === 'text') return operandSlot(rebuiltFrom(slotOperand(previous as Slot), { type: 'choose', cases: cases as { when: Predicate; then: Operand }[], otherwise: rules.otherwise as Operand } as const), previous);
+    if (kind === 'text') return operandSlot(rebuiltFrom(record(previous) && typeof previous.type === 'string' ? slotOperand(previous as Slot) : undefined,
+      { type: 'choose', cases: cases as { when: Predicate; then: Operand }[], otherwise: rules.otherwise as Operand } as const), previous);
     return rebuiltFrom(previous, { type: 'conditional', cases, otherwise: rules.otherwise });
   }
   if (kind !== 'text') {
