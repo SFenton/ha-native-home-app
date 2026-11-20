@@ -172,13 +172,34 @@ export function rebaseCanvasLayout(before: CompositionDocument, after: Compositi
   return sameJson(stored, encoded) ? after : { ...after, studioCanvas: encoded };
 }
 
-/** Each group's members, carried through the root associations to their encoded node IDs. */
+/**
+ * Each group's members, carried through the root associations to their encoded node IDs (in association order, then
+ * encoded order). Associations are indexed by old node ID and encoded nodes by root and lifted ID, so this is linear.
+ */
 function groupsFor(canvas: StoredCanvas, associations: Rebased['associations'], rootIds: readonly string[],
   byRoot: ReadonlyMap<string, readonly StoredNode[]>): { groups?: StoredCanvas['groups'] } {
   if (!canvas.groups) return {};
-  return { groups: canvas.groups.map(group => ({ ...group, nodeIds: [...new Set(group.nodeIds.flatMap(id => associations
-    .filter(association => association.old === id).flatMap(association => (byRoot.get(rootIds[association.root]) ?? [])
-      .filter(node => node.nodeId === association.node).map(node => node.id))))] })) };
+  const byOld = new Map<string, Rebased['associations']>();
+  for (const association of associations) {
+    const own = byOld.get(association.old);
+    if (own) own.push(association); else byOld.set(association.old, [association]);
+  }
+  const encoded = new Map<string | undefined, Map<string, string[]>>();
+  const idsOf = (root: number, nodeId: string) => {
+    const rootId = rootIds[root];
+    let lifted = encoded.get(rootId);
+    if (!lifted) {
+      lifted = new Map();
+      for (const node of (rootId === undefined ? undefined : byRoot.get(rootId)) ?? []) {
+        const ids = lifted.get(node.nodeId);
+        if (ids) ids.push(node.id); else lifted.set(node.nodeId, [node.id]);
+      }
+      encoded.set(rootId, lifted);
+    }
+    return lifted.get(nodeId) ?? [];
+  };
+  return { groups: canvas.groups.map(group => ({ ...group, nodeIds: [...new Set(group.nodeIds.flatMap(id =>
+    (byOld.get(id) ?? []).flatMap(association => idsOf(association.root, association.node))))] })) };
 }
 
 /**

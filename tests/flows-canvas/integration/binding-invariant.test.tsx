@@ -41,6 +41,7 @@ import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/Workspace
 import { houseFrom } from '../../../src/preview2/projections';
 import { binding, componentDocument, draftDocument, labelTemplate, privateSourceFixture, tile } from '../draft/fixtures';
 import { integrationSnapshot } from './fixture';
+import { check, componentSlot, fixture, meaningFixture, pageSlot, rules, text, valid, withMeaningCanvas } from './meaning-fixtures';
 import lamps from '../../fixtures/templates-lamps.json';
 import type { Operand } from '../../../src/shared/composition/expression';
 import type { ReactNode } from 'react';
@@ -73,62 +74,7 @@ vi.mock('../../../src/workspace2/logic-fields/LogicFields', async original => ({
   useLogicFields: () => canvas,
 }));
 
-const pageSlot: EditorPath = ['pages', 0, 'components', 0, 'props', 'subtitle'];
-const componentSlot: EditorPath = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
-const text = (value: string): Operand => ({ type: 'literal', value });
-const check = { type: 'viewer' as const, isAdmin: true };
 
-function fixture(kind: string) {
-  let document = compileCompositionDocument(kind.startsWith('component') ? componentDocument() : draftDocument()).document;
-  const slot = kind.startsWith('component') ? componentSlot : pageSlot;
-  if (kind.startsWith('component')) {
-    const unrelated = compileCompositionDocument(draftDocument()).document;
-    document = { ...document,
-      pages: [{ ...document.pages[0], components: [...document.pages[0].components, unrelated.pages[0].components[1]] }],
-      logicUseBindings: [...document.logicUseBindings!, unrelated.logicUseBindings![1]],
-    };
-  }
-  if (kind === 'component parameters') {
-    document = replaceAt(document, ['logicLibrary', 0, 'params', 0, 'name'], 'sourceId');
-    document = replaceAt(document, ['logicLibrary', 0, 'body', 'from', 'sourceId', 'name'], 'sourceId');
-    for (const binding of document.logicUseBindings!) {
-      const path = pointerPath(resolveLogicAnchor(document, binding.use)!.pointer);
-      document = replaceAt(document, [...path, 'args'], { sourceId: 'source-a' });
-    }
-    document = { ...document, logicUseBindings: document.logicUseBindings!.map(binding => ({ ...binding, argument: 'sourceId' })) };
-    document = setPerPlace(document, 'saved-tile', 'inner-tile', 'props/subtitle/value/args/sourceId', 'source');
-  }
-  if (kind === 'nested operand') {
-    const draft = createDraft(document), operand = valueAt(document, [...slot, 'value']);
-    draft.set(editSubtrees(document, { ...replaceAt(document, [...slot, 'value'], { type: 'logic-ref', logicId: 'outer', args: { value: operand } }),
-      logicLibrary: [...document.logicLibrary!, { id: 'outer', name: 'Outer', kind: 'operand', params: [{ name: 'value', kind: 'operand' }],
-        body: { type: 'format', pattern: '{value}', args: { value: { type: 'hole', name: 'value' } } } }],
-    }));
-    document = draft.get();
-  }
-  if (kind === 'rule cases') {
-    const draft = createDraft(document);
-    rules(draft, slot);
-    document = draft.get();
-  }
-  compileCompositionDocument(document);
-  return { document, slot };
-}
-function rules(draft: Draft, slot: EditorPath, reverse = false) {
-  const operand = slotOperand(valueAt(draft.get(), slot) as { type: string })!;
-  const cases = [{ when: check, then: operand }, { when: { ...check, isAdmin: false }, then: text('Other') }];
-  draft.set(rebuildField(draft.get(), slot, operandSlot({ type: 'choose', cases: reverse ? cases.reverse() : cases, otherwise: text('Otherwise') }, valueAt(draft.get(), slot))));
-}
-function valid(document: CompositionDocument) {
-  compileCompositionDocument(document);
-  expect(resolveLogicUseBindings(document).bindings).toHaveLength(document.logicUseBindings?.length ?? 0);
-  for (const entry of document.componentLibrary ?? []) for (const binding of entry.bindings ?? []) {
-    const node = binding.nodeId ? bodyNodes(entry.node).find(node => node.id === binding.nodeId) : ownedSources(entry).find(source => source.id === binding.sourceId);
-    expect(node, binding.field).toBeDefined();
-    const param = entry.params!.find(param => param.name === binding.param)!;
-    expect(readField(node, param.kind === 'value' ? fieldSteps(binding.field).slice(0, -1).join('/') : binding.field), binding.field).toBeDefined();
-  }
-}
 function unchanged(document: CompositionDocument) {
   return {
     use: JSON.stringify(document.logicUseBindings!.find(binding => 'nodeId' in binding.use && binding.use.nodeId === 'tile-b')),
@@ -152,63 +98,6 @@ function history(draft: Draft, before: CompositionDocument, sameBindings = true)
   expect(draft.get()).toEqual(after);
   valid(draft.get());
   expect(stable(draft.get())).toEqual(stable(before));
-}
-function meaningFixture(kind: string, policy: 'fallback' | 'keep' = 'fallback') {
-  const { document: original, slot } = fixture(kind === 'private sources' ? 'component parameters' : kind === 'id and type arguments' ? 'nested operand' : kind);
-  let document = replaceAt(original, kind.startsWith('component') || kind === 'private sources'
-    ? ['componentLibrary', 0, 'node', 'props', 'titleProviderId'] : ['pages', 0, 'components', 0, 'props', 'titleProviderId'], 'source-b');
-  if (kind === 'id and type arguments') {
-    document = replaceAt(document, ['logicLibrary', 1, 'params'], [...document.logicLibrary![1].params, { name: 'id', kind: 'text' }, { name: 'type', kind: 'text' }]);
-    document = replaceAt(document, [...slot, 'value', 'args'], { ...valueAt(document, [...slot, 'value', 'args']) as object, id: 'not-a-node', type: 'literal' });
-  }
-  if (kind === 'private sources') {
-    document = replaceAt(document, ['componentLibrary', 0, 'sources'], [privateSourceFixture.source]);
-    document = replaceAt(document, ['componentLibrary', 0, 'params'], [...document.componentLibrary![0].params!, { name: 'privateEntity', kind: 'entity-id' }]);
-    document = replaceAt(document, ['componentLibrary', 0, 'bindings'], [...document.componentLibrary![0].bindings!, { param: 'privateEntity', sourceId: 'private-state', field: 'entityId/value' }]);
-    for (const index of [0, 1]) document = replaceAt(document, ['pages', 0, 'components', index, 'args', 'privateEntity'], privateSourceFixture.placements[index]);
-  }
-  const independent = replaceAt(tile('unrelated-bound', 'source-b'), ['props', 'subtitle', 'value', 'logicId'], 'other-label');
-  document = { ...document, logicLibrary: [...document.logicLibrary!, { ...labelTemplate, id: 'other-label', name: 'Other label' } as NonNullable<CompositionDocument['logicLibrary']>[number]],
-    logicUseBindings: [...document.logicUseBindings!, { ...binding('unrelated-bound'), logicId: 'other-label' }],
-    pages: [{ ...document.pages[0], components: [...document.pages[0].components, independent as CompositionDocument['pages'][number]['components'][number]] }, ...document.pages.slice(1)],
-  };
-  const optional = compileCompositionDocument(lamps.document).document.componentLibrary![0];
-  document = { ...document, componentLibrary: [...document.componentLibrary ?? [], {
-    ...optional, params: [{ name: 'tint', kind: 'value' }], bindings: [{ param: 'tint', nodeId: 'demo-lamp', field: 'glyphTint' }],
-  }], pages: [...document.pages, { ...document.pages[0], id: 'other-page', title: 'Other page', components: [] }] };
-  const optionalIndex = document.componentLibrary!.length - 1;
-  document = replaceAt(document, ['componentLibrary', optionalIndex, 'node', 'children', 0, 'glyphTint'], { type: 'solid-rgb', red: 10, green: 20, blue: 30 });
-  for (const index of [0, 1]) document = replaceAt(document, ['pages', index, 'components'], [...document.pages[index].components, {
-    id: `optional-${index}`, type: 'component-ref', componentId: optional.id, layout: { span: 1 },
-    values: { tint: { type: 'solid-rgb', red: 20 + index * 80, green: 40, blue: 60 } },
-  }]);
-  if (kind.startsWith('component') || kind === 'private sources') {
-    const draft = createDraft(document);
-    draft.set(moveNodeTo(document, 'place-1', { kind: 'surface', id: 'other-page' }));
-    document = draft.get();
-  }
-  for (const location of authoredNodes(document)) {
-    const subtitlePath = [...location.path, 'props', 'subtitle'];
-    const subtitle = valueAt(document, subtitlePath);
-    if (record(subtitle) && (subtitle.type === 'expr' || subtitle.type === 'read')) document = replaceAt(document, subtitlePath,
-      { ...subtitle, fallback: `Fallback for ${location.node.id}`, whenUnavailable: policy });
-  }
-  valid(document);
-  return { document, slot, optionalIndex };
-}
-function withMeaningCanvas(document: CompositionDocument, slot: EditorPath) {
-  const unrelated = document.pages.flatMap((page, pageIndex) => page.components.flatMap((node, nodeIndex) => node.id === 'tile-b'
-    ? [['pages', pageIndex, 'components', nodeIndex, 'props', 'subtitle']] : []))[0];
-  const graphs = [slot, unrelated].map(path => liftField(document, path, 'slot').graph);
-  const metadata = encodeStudioCanvas(document, graphs.map((graph, index) => ({
-    id: `meaning-${index}`, roots: [{ anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, nodeIndex) => ({
-      id: node.id, origins: node.origins, x: 120 + nodeIndex * 100, y: 240 + index * 100,
-    })) }],
-  })));
-  return { ...document, studioCanvas: studioCanvasMetadataSchema.parse({ ...metadata, canvases: metadata.canvases.map(canvas => ({
-    ...canvas, groups: [{ id: 'meaning-group', label: 'Keep these together', nodeIds: canvas.nodes.map(node => node.id) },
-      { id: 'featured', label: 'Keep this member', nodeIds: [canvas.nodes[0].id] }],
-  })) }) };
 }
 function layoutMeaning(document: CompositionDocument) {
   const layout = readStudioCanvas(document);
@@ -1442,6 +1331,136 @@ describe('retention evidence outside the watched paths, committed-only caches an
         expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
       } finally { notice.mockRestore(); }
     }
+  });
+
+  const at = (index: number): EditorPath => ['pages', 0, 'components', index, 'props', 'subtitle'];
+  const call = { type: 'call-service', domain: 'light', service: 'turn_on', target: { entity_id: { type: 'literal', value: 'light.example' } },
+    data: { type: 'object', fields: {} }, feedback: 'policy' };
+  /** A third, subtitle-less tile, so a subtitle object can be placed there under a new key. */
+  const withThirdTile = (document: CompositionDocument): CompositionDocument => replaceAt(document, ['pages', 0, 'components'], [...document.pages[0].components,
+    { id: 'third-tile', type: 'bound-control', title: 'Third', layout: { span: 1 },
+      props: { kind: 'toggle', isOn: { type: 'state', sourceId: 'source-a', path: ['state'], in: ['on'] }, unavailableText: 'Unavailable' },
+      onAction: call, offAction: call } as unknown as CompositionNode]);
+
+  it('refuses rebuilding the unique ancestor that locates a use whose object was already shared before the edit', () => {
+    let document = automatic();
+    document = { ...document, logicUseBindings: compileCompositionDocument(draftDocument()).document.logicUseBindings!.slice(1) };
+    document = replaceAt(document, [...at(0), 'value'], valueAt(document, [...at(1), 'value']));
+    compileCompositionDocument(document);
+    // The shared use object occurs twice, so its location rests on tile-b's subtitle object; rebuilding that loses it.
+    for (const before of revisions(document)) refuses(before, replaceAt(before, [...at(1), 'fallback'], 'Only a sibling changed'));
+  });
+
+  it('refuses rebuilding the unique ancestor that locates a canvas root whose operand was already shared', () => {
+    let document: CompositionDocument = { ...automatic(), logicUseBindings: [] };
+    document = replaceAt(document, [...at(0), 'value'], valueAt(document, [...at(1), 'value']));
+    const graph = liftField(document, [...at(1), 'value'], 'operand').graph;
+    document = { ...document, studioCanvas: encodeStudioCanvas(document, [{ id: 'operand-frame', roots: [{ anchor: graph.roots[0].anchor,
+      nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 0, y: 0 })) }] }]) };
+    compileCompositionDocument(document);
+    for (const before of revisions(document)) refuses(before, replaceAt(before, [...at(1), 'fallback'], 'Only a sibling changed'));
+  });
+
+  it('refuses rebuilding the unique ancestor that locates a component parameter whose target was already shared', () => {
+    const raw = componentDocument();
+    let document = compileCompositionDocument({ ...raw, logicUseBindings: [],
+      componentLibrary: raw.componentLibrary.map(entry => ({ ...entry, params: [{ name: 'label', kind: 'text' }],
+        bindings: [{ param: 'label', nodeId: 'inner-tile', field: 'props/subtitle/value/value' }],
+        node: { ...entry.node, props: { ...entry.node.props, subtitle: { type: 'expr', value: { type: 'literal', value: 'Default' } } } } })),
+      pages: raw.pages.map(page => ({ ...page, components: [...page.components.map(node => ({ ...node, args: { label: 'Placed' } })), tile('alias', 'source-a')] })),
+    } as unknown as CompositionDocument).document;
+    const target: EditorPath = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
+    document = replaceAt(document, [...at(2), 'value'], valueAt(document, [...target, 'value']));
+    compileCompositionDocument(document);
+    for (const before of revisions(document)) refuses(before, replaceAt(before, [...target, 'fallback'], 'Only a sibling changed'));
+  });
+
+  it('refuses when a canvas root\'s witness, holding an already-shared use, is placed in a new field while the use\'s locating ancestor is rebuilt', () => {
+    let document = withThirdTile({ ...automatic(), logicUseBindings: compileCompositionDocument(draftDocument()).document.logicUseBindings!.slice(1) });
+    document = replaceAt(document, [...at(0), 'value'], valueAt(document, [...at(1), 'value']));
+    document = { ...document, studioCanvas: encodeStudioCanvas(document, [{ id: 'frame', roots: [lifted(document, at(0))] }]) };
+    compileCompositionDocument(document);
+    expect(readStudioCanvas(document).warnings).toEqual([]);
+    for (const before of revisions(document)) {
+      const held = valueAt(before, at(0));
+      refuses(before, replaceAt(replaceAt(before, [...at(1), 'fallback'], 'Rebuilt original ancestors'), at(2), held));
+    }
+  });
+
+  it('a witness rebuilt by a declared edit does not vouch for the bound use it holds when the index is carried forward', () => {
+    let document = withThirdTile(automatic());
+    const root = lifted(document, at(0));
+    document = { ...document, studioCanvas: encodeStudioCanvas(document, [{ id: 'frame', roots: [{ ...root, nodes: root.nodes.filter(node => node.origins.includes('')) }] }]) };
+    const pointer = fieldPointer(at(0)), references = { fields: new Map([[pointer, [pointer]]]) };
+    const propose = (before: CompositionDocument) => replaceAt(replaceAt(before, ['pages', 0, 'components', 0, 'props', 'selected'], 'none'), at(2), valueAt(before, at(0)));
+    compileCompositionDocument(propose(document));
+    const notice = vi.spyOn(toastManager, 'add');
+    try {
+      expect(documentEdit(document, propose(document), references)).toBe(document);
+      // Typing rebuilds the canvas root's slot under its declared provenance; the index is carried to the result.
+      const before = documentEdit(document, replaceAt(document, [...at(0), 'fallback'], 'Warm'), references);
+      expect(before).not.toBe(document);
+      expect(valueAt(before, [...at(0), 'fallback'])).toBe('Warm');
+      const unaliased = replaceAt(before, ['pages', 0, 'components', 0, 'props', 'selected'], 'none');
+      expect(documentEdit(before, unaliased, references)).toBe(unaliased);
+      notice.mockClear();
+      // The rebuilt slot, which still holds the bound use, now also appears in a new field: the use no longer locates.
+      expect(documentEdit(before, propose(before), references)).toBe(before);
+      expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    } finally { notice.mockRestore(); }
+  });
+
+  it.each([20, 40])('remaps canvas groups without a per-member scan of the associations (%i roots)', count => {
+    let document: CompositionDocument = { ...automatic(), logicUseBindings: [] };
+    document = replaceAt(document, ['pages', 0, 'components'], Array.from({ length: count }, (_, index) => tile(`group-${index}`, 'source-a')));
+    let stored = encodeStudioCanvas(document, [{ id: 'frame', roots: document.pages[0].components.map((_, index) => lifted(document, at(index))) }]);
+    stored = { ...stored, canvases: stored.canvases.map(canvas => ({ ...canvas, groups: [{ id: 'all', label: 'All', nodeIds: canvas.nodes.map(node => node.id) }] })) };
+    const initial = { ...document, studioCanvas: stored };
+    let before = documentEdit(initial, { ...initial, name: 'Prime' });
+    before = rebuildField(before, [...at(0), 'fallback'], 'Warm up');
+    const filter = Array.prototype.filter;
+    let comparisons = 0;
+    const spy = vi.spyOn(Array.prototype, 'filter').mockImplementation(function (this: unknown[], predicate, thisArg) {
+      if (this.length && this[0] && typeof this[0] === 'object' && 'old' in this[0] && 'root' in this[0] && 'node' in this[0]) {
+        return filter.call(this, (item, index, array) => { comparisons++; return predicate.call(thisArg, item, index, array); });
+      }
+      return filter.call(this, predicate, thisArg);
+    });
+    let result: CompositionDocument;
+    try { result = rebuildField(before, [...at(0), 'fallback'], 'Next keystroke'); } finally { spy.mockRestore(); }
+    expect(comparisons).toBe(0);
+    expect(valueAt(result, [...at(0), 'fallback'])).toBe('Next keystroke');
+    expect(readStudioCanvas(result).warnings).toEqual([]);
+    const nodes = studioCanvasMetadataSchema.parse(result.studioCanvas).canvases[0];
+    expect(nodes.groups![0].nodeIds).toEqual(nodes.nodes.map(node => node.id));
+    const after = replaceAt(before, [...at(0), 'fallback'], 'Next keystroke');
+    const locate = (pointer: string) => valueAt(after, pointerPath(pointer)) === undefined ? [] : [pointerPath(pointer)];
+    expect(sameJson(result.studioCanvas, rebaseCanvasLayout(before, after, locate, { deleted: () => false, refuse: (): never => { throw new Error('refused'); } }).studioCanvas)).toBe(true);
+  });
+
+  it('typing in a component with a private-source binding does not walk the document', () => {
+    const raw = componentDocument();
+    const document = compileCompositionDocument({ ...raw, logicUseBindings: [],
+      componentLibrary: raw.componentLibrary.map(entry => ({ ...entry, params: [{ name: 'entity', kind: 'entity-id' }],
+        bindings: [{ param: 'entity', sourceId: 'private-state', field: 'entityId/value' }],
+        sources: [{ id: 'private-state', kind: 'ha-entity', entityId: { type: 'literal', value: 'sensor.demo_private' } }] })),
+      pages: raw.pages.map(page => ({ ...page, components: page.components.map(node => ({ ...node, args: { entity: 'sensor.example' } })) })),
+    } as unknown as CompositionDocument).document;
+    let before = documentEdit(document, { ...document, name: 'Prime' });
+    const path: EditorPath = ['componentLibrary', 0, 'node', 'title'];
+    before = rebuildField(before, path, 'Warm');
+    const entries = Object.entries, unrelated = before.dataSources;
+    let scans = 0;
+    const spy = vi.spyOn(Object, 'entries').mockImplementation(value => { if (value === unrelated) scans++; return entries(value); });
+    let after: CompositionDocument;
+    try { after = rebuildField(before, path, 'Next character'); } finally { spy.mockRestore(); }
+    expect(scans).toBe(0);
+    expect(valueAt(after, path)).toBe('Next character');
+    expect(after.componentLibrary![0].bindings).toBe(before.componentLibrary![0].bindings);
+    valid(after);
+    // An edit that does reach the source binding still checks it: the source object placed twice in its entry is ambiguous.
+    const sources = after.componentLibrary![0].sources!;
+    refuses(after, replaceAt(after, ['componentLibrary', 0, 'sources'], [sources[0], sources[0]]), true);
   });
 
   it('visits each stored node of a shared canvas frame a bounded number of times when one root is reached', () => {

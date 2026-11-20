@@ -93,14 +93,15 @@ export class EditDependencies {
  * Visit every pointer where `after` differs from `before` by identity. Unchanged immutable branches are proofs, not a
  * classification of "simple" fields: anything rebuilt is visited, even when it looks equal.
  *
- * `placed` sees every object `after` holds at a position where `before` held something else (or nothing), including
- * everything inside newly introduced subtrees, so an object that now appears in a second place is noticed. It returns
- * true when that object's own registration already covers everything below it, which ends the scan there. Positions
- * `before` and `after` share by identity are never walked.
+ * `placed` sees every object `after` holds at a position where `before` held something else (or nothing), once per such
+ * position, including everything inside newly introduced subtrees, so an object that now appears in a second place is
+ * noticed. Newly placed subtrees are scanned whole: no object's registration is taken to cover what is below it. Positions
+ * `before` and `after` share by identity are never walked, so the cost is proportional to what the edit placed.
  */
-export function changedPaths(before: unknown, after: unknown, visit: (pointer: string) => void, placed: (value: object) => boolean = () => false): void {
+export function changedPaths(before: unknown, after: unknown, visit: (pointer: string) => void, placed: (value: object) => void = () => {}): void {
   const scan = (value: unknown): void => {
-    if (value === null || typeof value !== 'object' || placed(value)) return;
+    if (value === null || typeof value !== 'object') return;
+    placed(value);
     for (const child of Object.values(value)) scan(child);
   };
   const walk = (before: unknown, after: unknown, path: (string | number)[]): void => {
@@ -111,7 +112,8 @@ export function changedPaths(before: unknown, after: unknown, visit: (pointer: s
     if (Array.isArray(before) && Array.isArray(after) && before.length !== after.length) {
       visit(fieldPointer(path));
       // Items still at their own index are not newly placed; every other item is.
-      if (!placed(after)) after.forEach((item, at) => { if (item !== before[at]) scan(item); });
+      placed(after);
+      after.forEach((item, at) => { if (item !== before[at]) scan(item); });
       return;
     }
     placed(after);
