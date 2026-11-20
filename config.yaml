@@ -1,5 +1,5 @@
 name: S+H Studio
-version: "0.3.20"
+version: "0.3.21"
 slug: native_home_studio
 url: https://github.com/SFenton/ha-native-home-app
 image: ghcr.io/sfenton/native-home-studio
