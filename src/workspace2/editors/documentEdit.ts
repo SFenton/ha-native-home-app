@@ -5,8 +5,8 @@ import { atPointer, resolveLogicAnchor } from '../../shared/composition/studio-l
 import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
 import { sameJson } from '../../sameJson';
 import { usesOf } from '../data/logic/logicModel';
-import { fieldAnchor, fieldPointer, pointerPath } from '../logic-fields/registry';
-import { rebaseCanvasLayout } from '../logic-fields/layout';
+import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, type AuthoredNode } from '../logic-fields/registry';
+import { rebaseCanvasLayout, uncertifiedCanvasRoots } from '../logic-fields/layout';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { toastManager } from '../toasts';
 import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
@@ -26,6 +26,11 @@ export interface EditReferences {
 export const LINKED_EDIT_REFUSAL = "This change can't keep its linked values, so it wasn't applied.";
 class LinkedEditRefusal extends Error {}
 const refuse = (): never => { throw new LinkedEditRefusal(LINKED_EDIT_REFUSAL); };
+/**
+ * Caches below are keyed only by committed revisions: a `before` the caller holds, or a result this boundary accepted.
+ * Documents are immutable once committed, so their identity is a stable key (mutating one in place is outside the
+ * contract). A candidate `edit` is never a key: a refused candidate may be mutated and offered again.
+ */
 const validated = new WeakMap<CompositionDocument, CompositionDocument>();
 const inside = (pointer: string, base: string) => pointer === base || pointer.startsWith(`${base}/`);
 interface ReferenceIndex {
@@ -36,6 +41,16 @@ interface ReferenceIndex {
   /** `before.studioCanvas` parsed once per index; an index outlives a revision only while that object is retained. */
   readonly stored?: StoredStudioCanvasMetadata;
   /**
+   * Retention evidence: each key's holder object, and every object above it in the indexed revision, mapped to the keys
+   * whose reconciliation identity-locates through it. One of these placed somewhere new may make that location ambiguous.
+   * Holders an accepted edit rebuilds are added as the index is carried forward; entries only ever widen scope.
+   */
+  readonly evidence: WeakMap<object, string[]>;
+  /** The holder pointer behind each key in `evidence`. */
+  readonly holders: ReadonlyMap<string, string>;
+  /** Canvas roots a full rebase would not give back unchanged; every edit rebases these. */
+  readonly uncertified: ReadonlySet<string>;
+  /**
    * Known-usable layout metadata. Edits that keep this index either leave every root's reads untouched or rebase the reached
    * roots through a check that refuses unusable output, so usability carries forward. Unusable metadata is rechecked.
    */
@@ -43,13 +58,15 @@ interface ReferenceIndex {
 }
 const revisions = new WeakMap<CompositionDocument, ReferenceIndex>();
 const rootsOf = (metadata: StoredStudioCanvasMetadata) => metadata.canvases.map(canvas => [canvas.id, canvas.roots.map(root => [root.id, root.anchor])]);
-const objects = new WeakMap<object, Map<object, EditorPath[]>>();
+const committedPaths = new WeakMap<CompositionDocument, Map<object, EditorPath[]>>();
+/** `objectPaths` of a committed revision, computed once. */
+function committedObjectPaths(document: CompositionDocument): Map<object, EditorPath[]> {
+  let paths = committedPaths.get(document);
+  if (!paths) { paths = objectPaths(document); committedPaths.set(document, paths); }
+  return paths;
+}
 
 function objectPaths(value: unknown): Map<object, EditorPath[]> {
-  if (value !== null && typeof value === 'object') {
-    const cached = objects.get(value);
-    if (cached) return cached;
-  }
   const paths = new Map<object, EditorPath[]>();
   const visit = (value: unknown, path: EditorPath) => {
     if (value === null || typeof value !== 'object') return;
@@ -57,7 +74,6 @@ function objectPaths(value: unknown): Map<object, EditorPath[]> {
     for (const [key, child] of Object.entries(value)) visit(child, [...path, key]);
   };
   visit(value, []);
-  if (value !== null && typeof value === 'object') objects.set(value, paths);
   return paths;
 }
 
@@ -174,7 +190,14 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
   if (before === edit || sameJson(before, edit) && !references.relocated?.size && !references.copied?.length) return edit;
   const linked = (document: CompositionDocument) => document.logicUseBindings?.length || document.componentLibrary?.some(entry => entry.bindings?.length) || document.studioCanvas;
   if (!linked(before) && !linked(edit)) return edit;
-  const locate = (pointer: string) => referencePaths(before, objectPaths(edit))(pointer);
+  // Per-transaction memos of the candidate: never cached beyond this call.
+  let editPaths: Map<object, EditorPath[]> | undefined, editNodes: AuthoredNode[] | undefined;
+  const pathsOfEdit = () => editPaths ??= objectPaths(edit);
+  const locate = (pointer: string) => referencePaths(before, pathsOfEdit())(pointer);
+  /** A field's anchor in the candidate; a field without one owner (duplicate IDs, say) refuses rather than throws. */
+  const anchorAt = (path: EditorPath) => {
+    try { return fieldAnchor(edit, path, editNodes ??= authoredNodes(edit)); } catch { return refuse(); }
+  };
   const deleted = (pointer: string) => (references.deleted ?? []).some(path => inside(pointer, fieldPointer(path)))
     || [...references.relocated ?? []].some(([from, to]) => !to.length && inside(pointer, from));
   const declared = (pointer: string) => deleted(pointer)
@@ -199,6 +222,18 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
   let indexed = revisions.get(before);
   if (!indexed) {
     const dependencies = new EditDependencies(), targets = new Map<string, string>();
+    const evidence = new WeakMap<object, string[]>(), holders = new Map<string, string>();
+    /** `key` identity-locates through the object at `pointer` (its holder) and so through every object above it. */
+    const retainedBy = (pointer: string, ...keys: string[]) => {
+      let value: unknown = before;
+      for (const part of ['', ...pointerPath(pointer)]) {
+        if (part !== '') value = Reflect.get(value as object, part);
+        if (value === null || typeof value !== 'object') break;
+        const held = evidence.get(value);
+        if (held) held.push(...keys); else evidence.set(value, [...keys]);
+      }
+      for (const key of keys) holders.set(key, pointer);
+    };
     const build: IndexBuild = { dependencies, before, scans: new Set(), bases: new Map() };
     let stored: ReturnType<typeof studioCanvasMetadataSchema.safeParse> | undefined;
     const resolved = before.logicUseBindings?.length ? resolveLogicUseBindings(before).bindings : [];
@@ -210,7 +245,7 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
     resolved.forEach((binding, at) => {
       const key = `a:${at}`, reanchor = `r:${at}`, authored = before.logicUseBindings![at];
       const use = holder(before, binding.usePointer);
-      dependencies.add(use, key); dependencies.add(use, reanchor);
+      dependencies.add(use, key); dependencies.add(use, reanchor); retainedBy(use, key, reanchor);
       dependencies.add(binding.sourcePointer, key);
       dependencies.add('/logicLibrary', key);
       // The canonical resolution already found this use's node: `usePointer` is that node's pointer followed by the field.
@@ -227,10 +262,10 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
         dependencies.add(fieldPointer(['componentLibrary', at, field]), 'guard');
       }
       entry.bindings?.forEach((binding, bindingIndex) => {
-        const key = `p:${entry.id}:${bindingIndex}`, target = componentTarget(before, entry, binding, () => objectPaths(before));
+        const key = `p:${entry.id}:${bindingIndex}`, target = componentTarget(before, entry, binding, () => committedObjectPaths(before));
         // An already-broken binding stays in every edit's scope, so only an edit that repairs or removes it is accepted.
         if (target === undefined || !entry.params?.some(param => param.name === binding.param)) return dependencies.add('', key);
-        targets.set(key, target); dependencies.add(holder(before, target), key);
+        targets.set(key, target); dependencies.add(holder(before, target), key); retainedBy(holder(before, target), key);
         if (!binding.nodeId) {
           // A source binding is found by unique object identity anywhere in its entry, and by the entry's ID-order position.
           dependencies.add(fieldPointer(['componentLibrary', at]), key); dependencies.add(fieldPointer(['componentLibrary', at]), 'guard');
@@ -251,14 +286,21 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
       else for (const canvas of stored.data.canvases) for (const root of canvas.roots) {
         const key = `c:${root.id}`, target = anchorPointer(build, root.anchor);
         dependencies.add(target === undefined ? '' : holder(before, target), key);
+        if (target !== undefined) retainedBy(holder(before, target), key);
         watchAnchor(build, root.anchor, [key]);
       }
     }
-    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), ...(stored?.success ? { stored: stored.data } : {}) };
+    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders,
+      uncertified: stored?.success ? uncertifiedCanvasRoots(before, stored.data) : new Set(), ...(stored?.success ? { stored: stored.data } : {}) };
     revisions.set(before, indexed);
   }
   const index = indexed, scope = new Set<string>(), touch = (pointer: string) => index.dependencies.intersect(pointer, scope);
-  changedPaths(before, edit, touch);
+  const placed = (value: object) => {
+    const keys = index.evidence.get(value);
+    if (keys) for (const key of keys) scope.add(key);
+    return keys !== undefined;
+  };
+  changedPaths(before, edit, touch, placed);
   index.dependencies.expand(scope);
   const guardChanged = scope.has('guard');
   for (const [from, to] of [...references.relocated ?? [], ...references.fields ?? []]) {
@@ -273,15 +315,30 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
     if (edit.logicUseBindings?.some(binding => !held.has(binding))) scope.add('added');
   }
   for (const path of [...references.deleted ?? [], ...references.discardLayouts ?? []]) touch(fieldPointer(path));
+  for (const root of index.uncertified) scope.add(`c:${root}`);
   index.dependencies.expand(scope);
   /** The index stays exact for the result while nothing it read changed: no guarded read, no binding rewrite. */
   const finish = (document: CompositionDocument, rebased?: StoredStudioCanvasMetadata) => {
     if (guardChanged || document.logicUseBindings !== before.logicUseBindings) return document;
-    if (document === edit && document.studioCanvas === before.studioCanvas) revisions.set(document, index);
-    // A rebase that kept every canvas and root (IDs and anchors) moved only node associations, which nothing indexes.
+    let carried: ReferenceIndex | undefined;
+    if (document === edit && document.studioCanvas === before.studioCanvas) carried = index;
+    // A rebase that kept every canvas and root (IDs and anchors) moved only node associations, which nothing else indexes;
+    // the roots it rebased are certified afresh against the result.
     else if (rebased && index.stored && document.studioCanvas === rebased && sameJson(rootsOf(index.stored), rootsOf(rebased))) {
-      revisions.set(document, { ...index, stored: rebased, usable: true });
+      const reached = new Set([...scope].filter(key => key.startsWith('c:')).map(key => key.slice(2)));
+      const uncertified = new Set([...index.uncertified].filter(root => !reached.has(root)));
+      for (const root of uncertifiedCanvasRoots(document, rebased, reached)) uncertified.add(root);
+      carried = { ...index, stored: rebased, usable: true, uncertified };
     }
+    if (!carried) return document;
+    // Holders this edit rebuilt are the result's retention evidence from now on.
+    for (const key of scope) {
+      const pointer = index.holders.get(key), value = pointer === undefined ? undefined : valueAt(document, pointerPath(pointer));
+      if (value === null || typeof value !== 'object') continue;
+      const held = index.evidence.get(value);
+      if (!held) index.evidence.set(value, [key]); else if (!held.includes(key)) held.push(key);
+    }
+    revisions.set(document, carried);
     return document;
   };
   if (!scope.size) return finish(edit);
@@ -324,7 +381,7 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
       if (!candidates) { candidates = usesOf(edit, binding.logicId); uses.set(binding.logicId, candidates); }
       const result = paths.flatMap(path => {
         if (!candidates.some(use => fieldPointer(use.path) === fieldPointer(path))) return [];
-        const use = fieldAnchor(edit, path);
+        const use = anchorAt(path);
         return [sameJson(use, binding.use) ? binding : { ...binding, use }];
       });
       if (!result.length && !deleted(resolved[index].usePointer)) refuse();
@@ -380,7 +437,7 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
           if (binding.nodeId) {
             const holderPath = optional ? path.slice(0, -1) : path;
             const node = optional && resolveLogicAnchor(edit, { ...anchor, field: '' });
-            const base = node && node.pointer === fieldPointer(holderPath) ? { ...anchor, field: '' } : fieldAnchor(edit, holderPath);
+            const base = node && node.pointer === fieldPointer(holderPath) ? { ...anchor, field: '' } : anchorAt(holderPath);
             const address = optional ? { ...base, field: `${base.field}${fieldPointer(path.slice(-1))}` } : base;
             if (address.kind !== 'component' || address.id !== entry.id || !address.nodeId) return [];
             const field = fieldSteps(address.field).join('/');
@@ -388,7 +445,7 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
           }
           const source = ownedSources(entry).find(source => source.id === binding.sourceId);
           const owner = fieldPointer(['componentLibrary', edit.componentLibrary!.findIndex(next => next.id === entry.id)]);
-          const paths = source && objectPaths(edit).get(source)?.filter(path => inside(fieldPointer(path), owner));
+          const paths = source && pathsOfEdit().get(source)?.filter(path => inside(fieldPointer(path), owner));
           if (paths?.length !== 1) return [];
           const base = fieldPointer(paths[0]), pointer = fieldPointer(path);
           if (!pointer.startsWith(`${base}/`)) return [];
@@ -437,9 +494,10 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
     affected: scope.has('layout') ? undefined : new Set([...scope].filter(key => key.startsWith('c:')).map(key => key.slice(2))),
     ...(next.studioCanvas === before.studioCanvas && index.stored ? { stored: index.stored, usable: index.usable ?? false } : {}),
   });
+  let nextPaths: Map<object, EditorPath[]> | undefined;
   for (const entry of next.componentLibrary ?? []) if (component(entry.id)) for (const [at, binding] of (entry.bindings ?? []).entries()) {
     if (!parameter(entry.id, at) && entry.bindings === before.componentLibrary?.find(old => old.id === entry.id)?.bindings) continue;
-    if (!entry.params?.some(param => param.name === binding.param) || componentTarget(next, entry, binding, () => objectPaths(next)) === undefined) refuse();
+    if (!entry.params?.some(param => param.name === binding.param) || componentTarget(next, entry, binding, () => nextPaths ??= objectPaths(next)) === undefined) refuse();
   }
   // Metadata the edit itself changed is checked whole; a rebase only emits metadata it has checked.
   if (next.studioCanvas && next.studioCanvas === layout && !sameJson(before.studioCanvas, layout) && readStudioCanvas(next).warnings.length) refuse();

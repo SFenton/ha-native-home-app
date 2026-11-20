@@ -1,12 +1,12 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
-import { lift, type ASTReplacement } from '../../shared/composition/graph';
+import { lift, type ASTReplacement, type LogicAnchor } from '../../shared/composition/graph';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { encodeStudioCanvas, readStudioCanvas, type CanvasLayoutInput } from '../../shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
 import type { CanvasLayoutHandoff } from '../canvas/FlowCanvas';
-import { fieldAnchor, fieldPointer, pointerPath } from './registry';
+import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, type AuthoredNode } from './registry';
 import { valueAt, type EditorPath } from '../../composition-editor';
 import { sameJson } from '../../sameJson';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../editors/documentEdit';
@@ -14,7 +14,10 @@ import { documentEdit, LINKED_EDIT_REFUSAL } from '../editors/documentEdit';
 export interface CanvasRebase {
   readonly fields?: ReadonlyMap<string, readonly string[]>;
   readonly discard?: readonly EditorPath[];
-  /** Root IDs whose anchors or contents the edit reached; others are kept as stored. Omitted: every root. */
+  /**
+   * Root IDs to rebase; the others are kept as stored. Omitted: every root. Only roots `uncertifiedCanvasRoots` passes may
+   * be left out, and only while nothing they read has changed.
+   */
   readonly affected?: ReadonlySet<string>;
   /** `before`'s parsed metadata and that it is usable, when the caller already knows (both per revision). */
   readonly stored?: StoredStudioCanvasMetadata;
@@ -23,55 +26,138 @@ export interface CanvasRebase {
   refuse(): never;
 }
 
+type StoredCanvas = StoredStudioCanvasMetadata['canvases'][number];
+type StoredRoot = StoredCanvas['roots'][number];
+type StoredNode = StoredCanvas['nodes'][number];
+type LayoutNode = CanvasLayoutInput['roots'][number]['nodes'][number];
+interface Associated { readonly anchor: LogicAnchor; readonly nodes: LayoutNode[]; readonly associations: { old: string; node: string }[] }
+
+const asInput = (nodes: readonly StoredNode[]): LayoutNode[] => nodes.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y }));
+
+/** A canvas's nodes grouped by root, in stored order (one pass, however many roots share the canvas). */
+function nodesByRoot(nodes: readonly StoredNode[]): Map<string, StoredNode[]> {
+  const byRoot = new Map<string, StoredNode[]>();
+  for (const node of nodes) {
+    const own = byRoot.get(node.rootId);
+    if (own) own.push(node); else byRoot.set(node.rootId, [node]);
+  }
+  return byRoot;
+}
+
+/** Whether re-encoding this canvas, with every root unchanged, gives it back as stored (no group or node-order normalizing). */
+function normalCanvas(canvas: StoredCanvas, byRoot: ReadonlyMap<string, readonly StoredNode[]>): boolean {
+  if (!canvas.roots.length || canvas.groups?.some(group => new Set(group.nodeIds).size !== group.nodeIds.length)) return false;
+  const ordered = canvas.roots.flatMap(root => byRoot.get(root.id) ?? []);
+  return ordered.length === canvas.nodes.length && ordered.every((node, at) => node === canvas.nodes[at]);
+}
+
+/** A field's anchor; a field that no longer has one owner (duplicate IDs, a removed owner) refuses the edit. */
+function anchorAt(document: CompositionDocument, path: EditorPath, nodes: () => readonly AuthoredNode[], refuse: () => never): LogicAnchor {
+  try { return fieldAnchor(document, path, nodes()); } catch { return refuse(); }
+}
+
+/**
+ * The full rebase's step for one destination of one root: lift the destination's current value, then carry each saved
+ * node to the lifted nodes whose origins it still covers.
+ */
+function associate(semantic: CompositionDocument, pointer: string, path: EditorPath, own: readonly StoredNode[],
+  locate: (pointer: string) => EditorPath[], changes: Pick<CanvasRebase, 'deleted' | 'refuse'>, nodes: () => readonly AuthoredNode[]): Associated {
+  const anchor = anchorAt(semantic, path, nodes, changes.refuse), base = fieldPointer(path);
+  const graph = lift(valueAt(semantic, path) as Json, { anchor, context: { document: semantic as unknown as Json, pointer: base } }).graph;
+  const carried = new Map<string, LayoutNode>(), associations: { old: string; node: string }[] = [];
+  for (const old of own) {
+    const origins = new Set(old.origins.flatMap(origin => locate(`${pointer}${origin}`))
+      .map(fieldPointer).filter(at => at === base || at.startsWith(`${base}/`)).map(at => at.slice(base.length)));
+    const matches = graph.nodes.filter(node => node.origins.every(origin => origins.has(origin)));
+    if (!matches.length && !old.origins.every(origin => changes.deleted(`${pointer}${origin}`))) changes.refuse();
+    for (const node of matches) {
+      const previous = carried.get(node.id);
+      if (previous && (previous.x !== old.x || previous.y !== old.y)) changes.refuse();
+      carried.set(node.id, { id: node.id, origins: node.origins, x: old.x, y: old.y });
+      associations.push({ old: old.id, node: node.id });
+    }
+  }
+  return { anchor, nodes: [...carried.values()], associations };
+}
+
+const rootPointer = (document: CompositionDocument, root: StoredRoot) =>
+  root.anchor.kind === 'document' && root.anchor.field === '' ? '' : resolveLogicAnchor(document, root.anchor)?.pointer;
+
+/**
+ * Roots that a full rebase of this unedited document would not give back exactly as stored: an association it cannot
+ * carry, a lifted ID or anchor it would rewrite, or a canvas it would re-normalize. Such roots must be rebased by every
+ * edit; any other root may be kept as stored while nothing it reads changes. `only` limits the check to those roots (and
+ * every root of a canvas that needs re-normalizing).
+ */
+export function uncertifiedCanvasRoots(document: CompositionDocument, stored: StoredStudioCanvasMetadata, only?: ReadonlySet<string>): Set<string> {
+  const { studioCanvas: _layout, ...rest } = document, semantic = rest as CompositionDocument;
+  let authored: AuthoredNode[] | undefined;
+  const nodes = () => authored ??= authoredNodes(semantic);
+  const failed = new Set<string>(), unproven = (): never => { throw failed; };
+  const identity = (pointer: string) => valueAt(semantic, pointerPath(pointer)) === undefined ? [] : [pointerPath(pointer)];
+  for (const canvas of stored.canvases) {
+    if (only && !canvas.roots.some(root => only.has(root.id))) continue;
+    const byRoot = nodesByRoot(canvas.nodes);
+    if (!normalCanvas(canvas, byRoot)) { for (const root of canvas.roots) failed.add(root.id); continue; }
+    for (const root of canvas.roots) {
+      if (only && !only.has(root.id)) continue;
+      const own = byRoot.get(root.id) ?? [], pointer = rootPointer(semantic, root);
+      try {
+        if (pointer === undefined) unproven();
+        const result = associate(semantic, pointer!, pointerPath(pointer!), own, identity, { deleted: () => false, refuse: unproven }, nodes);
+        if (!sameJson({ anchor: result.anchor, nodes: result.nodes }, { anchor: root.anchor, nodes: asInput(own) })) failed.add(root.id);
+      } catch {
+        failed.add(root.id);
+      }
+    }
+  }
+  return failed;
+}
+
+interface Rebased {
+  readonly canvas: StoredCanvas;
+  readonly byRoot: ReadonlyMap<string, readonly StoredNode[]>;
+  readonly roots: CanvasLayoutInput['roots'][number][];
+  readonly associations: { old: string; root: number; node: string }[];
+  /** The stored root behind each entry of `roots` that was kept rather than rebased. */
+  readonly kept: (StoredRoot | undefined)[];
+}
+
 export function rebaseCanvasLayout(before: CompositionDocument, after: CompositionDocument, locate: (pointer: string) => EditorPath[],
   changes: CanvasRebase,
 ): CompositionDocument {
   if (!before.studioCanvas || !sameJson(before.studioCanvas, after.studioCanvas) || !(changes.usable ?? readStudioCanvas(before).metadata)) return after;
   const stored = changes.stored ?? studioCanvasMetadataSchema.parse(before.studioCanvas);
-  const { studioCanvas: _layout, ...semantic } = after;
+  const { studioCanvas: _layout, ...rest } = after, semantic = rest as CompositionDocument;
+  let authored: AuthoredNode[] | undefined;
+  const nodes = () => authored ??= authoredNodes(semantic);
   let changed = false;
-  const rebased = stored.canvases.map(canvas => {
-    const associations: { old: string; root: number; node: string }[] = [];
-    const roots: CanvasLayoutInput['roots'][number][] = [];
-    /** The stored root behind each entry of `roots` that the edit did not reach. */
-    const kept: (StoredStudioCanvasMetadata['canvases'][number]['roots'][number] | undefined)[] = [];
-    if (!canvas.roots.length || canvas.groups?.some(group => new Set(group.nodeIds).size !== group.nodeIds.length)) changed = true;
+  const rebased = stored.canvases.map((canvas): Rebased => {
+    const byRoot = nodesByRoot(canvas.nodes);
+    const associations: Rebased['associations'] = [], roots: Rebased['roots'] = [], kept: Rebased['kept'] = [];
+    if (!normalCanvas(canvas, byRoot)) changed = true;
     for (const root of canvas.roots) {
-      const own = canvas.nodes.filter(node => node.rootId === root.id);
+      const own = byRoot.get(root.id) ?? [];
       if (changes.affected && !changes.affected.has(root.id)) {
         for (const node of own) associations.push({ old: node.id, root: roots.length, node: node.nodeId });
-        roots.push({ anchor: root.anchor, nodes: own.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })) });
-        kept.push(root);
+        roots.push({ anchor: root.anchor, nodes: asInput(own) }); kept.push(root);
         continue;
       }
-      const pointer = root.anchor.kind === 'document' && root.anchor.field === '' ? '' : resolveLogicAnchor(before, root.anchor)?.pointer;
+      const pointer = rootPointer(before, root);
       if (pointer === undefined) { changed = true; continue; }
       if (changes.discard?.some(path => pointer === fieldPointer(path) || pointer.startsWith(`${fieldPointer(path)}/`))) { changed = true; continue; }
       const destinations = changes.fields?.get(pointer)?.map(pointerPath) ?? locate(pointer);
       if (!destinations.length && !changes.deleted(pointer)) changes.refuse();
       if (destinations.length !== 1) changed = true;
       for (const path of destinations) {
-        const anchor = fieldAnchor(semantic, path), base = fieldPointer(path);
-        const graph = lift(valueAt(semantic, path) as Json, { anchor, context: { document: semantic as unknown as Json, pointer: base } }).graph;
-        const nodes = new Map<string, CanvasLayoutInput['roots'][number]['nodes'][number]>();
-        for (const old of own) {
-          const origins = new Set(old.origins.flatMap(origin => locate(`${pointer}${origin}`))
-            .map(fieldPointer).filter(at => at === base || at.startsWith(`${base}/`)).map(at => at.slice(base.length)));
-          const matches = graph.nodes.filter(node => node.origins.every(origin => origins.has(origin)));
-          if (!matches.length && !old.origins.every(origin => changes.deleted(`${pointer}${origin}`))) changes.refuse();
-          for (const node of matches) {
-            const previous = nodes.get(node.id);
-            if (previous && (previous.x !== old.x || previous.y !== old.y)) changes.refuse();
-            nodes.set(node.id, { id: node.id, origins: node.origins, x: old.x, y: old.y });
-            associations.push({ old: old.id, root: roots.length, node: node.id });
-          }
-        }
-        const next = { anchor, nodes: [...nodes.values()] };
-        if (!sameJson(next, { anchor: root.anchor, nodes: own.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })) })) changed = true;
+        const result = associate(semantic, pointer, path, own, locate, changes, nodes);
+        for (const association of result.associations) associations.push({ ...association, root: roots.length });
+        const next = { anchor: result.anchor, nodes: result.nodes };
+        if (!sameJson(next, { anchor: root.anchor, nodes: asInput(own) })) changed = true;
         roots.push(next); kept.push(undefined);
       }
     }
-    return { canvas, roots, associations, kept };
+    return { canvas, byRoot, roots, associations, kept };
   });
   // Every root kept its anchor, its place and each node association, so the stored (usable) metadata is already the encoding.
   if (!changed) return after;
@@ -80,45 +166,44 @@ export function rebaseCanvasLayout(before: CompositionDocument, after: Compositi
     if (!roots.length) return [];
     const input = { id: canvas.id, roots, ...(canvas.viewport ? { viewport: canvas.viewport } : {}) };
     const encoded = encodeStudioCanvas(after, [input]).canvases[0];
-    const groups = canvas.groups?.map(group => ({ ...group, nodeIds: [...new Set(group.nodeIds.flatMap(id => associations
-      .filter(association => association.old === id).flatMap(association => encoded.nodes
-        .filter(node => node.rootId === encoded.roots[association.root].id && node.nodeId === association.node).map(node => node.id))))] }));
-    return [{ ...input, ...(groups ? { groups } : {}) }];
+    return [{ ...input, ...groupsFor(canvas, associations, encoded.roots.map(root => root.id), nodesByRoot(encoded.nodes)) }];
   });
   const encoded = encodeStudioCanvas(after, canvases, stored.bundles);
   return sameJson(stored, encoded) ? after : { ...after, studioCanvas: encoded };
 }
 
+/** Each group's members, carried through the root associations to their encoded node IDs. */
+function groupsFor(canvas: StoredCanvas, associations: Rebased['associations'], rootIds: readonly string[],
+  byRoot: ReadonlyMap<string, readonly StoredNode[]>): { groups?: StoredCanvas['groups'] } {
+  if (!canvas.groups) return {};
+  return { groups: canvas.groups.map(group => ({ ...group, nodeIds: [...new Set(group.nodeIds.flatMap(id => associations
+    .filter(association => association.old === id).flatMap(association => (byRoot.get(rootIds[association.root]) ?? [])
+      .filter(node => node.nodeId === association.node).map(node => node.id))))] })) };
+}
+
 /**
- * The encoding `encodeStudioCanvas` would give, built without re-resolving roots the edit did not reach: those are stored
- * entries of usable metadata whose reads are unchanged. Rebased roots are encoded (and so checked) on their own, then the
- * cross-root rules (unique root IDs, groups over existing nodes) are checked over the whole result.
+ * The encoding `encodeStudioCanvas` would give, built without re-resolving the kept roots: those are certified, unchanged
+ * entries of usable metadata. Rebased roots are encoded (and so checked) on their own, then the cross-root rules (unique
+ * root IDs, groups over existing nodes) are checked over the whole result.
  */
-function spliceCanvasLayout(after: CompositionDocument, stored: StoredStudioCanvasMetadata, rebased: readonly {
-  canvas: StoredStudioCanvasMetadata['canvases'][number];
-  roots: readonly CanvasLayoutInput['roots'][number][];
-  associations: readonly { old: string; root: number; node: string }[];
-  kept: readonly (StoredStudioCanvasMetadata['canvases'][number]['roots'][number] | undefined)[];
-}[]): CompositionDocument {
+function spliceCanvasLayout(after: CompositionDocument, stored: StoredStudioCanvasMetadata, rebased: readonly Rebased[]): CompositionDocument {
   const invalid = () => new CompositionValidationError([{ code: 'invalid_value', pointer: '/studioCanvas' }]);
   const rootIds = new Set<string>();
-  const canvases = rebased.flatMap(({ canvas, roots, associations, kept }) => {
+  const canvases = rebased.flatMap(({ canvas, byRoot, roots, associations, kept }) => {
     if (!roots.length) return [];
     const fresh = roots.filter((_, index) => !kept[index]);
     const encoded = fresh.length ? encodeStudioCanvas(after, [{ id: canvas.id, roots: fresh }]).canvases[0] : undefined;
+    const freshNodes = nodesByRoot(encoded?.nodes ?? []);
     let next = 0;
     const merged = roots.map((_, index) => {
       const root = kept[index] ?? encoded!.roots[next++];
-      const nodes = kept[index] ? canvas.nodes.filter(node => node.rootId === root.id) : encoded!.nodes.filter(node => node.rootId === root.id);
       if (rootIds.has(root.id)) throw invalid();
       rootIds.add(root.id);
-      return { root, nodes };
+      return { root, nodes: (kept[index] ? byRoot : freshNodes).get(root.id) ?? [] };
     });
-    const nodes = merged.flatMap(entry => entry.nodes);
-    const groups = canvas.groups?.map(group => ({ ...group, nodeIds: [...new Set(group.nodeIds.flatMap(id => associations
-      .filter(association => association.old === id).flatMap(association => nodes
-        .filter(node => node.rootId === merged[association.root].root.id && node.nodeId === association.node).map(node => node.id))))] }));
-    return [{ id: canvas.id, roots: merged.map(entry => entry.root), nodes, ...(canvas.viewport ? { viewport: canvas.viewport } : {}), ...(groups ? { groups } : {}) }];
+    const ids = merged.map(entry => entry.root.id), mergedNodes = new Map(merged.map(entry => [entry.root.id, entry.nodes]));
+    return [{ id: canvas.id, roots: merged.map(entry => entry.root), nodes: merged.flatMap(entry => entry.nodes),
+      ...(canvas.viewport ? { viewport: canvas.viewport } : {}), ...groupsFor(canvas, associations, ids, mergedNodes) }];
   });
   const encoded: StoredStudioCanvasMetadata = { version: 2, canvases, ...(stored.bundles ? { bundles: stored.bundles } : {}) };
   return sameJson(stored, encoded) ? after : { ...after, studioCanvas: encoded };

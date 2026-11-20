@@ -92,21 +92,41 @@ export class EditDependencies {
 /**
  * Visit every pointer where `after` differs from `before` by identity. Unchanged immutable branches are proofs, not a
  * classification of "simple" fields: anything rebuilt is visited, even when it looks equal.
+ *
+ * `placed` sees every object `after` holds at a position where `before` held something else (or nothing), including
+ * everything inside newly introduced subtrees, so an object that now appears in a second place is noticed. It returns
+ * true when that object's own registration already covers everything below it, which ends the scan there. Positions
+ * `before` and `after` share by identity are never walked.
  */
-export function changedPaths(before: unknown, after: unknown, visit: (pointer: string) => void, path: (string | number)[] = []): void {
-  if (before === after) return;
-  if (before === null || after === null || typeof before !== 'object' || typeof after !== 'object'
-    || Array.isArray(before) !== Array.isArray(after) || Array.isArray(before) && Array.isArray(after) && before.length !== after.length) {
-    visit(fieldPointer(path)); return;
-  }
-  let retained = true;
-  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    if (Object.hasOwn(before, key) !== Object.hasOwn(after, key)) { retained = false; visit(fieldPointer([...path, key])); }
-    else if (Reflect.get(before, key) !== Reflect.get(after, key)) {
-      retained = false;
-      changedPaths(Reflect.get(before, key), Reflect.get(after, key), visit, [...path, key]);
+export function changedPaths(before: unknown, after: unknown, visit: (pointer: string) => void, placed: (value: object) => boolean = () => false): void {
+  const scan = (value: unknown): void => {
+    if (value === null || typeof value !== 'object' || placed(value)) return;
+    for (const child of Object.values(value)) scan(child);
+  };
+  const walk = (before: unknown, after: unknown, path: (string | number)[]): void => {
+    if (before === after) return;
+    if (before === null || after === null || typeof before !== 'object' || typeof after !== 'object' || Array.isArray(before) !== Array.isArray(after)) {
+      visit(fieldPointer(path)); scan(after); return;
     }
-  }
-  // Equal-looking rebuilt containers still need provenance; equality cannot certify their identity.
-  if (retained) visit(fieldPointer(path));
+    if (Array.isArray(before) && Array.isArray(after) && before.length !== after.length) {
+      visit(fieldPointer(path));
+      // Items still at their own index are not newly placed; every other item is.
+      if (!placed(after)) after.forEach((item, at) => { if (item !== before[at]) scan(item); });
+      return;
+    }
+    placed(after);
+    let retained = true;
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (Object.hasOwn(before, key) !== Object.hasOwn(after, key)) {
+        retained = false; visit(fieldPointer([...path, key]));
+        if (Object.hasOwn(after, key)) scan(Reflect.get(after, key));
+      } else if (Reflect.get(before, key) !== Reflect.get(after, key)) {
+        retained = false;
+        walk(Reflect.get(before, key), Reflect.get(after, key), [...path, key]);
+      }
+    }
+    // Equal-looking rebuilt containers still need provenance; equality cannot certify their identity.
+    if (retained) visit(fieldPointer(path));
+  };
+  walk(before, after, []);
 }

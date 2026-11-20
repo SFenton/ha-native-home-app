@@ -14,7 +14,7 @@ import { RowsProvider } from '../../../src/workspace2/rowsContext';
 import { request } from '../../../src/api';
 import { useCompositionStudio } from '../../../src/useCompositionStudio';
 import { liftField } from '../../../src/workspace2/logic-fields/registry';
-import { rebaseCanvasLayout, saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
+import { rebaseCanvasLayout, saveCanvasLayout, uncertifiedCanvasRoots } from '../../../src/workspace2/logic-fields/layout';
 import { projectGraph } from '../../../src/shared/composition/graph/lower';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../../src/workspace2/logic-fields/registry';
@@ -1278,20 +1278,233 @@ it('after index reuse, an undeclared rebuild of a canvas-rooted slot is refused 
   notice.mockRestore();
 });
 
-it('splicing the reached canvas roots gives the same metadata as re-encoding every root', () => {
+const storedNodes = (document: CompositionDocument, canvas = 0) => studioCanvasMetadataSchema.parse(document.studioCanvas).canvases[canvas].nodes;
+/** Point stored canvas node `at` of `canvas` at a node ID the lift no longer produces, keeping group references consistent. */
+function staleAssociation(document: CompositionDocument, canvasIndex: number, at: number, nodeId = 'stale-node-id') {
+  const layout = studioCanvasMetadataSchema.parse(document.studioCanvas), canvas = layout.canvases[canvasIndex], node = canvas.nodes[at];
+  const id = JSON.stringify([node.rootId, nodeId]);
+  canvas.nodes[at] = { ...node, nodeId, id };
+  if (canvas.groups) canvas.groups = canvas.groups.map(group => ({ ...group, nodeIds: group.nodeIds.map(member => member === node.id ? id : member) }));
+  const result = { ...document, studioCanvas: layout };
+  expect(readStudioCanvas(result).warnings).toEqual([]);
+  return { document: result, original: node };
+}
+
+it('splicing the reached canvas roots gives the same metadata as re-encoding every root, including stale stored associations elsewhere', () => {
   const fixture = meaningFixture('page tile');
-  const before = withMeaningCanvas(fixture.document, fixture.slot);
+  // The unreached root (tile-b, canvas 1) stores an association its lift no longer produces; full re-encoding corrects it.
+  const { document: before, original } = staleAssociation(withMeaningCanvas(fixture.document, fixture.slot), 1, 0);
   const stored = studioCanvasMetadataSchema.parse(before.studioCanvas);
   const root = stored.canvases.flatMap(canvas => canvas.roots).find(root => resolveLogicAnchor(before, root.anchor)!.pointer === fieldPointer(fixture.slot))!;
+  const stale = stored.canvases[1].roots[0].id;
+  expect(uncertifiedCanvasRoots(before, stored)).toEqual(new Set([stale]));
   const after = replaceAt(before, [...fixture.slot, 'fallback'], 'Changes the lifted node IDs');
   const locate = (pointer: string) => valueAt(after, pointerPath(pointer)) === undefined ? [] : [pointerPath(pointer)];
   const changes = { deleted: () => false, refuse: (): never => { throw new Error('refused'); } };
   const whole = rebaseCanvasLayout(before, after, locate, changes);
-  const spliced = rebaseCanvasLayout(before, after, locate, { ...changes, affected: new Set([root.id]), stored, usable: true });
+  expect(storedNodes(whole, 1)[0].nodeId).toBe(original.nodeId);
+  // The caller's scope is the reached root plus every root certification did not pass.
+  const spliced = rebaseCanvasLayout(before, after, locate, { ...changes, affected: new Set([root.id, ...uncertifiedCanvasRoots(before, stored)]), stored, usable: true });
   expect(whole.studioCanvas).not.toEqual(before.studioCanvas);
   expect(sameJson(spliced.studioCanvas, whole.studioCanvas)).toBe(true);
   expect(readStudioCanvas(spliced).warnings).toEqual([]);
+  // The editing boundary scopes the same way on its own, for a declared and an undeclared-but-retained edit.
+  const pointer = fieldPointer(fixture.slot);
+  const declared = documentEdit(before, after, { fields: new Map([[pointer, [pointer]]]) });
+  expect(sameJson(declared.studioCanvas, whole.studioCanvas)).toBe(true);
+  const rename = documentEdit(before, { ...before, name: 'Unrelated rename' });
+  expect(rename).not.toBe(before);
+  expect(storedNodes(rename, 1)[0].nodeId).toBe(original.nodeId);
+  expect(sameJson(rename.studioCanvas, rebaseCanvasLayout(before, { ...before, name: 'Unrelated rename' }, locate, changes).studioCanvas)).toBe(true);
 });
+
+describe('retention evidence outside the watched paths, committed-only caches and canvas certification', () => {
+  const root: EditorPath = ['pages', 0, 'components', 0], slot: EditorPath = [...root, 'props', 'subtitle'];
+  const automatic = (): CompositionDocument => {
+    const document = compileCompositionDocument(draftDocument()).document;
+    return { ...document, logicUseBindings: document.logicUseBindings!.slice(0, 1) };
+  };
+  const lifted = (document: CompositionDocument, path: EditorPath, y = 200) => {
+    const graph = liftField(document, path, 'slot').graph;
+    return { anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: 100 * at, y })) };
+  };
+  const withCanvas = (document: CompositionDocument, paths: EditorPath[] = [slot]): CompositionDocument => ({ ...document,
+    studioCanvas: encodeStudioCanvas(document, paths.map((path, index) => ({ id: `canvas-${index}`, roots: [lifted(document, path)] }))) });
+  /** Both a fresh revision (the first edit builds its index) and one whose index an earlier edit already built. */
+  const revisions = (document: CompositionDocument) => {
+    const primed = documentEdit(document, { ...document, name: 'Prime cached dependencies' });
+    expect(primed).not.toBe(document);
+    return [document, primed];
+  };
+  /** `proposed` is valid unless `invalid` says the refusal under test is of an invalid candidate. */
+  const refuses = (before: CompositionDocument, proposed: CompositionDocument, invalid = false) => {
+    if (!invalid) compileCompositionDocument(proposed);
+    const notice = vi.spyOn(toastManager, 'add');
+    try {
+      expect(documentEdit(before, proposed)).toBe(before);
+      expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    } finally { notice.mockRestore(); }
+  };
+
+  it('refuses rebuilding a bound use\'s holder while the same use object is placed in another field', () => {
+    for (const before of revisions(automatic())) {
+      const held = valueAt(before, [...slot, 'value']);
+      let proposed = replaceAt(before, [...slot, 'fallback'], 'Rebuild original holder');
+      proposed = replaceAt(proposed, ['pages', 0, 'components', 1, 'props', 'subtitle', 'value'], held);
+      refuses(before, proposed);
+    }
+  });
+
+  it('refuses rebuilding a canvas root\'s ancestors while the same root object is placed in another field', () => {
+    for (const before of revisions(withCanvas({ ...automatic(), logicUseBindings: [] }))) {
+      const held = valueAt(before, slot);
+      let proposed = replaceAt(before, [...root, 'props', 'titleProviderId'], 'source-b');
+      proposed = replaceAt(proposed, ['pages', 0, 'components', 1, 'props', 'subtitle'], held);
+      refuses(before, proposed);
+    }
+  });
+
+  it('refuses rebuilding a component parameter target\'s ancestors while the same target object is placed elsewhere', () => {
+    let document = compileCompositionDocument(componentDocument()).document;
+    document = { ...document, logicUseBindings: [], componentLibrary: document.componentLibrary!.map(entry => ({
+      ...entry, bindings: [{ param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }],
+    })) };
+    compileCompositionDocument(document);
+    for (const before of revisions(document)) {
+      const held = valueAt(before, ['componentLibrary', 0, 'node', 'props']);
+      let proposed = replaceAt(before, ['componentLibrary', 0, 'node', 'title'], 'Rebuild original ancestors');
+      proposed = replaceAt(proposed, ['pages', 0, 'components'], [...before.pages[0].components, { ...tile('alias', 'source-a'), props: held }]);
+      refuses(before, proposed);
+    }
+  });
+
+  it('does not let objects cached from a refused candidate prove retention when the same candidate is retried', () => {
+    const before = compileCompositionDocument(draftDocument()).document, snapshot = JSON.stringify(before);
+    const proposed = replaceAt(before, ['pages', 0, 'components', 1, 'props', 'subtitle', 'value'], text('First attempt removes a bound use'));
+    refuses(before, proposed, true);
+    // The rejected candidate is the caller's to change; only committed revisions are cached.
+    proposed.pages[0].components[0] = structuredClone(before.pages[0].components[0]);
+    proposed.pages[0].components[1] = before.pages[0].components[1];
+    proposed.name = 'Retry with an undeclared cloned use';
+    expect(JSON.stringify(before)).toBe(snapshot);
+    refuses(before, proposed);
+  });
+
+  it('refuses an unrelated rename when a stored canvas association cannot be reconciled, as full re-encoding does', () => {
+    let document = withCanvas({ ...automatic(), logicUseBindings: [] });
+    document = replaceAt(document, [...slot, 'fallback'], 'Existing scalar, not a graph node');
+    document = replaceAt(document, ['studioCanvas', 'canvases', 0, 'nodes', 0, 'origins'], ['/fallback']);
+    compileCompositionDocument(document);
+    expect(readStudioCanvas(document).warnings).toEqual([]);
+    const stored = studioCanvasMetadataSchema.parse(document.studioCanvas);
+    expect(uncertifiedCanvasRoots(document, stored)).toEqual(new Set([stored.canvases[0].roots[0].id]));
+    refuses(document, { ...document, name: 'Unrelated rename' });
+  });
+
+  it('re-encodes a stored association with a stale lifted ID on an unrelated rename', () => {
+    const { document: before, original } = staleAssociation(withCanvas({ ...automatic(), logicUseBindings: [] }), 0, 0);
+    compileCompositionDocument(before);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = documentEdit(before, { ...before, name: `Unrelated rename ${attempt}` });
+      expect(result).not.toBe(before);
+      expect(result.name).toBe(`Unrelated rename ${attempt}`);
+      expect(storedNodes(result)[0].nodeId).toBe(original.nodeId);
+      expect(storedNodes(result)[0].id).toBe(original.id);
+      expect(readStudioCanvas(result).warnings).toEqual([]);
+    }
+  });
+
+  it('re-encodes a stale association in an unreached root of a shared canvas frame', () => {
+    const document = { ...automatic(), logicUseBindings: [] };
+    const paths = [slot, ['pages', 0, 'components', 1, 'props', 'subtitle']];
+    const framed = { ...document, studioCanvas: encodeStudioCanvas(document, [{ id: 'shared-frame', roots: paths.map(path => lifted(document, path, 0)) }]) };
+    const nodes = framed.studioCanvas.canvases[0].nodes;
+    const at = nodes.findIndex(node => node.rootId === framed.studioCanvas.canvases[0].roots[1].id);
+    const { document: before, original } = staleAssociation(framed, 0, at, 'stale');
+    const proposed = replaceAt(before, [...slot, 'fallback'], 'Changed reached root');
+    const pointer = fieldPointer(slot);
+    const result = documentEdit(before, proposed, { fields: new Map([[pointer, [pointer]]]) });
+    expect(result).not.toBe(before);
+    expect(storedNodes(result).some(node => node.nodeId === 'stale')).toBe(false);
+    expect(storedNodes(result).find(node => node.id === original.id)).toMatchObject({ nodeId: original.nodeId, x: original.x, y: original.y });
+    expect(readStudioCanvas(result).warnings).toEqual([]);
+  });
+
+  it('refuses, rather than throws, when an edit leaves a logic field without an unambiguous owner', () => {
+    const { document } = meaningFixture('page tile');
+    for (const before of revisions(document)) {
+      const owner = before.pages[0].components[0].id;
+      const duplicate = before.pages[0].components.findIndex((node, at) => at > 0 && node.id !== owner);
+      const proposed = replaceAt(before, ['pages', 0, 'components', duplicate, 'id'], owner);
+      const notice = vi.spyOn(toastManager, 'add');
+      try {
+        expect(documentEdit(before, proposed)).toBe(before);
+        expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+      } finally { notice.mockRestore(); }
+    }
+  });
+
+  it('visits each stored node of a shared canvas frame a bounded number of times when one root is reached', () => {
+    const count = 20;
+    let document: CompositionDocument = { ...automatic(), logicUseBindings: [] };
+    document = replaceAt(document, ['pages', 0, 'components'], Array.from({ length: count }, (_, at) => tile(`frame-${at}`, 'source-a')));
+    const roots = document.pages[0].components.map((_, at) => lifted(document, ['pages', 0, 'components', at, 'props', 'subtitle'], 0));
+    const before = { ...document, studioCanvas: encodeStudioCanvas(document, [{ id: 'shared-frame', roots }]) };
+    const original = before.studioCanvas.canvases[0].nodes;
+    let visits = 0;
+    const counted = <T,>(items: T[]): T[] => new Proxy(items, { get(target, key, receiver) {
+      if (typeof key === 'string' && /^\d+$/.test(key)) visits++;
+      if (key === 'filter' || key === 'forEach' || key === 'map' || key === 'some' || key === 'every' || key === 'find' || key === 'findIndex') {
+        return (callback: (item: T, index: number, list: readonly T[]) => unknown) => (Reflect.get(target, key) as (callback: unknown) => unknown).call(target, (item: T, index: number, list: readonly T[]) => { visits++; return callback(item, index, list); });
+      }
+      if (key === Symbol.iterator) return function* () { for (const item of target) { visits++; yield item; } };
+      return Reflect.get(target, key, receiver);
+    } });
+    const stored = { ...before.studioCanvas, canvases: [{ ...before.studioCanvas.canvases[0], nodes: counted(original) }] };
+    const after = replaceAt(before, [...slot, 'fallback'], 'One root changed');
+    const locate = (pointer: string) => valueAt(after, pointerPath(pointer)) === undefined ? [] : [pointerPath(pointer)];
+    const changes = { deleted: () => false, refuse: (): never => { throw new Error('refused'); } };
+    const result = rebaseCanvasLayout(before, after, locate, { ...changes, stored, usable: true, affected: new Set([stored.canvases[0].roots[0].id]) });
+    expect(sameJson(result.studioCanvas, rebaseCanvasLayout(before, after, locate, changes).studioCanvas)).toBe(true);
+    // Partitioned once per canvas: a small constant per stored node, not one pass per root.
+    expect(visits).toBeLessThanOrEqual(4 * original.length);
+  });
+});
+
+it.each([3, 18, 66, 256])('gates per-edit overhead with %i canvas roots sharing one frame', count => {
+  let document: CompositionDocument = compileCompositionDocument(draftDocument()).document;
+  document = { ...document, logicUseBindings: [] };
+  // Pages hold at most 64 components, so larger frames gather roots from several pages.
+  const pages = Array.from({ length: Math.ceil(count / 64) }, (_, page) => ({ ...document.pages[0], ...page ? { id: `frame-page-${page}`, title: `Frame page ${page}` } : {},
+    components: Array.from({ length: Math.min(64, count - page * 64) }, (_, at) => tile(`frame-${page * 64 + at}`, 'source-a')) }));
+  document = { ...document, pages: [...pages, ...document.pages.slice(1)] } as CompositionDocument;
+  const roots = pages.flatMap((page, pageIndex) => page.components.map((_, at) => {
+    const graph = liftField(document, ['pages', pageIndex, 'components', at, 'props', 'subtitle'], 'slot').graph;
+    return { anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, index) => ({ id: node.id, origins: node.origins, x: index * 100, y: (pageIndex * 64 + at) * 120 })) };
+  }));
+  let before: CompositionDocument = { ...document, studioCanvas: encodeStudioCanvas(document, [{ id: 'shared-frame', roots }]) };
+  valid(before);
+  const subtitle: EditorPath = ['pages', 0, 'components', 0, 'props', 'subtitle'];
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  for (const edit of ['rename', 'bound text', 'first edit of an unindexed revision'] as const) {
+    const samples: number[] = [];
+    for (let index = -10; index < 31; index++) {
+      const from = edit === 'first edit of an unindexed revision' ? { ...before, name: `Unindexed ${index}` } : before;
+      const start = performance.now();
+      const result = edit === 'bound text' ? rebuildField(from, [...subtitle, 'fallback'], `Typed ${index}`) : documentEdit(from, { ...from, name: `Edited ${index}` });
+      const elapsed = performance.now() - start;
+      expect(result).not.toBe(from);
+      if (edit === 'bound text') expect(valueAt(result, [...subtitle, 'fallback'])).toBe(`Typed ${index}`);
+      else expect(result.studioCanvas).toBe(from.studioCanvas);
+      if (edit !== 'first edit of an unindexed revision') before = result;
+      if (index >= 0) samples.push(elapsed);
+    }
+    const gate = count === 256 || edit === 'first edit of an unindexed revision' ? undefined : 8;
+    process.stdout.write(`Shared-frame edit overhead: ${count} roots in one canvas; ${edit}; boundary median ${median(samples).toFixed(4)} ms; ${gate === undefined ? 'report-only' : `<=${gate}ms gate`}.\n`);
+    if (gate !== undefined) expect(median(samples)).toBeLessThanOrEqual(gate);
+  }
+  valid(before); expect(readStudioCanvas(before).warnings).toEqual([]);
+}, 60_000);
 
 it('reuses dependency indexes across unbound typing and validates only the affected binding on a source edit', () => {
   const fixture = meaningFixture('page tile');

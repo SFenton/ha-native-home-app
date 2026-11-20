@@ -36,8 +36,9 @@ const escape = (part: string | number) => String(part).replace(/~/g, '~0').repla
 export const fieldPointer = (path: EditorPath): string => path.length ? `/${path.map(escape).join('/')}` : '';
 export const pointerPath = (pointer: string): EditorPath => pointer === '' ? [] : pointer.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
 const ownerKinds = { pages: 'page', modals: 'modal', componentLibrary: 'component', logicLibrary: 'logic', dataSources: 'flow' } as const;
-export function authoredNodes(document: CompositionDocument) {
-  const nodes: { node: CompositionNode; path: EditorPath; identity: string }[] = [];
+export type AuthoredNode = { node: CompositionNode; path: EditorPath; identity: string };
+export function authoredNodes(document: CompositionDocument): AuthoredNode[] {
+  const nodes: AuthoredNode[] = [];
   const visit = (node: CompositionNode, path: EditorPath, scope: string) => {
     nodes.push({ node, path, identity: JSON.stringify([scope, node.id]) });
     for (const list of childLists(node)) list.nodes.forEach((child, index) => visit(child, [...path, ...list.path, index], scope));
@@ -48,14 +49,15 @@ export function authoredNodes(document: CompositionDocument) {
   document.componentLibrary?.forEach((entry, index) => visit(entry.node, ['componentLibrary', index, 'node'], `component:${entry.id}`));
   return nodes;
 }
-export function fieldAnchor(document: CompositionDocument, path: EditorPath): LogicAnchor {
+/** `nodes` may pass `authoredNodes(document)` already computed for this same document, to share one walk across calls. */
+export function fieldAnchor(document: CompositionDocument, path: EditorPath, nodes?: readonly AuthoredNode[]): LogicAnchor {
   const collection = path[0], index = path[1];
   if (typeof collection === 'string' && Object.hasOwn(ownerKinds, collection) && index !== undefined) {
     const owner = valueAt(document, path.slice(0, 2)) as { id?: string } | undefined;
     if (!owner?.id) throw new Error('The logic owner no longer exists.');
     const kind = ownerKinds[collection as keyof typeof ownerKinds];
     let nodeId: string | undefined, depth = 2;
-    if (kind === 'page' || kind === 'modal' || kind === 'component') for (const location of authoredNodes(document)) {
+    if (kind === 'page' || kind === 'modal' || kind === 'component') for (const location of nodes ?? authoredNodes(document)) {
       if (location.path.length <= path.length && location.path.length > depth
         && location.path.every((part, index) => String(part) === String(path[index]))) {
         nodeId = location.node.id; depth = location.path.length;
