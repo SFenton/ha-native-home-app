@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { closePagesList, isPhone, openPagesList, openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
+import { closePagesList, isPhone, openChecksFromBar, openPagesList, openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
 
 /**
  * The Partly Folded rows (`sh.fold-sides@1`, `studio-duo-sim` L3): the page's Two Sides / One Column switch, a section's own side, the dimmed row of a nested
@@ -120,6 +120,11 @@ test('the app lists the id: the rows do not say it waits for an app update, and 
   await expect.poll(async () => home(await draft(request)).layout.foldSides).toBe('auto');
   // On a phone the properties are a sheet over the page: it closes first, and Checks is Project's first row.
   if (isPhone(page)) { await page.keyboard.press('Escape'); await expect(page.getByLabel('Properties')).toHaveCount(0); }
+  // Checks carries no pending warning (the desk's status tag opens it only for a problem; a suggestion is reached through the Checks pill).
+  if (isPhone(page)) await openChecksFromBar(page); else await page.getByTestId('checks-pill').click();
+  await expect(page.getByText(/Partly Folded, which the app does not have yet/)).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  if (isPhone(page)) { await page.keyboard.press('Escape'); await expect(page.locator('.w2-project-sheet')).toHaveCount(0); }
   // Publish does not repeat a pending warning in its dialog.
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.locator('[data-pending-warning]')).toHaveCount(0);

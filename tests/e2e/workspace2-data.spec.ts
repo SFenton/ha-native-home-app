@@ -145,7 +145,7 @@ test.describe('the flow editor', () => {
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(props.getByRole('button', { name: /^Step 3, Count/ })).toBeVisible();
   });
-  test('Average is selectable and says it needs a newer app', async ({ page }) => {
+  test('Average is selectable and carries no newer-app warning', async ({ page }) => {
     const panel = await openData(page);
     await panel.getByRole('button', { name: /^Overdue Chores/ }).click();
     const props = page.getByLabel('Properties');
