@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Plus } from 'lucide-react';
-import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
+import { valueAt, type EditorPath } from '../../composition-editor';
 import type { Operand } from '../../shared/composition/expression';
 import { useNarrow, usePush } from '../kit';
 import { useDraftDocument, type Draft } from '../editors/draft';
@@ -15,6 +15,7 @@ import { MAX_TOKENS, newToken, operandSlot, parseLine, slotOperand, tokenCount, 
 import { useNameContext } from './useExpr';
 import { words } from './words';
 import type { CompositionDocument } from '../../shared/composition/schema';
+import { rebuildField } from '../editors/provenance';
 
 /** Where a line lives: a text slot (`literal`, `read` or `expr`) or a bare operand (a rule's Then). */
 export interface LineAddress { path: EditorPath; wrap: 'slot' | 'operand' }
@@ -26,7 +27,7 @@ export function lineOperand(value: unknown, wrap: LineAddress['wrap']): Operand 
 /** Writes parts to a line: one step, coalescing typing. */
 export function writeParts(draft: Draft, address: LineAddress, parts: readonly Part[], typing: boolean, base = draft.get()): void {
   const operand = writeLine(parts);
-  draft.set(replaceAt(base, address.path,
+  draft.set(rebuildField(base, address.path,
     address.wrap === 'slot' ? operandSlot(operand, valueAt(base, address.path)) : operand), typing ? `line:${address.path.join('/')}` : undefined);
 }
 

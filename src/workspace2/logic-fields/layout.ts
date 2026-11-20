@@ -75,10 +75,23 @@ export function saveCanvasLayout(document: CompositionDocument, replacements: re
       return position ? [{ id: node.id, origins: node.origins, ...position }] : [];
     }) };
   });
-  const id = canonicalOfBounded(roots.map(root => root.anchor));
-  const encoded = encodeStudioCanvas(document, [{ id, roots }]);
-  const stored = old.present ? studioCanvasMetadataSchema.parse(old.raw) : undefined;
-  const ownAnchors = new Set([...roots.map(root => canonicalOfBounded(root.anchor)), ...previous.paths.map(path => canonicalOfBounded(fieldAnchor(previous.document, path)))]);
-  const canvases = stored?.canvases.filter(canvas => !canvas.roots.some(root => ownAnchors.has(canonicalOfBounded(root.anchor)))) ?? [];
-  return { ...document, studioCanvas: { ...encoded, canvases: [...canvases, ...encoded.canvases], ...(stored?.bundles ? { bundles: stored.bundles } : {}) } };
+  const current = readStudioCanvas(document);
+  if (current.warnings.length) throw new Error("Saved layout can't be used. Local edits have been retained.");
+  const stored = current.present ? studioCanvasMetadataSchema.parse(current.raw) : undefined;
+  const placed = new Set<string>();
+  const canvases: CanvasLayoutInput[] = (stored?.canvases ?? []).map(canvas => ({
+    id: canvas.id,
+    roots: canvas.roots.map(root => {
+      const key = canonicalOfBounded(root.anchor);
+      const replacement = roots.find(candidate => canonicalOfBounded(candidate.anchor) === key);
+      if (replacement) { placed.add(key); return replacement; }
+      return { anchor: root.anchor, nodes: canvas.nodes.filter(node => node.rootId === root.id)
+        .map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })) };
+    }),
+    ...(canvas.groups ? { groups: canvas.groups } : {}),
+    ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
+  }));
+  const added = roots.filter(root => !placed.has(canonicalOfBounded(root.anchor)));
+  if (added.length) canvases.push({ id: canonicalOfBounded(added.map(root => root.anchor)), roots: added });
+  return { ...document, studioCanvas: encodeStudioCanvas(document, canvases, stored?.bundles) };
 }

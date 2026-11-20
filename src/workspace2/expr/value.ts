@@ -3,6 +3,7 @@ import type { Environment, Tri } from '../../shared/composition/evaluator';
 import { evaluatePredicate } from '../data/logic/logicEval';
 import type { Json } from '../../shared/types';
 import { isLogicOperand, operandSlot, slotOperand } from './tokens';
+import { copySubtree } from '../editors/provenance';
 
 /**
  * The value field's pure logic (spec "Files"): which mode a slot is in, what each mode seeds from the others, and the slot each mode
@@ -59,7 +60,7 @@ export function fixedOf(slot: Slot, kind: Kind): Operand | Json {
 }
 
 /** Rules, seeded the first time the mode is entered: the current value as Otherwise and one empty rule (spec "Changing mode keeps work"). */
-export const seedRules = <T,>(current: T): RulesDraft<T> => ({ cases: [{ when: undefined, then: structuredClone(current) }], otherwise: current });
+export const seedRules = <T,>(current: T): RulesDraft<T> => ({ cases: [{ when: undefined, then: copySubtree(current) }], otherwise: current });
 
 /** Why Rules cannot be stored yet, in words, or undefined: a rule with no condition, or text that mixes kinds. */
 export function rulesProblem(rules: RulesDraft<Operand | Json>, kind: Kind): string | undefined {

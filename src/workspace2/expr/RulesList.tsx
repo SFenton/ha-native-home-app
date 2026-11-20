@@ -17,6 +17,7 @@ import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
 import { words } from './words';
 import CountCases from '../data/logic/CountCases';
 import { scalarText, evaluateOperand } from '../data/logic/logicEval';
+import { copySubtree, rebuildField } from '../editors/provenance';
 
 /** What a rule's Then says in a row: a look's swatch or glyph and name, or the text with its values named. */
 export function ThenSummary({ kind, look, then, ctx }: { kind: Kind; look?: LookKind; then: Operand | Json | undefined; ctx: NameContext }) {
@@ -50,14 +51,14 @@ export default function RulesList({ draft, path, kind, look, label }: { draft: D
   const list = useRef<HTMLOListElement>(null);
   if (!rules) return null;
   const count = rules.cases.length, status = ruleStatus(rules, env, kind);
-  const write = (next: RulesDraft<Operand | Json>, typing?: string) => draft.set(replaceAt(draft.get(), path, toSlot('rules', { rules: next }, kind, valueAt(draft.get(), path)) as unknown as Json), typing);
+  const write = (next: RulesDraft<Operand | Json>, typing?: string) => draft.set(rebuildField(draft.get(), path, toSlot('rules', { rules: next }, kind, valueAt(draft.get(), path))), typing);
   const open = (index: number | 'otherwise') => push?.push({ title: index === 'otherwise' ? words.otherwise : `Rule ${index + 1}`, body: <RulePage draft={draft} path={path} kind={kind} look={look} index={index} label={label}/> });
   const move = (from: number, to: number) => {
     if (to < 0 || to >= count || to === from) return;
     write({ ...rules, cases: moveItem(rules.cases, from, to - from) });
     setSaid(`Rule ${from + 1} moved to ${to + 1} of ${count}`);
   };
-  const add = () => { write({ ...rules, cases: [...rules.cases, { when: undefined, then: structuredClone(rules.otherwise) }] }); open(count); };
+  const add = () => { write({ ...rules, cases: [...rules.cases, { when: undefined, then: copySubtree(rules.otherwise) }] }); open(count); };
   const problem = kind === 'text' ? mixedKinds(rules as RulesDraft<Operand>) : undefined;
   const used = preview === 'live' ? status.used : preview;
   // Dragging: the grip follows the pointer; the row under it is where the rule lands (a 2 px accent line shows it).

@@ -17,6 +17,7 @@ import { useRule } from './useRule';
 import { groupCount, groupSentence, groupTitle, words, type Place } from './words';
 import { LogicField } from '../logic-fields/Field';
 import { useLogicFields } from '../logic-fields/LogicFields';
+import { copySubtree } from '../editors/provenance';
 
 /** Which row is open in the builder: one at a time (D5). */
 const OpenRow = createContext<{ open: string | undefined; setOpen: (key: string | undefined) => void }>({ open: undefined, setOpen: () => {} });
@@ -66,7 +67,7 @@ function GroupView({ props, at, level }: { props: BuilderProps; at: readonly num
   const addProblem = growProblem(rule, scope, 'condition', rows, level), groupProblem = growProblem(rule, scope, 'group', rows, level);
   const own = (index: number) => (first: readonly MenuCommand[]): readonly MenuCommand[] => [
     ...first,
-    { label: words.duplicate, run: () => setItems([...group.items.slice(0, index + 1), structuredClone(group.items[index]), ...group.items.slice(index + 1)]), disabled: Boolean(addProblem) },
+    { label: words.duplicate, run: () => setItems([...group.items.slice(0, index + 1), copySubtree(group.items[index]), ...group.items.slice(index + 1)]), disabled: Boolean(addProblem) },
     { label: words.moveUp, run: () => setItems(moveItem(group.items, index, -1)), disabled: index === 0 },
     { label: words.moveDown, run: () => setItems(moveItem(group.items, index, 1)), disabled: index === rows - 1 },
     { label: words.moveIntoGroup, run: () => setItems(group.items.map((item, i) => i === index ? groupPredicate({ mode: 'all', items: [item] }) : item)), disabled: Boolean(groupProblem) },
@@ -76,7 +77,7 @@ function GroupView({ props, at, level }: { props: BuilderProps; at: readonly num
   const headerCommands: MenuCommand[] = [
     ...(rows === 1 ? [{ label: words.turnIntoSingle, run: () => root ? write(group.items[0]) : write(replaceGroupAt(rule, at.slice(0, -1), { ...parent!, items: parent!.items.map((item, i) => i === index ? group.items[0] : item) })) }] : []),
     ...(root ? [] : [
-      { label: words.duplicate, run: () => write(replaceGroupAt(rule, at.slice(0, -1), { ...parent!, items: [...parent!.items.slice(0, index + 1), structuredClone(parent!.items[index]), ...parent!.items.slice(index + 1)] })) },
+      { label: words.duplicate, run: () => write(replaceGroupAt(rule, at.slice(0, -1), { ...parent!, items: [...parent!.items.slice(0, index + 1), copySubtree(parent!.items[index]), ...parent!.items.slice(index + 1)] })) },
       { label: words.removeGroup, run: () => setGroup(undefined), danger: true, separatorBefore: true },
     ]),
   ];

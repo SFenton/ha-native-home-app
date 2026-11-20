@@ -5,12 +5,13 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
 import { compileCompositionDocument, supportedCompositionCapabilities } from '../../shared/composition/compiler';
 import { canonicalOfBounded } from '../../shared/composition/json';
-import { lift, type CanvasHost, type CanvasLens, type CanvasSnapshot, type CanvasWriteResult, type LogicGraph } from '../../shared/composition/graph';
+import { lift, projectGraph, type CanvasHost, type CanvasLens, type CanvasSnapshot, type CanvasWriteResult, type LogicGraph } from '../../shared/composition/graph';
 import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import { documentEdit } from '../editors/documentEdit';
+import { canvasReferences, type CanvasProvenance } from '../editors/provenance';
 import FlowCanvas, { arrangeCanvas, type CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import type { CanvasObservations } from '../canvas/observations';
 import { SimulationHost } from '../logic-simulation/SimulationHost';
@@ -44,6 +45,7 @@ export interface CanvasFieldRequest {
 }
 interface OpenField extends CanvasFieldRequest {
   readonly graph: LogicGraph;
+  readonly sourceMap: CanvasProvenance['sourceMap'];
   readonly returnFocus: HTMLElement | null;
 }
 interface FieldsApi { readonly suspended: boolean; open(request: CanvasFieldRequest): void }
@@ -116,13 +118,16 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
       const anchor = fieldAnchor(document, scoped.path);
       // Start the second check from the authored one, not an invented entity or a persisted placeholder.
       const working = field.combine ? replaceAt(document, field.path, { type: field.combine, of: [valueAt(document, field.path), valueAt(document, field.path)] }) : document;
-      let graph = lift(fieldAdapters[scoped.kind].read(working, scoped.path), {
+      const lifted = lift(fieldAdapters[scoped.kind].read(working, scoped.path), {
         anchor, kind: fieldAdapters[scoped.kind].destination, metadata: layout.metadata,
         context: { document: document as unknown as Json, pointer: fieldPointer(scoped.path) },
-      }).graph;
+      });
+      let graph = lifted.graph;
       if (!layout.metadata || field.combine) graph = arrangeCanvas(graph);
       setError('');
-      setOpened({ ...scoped, graph, returnFocus: globalThis.document.activeElement instanceof HTMLElement ? globalThis.document.activeElement : null });
+      const sourceMap = field.combine ? lifted.sourceMap.flatMap(location => /^\/of\/[01](?:\/|$)/.test(location.pointer)
+        ? [{ ...location, pointer: location.pointer.replace(/^\/of\/[01]/, '') }] : []) : lifted.sourceMap;
+      setOpened({ ...scoped, graph, sourceMap, returnFocus: globalThis.document.activeElement instanceof HTMLElement ? globalThis.document.activeElement : null });
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   }, []);
   const suspended = Boolean(opened) || retiring;
@@ -139,6 +144,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
   const entry = field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined;
   const nameContext = useMemo(() => entry ? { ...names, logic: { library: document.logicLibrary ?? [], settings: entry.params } } : names, [names, entry, document.logicLibrary]);
   const [working, setWorking] = useState(field.graph), [selected, setSelected] = useState<string | null>(null);
+  const workingRef = useRef(working); workingRef.current = working;
   const blockNames = useMemo(() => {
     const index = indexGraph(working);
     return Object.fromEntries(working.nodes.map(node => [node.id, graphBlockLabel(node, working, nameContext, index).name]));
@@ -150,6 +156,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
   const [lastObservation, setLastObservation] = useState<SimulationObservations>(), [conflict, setConflict] = useState(false);
   const wsRef = useRef(ws); wsRef.current = ws;
   const appliedAnchors = useRef(new Map<string, ReturnType<typeof fieldAnchor>>());
+  const appliedProvenance = useRef<CanvasProvenance>({ graph: field.graph, sourceMap: field.sourceMap });
   const snapshot = useCallback((): CanvasSnapshot => {
     const document = field.draft.get();
     return { document: document as unknown as Json, revision: canonicalOfBounded(document) };
@@ -170,12 +177,14 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
     }
     if (transaction.generatedSources.length) next = { ...next, dataSources: [...next.dataSources, ...transaction.generatedSources] } as CompositionDocument;
     if (transaction.generatedLibrary.length) next = { ...next, logicLibrary: [...next.logicLibrary ?? [], ...transaction.generatedLibrary] } as CompositionDocument;
-    next = documentEdit(before, next);
+    const provenance = layout ?? { graph: workingRef.current, sourceMap: projectGraph(workingRef.current).sourceMap };
+    next = documentEdit(before, next, canvasReferences(paths, appliedProvenance.current, provenance));
     if (layout) next = saveCanvasLayout(next, transaction.replacements, layout, { document: before, paths });
     compileCompositionDocument(next);
     await request('/native/api/draft/prepare', { method: 'POST', body: JSON.stringify({ document: next }) });
     if (field.draft.get() !== before) return { status: 'conflict', remote: snapshot() };
     field.draft.set(next);
+    appliedProvenance.current = provenance;
     transaction.replacements.forEach((replacement, index) => appliedAnchors.current.set(canonicalOfBounded(replacement.anchor), fieldAnchor(field.draft.get(), paths[index])));
     return { status: 'applied', snapshot: snapshot() };
   }, [field, snapshot]);

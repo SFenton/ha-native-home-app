@@ -1,5 +1,5 @@
 import { replaceAt, valueAt, type EditorPath } from '../composition-editor';
-import { bodyIdOf, componentReferences, componentUses, expandRef, expandSources, libraryById, mapChildren, ownedSources, privateNames, readField, renameSources, type ComponentUse } from '../shared/composition/components';
+import { bodyIdOf, componentReferences, componentUses, expandRef, expandSources, fieldSteps, libraryById, mapChildren, ownedSources, privateNames, readField, renameSources, type ComponentUse } from '../shared/composition/components';
 import { omitFoldSide } from '../shared/composition/fold-sides';
 import { createId as uid } from '../shared/ids';
 import { compositionChildren, type ComponentEntry, type ComponentRefNode, type CompositionDocument, type CompositionNode } from '../shared/composition/schema';
@@ -8,6 +8,11 @@ import { sameJson } from '../sameJson';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
 import { canHold, type Destination } from './add/insert';
 import { typeName } from './util';
+import { resolveLogicUseBindings } from '../shared/composition/studio-logic/bindings';
+import { expandLogic } from '../shared/composition/logic-library';
+import { editSubtrees } from './editors/provenance';
+import { fieldPointer, pointerPath } from './logic-fields/registry';
+import { resolveLogicAnchor } from '../shared/composition/studio-logic/anchors';
 
 /**
  * Templates as pure operations over the document (`.agents`' studio-linked spec, L-studio, and the templates spec). A template is an entry of
@@ -29,17 +34,6 @@ function freshIds(node: CompositionNode, keepRoot: boolean): { node: Composition
     return { ...mapChildren(current, child => visit(child, false)), id } as CompositionNode;
   };
   return { node: visit(node, true), ids };
-}
-
-/** Every `component-ref` under `node` replaced by a plain copy of its body (fresh inner ids, the reference's own id and width on the root). */
-function unlinkInside(node: CompositionNode, entries: ReadonlyMap<string, ComponentEntry>): CompositionNode {
-  return mapChildren(node, child => child.type === 'component-ref' ? plainCopy(child, entries) ?? child : unlinkInside(child, entries));
-}
-
-/** What a reference stands for as a plain node: its expansion with fresh inner ids; undefined when its component is missing. */
-function plainCopy(ref: ComponentRefNode, entries: ReadonlyMap<string, ComponentEntry>): CompositionNode | undefined {
-  const entry = entries.get(ref.componentId);
-  return entry ? freshIds(expandRef(ref, entry), true).node : undefined;
 }
 
 // MARK: - Detaching a place
@@ -163,23 +157,31 @@ export interface Saved { document: CompositionDocument; entryId: string; /** The
  * plain copy: a body holds no reference. One document, so one undo step.
  */
 export function saveAsComponent(document: CompositionDocument, path: EditorPath, name: string): Saved {
-  const node = valueAt(document, path) as CompositionNode | undefined;
+  let prepared = document;
+  for (const use of componentReferences(document).filter(use => use.path.length > path.length && path.every((part, at) => String(part) === String(use.path[at])))) {
+    prepared = unlinkPlace(prepared, use.path);
+  }
+  const node = valueAt(resolveLogicUseBindings(prepared).document, path) as CompositionNode | undefined;
   if (!node || node.type === 'component-ref') throw new Error('Select a component to save');
   if ((document.componentLibrary?.length ?? 0) >= MAX_COMPONENTS) throw new Error(`A document holds at most ${MAX_COMPONENTS} templates`);
   const label = name.trim();
   if (!nameValid(label)) throw new Error('Name the template in 1 to 80 characters');
   if (nameTaken(document, label)) throw new Error(`A template named ${label} already exists.`);
-  const body = unlinkInside(node, libraryById(document));
+  const body = node;
   const entry: ComponentEntry = { id: uid('component'), name: label, node: { ...body, id: uid('native'), layout: { ...omitFoldSide(body.layout), span: 1 } } as CompositionNode };
   // The fold side (`sh.fold-sides@1`) belongs to the place on the page: the reference carries it and the template root holds none.
   const side = (node.layout as { foldSide?: unknown }).foldSide;
   const ref = { id: node.id, type: 'component-ref', componentId: entry.id, layout: { span: node.layout.span, ...(side !== undefined ? { foldSide: side } : {}) } } as ComponentRefNode;
-  const next = replaceAt(document, path, ref);
+  const next = replaceAt(prepared, path, ref);
   // A records flow only this body reads goes with it (`sh.repeat@1`, D2): each place then runs a copy of its own. One a page still reads stays in the document.
   const adopted = adoptFlows(next, body);
   if (adopted.length) entry.flows = adopted;
   const dataSources = adopted.length ? next.dataSources.filter(source => !adopted.some(flow => flow.id === source.id)) : next.dataSources;
-  return { document: { ...next, dataSources, componentLibrary: [...(document.componentLibrary ?? []), entry] }, entryId: entry.id, key: `node:${ref.id}` };
+  const relocated = new Map([[fieldPointer(path), [fieldPointer(['componentLibrary', prepared.componentLibrary?.length ?? 0, 'node'])]]]);
+  for (const [index, flow] of adopted.entries()) relocated.set(fieldPointer(['dataSources', prepared.dataSources.findIndex(source => source.id === flow.id)]),
+    [fieldPointer(['componentLibrary', prepared.componentLibrary?.length ?? 0, 'flows', index])]);
+  return { document: editSubtrees(prepared, { ...next, dataSources, componentLibrary: [...(prepared.componentLibrary ?? []), entry] }, { relocated }),
+    entryId: entry.id, key: `node:${ref.id}` };
 }
 
 /** The records flows the nodes of `body` read through a `repeat` and nothing else in `document` reads: what a saved component takes along (at most 8). */
@@ -231,33 +233,27 @@ function valueAtNode(root: CompositionNode, id: string): CompositionNode | undef
  * `<place id>-<inner id>` and each private source is copied into the document (see `detach`). Only this place changes. One undo step.
  */
 export function unlinkPlace(document: CompositionDocument, path: EditorPath): CompositionDocument {
-  const ref = valueAt(document, path) as CompositionNode | undefined;
+  const expansion = expandLogic(resolveLogicUseBindings(document).document);
+  const effective = expansion.document as CompositionDocument;
+  const ref = valueAt(effective, path) as CompositionNode | undefined;
   if (!ref || ref.type !== 'component-ref') throw new Error('This is not a linked template');
-  const entry = libraryById(document).get(ref.componentId);
+  const entry = libraryById(effective).get(ref.componentId);
   if (!entry) throw new Error('That template is gone');
   const copy = detach(ref, entry, usedIds(document));
-  const next = replaceAt(document, path, copy.node);
-  return copy.sources.length ? { ...next, dataSources: [...next.dataSources, ...copy.sources] } : next;
+  let next = replaceAt(document, path, copy.node);
+  if (copy.sources.length) next = { ...next, dataSources: [...next.dataSources, ...copy.sources] };
+  const from = ['componentLibrary', effective.componentLibrary!.findIndex(item => item.id === entry.id), 'node'];
+  const base = fieldPointer(from), to = fieldPointer(path);
+  const copied = [{ from, to: path }, ...expansion.sourceMap.flatMap(location => location.authoredPointer.startsWith(`${base}/`) && location.pointer.startsWith(`${base}/`)
+    ? [{ from: pointerPath(location.authoredPointer), to: pointerPath(`${to}${location.pointer.slice(base.length)}`) }] : [])];
+  return editSubtrees(document, next, { copied });
 }
 
 /** The document with every place that uses `id` made a plain copy, in document order, and their private sources added to `dataSources`. */
 function unlinkAll(document: CompositionDocument, id: string): CompositionDocument {
-  const entries = libraryById(document), entry = entries.get(id);
-  if (!entry) return document;
-  const taken = usedIds(document);
-  const added: DocumentSource[] = [];
-  const visit = (node: CompositionNode): CompositionNode => {
-    if (node.type === 'component-ref') {
-      if (node.componentId !== id) return node;
-      const copy = detach(node, entry, taken);
-      added.push(...copy.sources);
-      return copy.node;
-    }
-    return mapChildren(node, visit);
-  };
-  const surfaces = <T extends { components: CompositionNode[] }>(list: T[]): T[] => list.map(surface => ({ ...surface, components: surface.components.map(visit) }));
-  const pages = surfaces(document.pages), modals = surfaces(document.modals);
-  return { ...document, pages, modals, ...(added.length ? { dataSources: [...document.dataSources, ...added] } : {}) };
+  let next = document;
+  for (const use of componentReferences(document).filter(use => use.ref.componentId === id)) next = unlinkPlace(next, use.path);
+  return next;
 }
 
 /**
@@ -268,7 +264,7 @@ export function deleteComponent(document: CompositionDocument, id: string): Comp
   const unlinked = unlinkAll(document, id);
   const rest = (unlinked.componentLibrary ?? []).filter(entry => entry.id !== id);
   const { componentLibrary: _library, ...without } = unlinked;
-  return (rest.length ? { ...without, componentLibrary: rest } : without) as CompositionDocument;
+  return editSubtrees(unlinked, (rest.length ? { ...without, componentLibrary: rest } : without) as CompositionDocument);
 }
 
 /** Renames a component. Every place shows the new name at once. */
@@ -283,7 +279,7 @@ export function renameComponent(document: CompositionDocument, id: string, name:
 
 /** A new place of the component `entryId` at `destination`: a fresh id, width 1 and each parameter's default. */
 export function insertPlace(document: CompositionDocument, entryId: string, destination: Destination): { document: CompositionDocument; key: SelectionKey } {
-  const entry = libraryById(document).get(entryId);
+  const entry = libraryById(resolveLogicUseBindings(document).document as CompositionDocument).get(entryId);
   if (!entry) throw new Error('That template is gone');
   const items = valueAt(document, destination.list);
   if (!Array.isArray(items)) throw new Error('That place no longer exists');
@@ -301,7 +297,13 @@ export function insertPlace(document: CompositionDocument, entryId: string, dest
   const ref: ComponentRefNode = { id: uid('native'), type: 'component-ref', componentId: entry.id, layout: { span: 1 }, ...(args ? { args } : {}) };
   const next = [...items.slice(0, destination.index), ref, ...items.slice(destination.index)];
   const placed = replaceAt(document, destination.list, next);
-  return { document: localState === document.localState ? placed : { ...placed, localState }, key: `node:${ref.id}` };
+  const copied = (entry.params ?? []).flatMap(param => {
+    const binding = entry.bindings?.find(binding => binding.param === param.name);
+    if (!binding?.nodeId || !args || !Object.hasOwn(args, param.name)) return [];
+    const origin = resolveLogicAnchor(document, { kind: 'component', id: entry.id, nodeId: binding.nodeId, field: fieldPointer(fieldSteps(binding.field)) });
+    return origin ? [{ from: pointerPath(origin.pointer), to: [...destination.list, destination.index, 'args', param.name] }] : [];
+  });
+  return { document: editSubtrees(document, localState === document.localState ? placed : { ...placed, localState }, { copied }), key: `node:${ref.id}` };
 }
 
 // MARK: - The edit question
@@ -338,12 +340,13 @@ export function forkPlace(document: CompositionDocument, refId: string, name: st
   if (nameTaken(document, label)) throw new Error(`A template named ${label} already exists.`);
   const { node, ids } = freshIds(entry.node, false);
   const copy: ComponentEntry = {
-    id: uid('component'), name: label, node,
+    ...entry, id: uid('component'), name: label, node,
     ...(entry.params ? { params: entry.params } : {}),
     ...(entry.bindings ? { bindings: entry.bindings.map(binding => binding.nodeId === undefined ? binding : { ...binding, nodeId: ids.get(binding.nodeId) ?? binding.nodeId }) } : {}),
   };
   const repointed = replaceAt(document, use.path, { ...use.ref, componentId: copy.id });
-  return { document: { ...repointed, componentLibrary: [...(document.componentLibrary ?? []), copy] }, entryId: copy.id, ids };
+  return { document: editSubtrees(document, { ...repointed, componentLibrary: [...(document.componentLibrary ?? []), copy] },
+    { copied: [{ from: ['componentLibrary', document.componentLibrary!.findIndex(item => item.id === entry.id)], to: ['componentLibrary', document.componentLibrary!.length] }] }), entryId: copy.id, ids };
 }
 
 /** `node` with its ids renamed through `ids`; an id not in the map (a node the change added) stays. */
@@ -388,6 +391,10 @@ export function settleHeld(current: CompositionDocument, next: CompositionDocume
     void changed; void changedValues;
     result = replaceAt(result, other.path, { ...rest, ...(was.args ? { args: was.args } : {}), ...(was.values ? { values: was.values } : {}) });
   }
+  const from = ['componentLibrary', next.componentLibrary!.findIndex(entry => entry.id === original)];
+  result = editSubtrees(next, result, { relocated: new Map([[fieldPointer(from), [fieldPointer(['componentLibrary', restored.length])]]]) });
+  const originalBindings = current.logicUseBindings?.filter(binding => binding.use.kind === 'component' && binding.use.id === original) ?? [];
+  if (originalBindings.length) result = { ...result, logicUseBindings: [...result.logicUseBindings ?? [], ...originalBindings] };
   return [forked, result];
 }
 

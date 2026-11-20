@@ -1,5 +1,5 @@
 import { replaceAt, valueAt } from '../../composition-editor';
-import { bodyNodes } from '../../shared/composition/components';
+import { bodyNodes, readField } from '../../shared/composition/components';
 import { omitFoldSide, type FoldSide } from '../../shared/composition/fold-sides';
 import type { RepeatAnalysis, RepeatPlan } from '../../shared/composition/repeats';
 import { createId as uid } from '../../shared/ids';
@@ -7,6 +7,9 @@ import type { ComponentEntry, ComponentRefNode, CompositionDocument, Composition
 import { labelValid } from '../params';
 import { MAX_COMPONENTS, nameTaken, nameValid } from '../linked';
 import { paramNameFor, savedText } from './repeatWords';
+import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
+import { editSubtrees } from '../editors/provenance';
+import { fieldPointer } from '../logic-fields/registry';
 
 /** What Save as Template makes of a repeated piece. */
 export interface RepeatSave {
@@ -34,7 +37,8 @@ export function saveRepeat(document: CompositionDocument, analysis: RepeatAnalys
   if (!nameValid(title)) throw new Error('Name the template in 1 to 80 characters');
   if (nameTaken(document, title)) throw new Error(`A template named ${title} already exists.`);
   const places = plan.kept.map(at => analysis.cls.places[at]);
-  const nodes = places.map(place => valueAt(document, place.path) as CompositionNode | undefined);
+  const effective = resolveLogicUseBindings(document).document;
+  const nodes = places.map(place => valueAt(effective, place.path) as CompositionNode | undefined);
   if (nodes.some(node => !node)) throw new Error('A place of this piece has changed. Look for repeated pieces again.');
   const first = nodes[0]!;
   const body = { ...first, id: uid('native'), layout: { ...omitFoldSide(first.layout), span: 1 } } as CompositionNode;
@@ -56,10 +60,17 @@ export function saveRepeat(document: CompositionDocument, analysis: RepeatAnalys
     const node = nodes[order]!;
     // Each place keeps its own fold side (`sh.fold-sides@1`) on its reference; the template body holds none.
     const side = (node.layout as { foldSide?: FoldSide }).foldSide;
-    const args = Object.fromEntries(named.map(({ group, param }) => [param, group.values[at]]));
+    const args = Object.fromEntries(named.map(({ group, param }) => {
+      const field = group.fields[0];
+      const value = readField(bodyNodes(node)[field.index], field.field);
+      if (typeof value !== 'string') throw new Error('A repeated piece setting changed. Look for repeated pieces again.');
+      return [param, value];
+    }));
     const ref: ComponentRefNode = { id: node.id, type: 'component-ref', componentId: entry.id, layout: { ...(node.layout.span === undefined ? {} : { span: node.layout.span }), ...(side === undefined ? {} : { foldSide: side }) }, ...(named.length ? { args } : {}) };
     next = replaceAt(next, places[order].path, ref);
   });
   next = { ...next, componentLibrary: [...(document.componentLibrary ?? []), entry] };
-  return { document: next, entryId: entry.id, places: places.length, message: savedText(title, places.length) };
+  const target = fieldPointer(['componentLibrary', document.componentLibrary?.length ?? 0, 'node']);
+  return { document: editSubtrees(document, next, { relocated: new Map(places.map(place => [fieldPointer(place.path), [target]])) }),
+    entryId: entry.id, places: places.length, message: savedText(title, places.length) };
 }

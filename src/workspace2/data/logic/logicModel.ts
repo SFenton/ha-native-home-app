@@ -10,6 +10,7 @@ import { fieldSteps } from '../../../shared/composition/components';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../logic-fields/registry';
 import { documentEdit } from '../../editors/documentEdit';
 import { operandSlot, slotOperand } from '../../expr/tokens';
+import { copySubtree, editSubtrees } from '../../editors/provenance';
 import {
   argFits, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
 } from '../../../shared/composition/logic-library';
@@ -131,7 +132,7 @@ export function duplicateEntry(document: CompositionDocument, id: string): { doc
   if (!canAddEntry(document)) throw new Error('A document holds at most 100 logic templates');
   const name = freshName(document, `${entry.name} Copy`);
   const copyId = freshId(document, name);
-  return { document: withLibrary(document, [...libraryOf(document), { ...structuredClone(entry), id: copyId, name }]), id: copyId };
+  return { document: editSubtrees(document, withLibrary(document, [...libraryOf(document), { ...copySubtree(entry), id: copyId, name }])), id: copyId };
 }
 /** Replaces an entry's body. */
 export const setBody = (document: CompositionDocument, id: string, body: Rec): CompositionDocument => mapEntry(document, id, entry => ({ ...entry, body }));
@@ -189,7 +190,7 @@ export function updateSetting(document: CompositionDocument, id: string, name: s
 const fillHoles = (value: unknown, name: string, replacement: unknown): unknown => {
   if (Array.isArray(value)) return value.map(item => fillHoles(item, name, replacement));
   if (!isRecord(value)) return value;
-  if (value.type === 'hole' && value.name === name) return structuredClone(replacement);
+  if (value.type === 'hole' && value.name === name) return copySubtree(replacement);
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillHoles(item, name, replacement)]));
 };
 /**
@@ -207,7 +208,7 @@ export function removeSetting(document: CompositionDocument, id: string, name: s
     if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args)) { const { [name]: _gone, ...args } = value.args; return { ...value, args }; }
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'logicLibrary' ? item : strip(item)]));
   };
-  return strip(next) as CompositionDocument;
+  return editSubtrees(document, strip(next) as CompositionDocument);
 }
 
 // MARK: Uses
@@ -469,13 +470,13 @@ export function saveLogicTemplate(document: CompositionDocument, path: EditorPat
  * the last text, and an operand holds 64 nodes, so a count of up to 3 entities fits; more is the "more than one rule can hold" limit.
  */
 export function countCases(count: Rec): { cases: { when: Rec; then: Rec }[]; otherwise: Rec } {
-  const one = (op: 'eq' | 'above', value: number): Rec => ({ type: 'compare', op, left: structuredClone(count), right: { type: 'literal', value } });
-  const shown: Rec = { type: 'format', pattern: '{a}', args: { a: structuredClone(count) } };
+  const one = (op: 'eq' | 'above', value: number): Rec => ({ type: 'compare', op, left: copySubtree(count), right: { type: 'literal', value } });
+  const shown: Rec = { type: 'format', pattern: '{a}', args: { a: copySubtree(count) } };
   return {
     cases: [
       { when: one('eq', 0), then: { type: 'literal', value: 'None' } },
       { when: one('eq', 1), then: { type: 'literal', value: 'One' } },
-      { when: one('above', 1), then: structuredClone(shown) },
+      { when: one('above', 1), then: copySubtree(shown) },
     ],
     otherwise: { type: 'literal', value: '' },
   };

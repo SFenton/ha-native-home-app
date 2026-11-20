@@ -4,6 +4,7 @@ import type { DocumentIndex, SelectionKey } from '../../preview2/model';
 import { createId } from '../../shared/ids';
 import { addArea, areasOf, areasToNode, removeArea, type Area, type TabsNode } from '../../shared/composition/layout-blocks';
 import { cloneNode } from '../util';
+import { editSubtrees } from '../editors/provenance';
 
 /** An area found in the document: its container, where the container is, and the area's id (the tab's id in the shipped shape). */
 export interface AreaAt { node: TabsNode; path: EditorPath; areaId: string; areas: Area[]; position: number }
@@ -19,7 +20,7 @@ export function areaAt(document: CompositionDocument, index: DocumentIndex, key:
   return position < 0 ? undefined : { node, path: parent.path, areaId, areas, position };
 }
 
-const set = (document: CompositionDocument, at: AreaAt, node: TabsNode) => replaceAt(document, at.path, node);
+const set = (document: CompositionDocument, at: AreaAt, node: TabsNode) => editSubtrees(document, replaceAt(document, at.path, node));
 
 /** The container with the area moved by `offset` places in draw order (others shift). Moving off either end changes nothing. */
 export function moveArea(document: CompositionDocument, at: AreaAt, offset: number): CompositionDocument {
@@ -58,5 +59,5 @@ export function insertArea(document: CompositionDocument, path: EditorPath, node
   const rest = areas.slice(0, -1);
   const at = options.after ? rest.findIndex(area => area.id === options.after) : -1;
   const placed = at < 0 ? [...rest, { ...added, tabs }] : [...rest.slice(0, at + 1), { ...added, tabs }, ...rest.slice(at + 1)];
-  return { document: replaceAt(document, path, areasToNode(node, placed)), areaId };
+  return { document: editSubtrees(document, replaceAt(document, path, areasToNode(node, placed))), areaId };
 }

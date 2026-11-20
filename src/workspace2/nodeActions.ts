@@ -4,13 +4,14 @@ import { cloneNode } from './util';
 import { nodeTitle } from '../shared/composition/components';
 import { createId } from '../shared/ids';
 import { omitFoldSide } from '../shared/composition/fold-sides';
+import { editSubtrees } from './editors/provenance';
 
 const split = (path: EditorPath) => ({ list: path.slice(0, -1), index: Number(path.at(-1)) });
 
 /** Moves the node one place earlier (-1) or later (1) among its siblings; unchanged at either end. */
 export function moveNodeBy(document: CompositionDocument, path: EditorPath, offset: -1 | 1): CompositionDocument {
   const { list, index } = split(path);
-  return reorderCompositionItem(document, list, index, offset);
+  return editSubtrees(document, reorderCompositionItem(document, list, index, offset));
 }
 
 /** Inserts a copy of the node (fresh ids) right after it. Returns the new document and the path of the copy. */
@@ -20,7 +21,8 @@ export function duplicateNode(document: CompositionDocument, path: EditorPath): 
   // A place that uses a saved component has no title of its own: the copy is another place, linked to the same component.
   const copy = (source.type === 'component-ref' ? cloneNode(source) : { ...cloneNode(source), title: `${source.title} copy` }) as CompositionNode;
   const next = [...siblings.slice(0, index + 1), copy, ...siblings.slice(index + 1)];
-  return { document: replaceAt(document, list, next), path: [...list, index + 1] };
+  const to = [...list, index + 1];
+  return { document: editSubtrees(document, replaceAt(document, list, next), { copied: [{ from: path, to }] }), path: to };
 }
 
 /** Removes the node. The compiler's reference guard applies to the pages and sheets, not to tiles, so a tile always goes. */
@@ -70,7 +72,7 @@ export function moveTargets(document: CompositionDocument, id: string): MoveTarg
 }
 
 /** Moves a node to the end of another parent. */
-export const moveNodeTo = (document: CompositionDocument, id: string, parent: MoveTarget['parent']) => moveCompositionNode(document, id, parent);
+export const moveNodeTo = (document: CompositionDocument, id: string, parent: MoveTarget['parent']) => editSubtrees(document, moveCompositionNode(document, id, parent));
 export { removeCompositionItem };
 
 /** The targets whose name, page or containers contain every word of `query`. An empty query keeps them all. */
@@ -102,7 +104,7 @@ export function putControlsOnTop(document: CompositionDocument, path: EditorPath
   // The overlay takes the node's place on the page, so it takes the node's side of the hinge too (`sh.fold-sides@1`); the base inside holds none.
   const side = (base.layout as { foldSide?: string }).foldSide;
   const overlay = { id: createId('overlay'), title: 'Overlay', type: 'overlay', layout: side === undefined ? {} : { foldSide: side }, props: { anchors: [] }, children: [{ ...base, layout: omitFoldSide(base.layout) }] } as unknown as CompositionNode;
-  return replaceAt(document, list, siblings.map((item, at) => at === index ? overlay : item));
+  return editSubtrees(document, replaceAt(document, list, siblings.map((item, at) => at === index ? overlay : item)));
 }
 
 /** Takes the overlay off: its base takes its place and the controls on top are removed. */
@@ -110,12 +112,12 @@ export function takeOffOverlay(document: CompositionDocument, path: EditorPath):
   const { list, index } = split(path);
   const siblings = valueAt(document, list) as CompositionNode[], overlay = siblings[index];
   if (overlay.type !== 'overlay' || overlay.children.length === 0) throw new Error('The selected item is not an overlay with a base');
-  return replaceAt(document, list, siblings.map((item, at) => {
+  return editSubtrees(document, replaceAt(document, list, siblings.map((item, at) => {
     if (at !== index) return item;
     // The base takes the overlay's place, and its side of the hinge with it.
     const side = (overlay.layout as { foldSide?: string }).foldSide;
     return side === undefined ? overlay.children[0] : { ...overlay.children[0], layout: { ...overlay.children[0].layout, foldSide: side } } as CompositionNode;
-  }));
+  })));
 }
 
 /** Puts the control at one of the five places of its overlay, keeping its inset (Medium, 12, when it has none yet). */

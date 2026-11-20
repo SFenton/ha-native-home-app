@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { moveCompositionNode, replaceAt, valueAt, type EditorPath } from '../../../src/composition-editor';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
-import { bodyNodes, derivedId, expandDocument, fieldSteps, ownedSources, readField } from '../../../src/shared/composition/components';
+import { bodyNodes, derivedId, expandDocument, fieldSteps, ownedSources, readField, renameSources } from '../../../src/shared/composition/components';
 import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic/anchors';
 import { resolveLogicUseBindings } from '../../../src/shared/composition/studio-logic/bindings';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
@@ -26,12 +26,15 @@ import { bodyWithSamples, deleteEntry, saveLogicTemplate, workedOut } from '../.
 import { resolvedLogicValue, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
 import { evaluateOperand as editorValue, registerFill } from '../../../src/workspace2/data/logic/logicEval';
 import { useSentence } from '../../../src/workspace2/data/logic/logicNames';
-import { evaluateOperand, type Environment } from '../../../src/shared/composition/evaluator';
+import { evaluateOperand, resolveText, type TextSlot, type Environment } from '../../../src/shared/composition/evaluator';
 import { operandBase } from '../../../src/shared/composition/expression';
 import { record } from '../../../src/shared/composition/studio-logic/anchors';
 import { encodeStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
-import { newToken, slotOperand } from '../../../src/workspace2/expr/tokens';
+import { newToken, operandSlot, slotOperand } from '../../../src/workspace2/expr/tokens';
+import { authoredNodes } from '../../../src/workspace2/logic-fields/registry';
+import { canvasReferences, copySubtree, editSubtrees, rebuildField } from '../../../src/workspace2/editors/provenance';
+import { documentEdit } from '../../../src/workspace2/editors/documentEdit';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { houseFrom } from '../../../src/preview2/projections';
 import { binding, componentDocument, draftDocument, labelTemplate, privateSourceFixture, tile } from '../draft/fixtures';
@@ -39,6 +42,15 @@ import { integrationSnapshot } from './fixture';
 import lamps from '../../fixtures/templates-lamps.json';
 import type { Operand } from '../../../src/shared/composition/expression';
 import type { ReactNode } from 'react';
+import { duplicateNode, moveNodeBy, moveNodeTo, putControlsOnTop, takeOffOverlay } from '../../../src/workspace2/nodeActions';
+import { addPage, duplicateSurface } from '../../../src/workspace2/navigation/edit';
+import { deleteComponent, forkPlace, insertPlace, saveAsComponent, settleHeld, unlinkPlace } from '../../../src/workspace2/linked';
+import { edit as editCanvas, initialEditState } from '../../../src/workspace2/canvas/edit';
+import { lower } from '../../../src/shared/composition/graph';
+import { moveToSlot } from '../../../src/workspace2/dnd/moves';
+import { endOf } from '../../../src/workspace2/add/insert';
+import { convertTiles } from '../../../src/workspace2/repeats/convertTiles';
+import type { CompositionNode } from '../../../src/shared/composition/schema';
 
 afterEach(cleanup);
 vi.mock('../../../src/api', async original => ({ ...await original<typeof import('../../../src/api')>(), request: vi.fn() }));
@@ -92,7 +104,7 @@ function fixture(kind: string) {
 function rules(draft: Draft, slot: EditorPath, reverse = false) {
   const operand = slotOperand(valueAt(draft.get(), slot) as { type: string })!;
   const cases = [{ when: check, then: operand }, { when: { ...check, isAdmin: false }, then: text('Other') }];
-  draft.set(replaceAt(draft.get(), slot, { type: 'expr', value: { type: 'choose', cases: reverse ? cases.reverse() : cases, otherwise: text('Otherwise') } }));
+  draft.set(rebuildField(draft.get(), slot, operandSlot({ type: 'choose', cases: reverse ? cases.reverse() : cases, otherwise: text('Otherwise') }, valueAt(draft.get(), slot))));
 }
 function valid(document: CompositionDocument) {
   compileCompositionDocument(document);
@@ -128,7 +140,7 @@ function history(draft: Draft, before: CompositionDocument, sameBindings = true)
   valid(draft.get());
   expect(stable(draft.get())).toEqual(stable(before));
 }
-function meaningFixture(kind: string) {
+function meaningFixture(kind: string, policy: 'fallback' | 'keep' = 'fallback') {
   const { document: original, slot } = fixture(kind === 'private sources' ? 'component parameters' : kind === 'id and type arguments' ? 'nested operand' : kind);
   let document = replaceAt(original, kind.startsWith('component') || kind === 'private sources'
     ? ['componentLibrary', 0, 'node', 'props', 'titleProviderId'] : ['pages', 0, 'components', 0, 'props', 'titleProviderId'], 'source-b');
@@ -162,6 +174,12 @@ function meaningFixture(kind: string) {
     draft.set(moveCompositionNode(document, 'place-1', { kind: 'surface', id: 'other-page' }));
     document = draft.get();
   }
+  for (const location of authoredNodes(document)) {
+    const subtitlePath = [...location.path, 'props', 'subtitle'];
+    const subtitle = valueAt(document, subtitlePath);
+    if (record(subtitle) && (subtitle.type === 'expr' || subtitle.type === 'read')) document = replaceAt(document, subtitlePath,
+      { ...subtitle, fallback: `Fallback for ${location.node.id}`, whenUnavailable: policy });
+  }
   valid(document);
   return { document, slot, optionalIndex };
 }
@@ -175,7 +193,8 @@ function withMeaningCanvas(document: CompositionDocument, slot: EditorPath) {
     })) }],
   })));
   return { ...document, studioCanvas: studioCanvasMetadataSchema.parse({ ...metadata, canvases: metadata.canvases.map(canvas => ({
-    ...canvas, groups: [{ id: 'meaning-group', label: 'Keep these together', nodeIds: canvas.nodes.map(node => node.id) }],
+    ...canvas, groups: [{ id: 'meaning-group', label: 'Keep these together', nodeIds: canvas.nodes.map(node => node.id) },
+      { id: 'featured', label: 'Keep this member', nodeIds: [canvas.nodes[0].id] }],
   })) }) };
 }
 function layoutMeaning(document: CompositionDocument) {
@@ -188,12 +207,12 @@ function layoutMeaning(document: CompositionDocument) {
       const graph = liftField(document, pointerPath(target.pointer), 'slot').graph;
       const nodes = canvas.nodes.filter(node => node.rootId === root.id);
       for (const node of nodes) expect(graph.nodes.some(fresh => fresh.id === node.nodeId && JSON.stringify(fresh.origins) === JSON.stringify(node.origins)), node.id).toBe(true);
-      return { key: `${'nodeId' in root.anchor ? root.anchor.nodeId : root.anchor.id}:${root.anchor.field}`, positions: nodes.map(node => `${node.x},${node.y}`).sort() };
+      return { key: `${'nodeId' in root.anchor ? root.anchor.nodeId : root.anchor.id}:${root.anchor.field}`,
+        nodes: nodes.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y,
+          groups: (canvas.groups ?? []).filter(group => group.nodeIds.includes(node.id)).map(group => group.id).sort() })),
+      };
     }),
-    groups: canvas.groups?.map(group => ({ label: group.label, positions: group.nodeIds.map(id => {
-      const node = canvas.nodes.find(node => node.id === id)!;
-      return `${node.x},${node.y}`;
-    }).sort() })),
+    groups: canvas.groups?.map(group => ({ id: group.id, label: group.label })),
   }));
 }
 function meaning(document: CompositionDocument) {
@@ -202,7 +221,7 @@ function meaning(document: CompositionDocument) {
   const compiled = compileCompositionDocument(document).expanded as CompositionDocument;
   const expanded = expandDocument(compiled);
   const sources = Object.fromEntries(expanded.dataSources.map(source => [source.id, source]));
-  const nodes: Record<string, { fixed: unknown; values: unknown[]; reads: unknown[]; thens: unknown[] }> = {};
+  const nodes: Record<string, { fixed: unknown; values: unknown[]; unavailable: unknown[]; reads: unknown[]; thens: unknown[] }> = {};
   const add = (node: CompositionDocument['pages'][number]['components'][number], key: string, local = sources) => {
     const env = (isAdmin: boolean): Environment => ({ viewer: { isAdmin }, read: id => {
       const value = readField(local[id], 'entityId/value');
@@ -222,7 +241,10 @@ function meaning(document: CompositionDocument) {
     };
     walk(subtitle);
     const { children: _children, ...fixed } = node as typeof node & { children?: unknown };
-    nodes[key] = { fixed: { ...fixed, props: rest }, values: operand ? [true, false].map(admin => evaluateOperand(operand, env(admin))) : [], reads, thens };
+    const unavailable = operand ? [true, false].flatMap(admin => (['unavailable', 'loading'] as const).flatMap(status =>
+      [undefined, 'Last answered value'].map(previous => resolveText(subtitle as TextSlot, { ...env(admin), read: () => ({ status }) }, previous)))) : [];
+    const settings = record(subtitle) ? { fallback: subtitle.fallback, whenUnavailable: subtitle.whenUnavailable } : undefined;
+    nodes[key] = { fixed: { ...fixed, props: rest, settings }, values: operand ? [true, false].map(admin => evaluateOperand(operand, env(admin))) : [], unavailable, reads, thens };
   };
   for (const surface of [...expanded.pages, ...expanded.modals]) for (const root of surface.components) for (const node of bodyNodes(root)) add(node, node.id);
   for (const entry of compiled.componentLibrary ?? []) for (const node of bodyNodes(entry.node)) add(node, `component:${entry.id}:${node.id}`,
@@ -251,10 +273,36 @@ function preservesMeaning(before: CompositionDocument, after: CompositionDocumen
       ? raw.nodes.filter(node => {
         const base = resolveLogicAnchor(before, raw.roots.find(root => root.id === node.rootId)!.anchor)!.pointer;
         return node.origins.every(origin => `${base}${origin}` === removed || `${base}${origin}`.startsWith(`${removed}/`));
-      }).map(node => `${node.x},${node.y}`) : []);
-    for (const [rootIndex, root] of previous.roots.entries()) expect(current.roots[rootIndex].positions).toEqual(expect.arrayContaining(root.positions.filter(position => !retired.has(position))));
-    for (const [groupIndex, group] of (previous.groups ?? []).entries()) expect(current.groups![groupIndex].positions).toEqual(expect.arrayContaining(group.positions.filter(position => !retired.has(position))));
-    if (index !== 0 || ['cross-page Move To', 'move rule up', 'move rule down', 'rename document', 'remove optional default'].includes(operation)) expect(current).toEqual(previous);
+      }).map(node => node.nodeId) : []);
+    for (const [rootIndex, root] of previous.roots.entries()) {
+      const following = current.roots[rootIndex];
+      const base = resolveLogicAnchor(before, raw.roots[rootIndex].anchor)!.pointer;
+      const oldUse = usePointer.slice(base.length);
+      const newUse = resolveLogicUseBindings(after).bindings.find((_, at) => {
+        const binding = after.logicUseBindings![at];
+        return binding.logicId === before.logicUseBindings![0].logicId && 'nodeId' in binding.use && binding.use.nodeId === nodeId;
+      })?.usePointer;
+      const movedUse = newUse?.slice(resolveLogicAnchor(after, studioCanvasMetadataSchema.parse(after.studioCanvas).canvases[index].roots[rootIndex].anchor)!.pointer.length);
+      const originAfter = (origin: string) => {
+        if (index !== 0) return origin;
+        if (['move rule up', 'move rule down'].includes(operation)) return origin.replace(/\/cases\/([01])(?=\/|$)/, (_, at) => `/cases/${1 - Number(at)}`);
+        if (operation === 'remove rule') return origin.replace(/\/cases\/(\d+)(?=\/|$)/, (_, at) => `/cases/${Number(at) - 1}`);
+        if (operation === 'duplicate rule') return origin.replace(/\/cases\/(\d+)(?=\/|$)/, (_, at) => `/cases/${Number(at) > 0 ? Number(at) + 1 : 0}`);
+        if (['insert text before token', 'replace rebuilt canvas subtree'].includes(operation) && movedUse !== undefined && (origin === oldUse || origin.startsWith(`${oldUse}/`))) return `${movedUse}${origin.slice(oldUse.length)}`;
+        return origin;
+      };
+      for (const node of root.nodes) {
+        if (retired.has(node.id)) continue;
+        const origins = node.origins.map(originAfter);
+        const candidates = following.nodes.filter(candidate => JSON.stringify(candidate.origins) === JSON.stringify(origins));
+        expect(candidates, `${root.key}:${node.id}`).toHaveLength(1);
+        expect({ x: candidates[0].x, y: candidates[0].y, groups: candidates[0].groups }, `${root.key}:${node.id}`)
+          .toEqual({ x: node.x, y: node.y, groups: node.groups });
+        const stable = following.nodes.find(candidate => candidate.id === node.id);
+        if (stable) expect(stable).toEqual(candidates[0]);
+      }
+    }
+    expect(current.groups).toEqual(previous.groups);
   }
   expect(Object.keys(right.nodes).sort()).toEqual(Object.keys(left.nodes).sort());
   for (const [id, previous] of Object.entries(left.nodes)) {
@@ -274,9 +322,11 @@ function preservesMeaning(before: CompositionDocument, after: CompositionDocumen
       const replacement = operation === 'remove rule' ? 'Otherwise' : operation === 'remove use' || operation === 'replace operand' ? operation : '';
       expect(current.values, id).toEqual(previous.values.map(value => record(value) && value.status === 'value' && value.value === 'Other' ? value : { status: 'value', value: replacement }));
     } else if (operation === 'insert text before token' || operation === 'replace rebuilt canvas subtree') {
+      expect(current.unavailable, id).toEqual(previous.unavailable);
       expect(current.reads, id).toEqual(previous.reads);
       expect(current.values, id).toEqual(previous.values.map(value => record(value) && value.status === 'value' && value.value !== 'Other' ? { ...value, value: `Before ${value.value}` } : value));
     } else {
+      expect(current.unavailable, id).toEqual(previous.unavailable);
       expect(current.values, id).toEqual(previous.values);
       const sorted = (values: unknown[]) => values.map(value => JSON.stringify(value)).sort();
       const extra = operation === 'add rule' ? [{ status: 'value', value: 'Added' }] : operation === 'duplicate rule' ? previous.thens.filter(value => record(value) && value.value !== 'Other').slice(0, 1) : [];
@@ -286,12 +336,12 @@ function preservesMeaning(before: CompositionDocument, after: CompositionDocumen
   }
 }
 describe('binding meaning invariant: every structural edit and undo/redo preserves effective values on every page and placement', () => {
-  for (const kind of ['page tile', 'component anchor', 'component parameters', 'nested operand', 'rule cases', 'private sources', 'id and type arguments']) {
-    it.each(operations)(`${kind}: %s preserves effective sources, arguments, tints and Then values`, operation => {
-      const { document, slot, optionalIndex } = meaningFixture(kind), draft = createDraft(document);
+  for (const policy of ['fallback', 'keep'] as const) for (const kind of ['page tile', 'component anchor', 'component parameters', 'nested operand', 'rule cases', 'private sources', 'id and type arguments']) {
+    it.each(operations)(`${kind}, ${policy}: %s preserves effective sources, arguments, tints and Then values`, operation => {
+      const { document, slot, optionalIndex } = meaningFixture(kind, policy), draft = createDraft(document);
       if (operation.includes('rule')) {
         const path = pointerPath(resolveLogicUseBindings(draft.get()).bindings[0].usePointer);
-        draft.set(replaceAt(draft.get(), slot, { type: 'expr', value: valueAt(draft.get(), path) }));
+        draft.set(rebuildField(draft.get(), slot, operandSlot(valueAt(draft.get(), path) as Operand, valueAt(draft.get(), slot))));
         rules(draft, slot, operation === 'move rule up');
       }
       draft.set(withMeaningCanvas(draft.get(), slot));
@@ -302,7 +352,7 @@ describe('binding meaning invariant: every structural edit and undo/redo preserv
       const changes = vi.fn(() => valid(draft.get()));
       draft.subscribe(changes);
       if (operation === 'insert text before token') writeParts(draft, { path, wrap: 'operand' }, [{ text: 'Before ' }, { token: newToken(use) }], false);
-      else if (operation === 'replace rebuilt canvas subtree') draft.set(replaceAt(before, path, structuredClone({ type: 'format', pattern: 'Before {a}', args: { a: use } })));
+      else if (operation === 'replace rebuilt canvas subtree') draft.set(rebuildField(before, path, copySubtree({ type: 'format', pattern: 'Before {a}', args: { a: use } })));
       else if (operation === 'remove token' || operation === 'remove value') writeParts(draft, { path, wrap: 'operand' }, [], false);
       else if (operation === 'remove use' || operation === 'replace operand') draft.set(replaceAt(before, path, text(operation)));
       else if (operation === 'cross-page Move To') draft.set(moveCompositionNode(before, before.pages[0].components[0].id, { kind: 'surface', id: 'other-page' }));
@@ -340,6 +390,256 @@ describe('binding meaning invariant: every structural edit and undo/redo preserv
       expect(changes).toHaveBeenCalledTimes(5);
     });
   }
+});
+
+it.each(['tile', 'page'] as const)('round 4 regression: Duplicate %s copies effective B bindings and redo restores the correct copy', kind => {
+  const { document, slot } = meaningFixture('page tile'), before = withMeaningCanvas(document, slot), draft = createDraft(before);
+  const result = kind === 'tile' ? duplicateNode(before, ['pages', 0, 'components', 0]) : duplicateSurface(before, { kind: 'page', id: before.pages[0].id });
+  draft.set(result.document);
+  const copy = kind === 'tile' ? draft.get().pages[0].components[1] : draft.get().pages[1].components[0];
+  const expected = meaning(before).nodes['tile-a'];
+  const assertCopy = () => {
+    valid(draft.get());
+    const actual = meaning(draft.get()).nodes[copy.id];
+    expect(actual.values).toEqual(expected.values);
+    expect(actual.unavailable).toEqual(expected.unavailable);
+    expect(draft.get().logicUseBindings!.some(binding => 'nodeId' in binding.use && binding.use.nodeId === copy.id)).toBe(true);
+    for (const binding of before.logicUseBindings!) expect(draft.get().logicUseBindings!.map(item => JSON.stringify(item))).toContain(JSON.stringify(binding));
+  };
+  assertCopy();
+  draft.undo(); expect(draft.get()).toEqual(before); valid(draft.get());
+  draft.redo(); assertCopy();
+});
+
+it.each(['component anchor', 'component parameters', 'private sources'])('round 4 regression: detaching a placement materializes resolved values, not caches (%s)', kind => {
+  const { document } = meaningFixture(kind), draft = createDraft(document);
+  const before = meaning(document).nodes['place-0'];
+  draft.set(unlinkPlace(document, ['pages', 0, 'components', 0]));
+  const assertDetached = () => {
+    valid(draft.get());
+    expect(draft.get().pages[0].components[0].type).not.toBe('component-ref');
+    expect(meaning(draft.get()).nodes['place-0'].values).toEqual(before.values);
+    expect(meaning(draft.get()).nodes['place-0'].unavailable).toEqual(before.unavailable);
+    expect(JSON.stringify(draft.get().logicUseBindings)).toBe(JSON.stringify(document.logicUseBindings));
+    expect(JSON.stringify(draft.get().componentLibrary)).toBe(JSON.stringify(document.componentLibrary));
+  };
+  assertDetached(); draft.undo(); expect(draft.get()).toEqual(document); draft.redo(); assertDetached();
+});
+
+it('round 4 regression: Canvas Apply distinguishes two identical bound uses through repeated pattern edits', () => {
+  const fixture = meaningFixture('page tile'), setup = createDraft(fixture.document), path = [...fixture.slot, 'value'];
+  const use = valueAt(setup.get(), path) as Operand;
+  setup.set(rebuildField(setup.get(), path, { type: 'format', pattern: '{left}/{right}', args: { left: use, right: copySubtree(use) } }));
+  const before = withMeaningCanvas(setup.get(), fixture.slot), draft = createDraft(before);
+  expect(valueAt(before, [...path, 'args', 'left'])).toEqual(valueAt(before, [...path, 'args', 'right']));
+  let lifted = liftField(before, path, 'operand'), baseline = { graph: lifted.graph, sourceMap: lifted.sourceMap };
+  let state = initialEditState(lifted.graph);
+  for (const pattern of ['({left}/{right})', '[{left}/{right}]']) {
+    const root = state.graph.nodes.find(node => node.id === state.graph.roots[0].nodeId)!;
+    state = editCanvas(state, { type: 'update', nodeId: root.id, value: { ...root.payload.value as object, pattern } });
+    const lowered = lower(state.graph);
+    if (!lowered.ok) throw new Error(JSON.stringify(lowered.errors));
+    const next = documentEdit(draft.get(), replaceAt(draft.get(), path, lowered.ast), canvasReferences([path], baseline, { graph: state.graph, sourceMap: lowered.sourceMap }));
+    draft.set(next); valid(draft.get());
+    expect(draft.get().logicUseBindings!.filter(binding => 'nodeId' in binding.use && binding.use.nodeId === 'tile-a')).toHaveLength(2);
+    expect(meaning(draft.get()).nodes['tile-a'].values).toEqual([true, false].map(() => ({ status: 'value', value: pattern.replace('{left}', 'sensor.demo_1').replace('{right}', 'sensor.demo_1') })));
+    baseline = { graph: state.graph, sourceMap: lowered.sourceMap };
+  }
+  const after = draft.get();
+  draft.undo(); valid(draft.get()); draft.redo(); expect(draft.get()).toEqual(after); valid(draft.get());
+});
+
+it.each(['fallback', 'keep'] as const)('the meaning comparator detects fallback and unavailable-policy changes during an unrelated rename (%s)', policy => {
+  const { document, slot } = meaningFixture('page tile', policy);
+  for (const [field, value] of [['fallback', 'Wrong fallback'], ['whenUnavailable', policy === 'keep' ? 'fallback' : 'keep']]) {
+    const changed = replaceAt({ ...document, name: 'Renamed' }, [...slot, field], value);
+    valid(changed);
+    expect(() => preservesMeaning(document, changed, 'rename document')).toThrow();
+  }
+});
+
+it.each(['positions', 'memberships'])('the meaning comparator detects swapped node %s during an unrelated rename', mutation => {
+  const { document, slot } = meaningFixture('page tile'), before = withMeaningCanvas(document, slot);
+  const changed = structuredClone(before);
+  changed.name = 'Renamed';
+  const layout = studioCanvasMetadataSchema.parse(changed.studioCanvas), canvas = layout.canvases[0];
+  const [first, second] = canvas.nodes;
+  if (mutation === 'positions') {
+    [first.x, second.x] = [second.x, first.x]; [first.y, second.y] = [second.y, first.y];
+  } else canvas.groups![1].nodeIds = [second.id];
+  changed.studioCanvas = layout;
+  valid(changed);
+  expect(() => preservesMeaning(before, changed, 'rename document')).toThrow();
+});
+
+const auditedOperations = [
+  'duplicate tile', 'duplicate section', 'duplicate page', 'duplicate sheet', 'duplicate placement',
+  'detach placement', 'delete component', 'fork placement', 'save held change as new component',
+  'paste text', 'cut text', 'drag between sections', 'drag between pages', 'move sibling', 'Move To',
+  'Save as Component', 'place component', 'save repeated pieces', 'wrap overlay', 'unwrap overlay',
+  'Unlink template', 'Save as Logic Template', 'Delete Template', 'Duplicate Rule',
+  'canvas Apply pattern', 'canvas Apply re-parent', 'add page',
+] as const;
+
+function placementValues(document: CompositionDocument) {
+  const expanded = expandDocument(compileCompositionDocument(document).expanded);
+  const names = new Map(expanded.dataSources.map(({ id, ...source }) => [id, JSON.stringify(source)]));
+  const snapshot = meaning(document).nodes;
+  return Object.fromEntries([...expanded.pages, ...expanded.modals].flatMap(page => page.components.flatMap(root => bodyNodes(root).flatMap(node => {
+    if (!('props' in node && 'subtitle' in node.props) && !('glyphTint' in node)) return [];
+    const { id: _id, title: _title, layout: _layout, ...fixed } = snapshot[node.id].fixed as Record<string, unknown>;
+    return [[node.id, { ...snapshot[node.id], fixed: renameSources(fixed, names) }]];
+  }))));
+}
+
+function pairs(before: CompositionDocument, oldPath: EditorPath, after: CompositionDocument, newPath: EditorPath) {
+  const previous = valueAt(expandDocument(compileCompositionDocument(before).expanded), oldPath) as CompositionNode;
+  const next = valueAt(expandDocument(compileCompositionDocument(after).expanded), newPath) as CompositionNode;
+  const old = bodyNodes(previous), added = bodyNodes(next);
+  expect(added).toHaveLength(old.length);
+  return added.map((node, at) => [node.id, old[at].id] as const);
+}
+
+function section(id: string, children: CompositionNode[]): CompositionNode {
+  return { id, title: 'Section', type: 'section', layout: { span: 1 }, children,
+    props: { header: 'Section', footer: '', style: 'plain', density: 'thin', hasGlyphs: false, spacing: { type: 'token', name: 'm' } } };
+}
+
+describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fallback states, provenance and symmetric history', () => {
+  for (const policy of ['fallback', 'keep'] as const) it.each(auditedOperations)(`${policy}: %s`, operation => {
+    const component = ['duplicate placement', 'detach placement', 'delete component', 'fork placement', 'save held change as new component', 'place component'].includes(operation);
+    const fixture = meaningFixture(component ? 'private sources' : 'page tile', policy);
+    let document = fixture.document, slot = fixture.slot;
+    const root: EditorPath = ['pages', 0, 'components', 0];
+    if (['duplicate section', 'drag between sections'].includes(operation)) {
+      document = editSubtrees(document, replaceAt(document, ['pages', 0, 'components'],
+        [section('bound-section', [document.pages[0].components[0]]), section('empty-section', []), ...document.pages[0].components.slice(1)]));
+      slot = [...root, 'children', 0, 'props', 'subtitle'];
+    }
+    if (operation === 'duplicate sheet') {
+      const made = copySubtree(document.pages[0]);
+      const { navigation: _navigation, ...surface } = made;
+      document = { ...document, modals: [{ ...document.modals[0], ...surface, id: 'bound-sheet', components: [] }] };
+      document = moveNodeTo(document, 'tile-a', { kind: 'surface', id: 'bound-sheet' });
+      slot = ['modals', 0, 'components', 0, 'props', 'subtitle'];
+    }
+    if (operation === 'cut text') document = rebuildField(document, [...slot, 'value'],
+      { type: 'format', pattern: 'Cut {a}', args: { a: valueAt(document, [...slot, 'value']) } });
+    if (operation === 'unwrap overlay') {
+      document = putControlsOnTop(document, root); slot = [...root, 'children', 0, 'props', 'subtitle'];
+    }
+    if (operation === 'Duplicate Rule') {
+      const draft = createDraft(document); rules(draft, slot); document = draft.get();
+    }
+    if (operation === 'save repeated pieces') {
+      for (const at of [0, 1]) {
+        document = replaceAt(document, ['pages', 0, 'components', at, 'title'], 'Repeated tile');
+        document = replaceAt(document, ['pages', 0, 'components', at, 'props', 'titleProviderId'], 'source-b');
+        document = replaceAt(document, ['pages', 0, 'components', at, 'props', 'subtitle', 'fallback'], 'Repeated fallback');
+      }
+    }
+    if (operation.startsWith('canvas Apply')) {
+      const value = valueAt(document, [...slot, 'value']) as Operand;
+      document = rebuildField(document, [...slot, 'value'], { type: 'format', pattern: '{left}/{right}', args: { left: value, right: copySubtree(value) } });
+    }
+    document = withMeaningCanvas(document, slot);
+    const before = document, draft = createDraft(before), aliases = new Map<string, string>();
+    const resolved = resolveLogicUseBindings(before);
+    expect(resolved.bindings.some(binding => valueAt(before, [...pointerPath(binding.usePointer), 'args', binding.argument]) !== binding.sourceId)).toBe(true);
+    const old = placementValues(before);
+    const copyPairs = (oldPath: EditorPath, newPath: EditorPath) => { for (const [to, from] of pairs(before, oldPath, document, newPath)) aliases.set(to, from); };
+    if (operation === 'duplicate tile' || operation === 'duplicate section' || operation === 'duplicate placement') {
+      const duplicated = duplicateNode(before, root); document = duplicated.document; copyPairs(root, duplicated.path);
+    } else if (operation === 'duplicate page' || operation === 'duplicate sheet') {
+      const key = operation === 'duplicate page' ? 'pages' : 'modals';
+      document = duplicateSurface(before, { kind: key === 'pages' ? 'page' : 'modal', id: before[key][0].id }).document;
+      before[key][0].components.forEach((_, at) => copyPairs([key, 0, 'components', at], [key, 1, 'components', at]));
+    } else if (operation === 'detach placement' || operation === 'delete component') {
+      document = operation === 'detach placement' ? unlinkPlace(before, root) : deleteComponent(before, 'saved-tile');
+      for (const [pageIndex, page] of before.pages.entries()) page.components.forEach((node, index) => {
+        if (node.type === 'component-ref' && node.componentId === 'saved-tile') copyPairs(['pages', pageIndex, 'components', index], ['pages', pageIndex, 'components', index]);
+      });
+    } else if (operation === 'fork placement') {
+      document = forkPlace(before, 'place-0', 'Forked component').document; copyPairs(root, root);
+    } else if (operation === 'save held change as new component') {
+      const changed = replaceAt(before, ['componentLibrary', 0, 'name'], 'Edited component');
+      document = settleHeld(before, changed, 'place-0', { kind: 'new', name: 'Saved component' }).at(-1)!; copyPairs(root, root);
+    } else if (operation === 'Save as Component') {
+      document = saveAsComponent(before, root, 'Captured bound tile').document; copyPairs(root, root);
+    } else if (operation === 'place component') {
+      const destination = endOf(before, `page:${before.pages[0].id}`)!;
+      document = insertPlace(before, 'saved-tile', destination).document;
+      // The unoverridden placement on the other page supplies the resolved component defaults.
+      copyPairs(['pages', 1, 'components', 1], [...destination.list, destination.index]);
+    } else if (operation === 'save repeated pieces') document = convertTiles(before, { name: 'Repeated bound tiles', nodeIds: ['tile-a', 'tile-b'], labels: {} }).document;
+    else if (operation === 'wrap overlay') document = putControlsOnTop(before, root);
+    else if (operation === 'unwrap overlay') document = takeOffOverlay(before, root);
+    else if (operation === 'move sibling') document = moveNodeBy(before, root, 1);
+    else if (operation === 'Move To') document = moveNodeTo(before, before.pages[0].components[0].id, { kind: 'surface', id: 'other-page' });
+    else if (operation === 'drag between pages' || operation === 'drag between sections') {
+      const owner = operation === 'drag between pages' ? 'page:other-page' : 'node:empty-section';
+      document = moveToSlot(before, 'node:tile-a', endOf(before, owner)!).document;
+    } else if (operation === 'Unlink template') document = unlinkTemplate(before, pointerPath(resolved.bindings[0].usePointer));
+    else if (operation === 'Save as Logic Template') document = saveLogicTemplate(before, slot, 'value', 'Captured bound logic', []);
+    else if (operation === 'Delete Template') document = deleteEntry(before, 'tile-label');
+    else if (operation === 'Duplicate Rule') document = duplicateRule(before, slot, 'text', 0);
+    else if (operation === 'paste text' || operation === 'cut text') {
+      const operand = valueAt(before, [...slot, 'value']) as Operand;
+      const use = operation === 'cut text' && operand.type === 'format' ? operand.args.a : operand;
+      writeParts(draft, { path: slot, wrap: 'slot' }, [...operation === 'paste text' ? [{ text: 'Pasted ' }] : [], { token: newToken(use) }], false);
+      document = draft.get();
+    } else if (operation.startsWith('canvas Apply')) {
+      const lifted = liftField(before, slot, 'slot');
+      let state = initialEditState(lifted.graph);
+      const format = state.graph.nodes.find(node => {
+        const parsed = operandBase.safeParse(node.payload.value);
+        return parsed.success && parsed.data.type === 'format';
+      })!;
+      if (operation === 'canvas Apply pattern') state = editCanvas(state, { type: 'update', nodeId: format.id, value: { ...format.payload.value as object, pattern: '{right}/{left}' } });
+      else {
+        const [left, right] = state.graph.edges.filter(edge => edge.to.nodeId === format.id);
+        state = editCanvas(state, { type: 'connect', from: left.from, to: right.to, replace: true });
+        state = editCanvas(state, { type: 'connect', from: right.from, to: left.to, replace: true });
+      }
+      const projected = projectGraph(state.graph);
+      document = documentEdit(before, replaceAt(before, slot, projected.ast), canvasReferences([slot], lifted, { graph: state.graph, sourceMap: projected.sourceMap }));
+      document = saveCanvasLayout(document, [{ anchor: lifted.graph.roots[0].anchor, ast: projected.ast }],
+        { graph: state.graph, sourceMap: projected.sourceMap, positions: Object.fromEntries(state.graph.nodes.map((node, index) => [node.id, { x: 120 + index * 100, y: 240 }])) },
+        { document: before, paths: [slot] });
+    } else if (operation === 'add page') document = addPage(before, 'Added page').document;
+    else throw new Error(`Missing audited operation: ${operation}`);
+    if (document !== draft.get()) draft.set(document);
+    const assertMeaning = () => {
+      valid(draft.get());
+      const current = placementValues(draft.get());
+      for (const [id, expected] of Object.entries(old)) {
+        const actualId = [...aliases].find(([to, from]) => from === id && !Object.hasOwn(old, to))?.[0];
+        const actual = current[id] ?? (actualId ? current[actualId] : undefined);
+        if (operation === 'paste text' && id === 'tile-a' || operation === 'cut text' && id === 'tile-a') {
+          expect(actual!.unavailable).toEqual(expected.unavailable);
+          expect(actual!.values).toEqual(expected.values.map(value => record(value) && value.status === 'value'
+            ? { ...value, value: operation === 'paste text' ? `Pasted ${value.value}` : String(value.value).replace(/^Cut /, '') } : value));
+        } else if (operation === 'Duplicate Rule' && id === 'tile-a') {
+          expect(actual!.values).toEqual(expected.values); expect(actual!.unavailable).toEqual(expected.unavailable);
+          expect(actual!.thens).toEqual([expected.thens[0], ...expected.thens]);
+        } else expect(actual, id).toEqual(expected);
+      }
+      for (const [id, from] of aliases) expect(current[id], `${operation}: ${id}`).toEqual(old[from]);
+      for (const binding of before.logicUseBindings!.filter(binding => 'nodeId' in binding.use && binding.use.nodeId === 'unrelated-bound')) {
+        expect(draft.get().logicUseBindings!.map(item => JSON.stringify(item))).toContain(JSON.stringify(binding));
+      }
+      const layout = readStudioCanvas(draft.get()); expect(layout.warnings).toEqual([]);
+      if (operation.startsWith('canvas Apply')) {
+        const saved = studioCanvasMetadataSchema.parse(layout.raw).canvases;
+        const original = studioCanvasMetadataSchema.parse(before.studioCanvas).canvases;
+        expect(saved[0].groups?.map(group => [group.id, group.nodeIds.length])).toEqual(original[0].groups?.map(group => [group.id, group.nodeIds.length]));
+        expect(saved[1]).toEqual(original[1]);
+      }
+    };
+    assertMeaning(); const after = draft.get();
+    draft.undo(); expect(draft.get()).toEqual(before); expect(placementValues(draft.get())).toEqual(old); valid(draft.get());
+    draft.redo(); expect(draft.get()).toEqual(after); assertMeaning();
+  });
 });
 
 it('round 3 regression: Move To another page keeps the rebound B source and canvas groups', () => {

@@ -7,6 +7,7 @@ import { sameJson } from '../../sameJson';
 import { isUse, usesOf } from '../data/logic/logicModel';
 import { authoredNodes, fieldAnchor, fieldPointer, pointerPath } from '../logic-fields/registry';
 import { rebaseCanvasLayout } from '../logic-fields/layout';
+import { canonicalOfBounded } from '../../shared/composition/json';
 
 export interface EditReferences {
   readonly relocated?: ReadonlyMap<string, readonly string[]>;
@@ -28,15 +29,6 @@ function objectPaths(value: unknown): Map<object, EditorPath[]> {
 function referencePaths(before: CompositionDocument, after: CompositionDocument, old: Map<object, EditorPath[]>, next: Map<object, EditorPath[]>) {
   const previousNodes = authoredNodes(before), followingNodes = authoredNodes(after);
   const identities = new Map<object, string>(previousNodes.map(location => [location.node, location.identity]));
-  const sameOwner = (left: EditorPath, right: EditorPath) => {
-    const from = fieldAnchor(before, left), to = fieldAnchor(after, right);
-    if ('nodeId' in from && from.nodeId && 'nodeId' in to && to.nodeId) {
-      return from.nodeId === to.nodeId && (from.kind === 'component' || to.kind === 'component'
-        ? from.kind === to.kind && from.id === to.id : true);
-    }
-    return from.kind === to.kind && from.id === to.id
-      && ('nodeId' in from ? from.nodeId : undefined) === ('nodeId' in to ? to.nodeId : undefined);
-  };
   const follow = (left: unknown, right: unknown, tail: EditorPath, base: EditorPath): EditorPath | undefined => {
     const moved = [...base];
     for (const key of tail) {
@@ -77,25 +69,6 @@ function referencePaths(before: CompositionDocument, after: CompositionDocument,
         }
         if (nodes.length) matches = [nodes[0].path];
       }
-      // Lowering rebuilds AST objects. Only a referenced, uniquely surviving use may
-      // acquire that correspondence; equal-looking siblings already have their own identity.
-      if (!matches && isUse(value)) {
-        const candidates = usesOf(after, value.logicId).filter(use => {
-          const candidate = valueAt(after, use.path);
-          return candidate !== null && typeof candidate === 'object' && !old.has(candidate)
-            && sameOwner(path.slice(0, depth), use.path) && sameJson(value, candidate);
-        });
-        if (candidates.length) {
-          const previous = usesOf(before, value.logicId).filter(use => {
-            const candidate = valueAt(before, use.path);
-            return candidate !== null && typeof candidate === 'object' && !next.has(candidate)
-              && sameOwner(use.path, candidates[0].path) && sameJson(value, candidate);
-          });
-          if (candidates.length !== 1 || previous.length !== 1) throw new Error('This edit makes the template bindings ambiguous.');
-          matches = [candidates[0].path];
-          next.set(value, matches);
-        }
-      }
       if (!matches?.length) continue;
       if (matches.length !== 1) continue;
       return follow(value, valueAt(after, matches[0]), path.slice(depth), matches[0]);
@@ -121,12 +94,13 @@ export function documentEdit(before: CompositionDocument, edit: CompositionDocum
       const from = fieldPointer(copy.from);
       if (pointer === from || pointer.startsWith(`${from}/`)) found.push(pointerPath(`${fieldPointer(copy.to)}${pointer.slice(from.length)}`));
     }
-    return found.filter(path => valueAt(edit, path) !== undefined);
+    return [...new Map(found.filter(path => valueAt(edit, path) !== undefined).map(path => [fieldPointer(path), path])).values()];
   };
   let next = edit;
   const resolved = before.logicUseBindings?.length ? resolveLogicUseBindings(before).bindings : [];
   if (next.logicUseBindings?.length && resolved.length) {
     const uses = new Map<string, ReturnType<typeof usesOf>>();
+    const seen = new Map<string, NonNullable<CompositionDocument['logicUseBindings']>[number]>();
     const bindings = next.logicUseBindings.flatMap(binding => {
       const index = before.logicUseBindings!.findIndex(old => old === binding || sameJson(old, binding));
       if (index < 0) return [binding];
@@ -138,6 +112,12 @@ export function documentEdit(before: CompositionDocument, edit: CompositionDocum
         if (!candidates.some(use => fieldPointer(use.path) === fieldPointer(path))) return [];
         const use = fieldAnchor(edit, path);
         return [sameJson(use, binding.use) ? binding : { ...binding, use }];
+      }).filter(binding => {
+        const key = canonicalOfBounded([binding.use, binding.argument]);
+        const previous = seen.get(key);
+        if (previous && (previous.logicId !== binding.logicId || previous.from.field !== binding.from.field)) throw new Error('This edit combines incompatible template bindings.');
+        if (previous) return false;
+        seen.set(key, binding); return true;
       });
     });
     if (!sameJson(bindings, next.logicUseBindings)) next = { ...next, logicUseBindings: bindings };
