@@ -7,6 +7,7 @@ import { identifierSchema } from '../shared/validation';
 import { labelText, mechanicalLabel } from './labels';
 import { dialRowLabel } from './dial/dialLabels';
 import { schemaAt } from './schemaAt';
+import { editSubtrees } from './editors/provenance';
 
 /**
  * Settings of a template as pure operations (templates spec, "any field"). The author marks a field of a node inside the template as set per place;
@@ -254,7 +255,8 @@ export function sameEverywhere(document: CompositionDocument, entryId: string, n
   if (rest.some(item => item.param === binding.param)) {
     const { bindings: oldBindings, ...others } = entry;
     void oldBindings;
-    return replaceAt(document, ['componentLibrary', index], { ...others, bindings: rest });
+    return editSubtrees(document, replaceAt(document, ['componentLibrary', index], { ...others, bindings: rest }),
+      { deleted: [['componentLibrary', index, 'bindings', entry.bindings!.indexOf(binding)]] });
   }
   return removeParameter(document, entryId, binding.param);
 }
@@ -283,7 +285,18 @@ export function removeParameter(document: CompositionDocument, entryId: string, 
   const next: ComponentEntry = { ...rest, ...(params.length ? { params } : {}), ...(bindings.length ? { bindings } : {}) };
   const written = replaceAt(document, ['componentLibrary', index], next);
   const without = (record: Record<string, unknown> | undefined) => { if (!record) return undefined; const { [name]: gone, ...others } = record; void gone; return others; };
-  return rewritePlaces(written, entryId, ref => withRecord(withRecord(ref, 'args', without(ref.args) as Record<string, string> | undefined), 'values', without(ref.values)));
+  const deleted: EditorPath[] = [
+    ...(entry.params ?? []).flatMap((param, at) => param.name === name ? [['componentLibrary', index, 'params', at]] : []),
+    ...(entry.bindings ?? []).flatMap((binding, at) => binding.param === name ? [['componentLibrary', index, 'bindings', at]] : []),
+  ];
+  if (!params.length) deleted.push(['componentLibrary', index, 'params']);
+  if (!bindings.length) deleted.push(['componentLibrary', index, 'bindings']);
+  for (const use of componentUses(document, entryId)) for (const key of ['args', 'values'] as const) {
+    const record = use.ref[key];
+    if (record && Object.hasOwn(record, name)) deleted.push([...use.path, key, ...Object.keys(record).length === 1 ? [] : [name]]);
+  }
+  const nextDocument = rewritePlaces(written, entryId, ref => withRecord(withRecord(ref, 'args', without(ref.args) as Record<string, string> | undefined), 'values', without(ref.values)));
+  return editSubtrees(document, nextDocument, { deleted });
 }
 
 /** Sets one place's value for a string parameter. */

@@ -154,8 +154,9 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
     const library = next.componentLibrary.map(entry => {
       const previous = before.componentLibrary?.find(old => old.id === entry.id);
       if (!previous?.bindings?.length) return entry;
-      for (const binding of previous.bindings) {
+      for (const [bindingIndex, binding] of previous.bindings.entries()) {
         if (entry.bindings?.some(next => next === binding || sameJson(next, binding))) continue;
+        if (deleted(fieldPointer(['componentLibrary', before.componentLibrary!.indexOf(previous), 'bindings', bindingIndex]))) continue;
         const target = componentTarget(before, previous, binding, oldObjects);
         if (target === undefined || !declared(target)) refuse();
       }

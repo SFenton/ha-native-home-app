@@ -17,7 +17,7 @@ import { saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
 import { projectGraph } from '../../../src/shared/composition/graph/lower';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../../src/workspace2/logic-fields/registry';
-import { setPerPlace } from '../../../src/workspace2/params';
+import { removeParameter, sameEverywhere, setPerPlace } from '../../../src/workspace2/params';
 import TokenField, { writeParts } from '../../../src/workspace2/expr/TokenField';
 import TokenSettings from '../../../src/workspace2/expr/TokenSettings';
 import RulesList from '../../../src/workspace2/expr/RulesList';
@@ -1175,4 +1175,31 @@ it('reconciles an independently branched edit after an exact historical document
   expect(applied.name).toBe('First edit');
   expect(placementValues(applied)).toEqual(placementValues(document));
   valid(applied);
+});
+
+it.each(['shared field', 'last value setting', 'private-source setting'])('Same Everywhere declares only its intended %s deletion through history', operation => {
+  const fixture = meaningFixture(operation === 'private-source setting' ? 'private sources' : 'component parameters');
+  const before = withMeaningCanvas(fixture.document, fixture.slot), draft = createDraft(before);
+  const index = operation === 'last value setting' ? fixture.optionalIndex : 0, entry = before.componentLibrary![index];
+  const next = operation === 'shared field' ? sameEverywhere(before, entry.id, entry.node.id, 'props/subtitle/value/args/sourceId')
+    : removeParameter(before, entry.id, operation === 'private-source setting' ? 'privateEntity' : 'tint');
+  draft.set(next);
+  expect(draft.get()).not.toBe(before);
+  expect(draft.get().logicUseBindings).toEqual(before.logicUseBindings);
+  originalLayouts(before, draft.get());
+  if (operation === 'shared field') {
+    expect(draft.get().componentLibrary![index].params).toEqual(entry.params);
+    expect(draft.get().componentLibrary![index].bindings).toEqual(entry.bindings!.filter(binding => binding.field !== 'props/subtitle/value/args/sourceId'));
+  } else {
+    const name = operation === 'private-source setting' ? 'privateEntity' : 'tint';
+    expect(draft.get().componentLibrary![index].params?.some(param => param.name === name)).toBeFalsy();
+    expect(draft.get().componentLibrary![index].bindings?.some(binding => binding.param === name)).toBeFalsy();
+  }
+  const old = placementValues(before), current = placementValues(draft.get());
+  if (operation === 'last value setting') for (const id of Object.keys(old).filter(id => !id.startsWith('optional-'))) expect(current[id]).toEqual(old[id]);
+  else if (operation === 'private-source setting') for (const id of Object.keys(old)) expect({ ...current[id], privateSources: old[id].privateSources }).toEqual(old[id]);
+  valid(draft.get());
+  const after = draft.get();
+  draft.undo(); expect(draft.get()).toBe(before); expect(placementValues(draft.get())).toEqual(old); valid(draft.get());
+  draft.redo(); expect(draft.get()).toBe(after); expect(placementValues(draft.get())).toEqual(current); valid(draft.get());
 });
