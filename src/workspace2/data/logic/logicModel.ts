@@ -1,9 +1,17 @@
 import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
 import type { CompositionDocument } from '../../../shared/composition/schema';
 import type { Json } from '../../../shared/types';
+import type { Operand } from '../../../shared/composition/expression';
 import { logicWords } from './logicWords';
+import { resolvedLogicValue, unlinkTemplate } from '../../logic-fields/templates';
+import { resolveLogicUseBindings } from '../../../shared/composition/studio-logic/bindings';
+import { replacePointer, resolveLogicAnchor } from '../../../shared/composition/studio-logic/anchors';
+import { fieldSteps } from '../../../shared/composition/components';
+import { fieldAnchor, fieldPointer, pointerPath } from '../../logic-fields/registry';
+import { documentEdit } from '../../editors/documentEdit';
+import { operandSlot, slotOperand } from '../../expr/tokens';
 import {
-  expandKeepingHoles, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
+  argFits, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
 } from '../../../shared/composition/logic-library';
 
 /**
@@ -301,22 +309,16 @@ export const setsLine = (entry: LogicEntry): string => entry.params.length ? `Se
 
 /** A use worked out into plain logic, or undefined when it cannot be. */
 export function workedOut(document: CompositionDocument, use: unknown): unknown {
-  try { return (expandLogic({ logicLibrary: libraryOf(document), x: use }).document as { x: unknown }).x; } catch { return undefined; }
+  const effective = resolvedLogicValue(document, use);
+  try { return (expandLogic({ logicLibrary: libraryOf(document), x: effective }).document as { x: unknown }).x; } catch { return undefined; }
 }
 /** The entry's body with each setting at its Try With value: what the editor's result line works out. */
 export function bodyWithSamples(document: CompositionDocument, entry: LogicEntry): unknown {
-  return workedOut({ ...document, logicLibrary: [entry] }, makeUse(entry, defaultArgs(entry)));
+  return workedOut({ ...document, logicUseBindings: [], logicLibrary: [...libraryOf(document).filter(item => item.id !== entry.id), entry] }, makeUse(entry, defaultArgs(entry)));
 }
 /** Replaces the use at `path` with the logic it works out to, with this use's values written in (Unlink From Template). */
 export function unlinkUse(document: CompositionDocument, path: EditorPath): CompositionDocument {
-  const use = valueAt(document, path);
-  if (!isUse(use)) return document;
-  // A use inside another template's body keeps that template's own settings as settings.
-  const owner = path[0] === 'logicLibrary' && typeof path[1] === 'number' ? libraryOf(document)[path[1]] : undefined;
-  let plain: unknown;
-  try { plain = owner ? expandKeepingHoles(libraryOf(document), use, new Set(owner.params.map(param => param.name))) : workedOut(document, use); } catch { plain = undefined; }
-  if (plain === undefined) throw new Error('This use cannot be unlinked while its settings are wrong.');
-  return replaceAt(document, path, plain);
+  return isUse(valueAt(document, path)) ? unlinkTemplate(document, path) : document;
 }
 /** Unlinks every use of an entry. */
 export function unlinkAll(document: CompositionDocument, id: string): CompositionDocument {
@@ -383,6 +385,81 @@ export function entryFromLogic(document: CompositionDocument, kind: 'value' | 'c
   const params: LogicParam[] = named.map(({ row, name: paramName }) => ({ name: paramName, ...paramKindOf(row.kind), label: row.kind === 'entity' || row.kind === 'person' ? row.label : row.kind === 'number' ? `Number ${row.label}` : row.label, sample: row.value }));
   const entry: LogicEntry = { id: freshId(document, name), name: freshName(document, name), kind: kind === 'value' ? 'operand' : 'condition', params, body: holeBody(body, named) as Rec };
   return { entry, args: Object.fromEntries(named.map(({ row, name: paramName }) => [paramName, row.value])) };
+}
+
+/** Extraction reads resolved values and promotes dependent fields to explicit parameters of the new use. */
+export function saveLogicTemplate(document: CompositionDocument, path: EditorPath, kind: 'value' | 'condition' | 'operand', name: string, ticked: readonly ExtractRow[]): CompositionDocument {
+  const resolution = resolveLogicUseBindings(document), effective = resolution.document as CompositionDocument;
+  const slot = valueAt(effective, path) as { type: string };
+  const body = kind === 'value' ? slotOperand(slot) : slot;
+  if (!body) throw new Error('This field has no logic to save.');
+  const bodyPath = kind === 'value' && slot.type === 'expr' ? [...path, 'value'] : path;
+  const base = fieldPointer(bodyPath), inside = (pointer: string) => pointer === base || pointer.startsWith(`${base}/`);
+  const made = entryFromLogic(document, kind === 'condition' ? 'condition' : 'value', name, body, ticked);
+  const targets = new Map<string, { kind: LogicParam['kind']; group: string }>();
+  const automatic = resolution.bindings.flatMap((binding, index) => {
+    if (!inside(binding.usePointer)) return [];
+    const pointer = `${binding.usePointer}/args/${binding.argument}`;
+    targets.set(pointer, { kind: 'source-id', group: `automatic:${document.logicUseBindings![index].from.field}` });
+    return [{ index, pointer }];
+  });
+  const component = path[0] === 'componentLibrary' ? effective.componentLibrary![Number(path[1])] : undefined;
+  const componentTargets = (component?.bindings ?? []).flatMap((binding, index) => {
+    if (!binding.nodeId) return [];
+    const target = resolveLogicAnchor(effective, { kind: 'component', id: component!.id, nodeId: binding.nodeId, field: fieldPointer(fieldSteps(binding.field)) });
+    if (!target || !inside(target.pointer)) return [];
+    const param = component!.params!.find(param => param.name === binding.param)!;
+    const value = target.value;
+    const kind = param.kind === 'source-id' ? 'source-id' : typeof value === 'string' ? 'text' : typeof value === 'number' ? 'number'
+      : argFits('operand', value) ? 'operand' : argFits('condition', value) ? 'condition' : undefined;
+    if (!kind) throw new Error('This field cannot be extracted without changing a per-place setting.');
+    targets.set(target.pointer, { kind, group: `component:${binding.param}` });
+    return [{ index, pointer: target.pointer, binding }];
+  });
+  const forced = new Map<string, string>(), groups = new Map<string, string>();
+  let templateBody: unknown = made.entry.body;
+  for (const [pointer, target] of targets) {
+    let param = groups.get(target.group);
+    if (!param) {
+      let suffix = groups.size + 1;
+      while (made.entry.params.some(param => param.name === `binding${suffix}`)) suffix++;
+      param = `binding${suffix}`;
+      groups.set(target.group, param);
+      made.entry.params.push({ name: param, kind: target.kind });
+      made.args[param] = valueAt(effective, pointerPath(pointer)) as Json;
+    }
+    forced.set(pointer, param);
+    templateBody = replacePointer(templateBody, pointer.slice(base.length), { type: 'hole', name: param });
+  }
+  const used = holesIn(templateBody);
+  made.entry = { ...made.entry, params: made.entry.params.filter(param => used.has(param.name)), body: templateBody as Rec };
+  made.args = Object.fromEntries(made.entry.params.map(param => [param.name, made.args[param.name]]));
+  if (made.entry.params.length > MAX_SETTINGS) throw new Error('This extraction needs more than eight settings to preserve its bindings.');
+  const use = makeUse(made.entry, made.args);
+  let next = replaceAt(addMadeEntry(document, made.entry), path, kind === 'value' ? operandSlot(use as unknown as Operand, slot) : use);
+  const usePath = kind === 'value' ? [...path, 'value'] : path;
+  const relocated = new Map<string, string[]>([[fieldPointer(path), [fieldPointer(path)]]]);
+  for (const [pointer, param] of forced) relocated.set(pointer, [fieldPointer([...usePath, 'args', param])]);
+  if (automatic.length) {
+    const removed = new Set(automatic.map(binding => binding.index)), seen = new Set<string>();
+    const bindings = document.logicUseBindings!.filter((_, index) => !removed.has(index));
+    for (const binding of automatic) {
+      const argument = forced.get(binding.pointer)!;
+      if (seen.has(argument)) continue;
+      seen.add(argument);
+      bindings.push({ ...document.logicUseBindings![binding.index], logicId: made.entry.id, use: fieldAnchor(next, usePath), argument });
+    }
+    next = { ...next, logicUseBindings: bindings };
+  }
+  if (component) {
+    const raw = document.componentLibrary![Number(path[1])];
+    const generated = componentTargets.filter(target => target.index >= (raw.bindings?.length ?? 0)).map(target => {
+      const anchor = fieldAnchor(next, [...usePath, 'args', forced.get(target.pointer)!]);
+      return { ...target.binding, field: fieldSteps(anchor.field).join('/') };
+    });
+    if (generated.length) next = replaceAt(next, ['componentLibrary', path[1], 'bindings'], [...raw.bindings ?? [], ...generated]);
+  }
+  return documentEdit(document, next, { relocated });
 }
 
 // MARK: Count cases

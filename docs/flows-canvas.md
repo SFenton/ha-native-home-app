@@ -423,12 +423,27 @@ All inspector, rule and canvas document writes pass through
 history; canvas preflight uses that same transaction before compilation.
 Structural edits reconcile both `logicUseBindings` and saved-component parameter
 field bindings with the canonical resolver, anchors and document-model uses.
-Surviving subtrees carry their references to the new address; removed targets
-lose their dependent bindings. Unrelated binding records remain unchanged.
+Surviving subtrees carry their references to the new address, including a stable
+composition node moving between pages. Extraction, Unlink and Duplicate Rule
+supply explicit relocation/copy provenance; compiler expansion supplies
+one-to-many component-argument destinations. Removed targets lose their dependent
+bindings; an absent optional default retains its value binding while its holder
+survives. Unrelated binding records remain byte-identical.
 Undo and redo restore the complete reconciled snapshots, never a separate
-metadata patch. Valid saved layout associations whose origins no longer identify
-the same block are discarded; invalid imported layout stays available for
+metadata patch. Valid canvas roots, positions and group memberships follow
+surviving origins and are re-encoded against freshly lifted blocks. Only removed
+blocks lose their associations; invalid imported layout stays available for
 explicit reset/export.
+
+The binding resolver is authoritative, not the cached authored argument.
+Save as Logic Template, duplication, Unlink and Delete Template read its resolved
+projection, as do inspector evaluation, setting displays and sentences.
+Extraction promotes dependent fields to explicit parameters rather
+than baking one placement's default into the new template. Unlink remaps component
+parameters through every compiler expansion landing, preserving distinct values
+at different placements. The permanent 119-case meaning invariant checks effective
+sources, arguments, tints, every Then branch and live canvas/group associations
+before editing and after edit/undo/redo, across seven binding fixtures.
 
 Bindings are declarative Studio preprocessing, not new native nodes/capabilities.
 Cap at 128 bindings per document, retain existing per-component binding limits,

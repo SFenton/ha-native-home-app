@@ -83,9 +83,9 @@ export default function LogicUseSettings({ draft, use, kind, onChange, onUnlink,
   const entry = entryOf(document, use.logicId);
   if (!entry) return <div className="w2-logic-use" data-testid="logic-use"><p className="w2-error-text" role="alert">{logicWords.missing}</p>
     {onRemove && <button type="button" className="w2-expr-remove" onClick={onRemove}>{removeLabel}</button>}</div>;
-  const problems = useProblems(document, use);
   const resolved = path ? valueAt(resolveLogicUseBindings(document).document, path) : use;
   const effectiveUse = isUse(resolved) ? resolved : use;
+  const problems = useProblems(document, effectiveUse);
   const plain = workedOut(document, effectiveUse);
   return <div className="w2-logic-use" data-testid="logic-use">
     <p className="w2-expr-tokenname"><strong>{logicWords.useTitle(entry.name)}</strong></p>

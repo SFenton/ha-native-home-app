@@ -54,7 +54,7 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
         else writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: next as unknown as Operand } } : item), false, base);
       }}
       onUnlink={() => {
-        if (canvas && storedPath) draft.set(unlinkTemplate(draft.get(), storedPath));
+        if (storedPath) draft.set(unlinkTemplate(draft.get(), storedPath));
         else { const plain = workedOut(draft.get(), asUse) as Operand | undefined; if (plain) writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: plain } } : item), false); }
         afterChange();
       }}

@@ -8,6 +8,7 @@ import { environmentFor } from './useTryValues';
 import type { NameContext } from './condition';
 import { registerFill } from '../data/logic/logicEval';
 import { useLogicScope } from '../data/logic/logicScope';
+import { resolvedLogicValue } from '../logic-fields/templates';
 
 /** What naming a source needs, for the document an editor shows (its draft, which may hold sources the saved document lacks). */
 export function useNameContext(document: Pick<CompositionDocument, 'dataSources'>): NameContext {
@@ -15,7 +16,8 @@ export function useNameContext(document: Pick<CompositionDocument, 'dataSources'
   const names = useMemo(() => new Map(entities.map(row => [row.entityId, row.name])), [entities]);
   const scope = useLogicScope();
   const library = (document as { logicLibrary?: LogicEntry[] }).logicLibrary;
-  const logic = useMemo(() => library ? { library, settings: scope ? library.find(entry => entry.id === scope.entryId)?.params : undefined } : undefined, [library, scope]);
+  const logic = useMemo(() => library ? { library, settings: scope ? library.find(entry => entry.id === scope.entryId)?.params : undefined,
+    resolve: (value: unknown) => resolvedLogicValue(document, value) } : undefined, [document, library, scope]);
   return useMemo(() => ({ document, logic, entityName: id => names.get(id), entityExists: connected ? (id: string) => names.has(id) : undefined }), [document, logic, names, connected]);
 }
 
@@ -29,7 +31,8 @@ export function useDraftEnvironment(document: Pick<CompositionDocument, 'dataSou
     if (!house) return undefined;
     const env = environmentFor(document, house, overlay, tried, wallClock());
     const own = scope ? library?.find(entry => entry.id === scope.entryId) : undefined;
-    return registerFill(env, library ? { library, samples: own ? Object.fromEntries(own.params.map(param => [param.name, param.sample])) : undefined } : undefined);
+    return registerFill(env, library ? { library, samples: own ? Object.fromEntries(own.params.map(param => [param.name, param.sample])) : undefined,
+      resolve: (value: unknown) => resolvedLogicValue(document, value) } : undefined);
   }, [document, house, overlay, tried, library, scope]);
 }
 /** The data tag of a result: Live when connected, Demo when not, Test while a Try Values override is set. */

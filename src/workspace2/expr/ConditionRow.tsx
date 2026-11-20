@@ -20,7 +20,9 @@ import { words } from './words';
 import type { Operand } from '../../shared/composition/expression';
 import { itemInfoOf, useFlowScope } from '../data/flowScope';
 import LogicUseSettings from '../data/logic/LogicUse';
-import { isUse, workedOut } from '../data/logic/logicModel';
+import { isUse, usesOf, workedOut } from '../data/logic/logicModel';
+import { valueAt } from '../../composition-editor';
+import { unlinkTemplate } from '../logic-fields/templates';
 
 /** Splits "Garage Door is open" so the value's name is weight 600 ("**Garage Door** is open"). */
 function Sentence({ predicate, ctx }: { predicate: Predicate; ctx: NameContext }) {
@@ -85,6 +87,7 @@ export default function ConditionRow({ draft, item, index, ctx, open, onOpen, on
   const tri = env ? evaluatePredicate(item, env) : undefined;
   const leaf = openLeaf(item), person = item.type === 'viewer' || item.type === 'viewer-person';
   const asUse: unknown = item, use = isUse(asUse) ? asUse : undefined;
+  const usePath = use && usesOf(draft.get(), use.logicId).find(location => valueAt(draft.get(), location.path) === use)?.path;
   const custom = !leaf && !person && !use;
   const [json, setJson] = useState(false);
   const text = custom ? words.customCondition : sentence(item, ctx);
@@ -101,9 +104,12 @@ export default function ConditionRow({ draft, item, index, ctx, open, onOpen, on
       <h4 className="w2-expr-opentitle">{`${words.condition} ${index + 1}`}</h4>
       {leaf && <LeafEditor draft={draft} leaf={leaf} ctx={ctx} write={onChange}/>}
       {person && <ViewerEditor predicate={item as never} write={onChange}/>}
-      {use && <LogicUseSettings draft={draft} use={use} kind="condition" removeLabel={words.removeCondition}
+      {use && <LogicUseSettings draft={draft} path={usePath} use={use} kind="condition" removeLabel={words.removeCondition}
         onChange={(next, base) => onChange(next as unknown as Predicate, base)}
-        onUnlink={() => { const plain = workedOut(draft.get(), use) as Predicate | undefined; if (plain) onChange(plain); }}
+        onUnlink={() => {
+          if (usePath) draft.set(unlinkTemplate(draft.get(), usePath));
+          else { const plain = workedOut(draft.get(), use) as Predicate | undefined; if (plain) onChange(plain); }
+        }}
         onRemove={() => commands.find(command => command.label === words.removeCondition)?.run()}/>}
       {custom && <><p className="w2-caption">{words.customNote}</p>{json && <JsonBlock label={words.editJson} value={item as unknown as Json} onChange={next => onChange(next as unknown as Predicate)} validate={value => predicateSchema.safeParse(value).success ? undefined : 'That is not a valid condition.'}/>}</>}
     </div>}

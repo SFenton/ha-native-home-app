@@ -10,9 +10,22 @@ import { GroupLabel, MoreMenu } from './ui';
 import { moveItem } from './condition';
 import { MAX_RULES, rulesOf, toSlot, type Kind, type RulesDraft } from './value';
 import { words } from './words';
+import type { CompositionDocument } from '../../shared/composition/schema';
+import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
+import { documentEdit } from '../editors/documentEdit';
 
 /** The path of the rules node inside a value slot: a look is the `conditional` itself, text is the `choose` inside an `expr`. */
 export const rulesPath = (path: EditorPath, kind: Kind): EditorPath => kind === 'text' ? [...path, 'value'] : path;
+export function duplicateRule(document: CompositionDocument, path: EditorPath, kind: Kind, index: number): CompositionDocument {
+  const rules = rulesOf(valueAt(document, path) as { type: string }, kind);
+  if (!rules?.cases[index] || rules.cases.length >= MAX_RULES) throw new Error('That rule cannot be duplicated.');
+  const from = [...rulesPath(path, kind), 'cases', index];
+  const copy = structuredClone(valueAt(resolveLogicUseBindings(document).document, from)) as typeof rules.cases[number];
+  const next = replaceAt(document, path, toSlot('rules', { rules: { ...rules, cases: [
+    ...rules.cases.slice(0, index + 1), copy, ...rules.cases.slice(index + 1),
+  ] } }, kind, valueAt(document, path)) as unknown as Json);
+  return documentEdit(document, next, { copied: [{ from, to: [...rulesPath(path, kind), 'cases', index + 1] }] });
+}
 
 /**
  * One rule's page ("Rule 1"): "If" holds the whole condition editor (Simple or Logic, no "If it can't tell"), "Then" the field's Fixed
@@ -33,7 +46,7 @@ export default function RulePage({ draft, path, kind, look, index, label }: { dr
         <MoreMenu label={`More for Rule ${index + 1}`} commands={[
           { label: words.moveUp, run: () => write({ ...rules, cases: moveItem(rules.cases, index, -1) }), disabled: index === 0 },
           { label: words.moveDown, run: () => write({ ...rules, cases: moveItem(rules.cases, index, 1) }), disabled: index === rules.cases.length - 1 },
-          { label: words.duplicate, run: () => write({ ...rules, cases: [...rules.cases.slice(0, index + 1), structuredClone(rules.cases[index]), ...rules.cases.slice(index + 1)] }), disabled: rules.cases.length >= MAX_RULES },
+          { label: words.duplicate, run: () => draft.set(duplicateRule(draft.get(), path, kind, index)), disabled: rules.cases.length >= MAX_RULES },
           { label: words.removeRule, run: remove, danger: true, separatorBefore: true, disabled: rules.cases.length < 2 }]}/></div>
       <ConditionEditor draft={draft} path={[...base, 'cases', index, 'when']} place="rule" scope="rule"/>
       <hr className="w2-menu-sep"/>

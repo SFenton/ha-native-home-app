@@ -1,5 +1,6 @@
 import { replaceAt, valueAt, type EditorPath, type SchemaField } from '../../composition-editor';
-import type { CompositionDocument } from '../../shared/composition/schema';
+import type { CompositionDocument, CompositionNode } from '../../shared/composition/schema';
+import { childLists } from '../../shared/composition/components';
 import type { Json } from '../../shared/types';
 import { canonicalOfBounded } from '../../shared/composition/json';
 import { lift, type GraphDestination, type LogicAnchor } from '../../shared/composition/graph';
@@ -35,6 +36,18 @@ const escape = (part: string | number) => String(part).replace(/~/g, '~0').repla
 export const fieldPointer = (path: EditorPath): string => path.length ? `/${path.map(escape).join('/')}` : '';
 export const pointerPath = (pointer: string): EditorPath => pointer === '' ? [] : pointer.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
 const ownerKinds = { pages: 'page', modals: 'modal', componentLibrary: 'component', logicLibrary: 'logic', dataSources: 'flow' } as const;
+export function authoredNodes(document: CompositionDocument) {
+  const nodes: { node: CompositionNode; path: EditorPath; identity: string }[] = [];
+  const visit = (node: CompositionNode, path: EditorPath, scope: string) => {
+    nodes.push({ node, path, identity: JSON.stringify([scope, node.id]) });
+    for (const list of childLists(node)) list.nodes.forEach((child, index) => visit(child, [...path, ...list.path, index], scope));
+  };
+  for (const key of ['pages', 'modals'] as const) document[key].forEach((surface, index) => {
+    surface.components.forEach((node, at) => visit(node, [key, index, 'components', at], 'surface'));
+  });
+  document.componentLibrary?.forEach((entry, index) => visit(entry.node, ['componentLibrary', index, 'node'], `component:${entry.id}`));
+  return nodes;
+}
 export function fieldAnchor(document: CompositionDocument, path: EditorPath): LogicAnchor {
   const collection = path[0], index = path[1];
   if (typeof collection === 'string' && Object.hasOwn(ownerKinds, collection) && index !== undefined) {
@@ -42,9 +55,11 @@ export function fieldAnchor(document: CompositionDocument, path: EditorPath): Lo
     if (!owner?.id) throw new Error('The logic owner no longer exists.');
     const kind = ownerKinds[collection as keyof typeof ownerKinds];
     let nodeId: string | undefined, depth = 2;
-    if (kind === 'page' || kind === 'modal' || kind === 'component') for (let at = 3; at < path.length; at++) {
-      const node = valueAt(document, path.slice(0, at)) as { id?: unknown; type?: unknown } | undefined;
-      if (node && typeof node.id === 'string' && typeof node.type === 'string') { nodeId = node.id; depth = at; }
+    if (kind === 'page' || kind === 'modal' || kind === 'component') for (const location of authoredNodes(document)) {
+      if (location.path.length <= path.length && location.path.length > depth
+        && location.path.every((part, index) => String(part) === String(path[index]))) {
+        nodeId = location.node.id; depth = location.path.length;
+      }
     }
     const anchor: LogicAnchor = { kind, id: owner.id, ...(nodeId ? { nodeId } : {}), field: fieldPointer(path.slice(depth)) };
     if (resolveLogicAnchor(document, anchor)?.pointer !== fieldPointer(path)) throw new Error('This field does not have an unambiguous logic owner.');

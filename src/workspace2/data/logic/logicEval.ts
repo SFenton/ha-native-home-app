@@ -4,7 +4,7 @@ import { expandLogic, usesLogic, type LogicEntry } from '../../../shared/composi
 import { evaluateOperand as evaluate, evaluatePredicate as evaluateTest } from '../../../preview2/evaluate';
 
 /** What an environment needs to read logic: the library, and the Try With value of each setting while a template's body is on show. */
-export interface LogicFill { library: readonly LogicEntry[]; samples?: Record<string, unknown> }
+export interface LogicFill { library: readonly LogicEntry[]; samples?: Record<string, unknown>; resolve?: (value: unknown) => unknown }
 const fills = new WeakMap<object, LogicFill>();
 /** Says how `env` reads a use or a setting. The editors' environment is registered once, where it is built. */
 export function registerFill(env: Environment, fill: LogicFill | undefined): Environment {
@@ -24,6 +24,7 @@ const worked = new WeakMap<object, WeakMap<object, unknown>>();
 function plain<T>(value: T, env: Environment): T {
   const fill = fills.get(env);
   if (!fill || !value || typeof value !== 'object' || !usesLogic({ x: value })) return value;
+  value = (fill.resolve?.(value) ?? value) as T;
   const key = value as unknown as object, byValue = worked.get(fill.library) ?? new WeakMap<object, unknown>(), held = byValue.get(key);
   if (held !== undefined && fill.samples === undefined) return held as T;
   let out: unknown = value;

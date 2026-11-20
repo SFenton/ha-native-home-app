@@ -6,7 +6,7 @@ import type { Json } from '../../shared/types';
 import { usePush } from '../kit';
 import { SelectMenu } from '../SelectMenu';
 import { useDraftDocument, type Draft } from '../editors/draft';
-import RulePage from './RulePage';
+import RulePage, { duplicateRule } from './RulePage';
 import { LookSummary, lookName, type LookKind } from './LookControl';
 import { ResultLine } from './ResultLine';
 import { inputsOf, moveItem, operandName, sentence, type NameContext } from './condition';
@@ -103,7 +103,7 @@ export default function RulesList({ draft, path, kind, look, label }: { draft: D
           </button>
           <MoreMenu label={`More for Rule ${index + 1}`} commands={[
             { label: words.moveUp, run: () => move(index, index - 1), disabled: index === 0 }, { label: words.moveDown, run: () => move(index, index + 1), disabled: index === count - 1 },
-            { label: words.duplicate, run: () => write({ ...rules, cases: [...rules.cases.slice(0, index + 1), structuredClone(entry), ...rules.cases.slice(index + 1)] }), disabled: count >= MAX_RULES },
+            { label: words.duplicate, run: () => draft.set(duplicateRule(draft.get(), path, kind, index)), disabled: count >= MAX_RULES },
             { label: words.removeRule, run: () => write({ ...rules, cases: rules.cases.filter((_, i) => i !== index) }), danger: true, separatorBefore: true, disabled: count < 2 }]}/>
         </li>;
       })}

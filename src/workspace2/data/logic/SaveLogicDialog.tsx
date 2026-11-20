@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
+import { valueAt, type EditorPath } from '../../../composition-editor';
 import type { Operand, Predicate } from '../../../shared/composition/expression';
 import type { Draft } from '../../editors/draft';
 import { useDraftDocument } from '../../editors/draft';
@@ -7,9 +7,10 @@ import { Modal } from '../../kit';
 import { toastManager } from '../../toasts';
 import { MoreMenu } from '../../expr/ui';
 import { entityOfSource } from '../../expr/condition';
-import { slotOperand, operandSlot } from '../../expr/tokens';
+import { slotOperand } from '../../expr/tokens';
 import { useNameContext } from '../../expr/useExpr';
-import { addMadeEntry, canAddEntry, entryFromLogic, extractRows, freshName, makeUse } from './logicModel';
+import { canAddEntry, extractRows, freshName, saveLogicTemplate } from './logicModel';
+import { resolveLogicUseBindings } from '../../../shared/composition/studio-logic/bindings';
 import { useLogicScope } from './logicScope';
 import { logicWords } from './logicWords';
 
@@ -30,25 +31,25 @@ export default function SaveAsLogic({ draft, path, kind, onSaved }: { draft: Dra
 
 function SaveDialog({ draft, path, kind, onClose, onSaved }: { draft: Draft; path: EditorPath; kind: 'value' | 'condition' | 'operand'; onClose: () => void; onSaved?: () => void }) {
   const document = useDraftDocument(draft), ctx = useNameContext(document);
-  const slot = valueAt(document, path) as { type: string } & Record<string, unknown> | undefined;
+  const slot = valueAt(resolveLogicUseBindings(document).document, path) as { type: string } & Record<string, unknown> | undefined;
   const body = kind === 'value' ? (slot ? slotOperand(slot) : undefined) : slot as Operand | Predicate | undefined;
   const rows = useMemo(() => extractRows(body, id => { const entity = entityOfSource(ctx, id); return entity ? ctx.entityName?.(entity) ?? entity : id; }, id => ctx.entityName?.(id) ?? id), [body, ctx]);
   const [name, setName] = useState(() => freshName(document, kind === 'condition' ? 'New Condition' : 'New Value'));
+  const [error, setError] = useState<string>();
   const [ticked, setTicked] = useState(() => new Set(rows.filter(row => row.kind === 'entity' || row.kind === 'person').map(row => row.key)));
   const first = useRef<HTMLInputElement>(null);
   const save = () => {
     if (!body || !name.trim()) return;
-    const made = entryFromLogic(document, kind === 'condition' ? 'condition' : 'value', name.trim(), body, rows.filter(row => ticked.has(row.key)));
-    const use = makeUse(made.entry, made.args);
-    const next = addMadeEntry(document, made.entry);
-    draft.set(replaceAt(next, path, kind === 'value' ? operandSlot(use as unknown as Operand, slot) : use));
-    toastManager.add({ title: logicWords.saved(made.entry.name) });
+    try { draft.set(saveLogicTemplate(document, path, kind, name.trim(), rows.filter(row => ticked.has(row.key)))); }
+    catch (error) { setError(error instanceof Error ? error.message : String(error)); return; }
+    toastManager.add({ title: logicWords.saved(name.trim()) });
     onSaved?.();
     onClose();
   };
   return <Modal open onOpenChange={next => { if (!next) onClose(); }} title={logicWords.saveTitle} size="s" initialFocus={first}
     footer={<><button type="button" onClick={onClose}>{logicWords.cancel}</button><button type="button" className="w2-primary" disabled={!name.trim() || !body} onClick={save}>{logicWords.save}</button></>}>
     <p className="w2-caption">{logicWords.saveText}</p>
+    {error && <p className="w2-error-text" role="alert">{error}</p>}
     <label className="w2-logic-name"><span className="w2-row-label">{logicWords.saveName}</span>
       <input ref={first} aria-label={logicWords.saveName} value={name} maxLength={80} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') save(); }}/></label>
     <fieldset className="w2-logic-rows"><legend className="w2-group-title">{logicWords.saveEach}</legend>
