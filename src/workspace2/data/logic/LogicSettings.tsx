@@ -70,7 +70,7 @@ export default function LogicSettings({ draft, document, id, onError, apply }: {
                 onChange={next => run(() => { const source = next === 'entity' ? document.dataSources.find(item => item.kind === 'ha-entity')?.id : undefined; if (next === 'entity' && !source) throw new Error('Add an entity source first.'); const person = next === 'person' ? entities.find(row => row.domain === 'person')?.entityId : undefined; if (next === 'person' && !person) throw new Error('Connect to Home Assistant to try a Person setting.'); return updateSetting(document, id, param.name, { kind: next as SettingKind, sample: next === 'entity' ? source : next === 'person' ? person : undefined }); })}/></div>
               {used && <p className="w2-caption">{logicWords.kindLocked}</p>}</div>
             <p className="w2-row-label">{logicWords.tryWith}</p>
-            <SettingRow draft={draft} param={{ ...param, label: logicWords.tryWith }} arg={param.sample}
+            <SettingRow draft={draft} param={{ ...param, label: logicWords.tryWith }} arg={param.sample} path={['logicLibrary', document.logicLibrary!.findIndex(entry => entry.id === id), 'params', entry.params.findIndex(item => item.name === param.name), 'sample']}
               onArg={(next: Json, base?: CompositionDocument) => run(() => updateSetting(base ?? document, id, param.name, { sample: next }))}/>
             {!used && <p className="w2-caption" data-testid="setting-unused">{logicWords.settingNotUsed}</p>}
             <button type="button" className="w2-expr-remove" onClick={() => { setOpen(undefined); run(() => removeSetting(document, id, param.name)); }}>{logicWords.removeSetting}</button>

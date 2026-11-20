@@ -40,11 +40,14 @@ async function openCondition(page: Page) {
 
 test('Conditions: Read offers Last Changed, compared before or after a moment and never equal to it', async ({ page }) => {
   const panel = await openCondition(page);
-  await panel.getByRole('combobox', { name: 'Read', exact: true }).click();
+  await panel.getByRole('button', { name: 'Entity', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Read', exact: true }).click();
   // The time of last change is its own choice, not an attribute the phone cannot read.
   await expect(page.getByRole('option', { name: /last_changed/ })).toHaveCount(0);
   await page.getByRole('option', { name: 'Last Changed' }).click();
-  await expect(panel.getByText(/never equal to a date/)).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Read', exact: true })).toContainText('Last Changed');
+  await expect(page.getByText(/never equal to a date/)).toBeVisible();
+  if (isPhone(page)) await page.locator('.w2-back').click(); else await page.keyboard.press('Escape');
   const comparison = panel.getByRole('combobox', { name: 'Comparison' });
   await expect(comparison).toContainText('is before');
   await comparison.click();

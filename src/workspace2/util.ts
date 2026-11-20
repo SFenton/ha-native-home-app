@@ -1,5 +1,6 @@
 import type { CompositionNode } from '../shared/composition/schema';
 import { createId as uid } from '../shared/ids';
+import { copySubtree } from './editors/provenance';
 
 /** Copies text. The Clipboard API needs a secure context, which LAN HTTP is not, so fall back to a hidden textarea. */
 export async function copyText(text: string): Promise<boolean> {
@@ -17,7 +18,7 @@ export async function copyText(text: string): Promise<boolean> {
 
 /** A deep copy of a node with a fresh id on it and on every node beneath it. */
 export function cloneNode(node: CompositionNode): CompositionNode {
-  const copy = structuredClone(node) as CompositionNode & Record<string, unknown>;
+  const copy = copySubtree(node) as CompositionNode & Record<string, unknown>;
   const fresh = (item: Record<string, unknown>) => {
     if (typeof item.id === 'string' && typeof item.type === 'string' && 'layout' in item) item.id = uid('native');
     for (const key of ['children']) if (Array.isArray(item[key])) (item[key] as Record<string, unknown>[]).forEach(fresh);

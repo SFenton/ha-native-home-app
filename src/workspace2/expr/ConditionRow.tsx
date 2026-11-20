@@ -11,7 +11,7 @@ import type { Draft } from '../editors/draft';
 import { SelectMenu } from '../SelectMenu';
 import { evaluatePredicate } from '../data/logic/logicEval';
 import { ComparisonControls, leftKind, numericState } from './ComparisonControls';
-import { ReadRow } from './SimpleCondition';
+import { DraftReadRow, ReadRow, type ReadLeaf } from './SimpleCondition';
 import ValuePicker, { ValuePickerRow, type Picked } from './ValuePicker';
 import { closeLeaf, comparisonsFor, entityOfSource, markerOf, openLeaf, operandName, readOf, resultText, sentence, sourceOfOperand, type Leaf, type NameContext } from './condition';
 import { Marker, MoreMenu, type MenuCommand } from './ui';
@@ -20,7 +20,9 @@ import { words } from './words';
 import type { Operand } from '../../shared/composition/expression';
 import { itemInfoOf, useFlowScope } from '../data/flowScope';
 import LogicUseSettings from '../data/logic/LogicUse';
-import { isUse, workedOut } from '../data/logic/logicModel';
+import { isUse, usesOf, workedOut } from '../data/logic/logicModel';
+import { valueAt } from '../../composition-editor';
+import { unlinkTemplate } from '../logic-fields/templates';
 
 /** Splits "Garage Door is open" so the value's name is weight 600 ("**Garage Door** is open"). */
 function Sentence({ predicate, ctx }: { predicate: Predicate; ctx: NameContext }) {
@@ -38,7 +40,7 @@ function closedFor(leaf: Leaf, ctx: NameContext): readonly string[] | undefined 
 type Write = (next: Predicate, document?: CompositionDocument, typing?: string) => void;
 
 /** The three stacked controls of an open comparison: the value picker, the comparison, the other side (spec "Editing"). */
-export function LeafEditor({ draft, leaf, ctx, write }: { draft: Draft; leaf: Leaf; ctx: NameContext; write: Write }) {
+export function LeafEditor({ draft, leaf, ctx, write, compact = false, readLeaf }: { draft: Draft; leaf: Leaf; ctx: NameContext; write: Write; compact?: boolean; readLeaf?: ReadLeaf }) {
   const { entities } = useWorkspaceData();
   const commit = (next: Leaf, typing?: string, document?: CompositionDocument) => write(closeLeaf(next, id => sourceEntity((document ?? draft.get()).dataSources.find(source => source.id === id)) !== undefined), document, typing);
   const leftSource = sourceOfOperand(leaf.left), entityId = leftSource === undefined ? undefined : entityOfSource(ctx, leftSource);
@@ -52,10 +54,11 @@ export function LeafEditor({ draft, leaf, ctx, write }: { draft: Draft; leaf: Le
   };
   const right = leaf.right[0] as Operand | undefined;
   const compareWith = leaf.comparison !== 'has a value' && leaf.comparison !== 'has no value' && leaf.comparison !== 'is one of' && leaf.comparison !== 'is not one of';
-  return <div className="w2-expr-leaf">
-    <ValuePickerRow draft={draft} title="Value" primary={operandName(leaf.left, ctx)} secondary={entityId && row?.name !== entityId ? entityId : undefined} onPick={pickLeft} conditions/>
-    <ReadRow leaf={leaf} entityId={entityId} onChange={next => commit(next)}/>
-    <ComparisonControls numeric={itemInfo ? itemInfo.kind === 'number' : numericState(row?.state)} leaf={leaf} onChange={(next, typing) => commit(next, typing)} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} closed={itemInfo?.values ?? closedFor(leaf, ctx)}/>
+  return <div className={compact ? 'w2-expr-simple' : 'w2-expr-leaf'} data-compact={compact || undefined}>
+    <ValuePickerRow draft={draft} title="Value" primary={operandName(leaf.left, ctx)} secondary={!compact && entityId && row?.name !== entityId ? entityId : undefined} onPick={pickLeft} conditions
+      footer={compact && (readLeaf ? <DraftReadRow draft={draft} readLeaf={readLeaf} onChange={next => commit(next)}/> : <ReadRow leaf={leaf} entityId={entityId} onChange={next => commit(next)}/>)}/>
+    {!compact && <ReadRow leaf={leaf} entityId={entityId} onChange={next => commit(next)}/>}
+    <ComparisonControls compact={compact} numeric={itemInfo ? itemInfo.kind === 'number' : numericState(row?.state)} leaf={leaf} onChange={(next, typing) => commit(next, typing)} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} closed={itemInfo?.values ?? closedFor(leaf, ctx)}/>
     {compareWith && <PickerRow stacked title={words.compareWithValue} primary={right && right.type !== 'literal' ? operandName(right, ctx) : words.compareWithValue}>
       {close => <ValuePicker draft={draft} conditions={false} onPick={picked => { commit({ ...leaf, right: [picked.operand] }, undefined, picked.document); close(); }}/>}
     </PickerRow>}
@@ -63,7 +66,7 @@ export function LeafEditor({ draft, leaf, ctx, write }: { draft: Draft; leaf: Le
 }
 
 /** A person test: "The person using the app is an admin", "is one of …", "is (a person)". */
-function ViewerEditor({ predicate, write }: { predicate: Extract<Predicate, { type: 'viewer' | 'viewer-person' }>; write: Write }) {
+export function ViewerEditor({ predicate, write }: { predicate: Extract<Predicate, { type: 'viewer' | 'viewer-person' }>; write: Write }) {
   const { entities } = useWorkspaceData();
   if (predicate.type === 'viewer-person') {
     const people = entities.filter(row => row.domain === 'person'), chosen = predicate.in;
@@ -84,6 +87,7 @@ export default function ConditionRow({ draft, item, index, ctx, open, onOpen, on
   const tri = env ? evaluatePredicate(item, env) : undefined;
   const leaf = openLeaf(item), person = item.type === 'viewer' || item.type === 'viewer-person';
   const asUse: unknown = item, use = isUse(asUse) ? asUse : undefined;
+  const usePath = use && usesOf(draft.get(), use.logicId).find(location => valueAt(draft.get(), location.path) === use)?.path;
   const custom = !leaf && !person && !use;
   const [json, setJson] = useState(false);
   const text = custom ? words.customCondition : sentence(item, ctx);
@@ -100,9 +104,12 @@ export default function ConditionRow({ draft, item, index, ctx, open, onOpen, on
       <h4 className="w2-expr-opentitle">{`${words.condition} ${index + 1}`}</h4>
       {leaf && <LeafEditor draft={draft} leaf={leaf} ctx={ctx} write={onChange}/>}
       {person && <ViewerEditor predicate={item as never} write={onChange}/>}
-      {use && <LogicUseSettings draft={draft} use={use} kind="condition" removeLabel={words.removeCondition}
+      {use && <LogicUseSettings draft={draft} path={usePath} use={use} kind="condition" removeLabel={words.removeCondition}
         onChange={(next, base) => onChange(next as unknown as Predicate, base)}
-        onUnlink={() => { const plain = workedOut(draft.get(), use) as Predicate | undefined; if (plain) onChange(plain); }}
+        onUnlink={() => {
+          if (usePath) draft.set(unlinkTemplate(draft.get(), usePath));
+          else { const plain = workedOut(draft.get(), use) as Predicate | undefined; if (plain) onChange(plain); }
+        }}
         onRemove={() => commands.find(command => command.label === words.removeCondition)?.run()}/>}
       {custom && <><p className="w2-caption">{words.customNote}</p>{json && <JsonBlock label={words.editJson} value={item as unknown as Json} onChange={next => onChange(next as unknown as Predicate)} validate={value => predicateSchema.safeParse(value).success ? undefined : 'That is not a valid condition.'}/>}</>}
     </div>}

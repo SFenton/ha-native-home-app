@@ -15,6 +15,8 @@ import { usePush } from '../kit';
 import { IconField } from '../pickers/PickerField';
 import { schemaAt, useRows } from '../rows';
 import { cornerOrder, groupsOf, mapNodeAt, withGroups } from './mapControls';
+import { AddressedField } from '../logic-fields/AddressedField';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 /** What a button does, as the page's choice. */
 type Does = 'locate' | 'command' | 'service' | 'page';
@@ -27,6 +29,7 @@ const doesWords: Record<Does, string> = { locate: 'Locate', command: 'Robot Comm
  */
 export default function ButtonPage({ path, buttonId, focusLabel }: { path: EditorPath; buttonId: string; focusLabel?: boolean }) {
   const { document, onChange } = useRows();
+  const canvas = useLogicFields();
   const push = usePush();
   const map = mapNodeAt(document, path);
   const nodeId = (valueAt(document, path) as { id: string } | undefined)?.id;
@@ -51,11 +54,11 @@ export default function ButtonPage({ path, buttonId, focusLabel }: { path: Edito
   const choices = (['locate', 'command', 'service', 'page'] as const).filter(item => item !== 'locate' || !takenLocate || does === 'locate').map(item => ({ value: item, label: doesWords[item] }));
   const symbol = button.icon.type === 'sf-symbol' ? button.icon.name : undefined;
   return <div className="w2-editor-page w2-mc-page" data-testid="map-button-page">
-    {symbol !== undefined ? <IconField label="Icon" symbol={symbol} onPick={name => change({ icon: { ...button.icon, name } as never })}/> : <p className="w2-caption">The symbol follows a rule.</p>}
+    {symbol !== undefined ? <IconField label="Icon" symbol={symbol} onPick={name => change({ icon: { ...button.icon, name } as never })}/> : canvas && authored ? <AddressedField path={at('icon')} kind="slot" label="Icon"/> : <p className="w2-caption">The symbol follows a rule.</p>}
     {typeof button.label === 'string'
       ? <div className="w2-row"><label className="w2-field-row"><span className="w2-field-label">Label</span><div className="w2-field-control"><TextInput label="Label" value={button.label} onCommit={text => change({ label: text })}/></div></label>
         <p className="w2-caption">VoiceOver and Voice Control use the label.</p>{button.label.trim() === '' && <p role="alert" className="w2-error-text">A button needs a label.</p>}</div>
-      : <p className="w2-caption">The label follows a rule.</p>}
+      : canvas && authored ? <AddressedField path={at('label')} kind="slot" label="Label"/> : <p className="w2-caption">The label follows a rule.</p>}
     <div className="w2-row"><label className="w2-field-row"><span className="w2-field-label">Hint</span><div className="w2-field-control"><TextInput label="Hint" value={button.hint ?? ''} onCommit={text => change({ hint: text === '' ? undefined : text })}/></div></label></div>
     <section className="w2-group" aria-label="Action"><h3 className="w2-group-title">Action</h3>
       <SelectField label="Does" value={does} options={choices} onChange={next => choose(next as Does)}/>

@@ -10,6 +10,10 @@ export const labelTemplate = {
   body: read({ type: 'hole', name: 'source' }),
 };
 export const use = (source = 'source-a') => ({ type: 'logic-ref', logicId: 'tile-label', args: { source } });
+export const privateSourceFixture = {
+  source: { id: 'private-state', kind: 'ha-entity', entityId: { type: 'literal', value: 'sensor.demo_default_private' } },
+  placements: ['sensor.demo_private_0', 'sensor.demo_private_1'],
+};
 export function tile(id: string, sourceId: string) {
   return {
     id, type: 'navigation-tile', title: id, icon: compositionSymbol(), layout: { span: 1 },

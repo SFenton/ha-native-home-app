@@ -3,6 +3,9 @@ import { valueAt, type EditorPath, type SchemaField } from '../../composition-ed
 import { useRows } from '../rowsContext';
 import ValueField from './ValueField';
 import type { LookKind } from './LookControl';
+import { schemaFieldKind } from '../logic-fields/registry';
+import { AddressedField } from '../logic-fields/AddressedField';
+import { ActionRow } from '../editors/ActionEditor';
 
 /** The name of the item a field belongs to: the nearest object above it with a title or label ("Guest Room"). */
 function useItemName(path: EditorPath): string {
@@ -25,5 +28,8 @@ function SlotField({ path, schema, label }: { path: EditorPath; schema: SchemaFi
 }
 /** The control for a value slot, or undefined when the field is not one. Use as `FieldOptions.slot`. */
 export function slotControl(path: EditorPath, schema: SchemaField, label: string): ReactElement | undefined {
-  return schema.xValue ? <SlotField path={path} schema={schema} label={label}/> : undefined;
+  if (schema.xValue) return <SlotField path={path} schema={schema} label={label}/>;
+  const kind = schemaFieldKind(schema);
+  if (kind === 'call') return <ActionRow path={path} schema={schema} label={label} optional={false} itemName=""/>;
+  return kind ? <AddressedField path={path} kind={kind} label={label}/> : undefined;
 }

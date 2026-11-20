@@ -418,6 +418,33 @@ An unresolved target, wrong type, duplicate target/argument, changed ref, or
 missing owning tile is a **semantic binding error**, not a discarded layout
 warning. Never silently use a stale cached argument.
 
+All inspector, rule and canvas document writes pass through
+`src/workspace2/editors/documentEdit.ts` before entering draft or workspace
+history; canvas preflight uses that same transaction before compilation.
+Structural edits reconcile both `logicUseBindings` and saved-component parameter
+field bindings with the canonical resolver, anchors and document-model uses.
+Surviving subtrees carry their references to the new address, including a stable
+composition node moving between pages. Extraction, Unlink and Duplicate Rule
+supply explicit relocation/copy provenance; compiler expansion supplies
+one-to-many component-argument destinations. Removed targets lose their dependent
+bindings; an absent optional default retains its value binding while its holder
+survives. Unrelated binding records remain byte-identical.
+Undo and redo restore the complete reconciled snapshots, never a separate
+metadata patch. Valid canvas roots, positions and group memberships follow
+surviving origins and are re-encoded against freshly lifted blocks. Only removed
+blocks lose their associations; invalid imported layout stays available for
+explicit reset/export.
+
+The binding resolver is authoritative, not the cached authored argument.
+Save as Logic Template, duplication, Unlink and Delete Template read its resolved
+projection, as do inspector evaluation, setting displays and sentences.
+Extraction promotes dependent fields to explicit parameters rather
+than baking one placement's default into the new template. Unlink remaps component
+parameters through every compiler expansion landing, preserving distinct values
+at different placements. The permanent 119-case meaning invariant checks effective
+sources, arguments, tints, every Then branch and live canvas/group associations
+before editing and after edit/undo/redo, across seven binding fixtures.
+
 Bindings are declarative Studio preprocessing, not new native nodes/capabilities.
 Cap at 128 bindings per document, retain existing per-component binding limits,
 and run the existing expanded-size/depth checks. This is a new Studio-only bound,
@@ -1376,6 +1403,8 @@ errors add an icon and message, stale results a clock/label, pins a pin/label.
 Do not lower wire opacity on a live value that becomes unavailable.
 
 ## 11. Wave-2 implementation plan (C-lanes)
+
+Save repeated pieces adopts the first selected tile's canvas layout for each merged field and discards the other selected tiles' layouts for that field; values and per-placement bindings remain unchanged.
 
 Five implementation lanes, no nested dispatch. The orchestrator owns assignment,
 merge order, acceptance and a later independent read-only review. These are

@@ -10,6 +10,9 @@ import { ChoiceRow } from './workspace2/SegmentRow';
 import { sourceName } from './workspace2/dialogs/sources';
 import ColorPairField, { type ColorPairValue } from './workspace2/pickers/ColorPairField';
 import InkField, { type InkValue } from './workspace2/pickers/InkField';
+import { AddressedField } from './workspace2/logic-fields/AddressedField';
+import { ActionRow } from './workspace2/editors/ActionEditor';
+import { useLogicFields } from './workspace2/logic-fields/LogicFields';
 
 /**
  * Opt-in behaviour for the workspace. Without it the form renders its plain default: generated labels, "Include"
@@ -89,6 +92,7 @@ function relationInfo(document: CompositionDocument, path: EditorPath, plain = f
 export default function CompositionFields(props: Props) {
   const { value, path, label, document, onChange, onError, options } = props;
   const problem = useContext(Rows)?.problems?.get(path.join('/'));
+  const canvas = useLogicFields();
   const leaf = (element: ReactElement) => options?.fieldPath ? <div className="field-leaf" data-field-path={path.join('/')}>{element}{problem && <p className="w2-error-text w2-field-problem" data-field-problem={path.join('/')}>{problem}</p>}</div> : element;
   const schema = resolveField(props.schema), key = fieldKey(path);
   const set = (next: Json) => onChange(replaceAt(document, path, next));
@@ -96,8 +100,11 @@ export default function CompositionFields(props: Props) {
     try { onChange(operation()); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   };
   const object = value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : undefined;
-  const slotted = object && schema.xValue ? options?.slot?.(path, schema, label) : undefined;
+  const slotted = object && (schema.xValue || canvas) ? options?.slot?.(path, schema, label) : undefined;
   if (slotted) return leaf(slotted);
+  const dedicated = canvas && options?.rows ? specialEditor(document, path, value) : undefined;
+  if (dedicated === 'predicate' || dedicated === 'operand') return leaf(<AddressedField path={path} kind={dedicated === 'predicate' ? 'condition' : 'operand'} label={label}/>);
+  if (dedicated === 'call-service') return leaf(<ActionRow path={path} schema={schema} label={label} optional={false} itemName=""/>);
   if (object?.type === 'call-service') {
     const control = path.some((_, depth) => {
       const owner = valueAt(document, path.slice(0, depth)) as Record<string, Json> | undefined;

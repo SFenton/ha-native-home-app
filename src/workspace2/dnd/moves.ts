@@ -3,6 +3,7 @@ import { isTopLevelPageComponent, withoutFoldSide } from '../../shared/compositi
 import { compositionErrors, replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { buildDocumentIndex, type SelectionKey } from '../../preview2/model';
 import { canHold, endOf, ownerTitle, type Destination } from '../add/insert';
+import { editSubtrees } from '../editors/provenance';
 
 /** Whether the move from `before` to `after` made the document worse: the compiler finds more problems in it than it did. */
 export const movedIntoProblems = (before: CompositionDocument, after: CompositionDocument) => compositionErrors(after).length > compositionErrors(before).length;
@@ -73,7 +74,7 @@ export function moveToSlot(document: CompositionDocument, key: SelectionKey, des
   // A side belongs to a component at the top level of a page: a drop anywhere else (a sheet, a section) drops it.
   const node = isTopLevelPageComponent([...end.list, at]) ? sized : withoutFoldSide(sized);
   const list = valueAt(removed, end.list) as unknown[];
-  const next = replaceAt(removed, end.list, [...list.slice(0, at), node, ...list.slice(at)]);
+  const next = editSubtrees(document, replaceAt(removed, end.list, [...list.slice(0, at), node, ...list.slice(at)]));
   if (options.validate !== false && movedIntoProblems(document, next)) throw new Error(`${entry.node.title} cannot go there`);
   return { document: next, key, placement: { position: at + 1, of: list.length + 1, title: ownerTitle(next, destination.owner) } };
 }

@@ -4,6 +4,7 @@ import { compileCompositionDocument } from './shared/composition/compiler';
 import { CompositionValidationError } from './shared/composition/json';
 import { normaliseFoldSides } from './shared/composition/fold-sides-normalise';
 import { pruneEntitySources } from './workspace2/dialogs/sources';
+import { documentEdit } from './workspace2/editors/documentEdit';
 import { sameJson } from './sameJson';
 import type { CompositionDocument, CompositionPublication } from './shared/composition/schema';
 import type { HaPublishResult } from './ha-publication';
@@ -64,6 +65,8 @@ export function useCompositionStudio() {
   const whenIdle = useCallback(async () => { while (locked.current) await idle.current; }, []);
   const latestDocument = useCallback(() => current.current, []);
   const [error, setError] = useState(''), [status, setStatus] = useState(''), [conflict, setConflict] = useState(false);
+  const saveFailure = useRef<unknown>(undefined);
+  const latestSaveFailure = useCallback(() => saveFailure.current, []);
   const [publishedRevision, setPublishedRevision] = useState<number>();
   const [homeAssistant, setHomeAssistant] = useState<HaPublishResult>();
   const [houseImport, setHouseImport] = useState<HouseImportReport>();
@@ -95,7 +98,11 @@ export function useCompositionStudio() {
   const apply = useCallback((edit: CompositionDocument, group?: string) => {
     if (!current.current || sameJson(edit, current.current)) return;
     // A side of the hinge lives only on a page's top-level components: whatever the edit nested, moved or copied, it leaves none elsewhere (`sh.fold-sides@1`).
-    const next = pruneEntitySources(current.current, normaliseFoldSides(edit));
+    const linked = documentEdit(current.current, edit);
+    if (linked === current.current) return;
+    const normalised = pruneEntitySources(current.current, normaliseFoldSides(linked));
+    const next = documentEdit(linked, normalised);
+    if (next === linked && normalised !== linked && !sameJson(normalised, linked)) return;
     if (sameJson(next, current.current)) return;
     const path = group ? `group:${group}` : textEditPath(current.current, next), at = Date.now();
     const joins = path !== undefined && typing.current?.path === path && (group !== undefined || at - typing.current.at < UNDO_COALESCE_MS) && past.current.length > 0;
@@ -112,7 +119,11 @@ export function useCompositionStudio() {
     return next;
   }, []);
   const save = useCallback(async (publish: boolean | 'home-assistant' = false, keepLocal = false) => {
-    if (locked.current || !metadata.current || !current.current) return false;
+    saveFailure.current = undefined;
+    if (locked.current || !metadata.current || !current.current) {
+      saveFailure.current = new Error('Wait for the current operation and load the workspace before saving.');
+      return false;
+    }
     acquire(); setBusy(true); setError(''); setStatus('');
     try {
       let expected = metadata.current.revision;
@@ -129,7 +140,7 @@ export function useCompositionStudio() {
         setStatus(`Published revision ${published.revision}.`);
       } else setStatus(`Saved draft revision ${next.revision}`);
       return true;
-    } catch (reason) { report(reason); return false; }
+    } catch (reason) { saveFailure.current = reason; report(reason); return false; }
     finally { free(); setBusy(false); }
   }, [persist, report, acquire, free]);
   /** Adds the layout parts missing from the saved draft from the live house config, then reloads the draft. */
@@ -210,6 +221,6 @@ export function useCompositionStudio() {
   return {
     document, envelope, publishedRevision, homeAssistant, houseImport, importHouse, backup, refreshBackup, startFromPublished, restorePreviousDraft, setStatus, busy, error, status, conflict, dirty,
     canUndo: past.current.length > 0, canRedo: future.current.length > 0,
-    apply, save, reload, undo, redo, revert, setError, report, whenIdle, latestDocument, isSaved,
+    apply, save, reload, undo, redo, revert, setError, report, whenIdle, latestDocument, latestSaveFailure, isSaved,
   };
 }

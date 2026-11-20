@@ -14,6 +14,7 @@ import { categories, isTreeCategory, type Category, type Tier } from './layout';
 import type { Library } from './useLibrary';
 import type { LibraryTrail } from './useLibraryTrail';
 import type { Workspace2 } from './useWorkspace2';
+import { useLogicFields } from './logic-fields/LogicFields';
 
 /** The rail button of a category, for returning focus to it. */
 const railButton = (category: Category) => window.document.querySelector<HTMLElement>(`.w2-lib-rail [data-category="${category}"]`);
@@ -29,6 +30,7 @@ export default function LibraryPanel({ ws, document, tier, category, open, shown
   library: Library; trailApi: LibraryTrail; onCategory: (category: Category) => void; onKeepPanel: (key: SelectionKey) => void; onError: (message: string) => void; onClose: () => void;
 }) {
   const flyout = tier === 'flyout';
+  const suspended = useLogicFields()?.suspended;
   const panel = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
   // The flyout takes focus in when it opens, to its category button; closing it by Close or Escape (below) gives it back to the rail.
@@ -55,7 +57,7 @@ export default function LibraryPanel({ ws, document, tier, category, open, shown
   const content = usesEntry ? <TemplateUsesLevel ws={ws} entry={usesEntry} onBack={backFromUses} onKeepPanel={onKeepPanel} onClose={flyout ? undefined : close}/> : repeatsOpen ? <RepeatsLevel ws={ws} onBack={backToRow} onClose={flyout ? undefined : close}/>
     : isTreeCategory(category)
     ? <LibraryTree ws={ws} category={category} library={library} trailApi={trailApi} onCategory={onCategory} onKeepPanel={onKeepPanel} onError={onError} onClose={flyout ? undefined : close}/>
-    : category === 'flows' ? <FlowsPanel ws={ws} library={library} onKeepPanel={onKeepPanel} onError={onError}/>
+    : category === 'flows' ? <FlowsPanel ws={suspended ? { ...ws, flowId: undefined } : ws} library={library} onKeepPanel={onKeepPanel} onError={onError}/>
     : category === 'data' ? <DataPanel ws={ws} library={library} onError={onError}/> : <LibraryPalette ws={ws} kind={category} library={library}/>;
   return <aside ref={panel} className="w2-lib-panel" data-tier={tier} data-open={shown ? '' : undefined} aria-label={info.label} onKeyDown={keys} inert={!open} data-testid="library-panel">
     {flyout && <header className="w2-lib-head w2-lib-flyout-head">

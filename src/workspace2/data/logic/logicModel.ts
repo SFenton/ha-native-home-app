@@ -1,9 +1,17 @@
 import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
 import type { CompositionDocument } from '../../../shared/composition/schema';
 import type { Json } from '../../../shared/types';
+import type { Operand } from '../../../shared/composition/expression';
 import { logicWords } from './logicWords';
+import { resolvedLogicValue, unlinkTemplate } from '../../logic-fields/templates';
+import { resolveLogicUseBindings } from '../../../shared/composition/studio-logic/bindings';
+import { replacePointer, resolveLogicAnchor } from '../../../shared/composition/studio-logic/anchors';
+import { fieldSteps } from '../../../shared/composition/components';
+import { fieldAnchor, fieldPointer, pointerPath } from '../../logic-fields/registry';
+import { operandSlot, slotOperand } from '../../expr/tokens';
+import { copySubtree, editSubtrees } from '../../editors/provenance';
 import {
-  expandKeepingHoles, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
+  argFits, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
 } from '../../../shared/composition/logic-library';
 
 /**
@@ -123,7 +131,7 @@ export function duplicateEntry(document: CompositionDocument, id: string): { doc
   if (!canAddEntry(document)) throw new Error('A document holds at most 100 logic templates');
   const name = freshName(document, `${entry.name} Copy`);
   const copyId = freshId(document, name);
-  return { document: withLibrary(document, [...libraryOf(document), { ...structuredClone(entry), id: copyId, name }]), id: copyId };
+  return { document: editSubtrees(document, withLibrary(document, [...libraryOf(document), { ...copySubtree(entry), id: copyId, name }])), id: copyId };
 }
 /** Replaces an entry's body. */
 export const setBody = (document: CompositionDocument, id: string, body: Rec): CompositionDocument => mapEntry(document, id, entry => ({ ...entry, body }));
@@ -181,7 +189,7 @@ export function updateSetting(document: CompositionDocument, id: string, name: s
 const fillHoles = (value: unknown, name: string, replacement: unknown): unknown => {
   if (Array.isArray(value)) return value.map(item => fillHoles(item, name, replacement));
   if (!isRecord(value)) return value;
-  if (value.type === 'hole' && value.name === name) return structuredClone(replacement);
+  if (value.type === 'hole' && value.name === name) return copySubtree(replacement);
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillHoles(item, name, replacement)]));
 };
 /**
@@ -199,7 +207,7 @@ export function removeSetting(document: CompositionDocument, id: string, name: s
     if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args)) { const { [name]: _gone, ...args } = value.args; return { ...value, args }; }
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'logicLibrary' ? item : strip(item)]));
   };
-  return strip(next) as CompositionDocument;
+  return editSubtrees(document, strip(next) as CompositionDocument);
 }
 
 // MARK: Uses
@@ -301,22 +309,16 @@ export const setsLine = (entry: LogicEntry): string => entry.params.length ? `Se
 
 /** A use worked out into plain logic, or undefined when it cannot be. */
 export function workedOut(document: CompositionDocument, use: unknown): unknown {
-  try { return (expandLogic({ logicLibrary: libraryOf(document), x: use }).document as { x: unknown }).x; } catch { return undefined; }
+  const effective = resolvedLogicValue(document, use);
+  try { return (expandLogic({ logicLibrary: libraryOf(document), x: effective }).document as { x: unknown }).x; } catch { return undefined; }
 }
 /** The entry's body with each setting at its Try With value: what the editor's result line works out. */
 export function bodyWithSamples(document: CompositionDocument, entry: LogicEntry): unknown {
-  return workedOut({ ...document, logicLibrary: [entry] }, makeUse(entry, defaultArgs(entry)));
+  return workedOut({ ...document, logicUseBindings: [], logicLibrary: [...libraryOf(document).filter(item => item.id !== entry.id), entry] }, makeUse(entry, defaultArgs(entry)));
 }
 /** Replaces the use at `path` with the logic it works out to, with this use's values written in (Unlink From Template). */
 export function unlinkUse(document: CompositionDocument, path: EditorPath): CompositionDocument {
-  const use = valueAt(document, path);
-  if (!isUse(use)) return document;
-  // A use inside another template's body keeps that template's own settings as settings.
-  const owner = path[0] === 'logicLibrary' && typeof path[1] === 'number' ? libraryOf(document)[path[1]] : undefined;
-  let plain: unknown;
-  try { plain = owner ? expandKeepingHoles(libraryOf(document), use, new Set(owner.params.map(param => param.name))) : workedOut(document, use); } catch { plain = undefined; }
-  if (plain === undefined) throw new Error('This use cannot be unlinked while its settings are wrong.');
-  return replaceAt(document, path, plain);
+  return isUse(valueAt(document, path)) ? unlinkTemplate(document, path) : document;
 }
 /** Unlinks every use of an entry. */
 export function unlinkAll(document: CompositionDocument, id: string): CompositionDocument {
@@ -328,7 +330,8 @@ export function unlinkAll(document: CompositionDocument, id: string): Compositio
 /** Deletes an entry; with `unlink`, each use keeps its logic. */
 export function deleteEntry(document: CompositionDocument, id: string, unlink = true): CompositionDocument {
   const base = unlink ? unlinkAll(document, id) : document;
-  return withLibrary(base, libraryOf(base).filter(entry => entry.id !== id));
+  if (unlink && usesOf(base, id).length) return document;
+  return editSubtrees(base, withLibrary(base, libraryOf(base).filter(entry => entry.id !== id)), { deleted: [['logicLibrary', libraryOf(base).findIndex(entry => entry.id === id)]] });
 }
 
 // MARK: Save as Logic Template
@@ -385,6 +388,81 @@ export function entryFromLogic(document: CompositionDocument, kind: 'value' | 'c
   return { entry, args: Object.fromEntries(named.map(({ row, name: paramName }) => [paramName, row.value])) };
 }
 
+/** Extraction reads resolved values and promotes dependent fields to explicit parameters of the new use. */
+export function saveLogicTemplate(document: CompositionDocument, path: EditorPath, kind: 'value' | 'condition' | 'operand', name: string, ticked: readonly ExtractRow[]): CompositionDocument {
+  const resolution = resolveLogicUseBindings(document), effective = resolution.document as CompositionDocument;
+  const slot = valueAt(effective, path) as { type: string };
+  const body = kind === 'value' ? slotOperand(slot) : slot;
+  if (!body) throw new Error('This field has no logic to save.');
+  const bodyPath = kind === 'value' && slot.type === 'expr' ? [...path, 'value'] : path;
+  const base = fieldPointer(bodyPath), inside = (pointer: string) => pointer === base || pointer.startsWith(`${base}/`);
+  const made = entryFromLogic(document, kind === 'condition' ? 'condition' : 'value', name, body, ticked);
+  const targets = new Map<string, { kind: LogicParam['kind']; group: string }>();
+  const automatic = resolution.bindings.flatMap((binding, index) => {
+    if (!inside(binding.usePointer)) return [];
+    const pointer = `${binding.usePointer}/args/${binding.argument}`;
+    targets.set(pointer, { kind: 'source-id', group: `automatic:${document.logicUseBindings![index].from.field}` });
+    return [{ index, pointer }];
+  });
+  const component = path[0] === 'componentLibrary' ? effective.componentLibrary![Number(path[1])] : undefined;
+  const componentTargets = (component?.bindings ?? []).flatMap((binding, index) => {
+    if (!binding.nodeId) return [];
+    const target = resolveLogicAnchor(effective, { kind: 'component', id: component!.id, nodeId: binding.nodeId, field: fieldPointer(fieldSteps(binding.field)) });
+    if (!target || !inside(target.pointer)) return [];
+    const param = component!.params!.find(param => param.name === binding.param)!;
+    const value = target.value;
+    const kind = param.kind === 'source-id' ? 'source-id' : typeof value === 'string' ? 'text' : typeof value === 'number' ? 'number'
+      : argFits('operand', value) ? 'operand' : argFits('condition', value) ? 'condition' : undefined;
+    if (!kind) throw new Error('This field cannot be extracted without changing a per-place setting.');
+    targets.set(target.pointer, { kind, group: `component:${binding.param}` });
+    return [{ index, pointer: target.pointer, binding }];
+  });
+  const forced = new Map<string, string>(), groups = new Map<string, string>();
+  let templateBody: unknown = made.entry.body;
+  for (const [pointer, target] of targets) {
+    let param = groups.get(target.group);
+    if (!param) {
+      let suffix = groups.size + 1;
+      while (made.entry.params.some(param => param.name === `binding${suffix}`)) suffix++;
+      param = `binding${suffix}`;
+      groups.set(target.group, param);
+      made.entry.params.push({ name: param, kind: target.kind });
+      made.args[param] = valueAt(effective, pointerPath(pointer)) as Json;
+    }
+    forced.set(pointer, param);
+    templateBody = replacePointer(templateBody, pointer.slice(base.length), { type: 'hole', name: param });
+  }
+  const used = holesIn(templateBody);
+  made.entry = { ...made.entry, params: made.entry.params.filter(param => used.has(param.name)), body: templateBody as Rec };
+  made.args = Object.fromEntries(made.entry.params.map(param => [param.name, made.args[param.name]]));
+  if (made.entry.params.length > MAX_SETTINGS) throw new Error('This extraction needs more than eight settings to preserve its bindings.');
+  const use = makeUse(made.entry, made.args);
+  let next = replaceAt(addMadeEntry(document, made.entry), path, kind === 'value' ? operandSlot(use as unknown as Operand, slot) : use);
+  const usePath = kind === 'value' ? [...path, 'value'] : path;
+  const relocated = new Map<string, string[]>([[fieldPointer(path), [fieldPointer(path)]]]);
+  for (const [pointer, param] of forced) relocated.set(pointer, [fieldPointer([...usePath, 'args', param])]);
+  if (automatic.length) {
+    const removed = new Set(automatic.map(binding => binding.index)), seen = new Set<string>();
+    const bindings = document.logicUseBindings!.filter((_, index) => !removed.has(index));
+    for (const binding of automatic) {
+      const argument = forced.get(binding.pointer)!;
+      if (seen.has(argument)) continue;
+      seen.add(argument);
+      bindings.push({ ...document.logicUseBindings![binding.index], logicId: made.entry.id, use: fieldAnchor(next, usePath), argument });
+    }
+    next = { ...next, logicUseBindings: bindings };
+  }
+  if (component) {
+    const raw = document.componentLibrary![Number(path[1])];
+    const generated = componentTargets.filter(target => target.index >= (raw.bindings?.length ?? 0)).map(target => {
+      const anchor = fieldAnchor(next, [...usePath, 'args', forced.get(target.pointer)!]);
+      return { ...target.binding, field: fieldSteps(anchor.field).join('/') };
+    });
+    if (generated.length) next = replaceAt(next, ['componentLibrary', path[1], 'bindings'], [...raw.bindings ?? [], ...generated]);
+  }
+  return editSubtrees(document, next, { relocated, deleted: [path], fields: new Map([[fieldPointer(path), [fieldPointer(path)]]]) });
+}
+
 // MARK: Count cases
 
 /**
@@ -392,13 +470,13 @@ export function entryFromLogic(document: CompositionDocument, kind: 'value' | 'c
  * the last text, and an operand holds 64 nodes, so a count of up to 3 entities fits; more is the "more than one rule can hold" limit.
  */
 export function countCases(count: Rec): { cases: { when: Rec; then: Rec }[]; otherwise: Rec } {
-  const one = (op: 'eq' | 'above', value: number): Rec => ({ type: 'compare', op, left: structuredClone(count), right: { type: 'literal', value } });
-  const shown: Rec = { type: 'format', pattern: '{a}', args: { a: structuredClone(count) } };
+  const one = (op: 'eq' | 'above', value: number): Rec => ({ type: 'compare', op, left: copySubtree(count), right: { type: 'literal', value } });
+  const shown: Rec = { type: 'format', pattern: '{a}', args: { a: copySubtree(count) } };
   return {
     cases: [
       { when: one('eq', 0), then: { type: 'literal', value: 'None' } },
       { when: one('eq', 1), then: { type: 'literal', value: 'One' } },
-      { when: one('above', 1), then: structuredClone(shown) },
+      { when: one('above', 1), then: copySubtree(shown) },
     ],
     otherwise: { type: 'literal', value: '' },
   };

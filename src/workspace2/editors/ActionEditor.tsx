@@ -25,6 +25,8 @@ import JsonBlock from './JsonBlock';
 import { LabeledRow, TextInput } from './controls';
 import { AskFirstRow } from './AskFirst';
 import ActionRules, { ActionModeSwitch } from '../expr/ActionRules';
+import { useLogicFields } from '../logic-fields/LogicFields';
+import { DraftField } from '../logic-fields/AddressedField';
 
 // MARK: Value rows
 
@@ -43,9 +45,11 @@ const readType = (kind: ServiceFieldSpec['kind'] | undefined): 'string' | 'numbe
 /** The formula page (spec 5.5): the operand editor, as one more push; a tree deeper than two levels is edited as JSON. */
 function FormulaPage({ draft, path }: { draft: Draft; path: EditorPath }) {
   const doc = useDraftDocument(draft);
+  const canvas = useLogicFields();
   const operand = valueAt(doc, path) as Operand | undefined;
   if (!operand) return null;
   const set = (next: Json) => draft.set(replaceAt(draft.get(), path, next));
+  if (canvas) return <DraftField draft={draft} path={path} kind="operand" label="Formula"/>;
   return <div className="w2-editor-page">{operandDepth(operand) > 2
     ? <JsonBlock label="Edit as JSON" value={operand as unknown as Json} onChange={set} validate={value => operandSchema.safeParse(value).success ? undefined : 'That is not a valid formula.'}/>
     : <OperandEditor label="Formula" value={operand as any} document={doc} allowControl onChange={set}/>}</div>;

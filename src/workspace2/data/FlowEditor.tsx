@@ -15,6 +15,7 @@ import { canAddFlow, freshNames, flowById, flowLimits, hasRefresh, removeFlow, u
 import { clearSample, setHideValues, useSample } from './samples';
 import { setPickSlot } from './focus';
 import { useFlow } from './useFlow';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 /** The flow's More menu: Duplicate, Clear the Sample, Hide Values, Delete (a flow something uses cannot be deleted; the menu says what uses it). */
 export function FlowMenu({ ws, id, onError }: { ws: Workspace2; id: string; onError: (message: string) => void }) {
@@ -50,16 +51,17 @@ export function FlowMenu({ ws, id, onError }: { ws: Workspace2; id: string; onEr
  */
 export default function FlowEditor({ ws, id }: { ws: Workspace2; id: string }) {
   const { source, inputs, edit } = useFlow(id);
+  const suspended = useLogicFields()?.suspended;
   // Leaving the editor ends pick mode and returns the outline to the output.
   useEffect(() => () => { setPickSlot(undefined); }, [id]);
   if (!source || !inputs) return null;
   return <div className="w2-flow" data-testid="flow-editor">
     <section className="w2-group w2-data-section" aria-label="Name"><div className="w2-picker-row"><span className="w2-row-label">Name</span>
       <TextInput label="Name" value={inputs.title} maxLength={240} onCommit={text => { if (text.trim()) edit(held => ({ ...held, title: text })); }}/></div></section>
-    <RunBar flowId={id} inputs={inputs} onSample={json => edit(held => withSampleShape(held, json))}/>
-    <RequestSection inputs={inputs} edit={edit}/>
+    {!suspended && <RunBar flowId={id} inputs={inputs} onSample={json => edit(held => withSampleShape(held, json))}/>}
+    <RequestSection flowId={id} inputs={inputs} edit={edit}/>
     <StepList flowId={id} inputs={inputs}/>
-    <OutputSection inputs={inputs} edit={edit}/>
+    <OutputSection flowId={id} inputs={inputs} edit={edit}/>
     {hasRefresh(inputs.request) && inputs.refresh && <RefreshRow flowId={id} inputs={inputs}/>}
     <UsedBy flowId={id} onGo={(key: SelectionKey) => ws.selectAnywhere(key)}/>
   </div>;

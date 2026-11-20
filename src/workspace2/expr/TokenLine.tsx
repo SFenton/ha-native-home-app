@@ -72,7 +72,10 @@ export default function TokenLine({ label, parts, nameOf, describe, onChange, on
     if (!element) return;
     const spans = [...element.querySelectorAll('.w2-token')];
     const named = spans.length === tokens.current.length && spans.every((span, index) => span.textContent === nameOf(tokens.current[index]));
-    if (named && same(read(), tidy(parts))) return;
+    if (named && same(read(), tidy(parts))) {
+      tokens.current = parts.flatMap(part => 'token' in part ? [part.token] : []);
+      return;
+    }
     build(parts);
   });
 

@@ -4,12 +4,15 @@ import type { Predicate } from '../../shared/composition/expression';
 import EditorRow from '../editors/EditorRow';
 import { useRows } from '../rowsContext';
 import { evaluatePredicate } from '../data/logic/logicEval';
-import ConditionEditor from './ConditionEditor';
+import ConditionEditor, { PolicyRow } from './ConditionEditor';
 import { conditionCount, groupOf, markerOf, missingEntity, resultText, summary, type Scope } from './condition';
 import { Marker } from './ui';
 import { useDataTag, useDraftEnvironment, useNameContext } from './useExpr';
 import { groupCount, words, type Place } from './words';
 import { removeRuleAt, whenUnknownOf } from './removal';
+import { useFieldDraft, useLogicFields } from '../logic-fields/LogicFields';
+import { hasMultipleChecks } from '../logic-fields/checks';
+import { LogicField } from '../logic-fields/Field';
 
 /** Props of {@link ConditionField}: where it is and what the place calls things. Wiring a place is one line plus its words (spec "Where the fields are wired"). */
 export interface ConditionFieldProps {
@@ -37,6 +40,7 @@ export interface ConditionFieldProps {
  */
 export default function ConditionField({ label, title = label.replace(/(^|\s)(\w)/g, (_, space: string, letter: string) => `${space}${letter.toUpperCase()}`), path, place, itemName, policy, none = words.always, scope = 'document', policyKey = 'whenUnknown' }: ConditionFieldProps) {
   const { document, onChange, problems } = useRows();
+  const canvas = useLogicFields(), draft = useFieldDraft(document, onChange);
   const rule = valueAt(document, path) as Predicate | undefined;
   const env = useDraftEnvironment(document), ctx = useNameContext(document), tag = useDataTag();
   const tri = rule && env ? evaluatePredicate(rule, env) : undefined;
@@ -47,6 +51,10 @@ export default function ConditionField({ label, title = label.replace(/(^|\s)(\w
   const unknownPolicy = policy ? whenUnknownOf(document, path, policyKey) : undefined;
   const line2 = !rule ? '' : missing ? words.noEntity : tri === 'unknown' ? `${result} · ${unknownPolicy === 'hide' || unknownPolicy === 'disabled' ? (policy === 'enable' ? 'Disabled' : 'Hidden') : unknownPolicy === 'show' || unknownPolicy === 'enabled' ? (policy === 'enable' ? 'Enabled' : 'Shown') : 'Kept as it was'}` : env ? `${result} · ${tag}` : '';
   const name = rule ? `${label}: ${line1}.${missing ? ` ${words.noEntity}.` : tri === 'unknown' ? ` ${line2.replace(' · ', ', ')}.` : result && env ? ` ${result}, ${tag.toLowerCase()}.` : ''}` : `${label}: ${none}.`;
+  if (canvas && hasMultipleChecks(rule)) return <LogicField draft={draft} path={path} kind="condition" label={label}>
+    {policy && <PolicyRow draft={draft} path={path} policyKey={policyKey} kind={policy} place={place}/>}
+    <button type="button" className="w2-expr-remove" onClick={() => draft.set(removeRuleAt(draft.get(), path, policy ? policyKey : undefined))}>{words.removeCondition}</button>
+  </LogicField>;
   return <EditorRow label={label} title={title} summary={line1} itemName={itemName} document={document} onApply={onChange} path={path.join('/')}
     remove={rule ? { label: words.removeCondition, run: draft => draft.set(removeRuleAt(draft.get(), path, policy ? policyKey : undefined)) } : undefined}
     head={start => <div className="w2-expr-fieldrow" data-field-path={path.join('/')} data-has-condition={rule ? '' : undefined}>
@@ -59,6 +67,6 @@ export default function ConditionField({ label, title = label.replace(/(^|\s)(\w
       </button>
       {problem && <p id={`${path.join('-')}-problem`} className="w2-error-text w2-expr-problem" data-field-problem={path.join('/')}>{problem}</p>}
     </div>}>
-    {draft => <ConditionEditor draft={draft} path={path} place={place} scope={scope} policy={policy} policyKey={policyKey}/>}
+    {draft => <ConditionEditor draft={draft} path={path} label={label} place={place} scope={scope} policy={policy} policyKey={policyKey}/>}
   </EditorRow>;
 }

@@ -8,6 +8,9 @@ import { TextInput } from '../editors/controls';
 import { heldEntity } from './samples';
 import EntitiesChooser from './EntitiesChooser';
 import { defaultInputs, flowLimits, requestKind, requestKinds, requestWords, type RequestKind } from './flow';
+import { AddressedField } from '../logic-fields/AddressedField';
+import { useRows } from '../rowsContext';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 const forecastWords: Record<typeof forecastTypes[number], string> = { daily: 'Daily', hourly: 'Hourly', twice_daily: 'Twice Daily' };
 const feedWords = { 'todo-items': 'To-do Items', 'weather-forecast': 'Weather Forecast' } as const;
@@ -24,8 +27,10 @@ export const withSampleShape = (inputs: PipelineInputs, json: Json): PipelineInp
  * The Request section: "Get data from" with its five choices, then the rows each choice needs (studio-ux2 L-data, "A Group of Entities, and Nothing"). Changing the
  * choice starts the flow again from that choice, keeping its name.
  */
-export default function RequestSection({ inputs, edit }: { inputs: PipelineInputs; edit: (change: (inputs: PipelineInputs) => PipelineInputs) => void }) {
+export default function RequestSection({ inputs, edit, flowId }: { inputs: PipelineInputs; edit: (change: (inputs: PipelineInputs) => PipelineInputs) => void; flowId?: string }) {
   const { entities, house } = useWorkspaceData();
+  const rows = useRows(), canvas = useLogicFields();
+  const at = rows.document.dataSources.findIndex(source => source.id === flowId);
   const request = inputs.request, kind = requestKind(request), entity = entityOf(request);
   const setKind = (next: RequestKind) => {
     const domain = next === 'service' || next === 'live-list' ? 'todo' : next === 'group' ? 'light' : 'sensor';
@@ -75,7 +80,9 @@ export default function RequestSection({ inputs, edit }: { inputs: PipelineInput
         </div>}
       </PickerRow>
     </>}
-    {request.type === 'none' && <div className="w2-picker-row"><span className="w2-row-label">Value</span>
+    {request.type === 'none' && canvas && at >= 0
+      ? <AddressedField path={['dataSources', at, 'inputs', 'request', 'value']} kind="operand" label="Value"/>
+      : request.type === 'none' && <div className="w2-picker-row"><span className="w2-row-label">Value</span>
       <TextInput label="Value" value={request.value.type === 'literal' ? String(request.value.value ?? '') : ''} placeholder="A fixed value"
         onCommit={text => edit(held => held.request.type === 'none' ? { ...held, request: { type: 'none', value: { type: 'literal', value: text } } } : held)}/></div>}
   </section>;

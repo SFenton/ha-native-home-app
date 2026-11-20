@@ -7,16 +7,27 @@ import EntityList from '../pickers/EntityList';
 import { useWorkspaceData } from '../pickers/WorkspaceData';
 import { SelectMenu } from '../SelectMenu';
 import { TextInput } from '../editors/controls';
-import type { Draft } from '../editors/draft';
+import { useDraftDocument, type Draft } from '../editors/draft';
 import { ComparisonControls, leftKind, numericState } from './ComparisonControls';
-import { closeSimple, openSimple, operandForChoice, readChoiceOf, readOperand, sourceOfOperand, withLeft, type Leaf, type NameContext, type ReadChoice } from './condition';
+import { closeSimple, openSimple, operandForChoice, operandName, readChoiceOf, readOperand, sourceOfOperand, withLeft, type Leaf, type NameContext, type ReadChoice } from './condition';
 import { knownAttributes } from './appState';
 import { GroupLabel } from './ui';
 import { words } from './words';
+import ValuePicker from './ValuePicker';
+import { defaultFor } from './LogicBuilder';
 
 const SIMPLE_COMPARISONS = ['is', 'is not', 'is one of', 'is not one of', 'is above', 'is below'] as const;
 /** The first word a new "is" starts with: the entity's current state, else "on". */
 const unitOf = (state?: string) => /^-?[\d.]+\s+(.+)$/.exec(state ?? '')?.[1];
+
+export type ReadLeaf = (document: CompositionDocument) => Leaf | undefined;
+
+export function DraftReadRow({ draft, readLeaf, onChange }: { draft: Draft; readLeaf: ReadLeaf; onChange: (leaf: Leaf) => void }) {
+  const document = useDraftDocument(draft), leaf = readLeaf(document);
+  const sourceId = sourceOfOperand(leaf?.left);
+  const entityId = sourceId ? sourceEntity(document.dataSources.find(source => source.id === sourceId)) : undefined;
+  return leaf ? <ReadRow leaf={leaf} entityId={entityId} onChange={onChange}/> : null;
+}
 
 /**
  * The "Read" pop-up: State, Raw State (which tells Unknown from Unavailable), then each attribute Home Assistant reports with its value now (a list
@@ -64,7 +75,7 @@ export function ReadRow({ leaf, entityId, onChange }: { leaf: Leaf; entityId: st
  * The Simple editor (spec "The condition editor: Simple"): When, the entity, Read when it has attributes, a comparison and its value.
  * It writes the shipped leaves (D6) and never rewrites a condition it only shows.
  */
-export default function SimpleCondition({ draft, rule, ctx, write }: { draft: Draft; rule: Predicate | undefined; ctx: NameContext; write: (next: Predicate | undefined, document?: CompositionDocument, typing?: string) => void }) {
+export default function SimpleCondition({ draft, rule, ctx, write, compact = false, readLeaf }: { draft: Draft; rule: Predicate | undefined; ctx: NameContext; write: (next: Predicate | undefined, document?: CompositionDocument, typing?: string) => void; compact?: boolean; readLeaf?: ReadLeaf }) {
   const { entities } = useWorkspaceData();
   const leaf = openSimple(rule);
   const leftSource = sourceOfOperand(leaf?.left);
@@ -80,14 +91,23 @@ export default function SimpleCondition({ draft, rule, ctx, write }: { draft: Dr
     write(closeSimple(next, id2 => sourceEntity(made.document.dataSources.find(source => source.id === id2)) !== undefined), made.document);
   };
   const kind = leaf ? leftKind(leaf, ctx, row?.state?.split(' ')[0]) : 'text';
-  return <div className="w2-expr-simple" data-testid="simple-condition">
-    <GroupLabel>{words.when}</GroupLabel>
-    <PickerRow stacked title="Entity" path="when" primary={row?.name ?? entityId ?? <span className="w2-placeholder">Choose</span>} secondary={entityId && row?.name !== entityId ? entityId : undefined}>
-      {close => <EntityList onPick={picked => { pick(picked.entityId); close(); }}/>}
+  return <div className="w2-expr-simple" data-compact={compact || undefined} data-testid="simple-condition">
+    {!compact && <GroupLabel>{words.when}</GroupLabel>}
+    <PickerRow stacked title="Entity" path="when" primary={compact && leaf ? operandName(leaf.left, ctx) : row?.name ?? entityId ?? <span className="w2-placeholder">Choose</span>} secondary={!compact && entityId && row?.name !== entityId ? entityId : undefined}>
+      {close => compact ? <>
+        <ValuePicker draft={draft} conditions onPick={picked => {
+          const sourceId = picked.operand.type === 'read' && picked.operand.from.path.length === 1 && picked.operand.from.path[0] === 'state' ? picked.operand.from.sourceId : undefined;
+          const entity = sourceId ? sourceEntity(picked.document.dataSources.find(source => source.id === sourceId)) : undefined;
+          if (entity && !picked.predicate) pick(entity);
+          else write(defaultFor(picked), picked.document);
+          close();
+        }}/>
+        {readLeaf ? <DraftReadRow draft={draft} readLeaf={readLeaf} onChange={commit}/> : leaf && <ReadRow leaf={leaf} entityId={entityId} onChange={commit}/>}
+      </> : <EntityList onPick={picked => { pick(picked.entityId); close(); }}/>}
     </PickerRow>
     {leaf && <>
-      <ReadRow leaf={leaf} entityId={entityId} onChange={commit}/>
-      <ComparisonControls numeric={numericState(row?.state)} leaf={leaf} onChange={commit} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} unit={unitOf(row?.state)} allowed={leaf.left.type === 'last-changed' ? ['is before', 'is after'] : SIMPLE_COMPARISONS}/>
+      {!compact && <ReadRow leaf={leaf} entityId={entityId} onChange={commit}/>}
+      <ComparisonControls compact={compact} numeric={numericState(row?.state)} leaf={leaf} onChange={commit} kind={kind} states={row?.state ? [row.state.split(' ')[0]] : []} unit={unitOf(row?.state)} allowed={leaf.left.type === 'last-changed' ? ['is before', 'is after'] : SIMPLE_COMPARISONS}/>
     </>}
   </div>;
 }

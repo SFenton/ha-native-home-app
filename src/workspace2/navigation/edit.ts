@@ -6,6 +6,7 @@ import { collectLinks, type SurfaceRef } from '../outline';
 import { groupWithRoom } from '../capacity';
 import { cloneNode } from '../util';
 import { foldSidesShipped } from '../layout/fold-sides-edit';
+import { copySubtree, editSubtrees } from '../editors/provenance';
 
 type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
@@ -69,13 +70,13 @@ export interface Added { document: CompositionDocument; id: string }
  */
 export function addPage(document: CompositionDocument, name: string, from?: SurfaceRef): Added {
   const page = blankPage(document, freshName(document.pages.map(item => item.title), name));
-  const next = structuredClone(document);
+  const next = copySubtree(document);
   next.pages.push(page);
   if (from) {
     const owner = surfaces(next, from.kind).find(item => item.id === from.id);
     owner?.components.push(linkTile(page.title, page.id) as never);
   }
-  return { document: next, id: page.id };
+  return { document: editSubtrees(document, next), id: page.id };
 }
 
 /** Adds a sheet named `name` of `height`; with `fullScreen` it is a Modal (covers the whole screen, always full height). */
@@ -139,7 +140,8 @@ export function duplicateSurface(document: CompositionDocument, ref: SurfaceRef)
   copy.id = uid(ref.kind === 'page' ? 'page' : 'modal');
   copy.title = freshName(list.map(item => item.title), `${source.title} copy`);
   copy.components = source.components.map(node => cloneNode(node));
-  return { document: replaceAt(document, [keyOf(ref.kind)], [...list.slice(0, at + 1), copy, ...list.slice(at + 1)]), id: copy.id };
+  return { document: editSubtrees(document, replaceAt(document, [keyOf(ref.kind)], [...list.slice(0, at + 1), copy, ...list.slice(at + 1)]),
+    { copied: [{ from: [keyOf(ref.kind), at], to: [keyOf(ref.kind), at + 1] }] }), id: copy.id };
 }
 
 /** How many actions open a page or sheet (a tab opening a page counts too). */
