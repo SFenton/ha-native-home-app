@@ -150,10 +150,10 @@ test.describe('the flow editor', () => {
     await panel.getByRole('button', { name: /^Overdue Chores/ }).click();
     const props = page.getByLabel('Properties');
     await props.getByRole('button', { name: 'Add Step' }).click();
-    await page.getByRole('menuitem', { name: 'Average · Needs a newer app', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Average', exact: true }).click();
     await props.getByRole('button', { name: /^Step 3, Average/ }).click();
     await expect(props.getByRole('button', { name: 'Average of' })).toBeVisible();
-    await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toBeVisible();
+    await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toHaveCount(0);
     await props.getByRole('button', { name: 'Cancel' }).click();
   });
 });

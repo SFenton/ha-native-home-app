@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { closePagesList, isPhone, openChecksFromBar, openPagesList, openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
+import { closePagesList, isPhone, openPagesList, openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
 
 /**
  * The Partly Folded rows (`sh.fold-sides@1`, `studio-duo-sim` L3): the page's Two Sides / One Column switch, a section's own side, the dimmed row of a nested
@@ -112,23 +112,17 @@ test('Show Partly Folded: the caption offers the pose while the simulator is in 
   await expect(link).toHaveCount(0);
 });
 
-test('while the app cannot read the id: the rows say so, "Use Two Sides on Every Page" is not offered, and a page that uses it is warned about in Checks and in Publish', async ({ page, request }) => {
+test('the app lists the id: the rows do not say it waits for an app update, and a page that uses it is not warned about in Checks or in Publish', async ({ page, request }) => {
   await openWorkspace(page);
   const panel = await openHomeSettings(page);
-  await expect(row(panel).getByText('The app can’t show this yet. Publishing it waits for an app update.')).toBeVisible();
-  await expect(row(panel).getByRole('button', { name: 'Use Two Sides on Every Page' })).toHaveCount(0);
+  await expect(row(panel).getByText('The app can’t show this yet. Publishing it waits for an app update.')).toHaveCount(0);
   await row(panel).getByRole('button', { name: 'Two Sides', exact: true }).click();
   await expect.poll(async () => home(await draft(request)).layout.foldSides).toBe('auto');
   // On a phone the properties are a sheet over the page: it closes first, and Checks is Project's first row.
   if (isPhone(page)) { await page.keyboard.press('Escape'); await expect(page.getByLabel('Properties')).toHaveCount(0); }
-  // Checks carries the warning as a suggestion; Publish repeats it in its dialog.
-  // The desk's status tag opens Checks only for a problem; a suggestion is reached through the Checks pill.
-  if (isPhone(page)) await openChecksFromBar(page); else await page.getByTestId('checks-pill').click();
-  await expect(page.getByText(/Partly Folded, which the app does not have yet/).first()).toBeVisible();
-  await page.keyboard.press('Escape');
-  if (isPhone(page)) { await page.keyboard.press('Escape'); await expect(page.locator('.w2-project-sheet')).toHaveCount(0); }
+  // Publish does not repeat a pending warning in its dialog.
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
-  await expect(page.locator('[data-pending-warning]')).toContainText('Partly Folded, which the app does not have yet');
+  await expect(page.locator('[data-pending-warning]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();
 });
 

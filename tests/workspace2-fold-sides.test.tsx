@@ -86,17 +86,14 @@ describe('the pure edits', () => {
     expect(showsPartlyFolded(duoWindow({ turn: 90, fold: 'partly' }))).toBe(false);
     expect(showsPartlyFolded(duoWindow({ turn: 0, fold: 'open' }))).toBe(false);
   });
-  it('gives a new page no switch while the app has not shipped the id, so a publication is never refused for it', () => {
-    expect(foldEdit.foldSidesShipped()).toBe(false);
-    expect('foldSides' in blankPage(home, 'New').layout).toBe(false);
-    // A copy of a first page that has the switch does not carry it over either.
-    expect('foldSides' in blankPage(on(home), 'New').layout).toBe(false);
+  it('treats the id as shipped, so a new page starts on Two Sides', () => {
+    expect(foldEdit.foldSidesShipped()).toBe(true);
+    expect(blankPage(home, 'New').layout.foldSides).toBe('auto');
     const document = { ...home, pages: [...home.pages, blankPage(home, 'New')] } as CompositionDocument;
-    expect(compileCompositionDocument(document).capabilities).not.toContain('sh.fold-sides@1');
+    expect(compileCompositionDocument(document).capabilities).toContain('sh.fold-sides@1');
   });
-  it('gives a new page the switch once the id has shipped, and a new sheet none', () => {
+  it('gives a new page the switch, and a new sheet none', () => {
     expect(blankPage(home, 'New', true).layout.foldSides).toBe('auto');
-    vi.spyOn(foldEdit, 'foldSidesShipped').mockReturnValue(true);
     expect(blankPage(home, 'New').layout.foldSides).toBe('auto');
     expect('foldSides' in blankSheet(home, 'Sheet', 'fitted').layout).toBe(false);
     const document = { ...home, pages: [...home.pages, blankPage(home, 'New', true)], modals: [...home.modals, blankSheet(home, 'Sheet', 'fitted')] } as CompositionDocument;
@@ -207,17 +204,14 @@ describe('the page row', () => {
     expect(overrideCount((seen.mock.calls[0][0] as CompositionDocument).pages[homeIndex])).toBe(0);
     expect((screen.getByRole('button', { name: 'Reset Sides' }) as HTMLButtonElement).disabled).toBe(true);
   });
-  it('says the app cannot show it yet, and does not offer "Use Two Sides on Every Page", while the id is pending', () => {
+  it('does not say the app cannot show it yet, because the id is shipped', () => {
     render(<Surface document={home} target={{ kind: 'page', id: 'page-home' }}/>);
-    expect(screen.getByText(WAITING_CAPTION, { exact: false })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Use Two Sides on Every Page' })).toBeNull();
+    expect(screen.queryByText(WAITING_CAPTION, { exact: false })).toBeNull();
     cleanup();
     render(<Surface document={on(home)} target={{ kind: 'node', id: 'hc-weather-summary' }}/>);
-    expect(screen.getByText(WAITING_CAPTION, { exact: false })).toBeTruthy();
+    expect(screen.queryByText(WAITING_CAPTION, { exact: false })).toBeNull();
   });
-  it('offers "Use Two Sides on Every Page" once the id has shipped, once, as one change to every page', () => {
-    vi.spyOn(foldEdit, 'foldSidesShipped').mockReturnValue(true);
-    expect(screen.queryByText(WAITING_CAPTION)).toBeNull();
+  it('offers "Use Two Sides on Every Page", once, as one change to every page', () => {
     const seen = vi.fn();
     render(<Surface document={home} target={{ kind: 'page', id: 'page-home' }} seen={seen}/>);
     fireEvent.click(screen.getByRole('button', { name: 'Use Two Sides on Every Page' }));

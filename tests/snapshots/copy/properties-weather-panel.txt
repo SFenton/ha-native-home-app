@@ -35,7 +35,6 @@ Across the Top
 Leading Side
 Trailing Side
 Where this section sits when iPhone Duo is partly folded sideways. Other windows are unchanged.
-The app can’t show this yet. Publishing it waits for an app update.
 Behavior
 When tapped
 Opens Weather
@@ -86,7 +85,6 @@ Across the Top
 Leading Side
 Trailing Side
 Where this section sits when iPhone Duo is partly folded sideways. Other windows are unchanged.
-The app can’t show this yet. Publishing it waits for an app update.
 Behavior
 When tapped
 Opens Weather

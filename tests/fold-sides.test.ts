@@ -16,32 +16,30 @@ const bytes = (file: string) => readFileSync(path.join(corpus, file));
 const envelope = (file: string) => JSON.parse(bytes(file).toString('utf8'));
 
 describe('sh.fold-sides@1 corpus', () => {
-  it('is pending and sorted, and holds the cases of the design: 10 compile (nine pending) and 12 are refused', () => {
-    expect(pendingCompositionCapabilities).toContain('sh.fold-sides@1');
-    expect(JSON.parse(readFileSync(path.join(corpus, 'capabilities.pending.json'), 'utf8'))).toContain('sh.fold-sides@1');
+  it('is shipped and not pending, and holds the cases of the design: 10 compile and 12 are refused', () => {
+    expect(pendingCompositionCapabilities).not.toContain('sh.fold-sides@1');
+    expect(JSON.parse(readFileSync(path.join(corpus, 'capabilities.pending.json'), 'utf8'))).not.toContain('sh.fold-sides@1');
     expect([...pendingCompositionCapabilities]).toEqual([...pendingCompositionCapabilities].sort());
-    expect(ours.filter(item => item.pending && !item.studioIssue).length).toBe(9);
-    expect(ours.filter(item => item.outcome === 'accept').length).toBe(1);
-    expect(ours.filter(item => item.studioIssue || (item.outcome === 'reject' && !item.pending)).length).toBe(12);
+    expect(ours.filter(item => item.outcome === 'accept').length).toBe(10);
+    expect(ours.filter(item => item.outcome === 'reject' && !item.pending).length).toBe(12);
+    expect(ours.some(item => item.pending)).toBe(false);
   });
-  it('is not in the app\'s list yet: the shipped list does not name it', () => {
-    expect(JSON.parse(readFileSync(path.join(corpus, 'capabilities.json'), 'utf8'))).not.toContain('sh.fold-sides@1');
+  it('is in the app\'s list: the shipped list names it', () => {
+    expect(JSON.parse(readFileSync(path.join(corpus, 'capabilities.json'), 'utf8'))).toContain('sh.fold-sides@1');
   });
-  it.each(ours.filter(item => item.pending && !item.studioIssue))('compiles $file and declares the id; the shipped list refuses it first', item => {
+  it.each(ours.filter(item => item.outcome === 'accept' && item.file.includes('/fold-sides-') && !item.file.includes('no-fields')))('compiles $file and declares the id', item => {
     const document = envelope(item.file);
     expect(() => decodeCompositionPublication(bytes(item.file))).not.toThrow();
     expect(document.capabilities).toContain('sh.fold-sides@1');
     expect(legacyManifest(compileCompositionDocument(document.document).capabilities)).toEqual(legacyManifest(document.capabilities));
-    expect(item.issue?.code).toBe('unsupported_capability');
   });
-  it.each(ours.filter(item => item.studioIssue || (item.outcome === 'reject' && !item.pending)).map(item => ({ ...item, expected: item.studioIssue ?? item.issue! })))('refuses $file with its own code at its own pointer', item => {
+  it.each(ours.filter(item => item.outcome === 'reject').map(item => ({ ...item, expected: item.issue! })))('refuses $file with its own code at its own pointer', item => {
     let first: { code: string; pointer: string } | undefined;
     try { decodeCompositionPublication(bytes(item.file)); } catch (error) {
       if (!(error instanceof CompositionValidationError)) throw error;
       first = error.issues[0];
     }
     expect({ code: first?.code, pointer: first?.pointer }).toEqual({ code: item.expected.code, pointer: item.expected.pointer });
-    if (item.pending) expect(item.issue?.code).toBe('unsupported_capability');
   });
   it('declares the id exactly when a page names a side or the switch', () => {
     const plain = envelope('accept/fold-sides-no-fields-needs-no-id.json');
@@ -146,7 +144,7 @@ describe('compiling sides', () => {
     expect(issues.map(issue => issue.pointer)).toEqual(['/document/pages/2/components/1/layout/foldSide']);
   });
   it('reads a saved component\'s side from the place, and refuses one the body names', () => {
-    const body = envelope('reject/pending-fold-sides-component-ref-carries-a-side.json').document;
+    const body = envelope('accept/fold-sides-component-ref-carries-a-side.json').document;
     expect(compileIssues(body)).toEqual([]);
     expect(compileCompositionDocument(body).capabilities).toContain('sh.fold-sides@1');
     const named = envelope('reject/fold-sides-body-names-a-side.json').document;
