@@ -1,18 +1,18 @@
 import { valueAt, type EditorPath } from '../../composition-editor';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { fieldSteps, ownedSources } from '../../shared/composition/components';
-import { atPointer, resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
+import { atPointer, resolveLogicAnchor, type ResolvedLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
 import { sameJson } from '../../sameJson';
 import { usesOf } from '../data/logic/logicModel';
-import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
-import { rebaseCanvasLayout, uncertifiedCanvasRoots } from '../logic-fields/layout';
+import { AnchorResolver, authoredNodes, fieldAnchor, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
+import { canvasWalk, rebaseCanvasLayout, uncertifiedCanvasRoots, walkedNodes } from '../logic-fields/layout';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { toastManager } from '../toasts';
 import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
-import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
+import { logicUseBindingsSchema, studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
 import type { LogicAnchor } from '../../shared/composition/graph/types';
-import { changedPaths, EditDependencies } from './editDependencies';
+import { changedPaths, EditDependencies, readTrie, reads, type ReadTrie } from './editDependencies';
 
 export interface EditReferences {
   readonly relocated?: ReadonlyMap<string, readonly string[]>;
@@ -51,10 +51,13 @@ interface ReferenceIndex {
   /** The witness pointers behind each key in `evidence`. */
   readonly holders: ReadonlyMap<string, readonly string[]>;
   /**
-   * Every object of the indexed revision and of each revision the index was carried to (a superset, only ever widened).
-   * An object outside it is fresh: it can occur in a later revision only where an edit placed it.
+   * With the keys of `counts` (every object of the indexed revision), every object of each revision the index was carried
+   * to (a superset, only ever widened). An object outside both is fresh: it can occur in a later revision only where an
+   * edit placed it.
    */
   readonly members: WeakSet<object>;
+  /** How often each object occurs in the indexed revision. */
+  readonly counts: ReadonlyMap<object, number>;
   /** Keys whose witness could not be carried forward; every edit reconciles these. */
   readonly always: ReadonlySet<string>;
   /** Canvas roots a full rebase would not give back unchanged; every edit rebases these. */
@@ -68,6 +71,14 @@ interface ReferenceIndex {
   usable?: true;
 }
 const revisions = new WeakMap<CompositionDocument, ReferenceIndex>();
+/** `studioCanvasMetadataSchema.safeParse` of committed layout metadata, by its object (shared by revisions that keep it). */
+const parsedLayouts = new WeakMap<object, ReturnType<typeof studioCanvasMetadataSchema.safeParse>>();
+function parsedCanvas(value: unknown): ReturnType<typeof studioCanvasMetadataSchema.safeParse> {
+  if (value === null || typeof value !== 'object') return studioCanvasMetadataSchema.safeParse(value);
+  let parsed = parsedLayouts.get(value);
+  if (!parsed) { parsed = studioCanvasMetadataSchema.safeParse(value); parsedLayouts.set(value, parsed); }
+  return parsed;
+}
 const rootsOf = (metadata: StoredStudioCanvasMetadata) => metadata.canvases.map(canvas => [canvas.id, canvas.roots.map(root => [root.id, root.anchor])]);
 function objectPaths(value: unknown, prefix: EditorPath = []): Map<object, EditorPath[]> {
   const paths = new Map<object, EditorPath[]>();
@@ -90,13 +101,12 @@ function entryObjectPaths(document: CompositionDocument, entry: Pick<ComponentEn
   return at < 0 ? new Map() : objectPaths(document.componentLibrary![at], ['componentLibrary', at]);
 }
 
-/** How often each object occurs in `document`, adding each to `members`. */
-function objectCounts(document: CompositionDocument, members: WeakSet<object>): Map<object, number> {
+/** How often each object occurs in `document`. */
+function objectCounts(document: CompositionDocument): Map<object, number> {
   const counts = new Map<object, number>();
   const visit = (value: unknown) => {
     if (value === null || typeof value !== 'object') return;
     counts.set(value, (counts.get(value) ?? 0) + 1);
-    members.add(value);
     for (const child of Object.values(value)) visit(child);
   };
   visit(document);
@@ -152,6 +162,8 @@ const ownerLists = { page: 'pages', modal: 'modals', component: 'componentLibrar
 interface IndexBuild {
   readonly dependencies: EditDependencies;
   readonly before: CompositionDocument;
+  /** `resolveLogicAnchor(before, ...)`, from indexes. */
+  readonly resolver: AnchorResolver;
   /** Shared scans already observed. */
   readonly scans: Set<string>;
   /** Owner-or-node pointer by owner kind, owner ID and node ID, so a page is not rescanned for every anchor on it. */
@@ -162,16 +174,52 @@ const baseKey = (anchor: Exclude<LogicAnchor, { kind: 'document' }>) => JSON.str
 /** `resolveLogicAnchor`'s owner (or node) step, memoized for one index build. */
 function anchorBase(build: IndexBuild, anchor: Exclude<LogicAnchor, { kind: 'document' }>): string | undefined {
   const key = baseKey(anchor);
-  if (!build.bases.has(key)) build.bases.set(key, resolveLogicAnchor(build.before, { ...anchor, field: '' })?.pointer);
+  if (!build.bases.has(key)) build.bases.set(key, build.resolver.resolve({ ...anchor, field: '' })?.pointer);
   return build.bases.get(key);
 }
 
 /** `resolveLogicAnchor(before, anchor)?.pointer`, reusing the memoized owner/node step and then its final field step. */
 function anchorPointer(build: IndexBuild, anchor: LogicAnchor): string | undefined {
-  if (anchor.kind === 'document') return resolveLogicAnchor(build.before, anchor)?.pointer;
+  if (anchor.kind === 'document') return build.resolver.resolve(anchor)?.pointer;
   const base = anchorBase(build, anchor);
   if (base === undefined) return undefined;
   return atPointer(valueAt(build.before, pointerPath(base)), anchor.field) === undefined ? undefined : `${base}${anchor.field}`;
+}
+
+/**
+ * What the canonical node scan (`resolveLogicAnchor` with a node ID) reads in one owner, relative to it, given that the
+ * owner list scan matched that owner: recorded through the resolver itself, on a document holding just that owner, so
+ * these are its own reads. Each walked node (an entry's `node`, each of a surface's `components`) is recorded once per
+ * object and its trie shared wherever it is placed; each owner's trie is memoized too. The scan reads nothing outside
+ * the matched owner beyond the list scan, so for a committed owner object the reads are fixed.
+ */
+const walkReads = new WeakMap<object, ReadTrie>(), ownerWalks = { component: new WeakMap<object, ReadTrie>(), surface: new WeakMap<object, ReadTrie>(), other: new WeakMap<object, ReadTrie>() };
+function nodeReads(node: object): ReadTrie {
+  let known = walkReads.get(node);
+  if (!known) {
+    const base = '/pages/0/components/0';
+    known = readTrie(reads({ pages: [{ id: '', components: [node] }] }, document => resolveLogicAnchor(document, { kind: 'page', id: '', nodeId: '', field: '' }))
+      .filter(([pointer]) => pointer.startsWith(`${base}/`)).map(([pointer, exact]) => [pointer.slice(base.length), exact] as const));
+    walkReads.set(node, known);
+  }
+  return known;
+}
+function ownerReads(kind: Exclude<LogicAnchor['kind'], 'document'>, owner: Record<string, unknown> & { id: string }): ReadTrie {
+  const memo = ownerWalks[kind === 'component' ? 'component' : kind === 'page' || kind === 'modal' ? 'surface' : 'other'];
+  let known = memo.get(owner);
+  if (!known) {
+    const key = ownerLists[kind], base = `/${key}/0`, walked: (readonly [readonly string[], ReadTrie])[] = [];
+    const found = reads({ [key]: [owner] }, document => resolveLogicAnchor(document, { kind, id: owner.id, nodeId: '', field: '' }), (value, pointer) => {
+      const at = pointer.startsWith(`${base}/`) ? pointerPath(pointer.slice(base.length)) as string[] : [];
+      const node = kind === 'component' ? at.length === 1 && at[0] === 'node' : (kind === 'page' || kind === 'modal') && at.length === 2 && at[0] === 'components';
+      if (node) walked.push([at, nodeReads(value)]);
+      return node;
+    });
+    known = readTrie(found.filter(([pointer]) => pointer === base || pointer.startsWith(`${base}/`))
+      .map(([pointer, exact]) => [pointer.slice(base.length), exact] as const), walked);
+    memo.set(owner, known);
+  }
+  return known;
 }
 
 /**
@@ -180,12 +228,7 @@ function anchorPointer(build: IndexBuild, anchor: LogicAnchor): string | undefin
  */
 function watchAnchor(build: IndexBuild, anchor: LogicAnchor, own: readonly string[]): void {
   const { dependencies, before, scans } = build, keys = [...own, 'guard'];
-  const path = (base: string, field: string) => {
-    let at = base;
-    dependencies.add(at, keys, true);
-    for (const part of pointerPath(field)) { at = `${at}${fieldPointer([part])}`; dependencies.add(at, keys, true); }
-    return at;
-  };
+  const path = (base: string, field: string) => dependencies.addSteps(base, field, keys);
   const scan = (group: string, read: (document: CompositionDocument) => unknown) => {
     if (!scans.has(group)) { scans.add(group); dependencies.observe(before, [group, 'guard'], read); }
     for (const key of own) dependencies.join(group, key);
@@ -197,7 +240,19 @@ function watchAnchor(build: IndexBuild, anchor: LogicAnchor, own: readonly strin
   }
   scan(`list:${ownerLists[anchor.kind]}`, document => resolveLogicAnchor(document, { kind: anchor.kind, id: '', field: '' }));
   if (anchor.nodeId !== undefined) {
-    scan(`nodes:${anchor.kind}:${anchor.id}`, document => resolveLogicAnchor(document, { kind: anchor.kind, id: anchor.id, nodeId: '', field: '' }));
+    const group = `nodes:${anchor.kind}:${anchor.id}`, key = ownerLists[anchor.kind], list: unknown = Reflect.get(before, key);
+    if (typeof anchor.id !== 'string' || !Array.isArray(list)) scan(group, document => resolveLogicAnchor(document, { kind: anchor.kind, id: anchor.id, nodeId: '', field: '' }));
+    else {
+      if (!scans.has(group)) {
+        scans.add(group);
+        // The scan reads the owner list (registered under `list:`, which every key here joins too), then the matched owner.
+        const matches = build.resolver.owners(key, anchor.id);
+        if (matches.length === 1) {
+          dependencies.mount(`/${key}/${matches[0]}`, ownerReads(anchor.kind, list[matches[0]] as Record<string, unknown> & { id: string }), [group, 'guard']);
+        }
+      }
+      for (const key of own) dependencies.join(group, key);
+    }
   }
   // The owner (or node) itself, then each step of the field below it.
   const base = anchorBase(build, anchor);
@@ -218,6 +273,61 @@ function referencePaths(before: CompositionDocument, next: Map<object, EditorPat
     }
     return undefined;
   };
+}
+
+type ResolvedUses = ReturnType<typeof resolveLogicUseBindings>['bindings'];
+interface ResolvedBindings {
+  readonly library: unknown;
+  /** Each binding's parsed `use`. */
+  readonly uses: readonly LogicAnchor[];
+  /** The node each use resolved to, and for a component use its entry (whose `bindings` the resolution reads and extends). */
+  readonly nodes: readonly object[];
+  readonly entries: readonly (object | undefined)[];
+  /** Which uses share an owner: for each, the first binding resolved on the same owner. */
+  readonly places: readonly number[];
+  /** The node and owner pointers each use resolved to, in the revision these results are for. */
+  readonly bases: readonly { readonly node: string; readonly owner: string }[];
+  readonly bindings: ResolvedUses;
+}
+/**
+ * `resolveLogicUseBindings(document).bindings`, reused for a committed revision holding the same bindings array and
+ * library when every use resolves (owner and node uniqueness included) to the same node object, a component use to the
+ * same entry, and uses share owners alike. The canonical resolution reads, per binding: the owner list scan, the owner's
+ * node scan, the resolved node (its use field, type and source field, after the arguments earlier bindings wrote into
+ * it), the library, and for a component use its entry's `bindings` (after earlier appends). Its writes never change an
+ * ID, a type or a child list (a use field cannot pass through `children`, `tabs` or `blocks`), so every binding resolves
+ * to the same place in each intermediate document, and with the same objects in the same arrangement each step reads and
+ * writes the same values: only the owners' and nodes' pointers differ, and they are put back in place. A resolution that
+ * throws is not remembered.
+ */
+const resolvedBindings = new WeakMap<object, ResolvedBindings>();
+function resolvedUses(document: CompositionDocument, resolver: AnchorResolver): ResolvedUses {
+  const list: unknown = document.logicUseBindings;
+  const locate = (uses: readonly LogicAnchor[]) => uses.map(use => resolver.resolve({ ...use, field: '' }));
+  const places = (found: ReturnType<typeof locate>) => found.map(at => found.findIndex(other => other?.owner.pointer === at?.owner.pointer));
+  const memo = list !== null && typeof list === 'object' ? resolvedBindings.get(list) : undefined;
+  if (memo && memo.library === document.logicLibrary) {
+    const found = locate(memo.uses), shared = places(found);
+    if (found.every((at, index) => at?.node && at.node.value === memo.nodes[index]
+      && (memo.entries[index] === undefined || at.owner.value === memo.entries[index]) && shared[index] === memo.places[index])) {
+      return memo.bindings.map((binding, index) => {
+        const { node, owner } = found[index]!, base = memo.bases[index];
+        return { ...binding, usePointer: `${node!.pointer}${binding.usePointer.slice(base.node.length)}`, sourcePointer: `${node!.pointer}${binding.sourcePointer.slice(base.node.length)}`,
+          ...(binding.componentBindingPointer ? { componentBindingPointer: `${owner.pointer}${binding.componentBindingPointer.slice(base.owner.length)}` } : {}) };
+      });
+    }
+  }
+  const bindings = resolveLogicUseBindings(document).bindings;
+  const parsed = logicUseBindingsSchema.safeParse(list);
+  if (parsed.success && parsed.data.length === bindings.length && list !== null && typeof list === 'object') {
+    const uses = parsed.data.map(binding => binding.use as LogicAnchor), found = locate(uses);
+    const placed = found.every((at, index) => at?.node && bindings[index].usePointer.startsWith(at.node.pointer) && bindings[index].sourcePointer.startsWith(at.node.pointer)
+      && (!bindings[index].componentBindingPointer || bindings[index].componentBindingPointer!.startsWith(`${at.owner.pointer}/`)));
+    if (placed) resolvedBindings.set(list, { library: document.logicLibrary, uses, nodes: found.map(at => at!.node!.value),
+      entries: uses.map((use, index) => use.kind === 'component' ? found[index]!.owner.value : undefined), places: places(found),
+      bases: found.map(at => ({ node: at!.node!.pointer, owner: at!.owner.pointer })), bindings });
+  }
+  return bindings;
 }
 
 /**
@@ -256,27 +366,31 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
   if (before === edit || sameJson(before, edit) && !references.relocated?.size && !references.copied?.length) return edit;
   const linked = (document: CompositionDocument) => document.logicUseBindings?.length || document.componentLibrary?.some(entry => entry.bindings?.length) || document.studioCanvas;
   if (!linked(before) && !linked(edit)) return edit;
-  // Per-transaction memos of the candidate: never cached beyond this call.
-  let editPaths: Map<object, EditorPath[]> | undefined, editNodes: AuthoredNode[] | undefined;
+  // Per-transaction memos of the candidate: never cached beyond this call, except for objects of committed revisions (those
+  // `before`'s index has seen), which are immutable.
+  let editPaths: Map<object, EditorPath[]> | undefined, editResolver: AnchorResolver | undefined;
+  const committed = (value: object) => indexed !== undefined && (indexed.counts.has(value) || indexed.members.has(value));
+  const walk = canvasWalk(committed), editNodes = walkedNodes(edit, walk);
   const pathsOfEdit = () => editPaths ??= objectPaths(edit);
   const locate = (pointer: string) => referencePaths(before, pathsOfEdit())(pointer);
   /** A field's anchor in the candidate; a field without one owner (duplicate IDs, say) refuses rather than throws. */
   const anchorAt = (path: EditorPath) => {
-    try { return fieldAnchor(edit, path, () => editNodes ??= authoredNodes(edit)); } catch { return refuse(); }
+    try { return fieldAnchor(edit, path, editNodes, anchor => (editResolver ??= new AnchorResolver(edit, committed)).resolve(anchor)); } catch { return refuse(); }
   };
   const deleted = (pointer: string) => (references.deleted ?? []).some(path => inside(pointer, fieldPointer(path)))
     || [...references.relocated ?? []].some(([from, to]) => !to.length && inside(pointer, from));
   const declared = (pointer: string) => deleted(pointer)
     || [...references.relocated ?? []].some(([from]) => inside(pointer, from));
   const componentTarget = (document: CompositionDocument, entry: ComponentEntry,
-    binding: NonNullable<typeof entry.bindings>[number], objects: () => Map<object, EditorPath[]>): string | undefined => {
+    binding: NonNullable<typeof entry.bindings>[number], objects: () => Map<object, EditorPath[]>,
+    resolve: (anchor: LogicAnchor) => ResolvedLogicAnchor | undefined = anchor => resolveLogicAnchor(document, anchor)): string | undefined => {
     const field = fieldPointer(fieldSteps(binding.field));
     if (binding.nodeId) {
       const anchor = { kind: 'component' as const, id: entry.id, nodeId: binding.nodeId, field };
-      const resolved = resolveLogicAnchor(document, anchor);
+      const resolved = resolve(anchor);
       if (resolved) return resolved.pointer;
       if (entry.params?.find(param => param.name === binding.param)?.kind !== 'value') return undefined;
-      const steps = fieldSteps(binding.field), holder = resolveLogicAnchor(document, { ...anchor, field: fieldPointer(steps.slice(0, -1)) });
+      const steps = fieldSteps(binding.field), holder = resolve({ ...anchor, field: fieldPointer(steps.slice(0, -1)) });
       return holder ? `${holder.pointer}${fieldPointer(steps.slice(-1))}` : undefined;
     }
     const source = ownedSources(entry).find(source => source.id === binding.sourceId);
@@ -291,13 +405,14 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
     const checked = checking(), unshaped = !walkedOwnerLists.every(list => listShaped(before, list, checked));
     commitShapes(checked);
     if (unshaped) shapes.unshaped = true;
-    const dependencies = new EditDependencies(), targets = new Map<string, string>();
+    const dependencies = new EditDependencies(), targets = new Map<string, string>(), resolver = new AnchorResolver(before);
     const evidence = new WeakMap<object, string[]>(), holders = new Map<string, string[]>(), members = new WeakSet<object>();
-    const counts = objectCounts(before, members);
+    const counts = objectCounts(before);
     /** `keys` rely on the object at `at`: anything at, above or below it, or the object placed anywhere new, reaches them. */
-    const witnessAt = (at: string, keys: readonly string[]) => {
-      for (const key of keys) { dependencies.add(at, key); holders.set(key, [...holders.get(key) ?? [], at]); }
-      const value = valueAt(before, pointerPath(at)) as object, held = evidence.get(value);
+    const witnessAt = (at: string, keys: readonly string[], value = valueAt(before, pointerPath(at)) as object, steps?: readonly string[]) => {
+      dependencies.add(steps ?? at, keys);
+      for (const key of keys) { const own = holders.get(key); if (own) own.push(at); else holders.set(key, [at]); }
+      const held = evidence.get(value);
       if (held) held.push(...keys); else evidence.set(value, [...keys]);
     };
     /**
@@ -307,19 +422,19 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
      * cannot be located at all: its keys are reconciled by every edit.
      */
     const witnessed = (pointer: string | undefined, ...keys: string[]) => {
-      let value: unknown = before, found: string | undefined;
+      let value: unknown = before, found = 0, witness: object | undefined;
       const path = pointer === undefined ? [] : pointerPath(pointer);
       for (let depth = 1; pointer !== undefined && depth <= path.length; depth++) {
         value = value !== null && typeof value === 'object' && Object.hasOwn(value, path[depth - 1]) ? Reflect.get(value, path[depth - 1]) : undefined;
         if (value === null || typeof value !== 'object') break;
-        if (counts.get(value) === 1) found = fieldPointer(path.slice(0, depth));
+        if (counts.get(value) === 1) { found = depth; witness = value; }
       }
-      if (found === undefined) for (const key of keys) dependencies.add('', key);
-      else witnessAt(found, keys);
+      if (!witness) dependencies.add('', keys);
+      else { const steps = path.slice(0, found) as string[]; witnessAt(fieldPointer(steps), keys, witness, steps); }
     };
-    const build: IndexBuild = { dependencies, before, scans: new Set(), bases: new Map() };
+    const build: IndexBuild = { dependencies, before, resolver, scans: new Set(), bases: new Map() };
     let stored: ReturnType<typeof studioCanvasMetadataSchema.safeParse> | undefined;
-    const resolved = before.logicUseBindings?.length ? resolveLogicUseBindings(before).bindings : [];
+    const resolved = before.logicUseBindings?.length ? resolvedUses(before, resolver) : [];
     // Bindings array edits are scoped per element below; any of them invalidates this index's positions.
     dependencies.add('/logicUseBindings', 'guard');
     dependencies.add('/studioCanvas', 'layout');
@@ -346,7 +461,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       }
       let paths: Map<object, EditorPath[]> | undefined;
       entry.bindings?.forEach((binding, bindingIndex) => {
-        const key = `p:${entry.id}:${bindingIndex}`, target = componentTarget(before, entry, binding, () => paths ??= entryObjectPaths(before, entry));
+        const key = `p:${entry.id}:${bindingIndex}`, target = componentTarget(before, entry, binding, () => paths ??= entryObjectPaths(before, entry), anchor => resolver.resolve(anchor));
         // An already-broken binding stays in every edit's scope, so only an edit that repairs or removes it is accepted.
         if (target === undefined || !entry.params?.some(param => param.name === binding.param)) return dependencies.add('', key);
         targets.set(key, target); witnessed(target, key);
@@ -366,7 +481,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
     });
     if (before.studioCanvas) {
       // Unusable metadata is left alone unless the edit changes it (`rebaseCanvasLayout` rechecks before rebasing).
-      stored = studioCanvasMetadataSchema.safeParse(before.studioCanvas);
+      stored = parsedCanvas(before.studioCanvas);
       if (!stored.success) dependencies.add('', 'layout');
       else for (const canvas of stored.data.canvases) for (const root of canvas.roots) {
         const key = `c:${root.id}`;
@@ -375,7 +490,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
         watchAnchor(build, root.anchor, [key]);
       }
     }
-    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, always: new Set(),
+    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, counts, always: new Set(),
       uncertified: stored?.success ? uncertifiedCanvasRoots(before, stored.data) : new Set(), unshaped, ...(stored?.success ? { stored: stored.data } : {}) };
     revisions.set(before, indexed);
   }
@@ -439,7 +554,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
     else if (rebased && index.stored && document.studioCanvas === rebased && sameJson(rootsOf(index.stored), rootsOf(rebased))) {
       const reached = new Set([...scope].filter(key => key.startsWith('c:')).map(key => key.slice(2)));
       const uncertified = new Set([...index.uncertified].filter(root => !reached.has(root)));
-      for (const root of uncertifiedCanvasRoots(document, rebased, reached)) uncertified.add(root);
+      for (const root of uncertifiedCanvasRoots(document, rebased, reached, walk)) uncertified.add(root);
       carried = { ...index, stored: rebased, usable: true, uncertified };
     }
     if (!carried) return document;
@@ -451,7 +566,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       const value = valueAt(document, pointerPath(pointer));
       const held = value !== null && typeof value === 'object' ? index.evidence.get(value) : undefined;
       if (held?.includes(key)) continue;
-      if (value === null || typeof value !== 'object' || placements.get(value) !== 1 || index.members.has(value)) {
+      if (value === null || typeof value !== 'object' || placements.get(value) !== 1 || index.counts.has(value) || index.members.has(value)) {
         (always ??= new Set(index.always)).add(key); continue;
       }
       if (held) held.push(key); else index.evidence.set(value, [key]);
@@ -614,7 +729,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
   if (layouts && before.studioCanvas && next.studioCanvas === before.studioCanvas && index.stored && !index.usable && readStudioCanvas(before).metadata) index.usable = true;
   const layout = next.studioCanvas, settled = next;
   if (layouts) next = rebaseCanvasLayout(before, next, locateAll, {
-    fields: references.fields, discard: references.discardLayouts, deleted, refuse,
+    fields: references.fields, discard: references.discardLayouts, deleted, refuse, walk,
     affected: scope.has('layout') ? undefined : new Set([...scope].filter(key => key.startsWith('c:')).map(key => key.slice(2))),
     ...(next.studioCanvas === before.studioCanvas && index.stored ? { stored: index.stored, usable: index.usable ?? false } : {}),
   });

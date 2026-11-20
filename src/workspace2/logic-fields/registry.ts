@@ -2,9 +2,9 @@ import { replaceAt, valueAt, type EditorPath, type SchemaField } from '../../com
 import type { CompositionDocument, CompositionNode } from '../../shared/composition/schema';
 import { childLists } from '../../shared/composition/components';
 import type { Json } from '../../shared/types';
-import { canonicalOfBounded } from '../../shared/composition/json';
+import { canonicalOfBounded, pointer } from '../../shared/composition/json';
 import { lift, type GraphDestination, type LogicAnchor } from '../../shared/composition/graph';
-import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
+import { atPointer, record, resolveLogicAnchor, type ResolvedLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 
 export type LogicFieldKind = GraphDestination['kind'];
 interface FieldAdapter {
@@ -32,9 +32,13 @@ export const fieldAdapters = {
   fragment: direct('fragment', 'structure'),
 } satisfies Record<LogicFieldKind, FieldAdapter>;
 
-const escape = (part: string | number) => String(part).replace(/~/g, '~0').replace(/\//g, '~1');
+const escape = (part: string | number) => {
+  const text = String(part);
+  return text.includes('~') || text.includes('/') ? text.replace(/~/g, '~0').replace(/\//g, '~1') : text;
+};
 export const fieldPointer = (path: EditorPath): string => path.length ? `/${path.map(escape).join('/')}` : '';
-export const pointerPath = (pointer: string): EditorPath => pointer === '' ? [] : pointer.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+export const pointerPath = (pointer: string): EditorPath => pointer === '' ? [] : pointer.includes('~')
+  ? pointer.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~')) : pointer.slice(1).split('/');
 const ownerKinds = { pages: 'page', modals: 'modal', componentLibrary: 'component', logicLibrary: 'logic', dataSources: 'flow' } as const;
 export type AuthoredNode = { node: CompositionNode; path: EditorPath; identity: string };
 export function authoredNodes(document: CompositionDocument): AuthoredNode[] {
@@ -92,29 +96,159 @@ export function walkableOwner(list: WalkedOwnerList, owner: unknown, known?: Wea
   const components = (owner as { components?: unknown }).components;
   return Array.isArray(components) && components.every(node => walkableNode(node, known, walked));
 }
+/** Each walk's nodes by pointer, so `fieldAnchor` finds the deepest one on a path by its prefixes (a walk is never changed). */
+const nodesByPath = new WeakMap<readonly AuthoredNode[], Map<string, AuthoredNode>>();
+function deepestNode(nodes: readonly AuthoredNode[], path: EditorPath): AuthoredNode | undefined {
+  let byPath = nodesByPath.get(nodes);
+  if (!byPath) {
+    byPath = new Map();
+    for (const location of nodes) byPath.set(fieldPointer(location.path), location);
+    nodesByPath.set(nodes, byPath);
+  }
+  for (let depth = path.length; depth > 2; depth--) {
+    const found = byPath.get(fieldPointer(path.slice(0, depth)));
+    if (found) return found;
+  }
+  return undefined;
+}
 /**
  * `nodes` may give `authoredNodes(document)` for this same document, to share one walk across calls: computed already, or
- * a function computing it, called only for a page, modal or component field (no other field walks the owners).
+ * a function computing it, called only for a page, modal or component field (no other field walks the owners). `resolve`
+ * may give `resolveLogicAnchor` over this same document (an {@link AnchorResolver}'s, say).
  */
-export function fieldAnchor(document: CompositionDocument, path: EditorPath, nodes?: readonly AuthoredNode[] | (() => readonly AuthoredNode[])): LogicAnchor {
+export function fieldAnchor(document: CompositionDocument, path: EditorPath, nodes?: readonly AuthoredNode[] | (() => readonly AuthoredNode[]),
+  resolve: (anchor: LogicAnchor) => ResolvedLogicAnchor | undefined = anchor => resolveLogicAnchor(document, anchor)): LogicAnchor {
   const collection = path[0], index = path[1];
   if (typeof collection === 'string' && Object.hasOwn(ownerKinds, collection) && index !== undefined) {
     const owner = valueAt(document, path.slice(0, 2)) as { id?: string } | undefined;
     if (!owner?.id) throw new Error('The logic owner no longer exists.');
     const kind = ownerKinds[collection as keyof typeof ownerKinds];
     let nodeId: string | undefined, depth = 2;
-    if (kind === 'page' || kind === 'modal' || kind === 'component') for (const location of (typeof nodes === 'function' ? nodes() : nodes) ?? authoredNodes(document)) {
-      if (location.path.length <= path.length && location.path.length > depth
-        && location.path.every((part, index) => String(part) === String(path[index]))) {
-        nodeId = location.node.id; depth = location.path.length;
-      }
+    if (kind === 'page' || kind === 'modal' || kind === 'component') {
+      // The deepest walked node whose path is a prefix of this one (longer than the owner's).
+      const location = deepestNode((typeof nodes === 'function' ? nodes() : nodes) ?? authoredNodes(document), path);
+      if (location) { nodeId = location.node.id; depth = location.path.length; }
     }
     const anchor: LogicAnchor = { kind, id: owner.id, ...(nodeId ? { nodeId } : {}), field: fieldPointer(path.slice(depth)) };
-    if (resolveLogicAnchor(document, anchor)?.pointer !== fieldPointer(path)) throw new Error('This field does not have an unambiguous logic owner.');
+    if (resolve(anchor)?.pointer !== fieldPointer(path)) throw new Error('This field does not have an unambiguous logic owner.');
     return anchor;
   }
   return { kind: 'document', id: document.id, field: fieldPointer(path), fingerprint: canonicalOfBounded(valueAt(document, path)) };
 }
+
+type Located = NonNullable<ResolvedLogicAnchor['node']>;
+/**
+ * Memos keyed by objects. Objects of committed revisions are immutable, so their entries are kept across revisions; any
+ * other object (one a candidate built: a refused candidate may be mutated and offered again) is kept only for one caller.
+ */
+class ObjectMemo<T> {
+  private readonly local = new Map<object, T>();
+  constructor(private readonly shared: WeakMap<object, T>, private readonly committed: (value: object) => boolean) {}
+  get(value: object): T | undefined { return this.local.get(value) ?? this.shared.get(value); }
+  set(value: object, result: T): T {
+    if (this.committed(value)) this.shared.set(value, result); else this.local.set(value, result);
+    return result;
+  }
+}
+/**
+ * The logic nodes `resolveLogicAnchor` finds at and below `value` (anchors.ts `nodes`: records with a string `type` and
+ * `id`, through `children` and, for `local-tabs`, each record area's `children` under `tabs` and `blocks`), each with its
+ * pointer relative to `value`.
+ */
+const candidatesBelow = new WeakMap<object, readonly Located[]>();
+function logicNodes(value: unknown, memo: ObjectMemo<readonly Located[]>): readonly Located[] {
+  if (!record(value) || typeof value.type !== 'string' || typeof value.id !== 'string') return [];
+  const known = memo.get(value);
+  if (known) return known;
+  const result: Located[] = [{ value, pointer: '' }];
+  const children = (list: unknown, base: string) => {
+    if (Array.isArray(list)) list.forEach((child, index) => {
+      const at = pointer(base, index);
+      for (const found of logicNodes(child, memo)) result.push({ value: found.value, pointer: `${at}${found.pointer}` });
+    });
+  };
+  children(value.children, '/children');
+  if (value.type === 'local-tabs') for (const key of ['tabs', 'blocks']) {
+    const list = value[key];
+    if (Array.isArray(list)) list.forEach((tab, index) => {
+      if (record(tab)) children(tab.children, `${pointer(pointer('', key), index)}/children`);
+    });
+  }
+  return memo.set(value, result);
+}
+/** Each owner's logic nodes by ID, pointers relative to the owner (anchors.ts: an entry's `node`, a surface's `components`). */
+const entryNodes = new WeakMap<object, ReadonlyMap<string, readonly Located[]>>(), surfaceNodes = new WeakMap<object, ReadonlyMap<string, readonly Located[]>>();
+const ownerListKeys = { page: 'pages', modal: 'modals', component: 'componentLibrary', logic: 'logicLibrary', flow: 'dataSources' } as const;
+/**
+ * `resolveLogicAnchor` over one document, answering repeated lookups from indexes: each owner list's IDs (per resolver)
+ * and each owner's logic nodes (per owner object). It gives exactly the canonical result, the same object identities
+ * included, and falls back to the canonical resolver for every anchor shape the indexes do not cover (document anchors,
+ * IDs that are not text). Indexes of objects `committed` admits are kept across revisions that share them; the rest only
+ * for this resolver, so a candidate may be resolved too, as long as `committed` admits only objects of committed revisions.
+ */
+export class AnchorResolver {
+  private readonly lists = new Map<string, Map<string, number[]>>();
+  private readonly nodes: ObjectMemo<readonly Located[]>;
+  private readonly owners_: { component: ObjectMemo<ReadonlyMap<string, readonly Located[]>>; surface: ObjectMemo<ReadonlyMap<string, readonly Located[]>> };
+  constructor(readonly document: unknown, committed: (value: object) => boolean = () => true) {
+    this.nodes = new ObjectMemo(candidatesBelow, committed);
+    this.owners_ = { component: new ObjectMemo(entryNodes, committed), surface: new ObjectMemo(surfaceNodes, committed) };
+  }
+
+  /** Indices of the records in `key` whose `id` is `id` (the owner list scan). */
+  owners(key: string, id: string): readonly number[] {
+    let byId = this.lists.get(key);
+    if (!byId) {
+      byId = new Map();
+      const list = record(this.document) ? this.document[key] : undefined;
+      if (Array.isArray(list)) list.forEach((value, index) => {
+        if (!record(value) || typeof value.id !== 'string') return;
+        const same = byId!.get(value.id);
+        if (same) same.push(index); else byId!.set(value.id, [index]);
+      });
+      this.lists.set(key, byId);
+    }
+    return byId.get(id) ?? [];
+  }
+
+  /** The owner's logic nodes by ID, pointers relative to the owner. */
+  ownerNodes(kind: 'component' | 'page' | 'modal', owner: Record<string, unknown>): ReadonlyMap<string, readonly Located[]> {
+    const memo = kind === 'component' ? this.owners_.component : this.owners_.surface, known = memo.get(owner);
+    if (known) return known;
+    const byId = new Map<string, Located[]>();
+    const add = (value: unknown, base: string) => {
+      for (const found of logicNodes(value, this.nodes)) {
+        const id = found.value.id as string, entry = { value: found.value, pointer: `${base}${found.pointer}` }, same = byId.get(id);
+        if (same) same.push(entry); else byId.set(id, [entry]);
+      }
+    };
+    if (kind === 'component') add(owner.node, '/node');
+    else if (Array.isArray(owner.components)) owner.components.forEach((value, index) => add(value, `/components/${index}`));
+    return memo.set(owner, byId);
+  }
+
+  resolve(anchor: LogicAnchor): ResolvedLogicAnchor | undefined {
+    const document = this.document;
+    if (!record(document)) return undefined;
+    if (anchor.kind === 'document' || !Object.hasOwn(ownerListKeys, anchor.kind) || typeof anchor.id !== 'string'
+      || anchor.nodeId !== undefined && typeof anchor.nodeId !== 'string') return resolveLogicAnchor(document, anchor);
+    const key = ownerListKeys[anchor.kind], list = document[key];
+    if (!Array.isArray(list)) return undefined;
+    const matches = this.owners(key, anchor.id);
+    if (matches.length !== 1) return undefined;
+    const owner: Located = { value: list[matches[0]] as Record<string, unknown>, pointer: `/${key}/${matches[0]}` };
+    let node: Located | undefined;
+    if (anchor.nodeId !== undefined) {
+      const found = anchor.kind === 'component' || anchor.kind === 'page' || anchor.kind === 'modal'
+        ? this.ownerNodes(anchor.kind, owner.value).get(anchor.nodeId) ?? [] : [];
+      if (found.length !== 1) return undefined;
+      node = { value: found[0].value, pointer: `${owner.pointer}${found[0].pointer}` };
+    }
+    const base = node ?? owner, value = atPointer(base.value, anchor.field);
+    return value === undefined ? undefined : { value, pointer: `${base.pointer}${anchor.field}`, node, owner };
+  }
+}
+
 export function liftField(document: CompositionDocument, path: EditorPath, kind: LogicFieldKind) {
   const anchor = fieldAnchor(document, path);
   const adapter = fieldAdapters[kind];
