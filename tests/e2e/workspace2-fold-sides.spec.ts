@@ -122,6 +122,8 @@ test('the app lists the id: the rows do not say it waits for an app update, and 
   if (isPhone(page)) { await page.keyboard.press('Escape'); await expect(page.getByLabel('Properties')).toHaveCount(0); }
   // Checks carries no pending warning (the desk's status tag opens it only for a problem; a suggestion is reached through the Checks pill).
   if (isPhone(page)) await openChecksFromBar(page); else await page.getByTestId('checks-pill').click();
+  // Wait for the panel itself first, so the absence below is not read before Checks has opened.
+  await expect(page.locator('.w2-checks')).toBeVisible();
   await expect(page.getByText(/Partly Folded, which the app does not have yet/)).toHaveCount(0);
   await page.keyboard.press('Escape');
   if (isPhone(page)) { await page.keyboard.press('Escape'); await expect(page.locator('.w2-project-sheet')).toHaveCount(0); }
