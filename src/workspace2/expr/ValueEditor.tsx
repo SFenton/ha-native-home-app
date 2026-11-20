@@ -112,7 +112,7 @@ export default function ValueEditor({ draft, path, kind, modes, look, label, ini
             const { whenUnavailable: _gone, ...rest } = valueAt(draft.get(), path) as Slot;
             draft.set(replaceAt(draft.get(), path, (next === 'keep' ? { ...rest, whenUnavailable: 'keep' } : rest) as unknown as Json));
           }}/>
-        <p className="w2-caption">Keep last needs a newer app. Until the first answer, the fallback is shown.</p>
+        <p className="w2-caption">Until the first answer, the fallback is shown.</p>
       </div>
     </div>}
     <TryValues document={document} inputs={unique}/>

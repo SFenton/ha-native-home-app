@@ -2,8 +2,8 @@ import { capabilitiesOf } from '../composition-editor';
 import type { CompositionDocument } from '../shared/composition/schema';
 import { pendingCompositionCapabilities } from '../shared/composition/pending';
 
-/** The Studio's words for a pending capability, where it has one an author would know; any other id is named by its own words. */
-const pendingNames: Record<string, string> = { 'sh.fold-sides@1': 'Partly Folded' };
+/** The Studio's words for a pending capability, where it has one an author would know; any other id is named by its own words. No pending id has one now. */
+const pendingNames: Record<string, string> = {};
 
 const used = new WeakMap<object, string[]>();
 /** The pending capability ids a document declares: features the shipped app does not list yet. A publication that declares one is refused by the app until it updates. */
