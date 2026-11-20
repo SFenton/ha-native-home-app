@@ -6,6 +6,7 @@ import { omitFoldSide } from './shared/composition/fold-sides';
 import { createId as uid } from './shared/ids';
 import type { Json } from './shared/types';
 import { formatCompositionIssue } from './shared/composition/workspace';
+import { readStudioCanvas } from './shared/composition/studio-logic/layout';
 
 export type SchemaField = {
   $ref?: string; type?: string | string[]; const?: Json; enum?: Json[];
@@ -303,9 +304,16 @@ export function moveCompositionNode(document: CompositionDocument, id: string, p
   children.push(moved);
   return next;
 }
+/**
+ * Parses and checks a whole document for Import and Edit as JSON. Its links are taken as authored: they must pass the compiler
+ * (which resolves every automatic binding and component parameter) and its saved canvas layout must fit its content. A
+ * document that does not is rejected with its issues, never repaired. Applying it replaces the current document
+ * (`replaceDocument` in `workspace2/editors/provenance`).
+ */
 export function importCompositionText(text: string, documentId: string): CompositionDocument {
   const parsed = parseCompositionJSON(new TextEncoder().encode(text));
   const { document } = compileCompositionDocument(parsed);
+  if (readStudioCanvas(document).warnings.length) throw new CompositionValidationError([{ code: 'invalid_value', pointer: '/document/studioCanvas' }]);
   // Import is explicitly content-only; publisher and document identity belong to this workspace.
   return { ...document, id: documentId };
 }

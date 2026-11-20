@@ -1,4 +1,4 @@
-import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
+import { compilerIssuesOf, componentLocations, replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
 import type { CompositionDocument } from '../../../shared/composition/schema';
 import type { Json } from '../../../shared/types';
 import type { Operand } from '../../../shared/composition/expression';
@@ -195,19 +195,67 @@ const fillHoles = (value: unknown, name: string, replacement: unknown): unknown 
 /**
  * Removes a setting. Where the body used it, the setting's Try With value stands in; each use drops its value for it. The remaining uses keep drawing what they
  * drew only when they had given the Try With value, which is why Remove Setting is a change a person asks for by name.
+ *
+ * Only the uses' `args` change, and only along their paths, so every other object keeps its identity. Each dropped value is declared deleted: an automatic
+ * binding or a component parameter binding that filled it in is removed with it, and every other link stays exactly as it was.
  */
 export function removeSetting(document: CompositionDocument, id: string, name: string): CompositionDocument {
   const entry = entryOf(document, id);
   const param = entry?.params.find(item => item.name === name);
   if (!entry || !param) return document;
   const next = mapEntry(document, id, held => ({ ...held, params: held.params.filter(item => item.name !== name), body: fillHoles(held.body, name, param.sample ?? defaultSample(settingKindOf(param))) as Rec }));
-  const strip = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(strip);
+  const deleted: EditorPath[] = [];
+  const strip = (value: unknown, path: EditorPath): unknown => {
+    if (Array.isArray(value)) {
+      let changed = false;
+      const items = value.map((item, at) => { const stripped = strip(item, [...path, at]); if (stripped !== item) changed = true; return stripped; });
+      return changed ? items : value;
+    }
     if (!isRecord(value)) return value;
-    if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args)) { const { [name]: _gone, ...args } = value.args; return { ...value, args }; }
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'logicLibrary' ? item : strip(item)]));
+    let out: Rec | undefined;
+    if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args) && Object.hasOwn(value.args, name)) {
+      const { [name]: _gone, ...args } = value.args;
+      out = { ...value, args }; deleted.push([...path, 'args', name]);
+    }
+    for (const [key, item] of Object.entries(out ?? value)) {
+      if (key === 'logicLibrary') continue;
+      const stripped = strip(item, [...path, key]);
+      if (stripped !== item) { out ??= { ...value }; out[key] = stripped; }
+    }
+    return out ?? value;
   };
-  return editSubtrees(document, strip(next) as CompositionDocument);
+  return editSubtrees(document, strip(next, []) as CompositionDocument, { deleted });
+}
+
+/** The tiles a link fills in: a place on a page or sheet by its node, or, inside a tile template, each place of that template. */
+function filledTiles(before: CompositionDocument, after: CompositionDocument): number {
+  const tiles = new Set<string>();
+  const places = (componentId: string) => componentLocations(before, true).filter(({ node }) => node.type === 'component-ref' && node.componentId === componentId).map(({ node }) => node.id);
+  const kept = new Set((after.logicUseBindings ?? []).map(binding => JSON.stringify(binding)));
+  for (const binding of before.logicUseBindings ?? []) {
+    if (kept.has(JSON.stringify(binding))) continue;
+    if (binding.use.kind === 'component') for (const place of places(binding.use.id)) tiles.add(place);
+    else tiles.add(binding.use.kind === 'document' ? 'document' : `${binding.use.kind}:${binding.use.id}:${binding.use.nodeId ?? binding.use.field}`);
+  }
+  for (const entry of before.componentLibrary ?? []) {
+    const held = new Set((after.componentLibrary?.find(next => next.id === entry.id)?.bindings ?? []).map(binding => JSON.stringify(binding)));
+    if ((entry.bindings ?? []).some(binding => !held.has(JSON.stringify(binding)))) for (const place of places(entry.id)) tiles.add(place);
+  }
+  return tiles.size;
+}
+
+/**
+ * Remove Setting as the editor asks it: the declared removal, and how many tiles that fill the setting in lose that value (0 when no link fills it in,
+ * so nothing needs asking). `document` comes back unchanged when the setting is gone or the removal cannot keep the other links.
+ */
+export function removeSettingPlan(document: CompositionDocument, id: string, name: string): { document: CompositionDocument; tiles: number } {
+  const next = removeSetting(document, id, name);
+  // The Try With value stands in for the setting; one the template cannot read leaves a document that does not compile, which is refused, never repaired.
+  if (next !== document && compilerIssuesOf(next).length && !compilerIssuesOf(document).length) {
+    const param = entryOf(document, id)?.params.find(item => item.name === name);
+    throw new Error(logicWords.removeNeedsSample(param?.label ?? name));
+  }
+  return { document: next, tiles: next === document ? 0 : filledTiles(document, next) };
 }
 
 // MARK: Uses

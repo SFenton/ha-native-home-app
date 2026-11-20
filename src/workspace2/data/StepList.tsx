@@ -4,7 +4,7 @@ import type { PipelineInputs, PipelineStep } from '../../shared/composition/pipe
 import EditorRow from '../editors/EditorRow';
 import { MoreMenu } from '../expr/ui';
 import { useRows } from '../rowsContext';
-import { addStepAt, countWords, defaultFieldFor, flowLimits, flowShapes, moveStep, newStep, stepId, stepNames, stepSummary, stepsThatFit, updateFlow, withoutStep } from './flow';
+import { addStepAt, countWords, defaultFieldFor, flowLimits, flowShapes, moveFlowStep, newStep, stepId, stepNames, stepSummary, stepsThatFit, updateFlow, withoutStep } from './flow';
 import { setFlowFocus } from './focus';
 import StepPage from './StepPage';
 import { useWorkspaceFlowData } from '../logic-fields/live';
@@ -47,8 +47,8 @@ export default function StepList({ flowId, inputs }: { flowId: string; inputs: P
           {draft => <StepPage ctx={{ draft, flowId, stepId: step.id, arriving, params: inputs.parameters.map(item => ({ name: item.name, type: item.type })) }}/>}
         </EditorRow>
         <MoreMenu label={`More for step ${index + 1}, ${name}`} commands={[
-          { label: 'Move Up', disabled: index === 0, run: () => apply(value => ({ ...value, steps: moveStep(value.steps, index, -1) })) },
-          { label: 'Move Down', disabled: index >= inputs.steps.length - 1, run: () => apply(value => ({ ...value, steps: moveStep(value.steps, index, 1) })) },
+          { label: 'Move Up', disabled: index === 0, run: () => onChange(moveFlowStep(document, flowId, index, -1)) },
+          { label: 'Move Down', disabled: index >= inputs.steps.length - 1, run: () => onChange(moveFlowStep(document, flowId, index, 1)) },
           { label: 'Remove Step', danger: true, separatorBefore: true, run: () => apply(value => ({ ...value, steps: withoutStep(value.steps, index) })) },
         ]}/>
       </li>;

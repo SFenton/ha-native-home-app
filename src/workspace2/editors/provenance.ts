@@ -4,7 +4,12 @@ import { documentEdit, walkableDocument, type EditReferences } from './documentE
 import type { EditorPath } from '../../composition-editor';
 import type { GraphSourceMap, LogicGraph } from '../../shared/composition/graph';
 import { canonicalOfBounded } from '../../shared/composition/json';
-import { replaceAt, valueAt } from '../../composition-editor';
+import { changeFieldVariant, replaceAt, valueAt, type SchemaField } from '../../composition-editor';
+import type { Json } from '../../shared/types';
+import { studioCanvasMetadataSchema } from '../../shared/composition/studio-logic/schemas';
+import { encodeStudioCanvas, readStudioCanvas } from '../../shared/composition/studio-logic/layout';
+import { CompositionValidationError } from '../../shared/composition/json';
+import type { LogicAnchor } from '../../shared/composition/graph/types';
 
 const copiedFrom = new WeakMap<object, object>();
 const rebuiltOrigins = new WeakMap<object, object>();
@@ -45,7 +50,7 @@ function retainedObjects(before: unknown, after: unknown, base: EditorPath, fiel
   return relocated;
 }
 
-export function rebuildField(document: CompositionDocument, path: EditorPath, value: unknown): CompositionDocument {
+export function rebuildField(document: CompositionDocument, path: EditorPath, value: unknown, extra: Pick<EditReferences, 'relocated' | 'discardLayouts'> = {}): CompositionDocument {
   const next = replaceAt(document, path, value);
   const fields = new Map<string, readonly string[]>();
   const relocated = retainedObjects(valueAt(document, path), value, path, fields);
@@ -59,9 +64,36 @@ export function rebuildField(document: CompositionDocument, path: EditorPath, va
       relocated.set(sibling, [sibling]);
     }
   }
+  for (const [from, to] of extra.relocated ?? []) relocated.set(from, [...to]);
   return documentEdit(document, next, {
-    relocated, fields, deleted: [path],
+    relocated, fields, deleted: [path], ...(extra.discardLayouts ? { discardLayouts: extra.discardLayouts } : {}),
   });
+}
+
+/** What `changeFieldVariant` copies from the old value into the new one, unchanged and at the same key. */
+const keptAcrossTypes = ['id', 'title', 'label', 'icon', 'layout'] as const;
+const linkCount = (document: CompositionDocument) => (document.logicUseBindings?.length ?? 0)
+  + (document.componentLibrary ?? []).reduce((count, entry) => count + (entry.bindings?.length ?? 0), 0);
+const layoutCount = (document: CompositionDocument) => {
+  const stored = document.studioCanvas === undefined ? undefined : studioCanvasMetadataSchema.safeParse(document.studioCanvas);
+  return stored?.success ? stored.data.canvases.reduce((count, canvas) => count + canvas.roots.length, 0) : 0;
+};
+
+/**
+ * A field's type change (the variant picker) as a declared edit. The old value is rebuilt as the new type: whatever lived
+ * under it is declared deleted, so an automatic binding or component parameter binding into it is removed, and every saved
+ * canvas layout rooted inside it is discarded. A binding is kept only when it is unambiguous: its target sits under a key
+ * the new type copies verbatim from the old one (`id`, `title`, `label`, `icon`, `layout`), so the same value stays at the
+ * same pointer. Every other link is untouched. `bindings` and `layouts` say what the change removes (both 0 when nothing
+ * linked is lost, so nothing needs asking); `document` comes back unchanged when the boundary refuses.
+ */
+export function changeFieldType(document: CompositionDocument, path: EditorPath, schema: SchemaField, key: string): { document: CompositionDocument; bindings: number; layouts: number } {
+  const previous = valueAt(document, path) as Json, value = changeFieldVariant(schema, previous, document, key);
+  const kept = value && typeof value === 'object' && !Array.isArray(value) && previous && typeof previous === 'object' && !Array.isArray(previous)
+    ? keptAcrossTypes.filter(field => Object.hasOwn(value, field) && Object.hasOwn(previous, field)) : [];
+  const relocated = new Map(kept.map(field => { const pointer = fieldPointer([...path, field]); return [pointer, [pointer]] as const; }));
+  const next = rebuildField(document, path, value, { relocated, discardLayouts: [path] });
+  return { document: next, bindings: next === document ? 0 : linkCount(document) - linkCount(next), layouts: next === document ? 0 : layoutCount(document) - layoutCount(next) };
 }
 
 export interface CanvasProvenance { readonly graph: LogicGraph; readonly sourceMap: GraphSourceMap }
@@ -118,4 +150,61 @@ export function editSubtrees(before: CompositionDocument, after: CompositionDocu
   for (const [from, to] of references.fields ?? []) fields.set(from, to);
   for (const [from, to] of references.relocated ?? []) relocated.set(from, to);
   return documentEdit(before, after, { ...references, relocated, fields });
+}
+
+/** The document without its links: automatic bindings, component parameter bindings and saved canvas layout. */
+function withoutLinks(document: CompositionDocument): CompositionDocument {
+  const { logicUseBindings: _bindings, studioCanvas: _layout, ...rest } = document;
+  return (document.componentLibrary ? { ...rest, componentLibrary: document.componentLibrary.map(({ bindings: _parameters, ...entry }) => entry) } : rest) as CompositionDocument;
+}
+
+/**
+ * Replaces the whole document (Import, Edit as JSON) as one validated edit. Nothing of the current document is retained, so
+ * every one of its links is declared deleted (the whole document, `deleted: [[]]`); the replacement's own links are then
+ * added as authored, and the boundary checks them whole (bindings resolve, component parameters find their fields, the saved
+ * layout fits). Returns `before` (after the boundary's notice) when the replacement's links do not hold; never a repaired copy.
+ */
+export function replaceDocument(before: CompositionDocument, after: CompositionDocument): CompositionDocument {
+  if (before === after) return after;
+  const unlinked = withoutLinks(after);
+  const cleared = documentEdit(before, unlinked, { deleted: [[]] });
+  if (cleared === before) return before;
+  const linked = documentEdit(cleared, after);
+  return linked === cleared ? before : linked;
+}
+
+/**
+ * Moves the saved canvas roots of a logic template's field from one field prefix to another: the same value seen at another
+ * place, such as a template body inside its editor-only slot view (`/body/value`) and canonically (`/body`). Origins are
+ * anchor-relative, so every node, position and group membership is carried as is; only the roots' anchors (and the IDs
+ * derived from them) change. Other canvases are kept as stored. Throws when the moved layout does not fit the document.
+ */
+export function retargetLogicLayout(document: CompositionDocument, logicId: string, from: string, to: string): CompositionDocument {
+  const layout = readStudioCanvas(document);
+  if (!layout.present || from === to) return document;
+  const parsed = studioCanvasMetadataSchema.safeParse(layout.raw);
+  if (!parsed.success) return document;
+  const stored = parsed.data;
+  const moves = (anchor: LogicAnchor) => anchor.kind === 'logic' && anchor.id === logicId && (anchor.field === from || anchor.field.startsWith(`${from}/`));
+  const moved = stored.canvases.filter(canvas => canvas.roots.some(root => moves(root.anchor)));
+  if (!moved.length) return document;
+  const order = moved.map(canvas => canvas.roots.map(root => canvas.nodes.filter(node => node.rootId === root.id)));
+  const target = (anchor: LogicAnchor) => moves(anchor) ? { ...anchor, field: `${to}${anchor.field.slice(from.length)}` } as LogicAnchor : anchor;
+  // A canvas the layout save named after its roots' anchors (`saveCanvasLayout`) is renamed with them, so the move is its own inverse.
+  const named = (canvas: typeof moved[number]) => canvas.id === canonicalOfBounded(canvas.roots.map(root => root.anchor)) ? canonicalOfBounded(canvas.roots.map(root => target(root.anchor))) : canvas.id;
+  const encoded = encodeStudioCanvas(document, moved.map((canvas, index) => ({
+    id: named(canvas), ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
+    roots: canvas.roots.map((root, at) => ({
+      anchor: target(root.anchor),
+      nodes: order[index][at].map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })),
+    })),
+  })));
+  const canvases = new Map(moved.map((canvas, index) => {
+    const ids = new Map(order[index].flat().map((node, at) => [node.id, encoded.canvases[index].nodes[at].id]));
+    const groups = canvas.groups?.map(group => ({ ...group, nodeIds: group.nodeIds.map(id => ids.get(id)!) }));
+    return [canvas, { ...encoded.canvases[index], ...(groups ? { groups } : {}) }] as const;
+  }));
+  const next = { ...document, studioCanvas: { ...stored, canvases: stored.canvases.map(canvas => canvases.get(canvas) ?? canvas) } };
+  if (readStudioCanvas(next).warnings.length) throw new CompositionValidationError([{ code: 'invalid_value', pointer: '/studioCanvas' }]);
+  return next;
 }

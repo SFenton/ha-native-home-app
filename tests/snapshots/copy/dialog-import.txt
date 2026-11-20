@@ -1,5 +1,6 @@
 Paste JSON
 Choose File…
 Import
+Importing replaces this whole draft, including its linked values and saved canvas layouts.
 From Home Assistant
 Adds the rooms and chores pages this draft does not have yet.

@@ -23,7 +23,7 @@ import TokenField, { writeParts } from '../../../src/workspace2/expr/TokenField'
 import TokenSettings from '../../../src/workspace2/expr/TokenSettings';
 import RulesList from '../../../src/workspace2/expr/RulesList';
 import RulePage, { duplicateRule } from '../../../src/workspace2/expr/RulePage';
-import { bodyWithSamples, deleteEntry, removeSetting, saveLogicTemplate, workedOut } from '../../../src/workspace2/data/logic/logicModel';
+import { bodyWithSamples, deleteEntry, removeSetting, removeSettingPlan, saveLogicTemplate, workedOut } from '../../../src/workspace2/data/logic/logicModel';
 import { resolvedLogicValue, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
 import { evaluateOperand as editorValue, registerFill } from '../../../src/workspace2/data/logic/logicEval';
 import { useSentence } from '../../../src/workspace2/data/logic/logicNames';
@@ -36,7 +36,8 @@ import { newToken, operandSlot, slotOperand } from '../../../src/workspace2/expr
 import { toSlot } from '../../../src/workspace2/expr/value';
 import { authoredNodes, walkableList, walkableOwner, walkedOwnerLists } from '../../../src/workspace2/logic-fields/registry';
 import { documentEdit as wholeDocumentEdit } from './oracle/documentEdit';
-import { canvasReferences, copySubtree, editSubtrees, rebuildField } from '../../../src/workspace2/editors/provenance';
+import { canvasReferences, changeFieldType, copySubtree, editSubtrees, rebuildField, replaceDocument } from '../../../src/workspace2/editors/provenance';
+import { bodyFromSlotView, canonicalBody, slotBodyView } from '../../../src/workspace2/logic-fields/LogicFields';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { houseFrom } from '../../../src/preview2/projections';
@@ -62,7 +63,7 @@ import { areaAt, duplicateArea } from '../../../src/workspace2/layout/areaOps';
 import { buildDocumentIndex } from '../../../src/preview2/model';
 import { groupPredicate } from '../../../src/workspace2/expr/condition';
 import { writeRule } from '../../../src/workspace2/expr/useRule';
-import { moveStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
+import { moveFlowStep, moveStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import { duplicateStyle } from '../../../src/shared/composition/state-style-library';
 import { builtInStyles } from '../../../src/shared/composition/state-styles';
 import type { Json } from '../../../src/shared/types';
@@ -107,7 +108,7 @@ function layoutMeaning(document: CompositionDocument) {
     id: canvas.id,
     roots: canvas.roots.map(root => {
       const target = resolveLogicAnchor(document, root.anchor)!;
-      const graph = liftField(document, pointerPath(target.pointer), 'slot').graph;
+      const graph = liftField(document, pointerPath(target.pointer), root.anchor.kind === 'logic' ? 'operand' : 'slot').graph;
       const nodes = canvas.nodes.filter(node => node.rootId === root.id);
       for (const node of nodes) expect(graph.nodes.some(fresh => fresh.id === node.nodeId && JSON.stringify(fresh.origins) === JSON.stringify(node.origins)), node.id).toBe(true);
       return { key: `${'nodeId' in root.anchor ? root.anchor.nodeId : root.anchor.id}:${root.anchor.field}`,
@@ -918,39 +919,106 @@ function originalLayouts(before: CompositionDocument, after: CompositionDocument
 }
 
 const remainingOperations = ['duplicate local-tab area', 'group and duplicate predicate', 'value mode transition',
-  'action mode transition', 'remove bound logic setting', 'reorder flow steps', 'duplicate style', 'typed conversion', 'import'] as const;
+  'action mode transition', 'remove bound logic setting', 'reorder flow steps', 'duplicate style', 'typed conversion', 'import', 'template body slot view'] as const;
+type RemainingOperation = typeof remainingOperations[number];
+/** The operations that change linked meaning on purpose: each declares what it removes or moves, and is applied. */
+const declaredOperations: readonly RemainingOperation[] = ['remove bound logic setting', 'reorder flow steps', 'typed conversion', 'import', 'template body slot view'];
+const templateBody: EditorPath = ['logicLibrary', 1, 'body'];
+function remainingFixture(operation: RemainingOperation, policy: 'fallback' | 'keep') {
+  const fixture = meaningFixture('page tile', policy);
+  let before = fixture.document, slot = fixture.slot;
+  const root = ['pages', 0, 'components', 0], rulePath = [...root, 'visibleWhen'], actionPath = [...root, 'action'];
+  let flowId = '';
+  if (operation === 'duplicate local-tab area') {
+    const tabs = documentWithTabs();
+    before = { ...before, localState: tabs.localState };
+    before = replaceAt(before, ['pages', 0, 'components'], [...before.pages[0].components, tabs.pages[0].components[0]]);
+    before = moveToSlot(before, 'node:tile-a', endOf(before, 'local-tab:area-tabs/one')!).document;
+    slot = [...buildDocumentIndex(before).get('node:tile-a')!.path, 'props', 'subtitle'];
+  } else if (operation === 'group and duplicate predicate') {
+    const use = structuredClone(valueAt(before, [...slot, 'value']));
+    before = replaceAt(before, root, { ...valueAt(before, root) as object, visibleWhen: { type: 'compare', op: 'eq', left: use, right: text('sensor.demo_1') }, whenUnknown: 'keep' });
+    before = { ...before, logicUseBindings: [...before.logicUseBindings!, { ...before.logicUseBindings![0], use: { ...before.logicUseBindings![0].use, field: '/visibleWhen/left' } }] };
+  } else if (operation === 'action mode transition') {
+    before = replaceAt(before, actionPath, { type: 'conditional', cases: [{ when: check, then: valueAt(before, actionPath) }], otherwise: { type: 'none' } });
+  } else if (operation === 'reorder flow steps') {
+    const made = newFlow(before, 'group'); flowId = made.id;
+    before = updateFlow(made.document, flowId, inputs => ({ ...inputs, steps: [{ id: 'one', op: 'limit', count: 10 }, { id: 'two', op: 'limit', count: 20 }] }));
+  } else if (operation === 'remove bound logic setting') {
+    // The setting's Try With value stands in for it in the body, so it must be one the body can read.
+    before = replaceAt(before, ['logicLibrary', 0, 'params', 0, 'sample'], 'source-b');
+  } else if (operation === 'template body slot view') {
+    expect(before.logicLibrary![1].id).toBe('other-label');
+    before = replaceAt(before, templateBody, { type: 'choose', cases: [{ when: check, then: valueAt(before, templateBody) }], otherwise: text('Guest') });
+  }
+  before = withMeaningCanvas(before, slot);
+  const extra = (path: EditorPath, kind: 'flow' | 'operand', id: string) => {
+    const graph = liftField(before, path, kind).graph;
+    const added = encodeStudioCanvas(before, [{ id, roots: [{ anchor: graph.roots[0].anchor,
+      nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 100, y: 600 })) }] }]);
+    before = { ...before, studioCanvas: { ...studioCanvasMetadataSchema.parse(before.studioCanvas),
+      canvases: [...studioCanvasMetadataSchema.parse(before.studioCanvas).canvases, ...added.canvases] } };
+  };
+  if (flowId) extra(['dataSources', before.dataSources.findIndex(source => source.id === flowId), 'inputs'], 'flow', 'flow-layout');
+  if (operation === 'template body slot view') extra(templateBody, 'operand', 'body-layout');
+  valid(before);
+  return { before, slot, root, rulePath, actionPath, flowId };
+}
+/**
+ * The saved layout `before` would have over `semantic`, built from the contract's own lift and encoding rather than the
+ * boundary's rebase: each kept root re-lifted where it now resolves, each node carried (position and groups) to the fresh
+ * node with the same origins, roots that `drop` names removed, and canvases left without roots removed.
+ */
+function expectedLayout(before: CompositionDocument, semantic: CompositionDocument, drop: (anchor: Record<string, unknown>) => boolean = () => false): CompositionDocument {
+  const stored = studioCanvasMetadataSchema.parse(before.studioCanvas);
+  const kept = stored.canvases.map(canvas => ({ canvas, roots: canvas.roots.filter(root => !drop(root.anchor as Record<string, unknown>)) })).filter(entry => entry.roots.length);
+  const order = kept.map(({ canvas, roots }) => roots.map(root => canvas.nodes.filter(node => node.rootId === root.id)));
+  const encoded = encodeStudioCanvas(semantic, kept.map(({ canvas, roots }, index) => ({
+    id: canvas.id, ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
+    roots: roots.map((root, at) => {
+      const path = pointerPath(resolveLogicAnchor(semantic, root.anchor)!.pointer);
+      const kind = root.anchor.kind === 'flow' ? 'flow' : root.anchor.kind === 'logic' ? 'operand' : 'slot';
+      const graph = liftField(semantic, path, kind).graph;
+      return { anchor: root.anchor, nodes: order[index][at].map(node => {
+        const fresh = graph.nodes.find(candidate => JSON.stringify(candidate.origins) === JSON.stringify(node.origins));
+        expect(fresh, node.id).toBeDefined();
+        return { id: fresh!.id, origins: node.origins, x: node.x, y: node.y };
+      }) };
+    }),
+  })), stored.bundles);
+  const canvases = encoded.canvases.map((canvas, index) => {
+    const ids = new Map(order[index].flat().map((node, at) => [node.id, canvas.nodes[at].id]));
+    const groups = kept[index].canvas.groups?.map(group => ({ ...group, nodeIds: group.nodeIds.flatMap(id => ids.has(id) ? [ids.get(id)!] : []) })).filter(group => group.nodeIds.length);
+    return { ...canvas, ...(groups ? { groups } : {}) };
+  });
+  return { ...semantic, studioCanvas: { ...encoded, canvases } };
+}
+/** Each declared operation's result, written out from `before` alone. */
+function declaredExpectation(operation: RemainingOperation, before: CompositionDocument, flowId: string): CompositionDocument {
+  const tileA = (anchor: Record<string, unknown>) => anchor.nodeId === 'tile-a';
+  if (operation === 'import') return { ...before, name: 'Imported layout' };
+  if (operation === 'remove bound logic setting') {
+    const entry = before.logicLibrary![0] as unknown as { body: { from: object } };
+    let semantic = replaceAt(before, ['logicLibrary', 0], { ...before.logicLibrary![0], params: [], body: { ...entry.body, from: { ...entry.body.from, sourceId: 'source-b' } } });
+    for (const index of [0, 1]) semantic = replaceAt(semantic, ['pages', 0, 'components', index, 'props', 'subtitle', 'value', 'args'], {});
+    return expectedLayout(before, { ...semantic, logicUseBindings: before.logicUseBindings!.filter(binding => binding.logicId !== 'tile-label') });
+  }
+  if (operation === 'reorder flow steps') {
+    const at = before.dataSources.findIndex(source => source.id === flowId);
+    const steps = valueAt(before, ['dataSources', at, 'inputs', 'steps']) as unknown[];
+    return expectedLayout(before, replaceAt(before, ['dataSources', at, 'inputs', 'steps'], [steps[1], steps[0]]));
+  }
+  if (operation === 'typed conversion') {
+    const node = before.pages[0].components[0] as { id: string; title: string; layout: object };
+    const semantic = replaceAt(before, ['pages', 0, 'components', 0], { id: node.id, type: 'text', title: node.title, layout: node.layout,
+      props: { value: { type: 'literal', value: '' }, style: 'large-title', unavailableText: 'Unavailable' } });
+    return expectedLayout(before, { ...semantic, logicUseBindings: before.logicUseBindings!.filter(binding => !tileA(binding.use as Record<string, unknown>)) }, tileA);
+  }
+  return expectedLayout(before, replaceAt(before, [...templateBody, 'otherwise'], text('Elsewhere')));
+}
 describe('fail-closed meaning matrix for remaining transformation areas', () => {
-  for (const policy of ['fallback', 'keep'] as const) it.each(remainingOperations)(`${policy}: %s preserves meaning or is cleanly refused`, operation => {
-    const fixture = meaningFixture('page tile', policy);
-    let before = fixture.document, slot = fixture.slot;
-    const root = ['pages', 0, 'components', 0], rulePath = [...root, 'visibleWhen'], actionPath = [...root, 'action'];
-    let flowId = '';
-    if (operation === 'duplicate local-tab area') {
-      const tabs = documentWithTabs();
-      before = { ...before, localState: tabs.localState };
-      before = replaceAt(before, ['pages', 0, 'components'], [...before.pages[0].components, tabs.pages[0].components[0]]);
-      before = moveToSlot(before, 'node:tile-a', endOf(before, 'local-tab:area-tabs/one')!).document;
-      slot = [...buildDocumentIndex(before).get('node:tile-a')!.path, 'props', 'subtitle'];
-    } else if (operation === 'group and duplicate predicate') {
-      const use = structuredClone(valueAt(before, [...slot, 'value']));
-      before = replaceAt(before, root, { ...valueAt(before, root) as object, visibleWhen: { type: 'compare', op: 'eq', left: use, right: text('sensor.demo_1') }, whenUnknown: 'keep' });
-      before = { ...before, logicUseBindings: [...before.logicUseBindings!, { ...before.logicUseBindings![0], use: { ...before.logicUseBindings![0].use, field: '/visibleWhen/left' } }] };
-    } else if (operation === 'action mode transition') {
-      before = replaceAt(before, actionPath, { type: 'conditional', cases: [{ when: check, then: valueAt(before, actionPath) }], otherwise: { type: 'none' } });
-    } else if (operation === 'reorder flow steps') {
-      const made = newFlow(before, 'group'); flowId = made.id;
-      before = updateFlow(made.document, flowId, inputs => ({ ...inputs, steps: [{ id: 'one', op: 'limit', count: 10 }, { id: 'two', op: 'limit', count: 20 }] }));
-    }
-    before = withMeaningCanvas(before, slot);
-    if (flowId) {
-      const path = ['dataSources', before.dataSources.findIndex(source => source.id === flowId), 'inputs'];
-      const graph = liftField(before, path, 'flow').graph;
-      const extra = encodeStudioCanvas(before, [{ id: 'flow-layout', roots: [{ anchor: graph.roots[0].anchor,
-        nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 100, y: 600 })) }] }]);
-      before = { ...before, studioCanvas: { ...studioCanvasMetadataSchema.parse(before.studioCanvas),
-        canvases: [...studioCanvasMetadataSchema.parse(before.studioCanvas).canvases, ...extra.canvases] } };
-    }
-    valid(before);
+  for (const policy of ['fallback', 'keep'] as const) it.each(remainingOperations)(`${policy}: %s preserves meaning or is declared and applied`, operation => {
+    const { before, slot, root, rulePath, actionPath, flowId } = remainingFixture(operation, policy);
     const expected = placementValues(before), draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
     let proposed = before, copyId: string | undefined;
     if (operation === 'duplicate local-tab area') {
@@ -966,20 +1034,40 @@ describe('fail-closed meaning matrix for remaining transformation areas', () => 
       proposed = rebuildField(before, slot, toSlot('rules', { rules: { cases: [{ when: check, then: copySubtree(value) }], otherwise: value } }, 'text', valueAt(before, slot)));
     } else if (operation === 'action mode transition') {
       proposed = rebuildField(before, actionPath, copySubtree(valueAt(before, [...actionPath, 'cases', 0, 'then'])));
-    } else if (operation === 'remove bound logic setting') proposed = removeSetting(before, 'tile-label', 'source');
-    else if (operation === 'reorder flow steps') proposed = updateFlow(before, flowId, inputs => ({ ...inputs, steps: moveStep(inputs.steps, 0, 1) }));
+    } else if (operation === 'remove bound logic setting') {
+      const plan = removeSettingPlan(before, 'tile-label', 'source'); proposed = plan.document;
+      expect(plan.tiles).toBe(2);
+    } else if (operation === 'reorder flow steps') proposed = moveFlowStep(before, flowId, 0, 1);
     else if (operation === 'duplicate style') proposed = { ...before, stateStyles: duplicateStyle(before.stateStyles, builtInStyles[0]).library };
     else if (operation === 'typed conversion') {
       const type = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
-      proposed = replaceAt(before, root, changeFieldVariant(type, valueAt(before, root) as Json, before, 'component'));
-    } else proposed = importCompositionText(compositionSourceText({ ...before, name: 'Imported layout' }), before.id);
+      const change = changeFieldType(before, root, type, 'component'); proposed = change.document;
+      expect({ bindings: change.bindings, layouts: change.layouts }).toEqual({ bindings: 1, layouts: 1 });
+    } else if (operation === 'import') proposed = replaceDocument(before, importCompositionText(compositionSourceText({ ...before, name: 'Imported layout' }), before.id));
+    else {
+      const pushed = createDraft(slotBodyView(before, templateBody, valueAt(before, templateBody) as Operand));
+      pushed.set(rebuildField(pushed.get(), [...templateBody, 'value', 'otherwise'], text('Elsewhere')));
+      proposed = bodyFromSlotView(before, pushed.get(), templateBody);
+    }
     draft.set(proposed);
-    const refused = ['remove bound logic setting', 'reorder flow steps', 'typed conversion', 'import'].includes(operation);
-    if (refused) {
-      expect(draft.get()).toBe(before);
-      expect(draft.canUndo()).toBe(false); expect(draft.canRedo()).toBe(false);
-      expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
-      draft.undo(); draft.redo(); expect(draft.get()).toBe(before);
+    expect(notice).not.toHaveBeenCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    if (declaredOperations.includes(operation)) {
+      expect(draft.get()).toBe(proposed);
+      expect(draft.get()).toEqual(declaredExpectation(operation, before, flowId));
+      valid(draft.get());
+      const current = placementValues(draft.get());
+      // Placements the operation does not reach keep their meaning exactly.
+      const reached = operation === 'remove bound logic setting' ? ['tile-a', 'tile-b'] : operation === 'typed conversion' ? ['tile-a']
+        : operation === 'template body slot view' ? ['unrelated-bound'] : [];
+      for (const [id, old] of Object.entries(expected)) if (!reached.includes(id)) expect(current[id], id).toEqual(old);
+      if (operation !== 'import') history(draft, before, operation !== 'remove bound logic setting');
+      else {
+        // The imported text is canonical JSON: its links equal the old ones as values (key order aside) because they were authored so.
+        const after = draft.get();
+        expect(after.logicUseBindings).toEqual(before.logicUseBindings); expect(after.componentLibrary).toEqual(before.componentLibrary); expect(after.studioCanvas).toEqual(before.studioCanvas);
+        act(() => draft.undo()); expect(draft.get()).toBe(before); expect(draft.canUndo()).toBe(false);
+        act(() => draft.redo()); expect(draft.get()).toBe(after); expect(draft.canRedo()).toBe(false);
+      }
     } else {
       expect(draft.get()).not.toBe(before);
       const current = placementValues(draft.get());
@@ -1007,6 +1095,33 @@ describe('fail-closed meaning matrix for remaining transformation areas', () => 
       history(draft, before);
     }
     valid(draft.get()); notice.mockRestore();
+  });
+
+  // The same changes made without declaring what they remove or move: the boundary still refuses each one whole.
+  for (const policy of ['fallback', 'keep'] as const) it.each(declaredOperations)(`${policy}: %s without its declaration is cleanly refused`, operation => {
+    const { before, root, flowId } = remainingFixture(operation, policy);
+    const draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
+    const declared = declaredExpectation(operation, before, flowId);
+    let undeclared: CompositionDocument;
+    if (operation === 'remove bound logic setting') undeclared = JSON.parse(JSON.stringify(declared));
+    else if (operation === 'reorder flow steps') undeclared = updateFlow(before, flowId, inputs => ({ ...inputs, steps: moveStep(inputs.steps, 0, 1) }));
+    else if (operation === 'typed conversion') {
+      const type = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
+      undeclared = replaceAt(before, root, changeFieldVariant(type, valueAt(before, root) as Json, before, 'component'));
+    } else if (operation === 'import') undeclared = importCompositionText(compositionSourceText({ ...before, name: 'Imported layout' }), before.id);
+    else {
+      // What Done did before: the slot view's body set back as is, with no provenance for its layout.
+      const pushed = createDraft(slotBodyView(before, templateBody, valueAt(before, templateBody) as Operand));
+      pushed.set(rebuildField(pushed.get(), [...templateBody, 'value', 'otherwise'], text('Elsewhere')));
+      undeclared = replaceAt(canonicalBody(pushed.get(), templateBody), ['logicLibrary', 1, 'name'], 'Other label');
+      undeclared = JSON.parse(JSON.stringify(undeclared));
+    }
+    draft.set(undeclared);
+    expect(draft.get()).toBe(before);
+    expect(draft.canUndo()).toBe(false); expect(draft.canRedo()).toBe(false);
+    expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    draft.undo(); draft.redo(); expect(draft.get()).toBe(before);
+    notice.mockRestore();
   });
 });
 
