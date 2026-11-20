@@ -3,13 +3,12 @@ import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import type { Predicate } from '../../shared/composition/expression';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { removeRuleAt } from './removal';
-import { editBoundField } from '../logic-fields/templates';
 import { useDraftDocument, type Draft } from '../editors/draft';
 
 /** Writes `next` at `path` of a document; no condition removes the key, and the `whenUnknown` beside it (spec "Remove Condition"). */
 export function writeRule(document: CompositionDocument, path: EditorPath, next: Predicate | undefined, policyKey?: string): CompositionDocument {
   const parent = path.slice(0, -1), holder = valueAt(document, parent) as Record<string, unknown> | undefined;
-  if (next) return editBoundField(document, path, document => replaceAt(holder === undefined && parent.length ? replaceAt(document, parent, policyKey ? { [policyKey]: 'keep' } : {}) : document, path, next));
+  if (next) return replaceAt(holder === undefined && parent.length ? replaceAt(document, parent, policyKey ? { [policyKey]: 'keep' } : {}) : document, path, next);
   return removeRuleAt(document, path, policyKey);
 }
 

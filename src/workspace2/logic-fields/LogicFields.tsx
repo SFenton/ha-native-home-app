@@ -10,6 +10,7 @@ import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchor
 import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { useDraftDocument, type Draft } from '../editors/draft';
+import { documentEdit } from '../editors/documentEdit';
 import FlowCanvas, { arrangeCanvas, type CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import type { CanvasObservations } from '../canvas/observations';
 import { SimulationHost } from '../logic-simulation/SimulationHost';
@@ -80,7 +81,7 @@ export function useFieldDraft(document: CompositionDocument, onChange: (next: Co
   useEffect(() => { listeners.current.forEach(listener => listener()); }, [document]);
   const [draft] = useState<Draft>(() => ({
     get: () => latest.current.document,
-    set: (next, group) => { latest.current = { ...latest.current, document: next }; latest.current.onChange(next, group); listeners.current.forEach(listener => listener()); },
+    set: (next, group) => { next = documentEdit(latest.current.document, next); latest.current = { ...latest.current, document: next }; latest.current.onChange(next, group); listeners.current.forEach(listener => listener()); },
     subscribe: listener => { listeners.current.add(listener); return () => { listeners.current.delete(listener); }; },
     dirty: () => false, tryLeave: () => true, name: '',
     prompt: { get: () => false, set: () => {}, subscribe: () => () => {} },
@@ -169,6 +170,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
     }
     if (transaction.generatedSources.length) next = { ...next, dataSources: [...next.dataSources, ...transaction.generatedSources] } as CompositionDocument;
     if (transaction.generatedLibrary.length) next = { ...next, logicLibrary: [...next.logicLibrary ?? [], ...transaction.generatedLibrary] } as CompositionDocument;
+    next = documentEdit(before, next);
     if (layout) next = saveCanvasLayout(next, transaction.replacements, layout, { document: before, paths });
     compileCompositionDocument(next);
     await request('/native/api/draft/prepare', { method: 'POST', body: JSON.stringify({ document: next }) });

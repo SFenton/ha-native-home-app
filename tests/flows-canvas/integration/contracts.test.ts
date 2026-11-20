@@ -7,7 +7,8 @@ import { lower, lift, type GraphDestination } from '../../../src/shared/composit
 import { projectGraph } from '../../../src/shared/composition/graph/lower';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { fieldAdapters, fieldAnchor, fieldPointer, liftField, schemaFieldKind, type LogicFieldKind } from '../../../src/workspace2/logic-fields/registry';
-import { editBoundField, explicitTemplateUse, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
+import { explicitTemplateUse, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
+import { createDraft } from '../../../src/workspace2/editors/draft';
 import { saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
 import { componentDocument, draftDocument } from '../draft/fixtures';
 import type { Json } from '../../../src/shared/types';
@@ -116,9 +117,11 @@ it('reanchors a moved component-owned use with its canonical owner and resolves 
   const document = compileCompositionDocument(componentDocument()).document;
   const path = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
   const use = valueAt(document, [...path, 'value']);
-  const next = editBoundField(document, path, document => replaceAt(document, path, {
+  const draft = createDraft(document);
+  draft.set(replaceAt(document, path, {
     type: 'expr', value: { type: 'format', pattern: 'Room: {value}', args: { value: use } },
   }));
+  const next = draft.get();
   expect(next.logicUseBindings![0].use).toEqual({ kind: 'component', id: 'saved-tile', nodeId: 'inner-tile', field: '/props/subtitle/value/args/value' });
   const expanded = expandDocument(compileCompositionDocument(next).expanded);
   for (const [index, sourceId] of ['source-a', 'source-b'].entries()) {

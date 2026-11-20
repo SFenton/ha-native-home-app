@@ -19,7 +19,7 @@ import { fieldUsage } from '../canvas/LimitsMeter';
 import { useLogicFields } from './LogicFields';
 import { fieldAdapters, liftField, type LogicFieldKind } from './registry';
 import { TemplatePicker } from './TemplatePicker';
-import { editBoundField, unlinkTemplate } from './templates';
+import { unlinkTemplate } from './templates';
 import { operandSlot } from '../expr/tokens';
 import type { Operand } from '../../shared/composition/expression';
 import { describeLogic, graphSentence, sourceLabel } from './presentation';
@@ -99,10 +99,10 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
       <p>From the template: <strong>{entry?.name ?? 'Missing template'}</strong></p>
       {entry && <p className="w2-caption">{entry.params.map(param => `${param.label ?? param.name}: ${param.kind === 'source-id' ? sourceLabel(effectiveUse?.args[param.name], ctx) : describeLogic(effectiveUse?.args[param.name], ctx)}`).join(' · ')}</p>}
       {settings && <LogicUseSettings draft={draft} path={usePath} use={use} kind={kind === 'condition' ? 'condition' : 'value'} removeLabel="Remove use"
-        onChange={(next, base) => draft.set(editBoundField(base ?? draft.get(), [...usePath, 'args'], document => replaceAt(document, usePath, next)))}
+        onChange={(next, base) => draft.set(replaceAt(base ?? draft.get(), usePath, next))}
         onUnlink={() => run(() => draft.set(unlinkTemplate(draft.get(), usePath)))}
         onRemove={kind === 'condition' ? () => run(() => draft.set(writeRule(draft.get(), path, undefined)))
-          : textSlot ? () => run(() => draft.set(editBoundField(draft.get(), path, document => replaceAt(document, path, { type: 'literal', value: '' })))) : undefined}/>}
+          : textSlot ? () => run(() => draft.set(replaceAt(draft.get(), path, { type: 'literal', value: '' }))) : undefined}/>}
     </div>}
     <div className="w2-logic-commands">
       {simple && predicate && <><button type="button" onClick={() => open('all')}>+ And…</button><button type="button" onClick={() => open('any')}>+ Or…</button></>}
@@ -111,7 +111,7 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
       {value !== undefined && <button type="button" className={simple ? undefined : 'w2-logic-primary'} onClick={() => open()} disabled={!api}>Edit in Canvas</button>}
     </div>
     {(kind === 'condition' || kind === 'operand' || textSlot) && <div className="w2-logic-commands w2-logic-secondary">
-      <TemplatePicker document={document} kind={kind === 'condition' ? 'condition' : 'operand'} onUse={use => draft.set(editBoundField(draft.get(), path, document => replaceAt(document, path, textSlot ? operandSlot(use as unknown as Operand, slot) : use)))}/>
+      <TemplatePicker document={document} kind={kind === 'condition' ? 'condition' : 'operand'} onUse={use => draft.set(replaceAt(draft.get(), path, textSlot ? operandSlot(use as unknown as Operand, slot) : use))}/>
       {value !== undefined && <SaveAsLogic draft={draft} path={path} kind={kind === 'slot' ? 'value' : kind === 'condition' ? 'condition' : 'operand'}/>}
     </div>}
     {adapter.output === 'yes/no' && !predicate && <p className="w2-caption">One check edits here. Add And or Or to build a flow.</p>}

@@ -17,7 +17,7 @@ import { useLogicFields } from '../logic-fields/LogicFields';
 import { DraftField } from '../logic-fields/AddressedField';
 import type { EditorPath } from '../../composition-editor';
 import { hasMultipleChecks } from '../logic-fields/checks';
-import { editBoundField, unlinkTemplate } from '../logic-fields/templates';
+import { unlinkTemplate } from '../logic-fields/templates';
 
 function tokenPath(value: unknown, operand: Operand, path: EditorPath): EditorPath | undefined {
   if (value === operand) return path;
@@ -50,7 +50,7 @@ export default function TokenSettings({ draft, address, index, onWording, onClos
     const afterChange = () => { if (!inline) leaveUse(); };
     return <LogicUseSettings draft={draft} path={storedPath} use={asUse} kind="value" removeLabel={words.removeValue} onLeave={leaveUse}
       onChange={(next, base) => {
-        if (storedPath) draft.set(editBoundField(base ?? draft.get(), [...storedPath, 'args'], document => replaceAt(document, storedPath, next)));
+        if (storedPath) draft.set(replaceAt(base ?? draft.get(), storedPath, next));
         else writeParts(draft, address, parts.map((item, i) => i === at ? { token: { ...token, operand: next as unknown as Operand } } : item), false, base);
       }}
       onUnlink={() => {

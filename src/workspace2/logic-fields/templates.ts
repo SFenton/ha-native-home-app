@@ -3,38 +3,10 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import { argFits, expandKeepingHoles, type LogicEntry, type LogicRef } from '../../shared/composition/logic-library';
 import { canonicalOfBounded } from '../../shared/composition/json';
 import { resolveLogicUseBindings, unbindLogicUse } from '../../shared/composition/studio-logic/bindings';
-import { atPointer, resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
+import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { logicUseBindingsSchema } from '../../shared/composition/studio-logic/schemas';
 import type { Json } from '../../shared/types';
-import { fieldAnchor, fieldPointer } from './registry';
-import { usesOf } from '../data/logic/logicModel';
-
-/** Structural edits retain bindings only for the same authored uses, at their new canonical addresses. */
-export function editBoundField(document: CompositionDocument, path: EditorPath, edit: (document: CompositionDocument) => CompositionDocument): CompositionDocument {
-  const stored = document.logicUseBindings ?? [], bindings = logicUseBindingsSchema.parse(stored);
-  if (!bindings.length) return edit(document);
-  const resolved = resolveLogicUseBindings(document).bindings;
-  const root = fieldPointer(path), inside = (pointer: string) => pointer === root || pointer.startsWith(`${root}/`);
-  const next = edit(document);
-  if (next === document) return document;
-  const seen = new Map<string, string>();
-  const rewritten = bindings.flatMap((binding, index) => {
-    const pointer = resolved[index].usePointer;
-    if (!inside(pointer)) return [stored[index]];
-    const value = atPointer(document, pointer);
-    return usesOf(next, binding.logicId).filter(use => inside(fieldPointer(use.path)) && valueAt(next, use.path) === value)
-      .map(use => ({ ...binding, use: fieldAnchor(next, use.path) }));
-  }).filter(binding => {
-    const key = canonicalOfBounded([binding.use, binding.argument]), value = canonicalOfBounded(binding);
-    const previous = seen.get(key);
-    if (previous !== undefined && previous !== value) throw new Error('This edit makes the template bindings ambiguous.');
-    seen.set(key, value);
-    return previous === undefined;
-  });
-  const result = { ...next, logicUseBindings: rewritten };
-  resolveLogicUseBindings(result);
-  return result;
-}
+import { fieldPointer } from './registry';
 
 export function explicitTemplateUse(entry: LogicEntry, args: Record<string, Json>, enclosing: Readonly<LogicEntry['params']> = []): LogicRef {
   if (Object.keys(args).length !== entry.params.length || entry.params.some(param => {

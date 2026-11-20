@@ -14,7 +14,6 @@ import { describeToken } from '../data/logic/logicTokens';
 import { MAX_TOKENS, newToken, operandSlot, parseLine, slotOperand, tokenCount, writeLine, type Part, type Token } from './tokens';
 import { useNameContext } from './useExpr';
 import { words } from './words';
-import { editBoundField } from '../logic-fields/templates';
 import type { CompositionDocument } from '../../shared/composition/schema';
 
 /** Where a line lives: a text slot (`literal`, `read` or `expr`) or a bare operand (a rule's Then). */
@@ -27,8 +26,8 @@ export function lineOperand(value: unknown, wrap: LineAddress['wrap']): Operand 
 /** Writes parts to a line: one step, coalescing typing. */
 export function writeParts(draft: Draft, address: LineAddress, parts: readonly Part[], typing: boolean, base = draft.get()): void {
   const operand = writeLine(parts);
-  draft.set(editBoundField(base, address.path, document => replaceAt(document, address.path,
-    address.wrap === 'slot' ? operandSlot(operand, valueAt(document, address.path)) : operand)), typing ? `line:${address.path.join('/')}` : undefined);
+  draft.set(replaceAt(base, address.path,
+    address.wrap === 'slot' ? operandSlot(operand, valueAt(base, address.path)) : operand), typing ? `line:${address.path.join('/')}` : undefined);
 }
 
 /**

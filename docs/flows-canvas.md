@@ -418,6 +418,18 @@ An unresolved target, wrong type, duplicate target/argument, changed ref, or
 missing owning tile is a **semantic binding error**, not a discarded layout
 warning. Never silently use a stale cached argument.
 
+All inspector, rule and canvas document writes pass through
+`src/workspace2/editors/documentEdit.ts` before entering draft or workspace
+history; canvas preflight uses that same transaction before compilation.
+Structural edits reconcile both `logicUseBindings` and saved-component parameter
+field bindings with the canonical resolver, anchors and document-model uses.
+Surviving subtrees carry their references to the new address; removed targets
+lose their dependent bindings. Unrelated binding records remain unchanged.
+Undo and redo restore the complete reconciled snapshots, never a separate
+metadata patch. Valid saved layout associations whose origins no longer identify
+the same block are discarded; invalid imported layout stays available for
+explicit reset/export.
+
 Bindings are declarative Studio preprocessing, not new native nodes/capabilities.
 Cap at 128 bindings per document, retain existing per-component binding limits,
 and run the existing expanded-size/depth checks. This is a new Studio-only bound,
