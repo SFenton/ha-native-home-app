@@ -28,6 +28,7 @@ import { hasMultipleChecks, inlineCheck } from './checks';
 import { LeafEditor, ViewerEditor } from '../expr/ConditionRow';
 import { ValuePickerRow } from '../expr/ValuePicker';
 import { defaultFor } from '../expr/LogicBuilder';
+import { rebuildField } from '../editors/provenance';
 
 function InlineResult({ draft, predicate }: { draft: Draft; predicate: Predicate | undefined }) {
   const document = useDraftDocument(draft), env = useDraftEnvironment(document), ctx = useNameContext(document);
@@ -99,10 +100,10 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
       <p>From the template: <strong>{entry?.name ?? 'Missing template'}</strong></p>
       {entry && <p className="w2-caption">{entry.params.map(param => `${param.label ?? param.name}: ${param.kind === 'source-id' ? sourceLabel(effectiveUse?.args[param.name], ctx) : describeLogic(effectiveUse?.args[param.name], ctx)}`).join(' · ')}</p>}
       {settings && <LogicUseSettings draft={draft} path={usePath} use={use} kind={kind === 'condition' ? 'condition' : 'value'} removeLabel="Remove use"
-        onChange={(next, base) => draft.set(replaceAt(base ?? draft.get(), usePath, next))}
+        onChange={(next, base) => draft.set(rebuildField(base ?? draft.get(), usePath, next))}
         onUnlink={() => run(() => draft.set(unlinkTemplate(draft.get(), usePath)))}
         onRemove={kind === 'condition' ? () => run(() => draft.set(writeRule(draft.get(), path, undefined)))
-          : textSlot ? () => run(() => draft.set(replaceAt(draft.get(), path, { type: 'literal', value: '' }))) : undefined}/>}
+          : textSlot ? () => run(() => draft.set(rebuildField(draft.get(), path, { type: 'literal', value: '' }))) : undefined}/>}
     </div>}
     <div className="w2-logic-commands">
       {simple && predicate && <><button type="button" onClick={() => open('all')}>+ And…</button><button type="button" onClick={() => open('any')}>+ Or…</button></>}
@@ -111,7 +112,7 @@ export function LogicField({ draft, path, kind, label, inline, children, showLab
       {value !== undefined && <button type="button" className={simple ? undefined : 'w2-logic-primary'} onClick={() => open()} disabled={!api}>Edit in Canvas</button>}
     </div>
     {(kind === 'condition' || kind === 'operand' || textSlot) && <div className="w2-logic-commands w2-logic-secondary">
-      <TemplatePicker document={document} kind={kind === 'condition' ? 'condition' : 'operand'} onUse={use => draft.set(replaceAt(draft.get(), path, textSlot ? operandSlot(use as unknown as Operand, slot) : use))}/>
+      <TemplatePicker document={document} kind={kind === 'condition' ? 'condition' : 'operand'} onUse={use => draft.set(rebuildField(draft.get(), path, textSlot ? operandSlot(use as unknown as Operand, slot) : use))}/>
       {value !== undefined && <SaveAsLogic draft={draft} path={path} kind={kind === 'slot' ? 'value' : kind === 'condition' ? 'condition' : 'operand'}/>}
     </div>}
     {adapter.output === 'yes/no' && !predicate && <p className="w2-caption">One check edits here. Add And or Or to build a flow.</p>}

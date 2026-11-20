@@ -1404,6 +1404,8 @@ Do not lower wire opacity on a live value that becomes unavailable.
 
 ## 11. Wave-2 implementation plan (C-lanes)
 
+Save repeated pieces adopts the first selected tile's canvas layout for each merged field and discards the other selected tiles' layouts for that field; values and per-placement bindings remain unchanged.
+
 Five implementation lanes, no nested dispatch. The orchestrator owns assignment,
 merge order, acceptance and a later independent read-only review. These are
 proposed ownership boundaries, not instructions to start workers from this

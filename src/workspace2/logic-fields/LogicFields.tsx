@@ -11,7 +11,7 @@ import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import { documentEdit } from '../editors/documentEdit';
-import { canvasReferences, type CanvasProvenance } from '../editors/provenance';
+import { canvasReferences, editSubtrees, type CanvasProvenance } from '../editors/provenance';
 import FlowCanvas, { arrangeCanvas, type CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import type { CanvasObservations } from '../canvas/observations';
 import { SimulationHost } from '../logic-simulation/SimulationHost';
@@ -83,7 +83,11 @@ export function useFieldDraft(document: CompositionDocument, onChange: (next: Co
   useEffect(() => { listeners.current.forEach(listener => listener()); }, [document]);
   const [draft] = useState<Draft>(() => ({
     get: () => latest.current.document,
-    set: (next, group) => { next = documentEdit(latest.current.document, next); latest.current = { ...latest.current, document: next }; latest.current.onChange(next, group); listeners.current.forEach(listener => listener()); },
+    set: (next, group) => {
+      next = documentEdit(latest.current.document, next);
+      if (next === latest.current.document) return;
+      latest.current = { ...latest.current, document: next }; latest.current.onChange(next, group); listeners.current.forEach(listener => listener());
+    },
     subscribe: listener => { listeners.current.add(listener); return () => { listeners.current.delete(listener); }; },
     dirty: () => false, tryLeave: () => true, name: '',
     prompt: { get: () => false, set: () => {}, subscribe: () => () => {} },
@@ -178,12 +182,15 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
     if (transaction.generatedSources.length) next = { ...next, dataSources: [...next.dataSources, ...transaction.generatedSources] } as CompositionDocument;
     if (transaction.generatedLibrary.length) next = { ...next, logicLibrary: [...next.logicLibrary ?? [], ...transaction.generatedLibrary] } as CompositionDocument;
     const provenance = layout ?? { graph: workingRef.current, sourceMap: projectGraph(workingRef.current).sourceMap };
-    next = documentEdit(before, next, canvasReferences(paths, appliedProvenance.current, provenance));
+    const proposed = next;
+    next = editSubtrees(before, next, canvasReferences(paths, appliedProvenance.current, provenance));
+    if (next === before && proposed !== before) return invalid("This change can't keep its linked values, so it wasn't applied.");
     if (layout) next = saveCanvasLayout(next, transaction.replacements, layout, { document: before, paths });
     compileCompositionDocument(next);
     await request('/native/api/draft/prepare', { method: 'POST', body: JSON.stringify({ document: next }) });
     if (field.draft.get() !== before) return { status: 'conflict', remote: snapshot() };
     field.draft.set(next);
+    if (canonicalOfBounded(field.draft.get()) !== canonicalOfBounded(next)) return invalid("This change can't keep its linked values, so it wasn't applied.");
     appliedProvenance.current = provenance;
     transaction.replacements.forEach((replacement, index) => appliedAnchors.current.set(canonicalOfBounded(replacement.anchor), fieldAnchor(field.draft.get(), paths[index])));
     return { status: 'applied', snapshot: snapshot() };
@@ -252,7 +259,8 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
           {conflict && <p role="alert">The saved revision changed. Local canvas edits are retained; close the canvas to compare revisions in the workspace.</p>}
           {warnings.map(warning => <p role="alert" key={warning.pointer}>{warning.message}</p>)}
           {warnings.length > 0 && <button type="button" onClick={() => {
-            const { studioCanvas: _removed, ...rest } = field.draft.get(); field.draft.set(rest as CompositionDocument);
+            const before = field.draft.get(), { studioCanvas: _removed, ...rest } = before;
+            field.draft.set(documentEdit(before, rest as CompositionDocument, { deleted: [['studioCanvas']] }));
           }}>Reset saved layout</button>}
         </aside>
       </div>

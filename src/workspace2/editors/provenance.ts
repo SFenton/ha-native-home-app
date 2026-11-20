@@ -7,6 +7,12 @@ import { canonicalOfBounded } from '../../shared/composition/json';
 import { replaceAt, valueAt } from '../../composition-editor';
 
 const copiedFrom = new WeakMap<object, object>();
+const rebuiltOrigins = new WeakMap<object, object>();
+
+export function rebuiltFrom<T extends object>(before: unknown, after: T): T {
+  if (before && typeof before === 'object') rebuiltOrigins.set(after, before);
+  return after;
+}
 
 /** Provenance is editor-local and never serialized into a document or clipboard. */
 export function copySubtree<T>(value: T): T {
@@ -20,7 +26,7 @@ export function copySubtree<T>(value: T): T {
   return copy;
 }
 
-function retainedObjects(before: unknown, after: unknown, base: EditorPath): Map<string, readonly string[]> {
+function retainedObjects(before: unknown, after: unknown, base: EditorPath, fields: Map<string, readonly string[]>): Map<string, readonly string[]> {
   const previous = new Map<object, string[]>(), relocated = new Map<string, string[]>();
   const walk = (value: unknown, path: EditorPath, visit: (value: object, pointer: string) => void) => {
     if (!value || typeof value !== 'object') return;
@@ -29,6 +35,8 @@ function retainedObjects(before: unknown, after: unknown, base: EditorPath): Map
   };
   walk(before, base, (value, pointer) => previous.set(value, [...previous.get(value) ?? [], pointer]));
   walk(after, base, (value, pointer) => {
+    const rebuilt = rebuiltOrigins.get(value), containers = rebuilt && previous.get(rebuilt);
+    if (containers?.length === 1) fields.set(containers[0], [...fields.get(containers[0]) ?? [], pointer]);
     let origin: object | undefined = value;
     while (origin && !previous.has(origin)) origin = copiedFrom.get(origin);
     const origins = origin ? previous.get(origin) ?? [] : [];
@@ -39,7 +47,21 @@ function retainedObjects(before: unknown, after: unknown, base: EditorPath): Map
 
 export function rebuildField(document: CompositionDocument, path: EditorPath, value: unknown): CompositionDocument {
   const next = replaceAt(document, path, value);
-  return documentEdit(document, next, { relocated: retainedObjects(valueAt(document, path), value, path) });
+  const fields = new Map<string, readonly string[]>();
+  const relocated = retainedObjects(valueAt(document, path), value, path, fields);
+  for (let depth = 0; depth <= path.length; depth++) {
+    const ancestor = path.slice(0, depth), pointer = fieldPointer(ancestor);
+    fields.set(pointer, [pointer]);
+    if (depth === path.length) continue;
+    for (const key of Object.keys(valueAt(document, ancestor) as object)) {
+      if (key === String(path[depth])) continue;
+      const sibling = fieldPointer([...ancestor, key]);
+      relocated.set(sibling, [sibling]);
+    }
+  }
+  return documentEdit(document, next, {
+    relocated, fields, deleted: [path],
+  });
 }
 
 export interface CanvasProvenance { readonly graph: LogicGraph; readonly sourceMap: GraphSourceMap }
@@ -73,18 +95,24 @@ export function canvasReferences(paths: readonly EditorPath[], before: CanvasPro
       }
     }
   });
-  return { relocated };
+  return { relocated, fields: new Map(paths.flatMap(path => path.map((_, depth) => {
+    const pointer = fieldPointer(path.slice(0, depth + 1));
+    return [pointer, [pointer]] as const;
+  }))) };
 }
 
 /** Structural operations declare their copies/rebuilds; retained composition IDs supply the other relocations. */
 export function editSubtrees(before: CompositionDocument, after: CompositionDocument, references: EditReferences = {}): CompositionDocument {
-  if (before === after || !before.logicUseBindings?.length && !before.componentLibrary?.some(entry => entry.bindings?.length) && !before.studioCanvas) return after;
+  if (before === after) return after;
+  if (!before.logicUseBindings?.length && !before.componentLibrary?.some(entry => entry.bindings?.length) && !before.studioCanvas) return documentEdit(before, after, references);
   const following = new Map(authoredNodes(after).map(location => [location.identity, location.path]));
   const relocated: Map<string, readonly string[]> = new Map(authoredNodes(before).flatMap(location => {
     const path = following.get(location.identity);
     return path ? [[fieldPointer(location.path), [fieldPointer(path)]] as const] : [];
   }));
-  for (const [from, to] of retainedObjects(before, after, [])) relocated.set(from, to);
+  const fields = new Map<string, readonly string[]>();
+  for (const [from, to] of retainedObjects(before, after, [], fields)) relocated.set(from, to);
+  for (const [from, to] of references.fields ?? []) fields.set(from, to);
   for (const [from, to] of references.relocated ?? []) relocated.set(from, to);
-  return documentEdit(before, after, { ...references, relocated });
+  return documentEdit(before, after, { ...references, relocated, fields });
 }

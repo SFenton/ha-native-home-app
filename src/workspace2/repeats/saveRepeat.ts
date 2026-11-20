@@ -71,6 +71,6 @@ export function saveRepeat(document: CompositionDocument, analysis: RepeatAnalys
   });
   next = { ...next, componentLibrary: [...(document.componentLibrary ?? []), entry] };
   const target = fieldPointer(['componentLibrary', document.componentLibrary?.length ?? 0, 'node']);
-  return { document: editSubtrees(document, next, { relocated: new Map(places.map(place => [fieldPointer(place.path), [target]])) }),
+  return { document: editSubtrees(document, next, { relocated: new Map(places.map(place => [fieldPointer(place.path), [target]])), discardLayouts: places.slice(1).map(place => place.path) }),
     entryId: entry.id, places: places.length, message: savedText(title, places.length) };
 }

@@ -9,8 +9,11 @@ import type { CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import { fieldAnchor, fieldPointer, pointerPath } from './registry';
 import { valueAt, type EditorPath } from '../../composition-editor';
 import { sameJson } from '../../sameJson';
+import { documentEdit, LINKED_EDIT_REFUSAL } from '../editors/documentEdit';
 
-export function rebaseCanvasLayout(before: CompositionDocument, after: CompositionDocument, locate: (pointer: string) => EditorPath[]): CompositionDocument {
+export function rebaseCanvasLayout(before: CompositionDocument, after: CompositionDocument, locate: (pointer: string) => EditorPath[],
+  changes: { fields?: ReadonlyMap<string, readonly string[]>; discard?: readonly EditorPath[]; deleted(pointer: string): boolean; refuse(): never },
+): CompositionDocument {
   if (!before.studioCanvas || !sameJson(before.studioCanvas, after.studioCanvas) || !readStudioCanvas(before).metadata) return after;
   const stored = studioCanvasMetadataSchema.parse(before.studioCanvas);
   const { studioCanvas: _layout, ...semantic } = after;
@@ -20,16 +23,21 @@ export function rebaseCanvasLayout(before: CompositionDocument, after: Compositi
     for (const root of canvas.roots) {
       const pointer = root.anchor.kind === 'document' && root.anchor.field === '' ? '' : resolveLogicAnchor(before, root.anchor)?.pointer;
       if (pointer === undefined) continue;
-      for (const path of locate(pointer)) {
+      if (changes.discard?.some(path => pointer === fieldPointer(path) || pointer.startsWith(`${fieldPointer(path)}/`))) continue;
+      const destinations = changes.fields?.get(pointer)?.map(pointerPath) ?? locate(pointer);
+      if (!destinations.length && !changes.deleted(pointer)) changes.refuse();
+      for (const path of destinations) {
         const anchor = fieldAnchor(semantic, path), base = fieldPointer(path);
         const graph = lift(valueAt(semantic, path) as Json, { anchor, context: { document: semantic as unknown as Json, pointer: base } }).graph;
         const nodes = new Map<string, CanvasLayoutInput['roots'][number]['nodes'][number]>();
         for (const old of canvas.nodes.filter(node => node.rootId === root.id)) {
           const origins = new Set(old.origins.flatMap(origin => locate(`${pointer}${origin}`))
             .map(fieldPointer).filter(at => at === base || at.startsWith(`${base}/`)).map(at => at.slice(base.length)));
-          for (const node of graph.nodes.filter(node => node.origins.every(origin => origins.has(origin)))) {
+          const matches = graph.nodes.filter(node => node.origins.every(origin => origins.has(origin)));
+          if (!matches.length && !old.origins.every(origin => changes.deleted(`${pointer}${origin}`))) changes.refuse();
+          for (const node of matches) {
             const previous = nodes.get(node.id);
-            if (previous && (previous.x !== old.x || previous.y !== old.y)) throw new Error('This edit makes the saved canvas positions ambiguous.');
+            if (previous && (previous.x !== old.x || previous.y !== old.y)) changes.refuse();
             nodes.set(node.id, { id: node.id, origins: node.origins, x: old.x, y: old.y });
             associations.push({ old: old.id, root: roots.length, node: node.id });
           }
@@ -93,5 +101,41 @@ export function saveCanvasLayout(document: CompositionDocument, replacements: re
   }));
   const added = roots.filter(root => !placed.has(canonicalOfBounded(root.anchor)));
   if (added.length) canvases.push({ id: canonicalOfBounded(added.map(root => root.anchor)), roots: added });
-  return { ...document, studioCanvas: encodeStudioCanvas(document, canvases, stored?.bundles) };
+  const proposed = { ...document, studioCanvas: encodeStudioCanvas(document, canvases, stored?.bundles) };
+  const applied = documentEdit(document, proposed, { layout: previous.paths });
+  if (applied === document && !sameJson(document, proposed)) throw new Error(LINKED_EDIT_REFUSAL);
+  return applied;
+}
+
+export function restoreComponentLayout(original: CompositionDocument, document: CompositionDocument, id: string): CompositionDocument | undefined {
+  if (!original.studioCanvas) return document;
+  const previous = studioCanvasMetadataSchema.parse(original.studioCanvas), next = studioCanvasMetadataSchema.parse(document.studioCanvas);
+  const saved = new Set(next.canvases.flatMap(canvas => canvas.roots.map(root => root.id)));
+  const paths: EditorPath[] = [];
+  for (const canvas of previous.canvases) {
+    const roots = canvas.roots.filter(root => root.anchor.kind === 'component' && root.anchor.id === id && !saved.has(root.id));
+    if (!roots.length) continue;
+    for (const root of roots) {
+      const target = resolveLogicAnchor(document, root.anchor);
+      if (!target) throw new Error('The restored layout owner no longer exists.');
+      paths.push(pointerPath(target.pointer));
+    }
+    const ids = new Set(roots.map(root => root.id)), nodes = canvas.nodes.filter(node => ids.has(node.rootId));
+    const nodeIds = new Set(nodes.map(node => node.id));
+    const groups = canvas.groups?.map(group => ({ ...group, nodeIds: group.nodeIds.filter(id => nodeIds.has(id)) })).filter(group => group.nodeIds.length);
+    const present = next.canvases.find(next => next.id === canvas.id);
+    if (!present) next.canvases.push({ ...canvas, roots, nodes, ...(groups ? { groups } : {}) });
+    else {
+      present.roots.push(...roots); present.nodes.push(...nodes);
+      for (const group of groups ?? []) {
+        const existing = present.groups?.find(existing => existing.id === group.id);
+        if (existing) Object.assign(existing, { ...group, nodeIds: [...new Set([...existing.nodeIds, ...group.nodeIds])] });
+        else (present.groups ??= []).push(group);
+      }
+    }
+  }
+  if (!paths.length) return document;
+  const proposed = { ...document, studioCanvas: next };
+  const applied = documentEdit(document, proposed, { layout: paths });
+  return applied === document && !sameJson(document, proposed) ? undefined : applied;
 }

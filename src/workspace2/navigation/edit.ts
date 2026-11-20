@@ -6,7 +6,7 @@ import { collectLinks, type SurfaceRef } from '../outline';
 import { groupWithRoom } from '../capacity';
 import { cloneNode } from '../util';
 import { foldSidesShipped } from '../layout/fold-sides-edit';
-import { editSubtrees } from '../editors/provenance';
+import { copySubtree, editSubtrees } from '../editors/provenance';
 
 type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
@@ -70,7 +70,7 @@ export interface Added { document: CompositionDocument; id: string }
  */
 export function addPage(document: CompositionDocument, name: string, from?: SurfaceRef): Added {
   const page = blankPage(document, freshName(document.pages.map(item => item.title), name));
-  const next = structuredClone(document);
+  const next = copySubtree(document);
   next.pages.push(page);
   if (from) {
     const owner = surfaces(next, from.kind).find(item => item.id === from.id);

@@ -30,7 +30,7 @@ export function deleteNode(document: CompositionDocument, path: EditorPath): Com
   const { list, index } = split(path);
   const siblings = valueAt(document, list);
   if (!Array.isArray(siblings)) throw new Error('The selected item no longer exists');
-  return replaceAt(document, list, siblings.filter((_, at) => at !== index));
+  return editSubtrees(document, replaceAt(document, list, siblings.filter((_, at) => at !== index)), { deleted: [path] });
 }
 
 /** One place a node can be moved to. */
@@ -72,7 +72,13 @@ export function moveTargets(document: CompositionDocument, id: string): MoveTarg
 }
 
 /** Moves a node to the end of another parent. */
-export const moveNodeTo = (document: CompositionDocument, id: string, parent: MoveTarget['parent']) => editSubtrees(document, moveCompositionNode(document, id, parent));
+export function moveNodeTo(document: CompositionDocument, id: string, parent: MoveTarget['parent']): CompositionDocument {
+  const moved = moveCompositionNode(document, id, parent);
+  const source = componentLocations(document, true).find(location => location.node.id === id);
+  return editSubtrees(document, { ...document, pages: moved.pages, modals: moved.modals,
+    ...(source?.path[0] === 'componentLibrary' ? { componentLibrary: moved.componentLibrary } : {}),
+  });
+}
 export { removeCompositionItem };
 
 /** The targets whose name, page or containers contain every word of `query`. An empty query keeps them all. */
@@ -117,7 +123,7 @@ export function takeOffOverlay(document: CompositionDocument, path: EditorPath):
     // The base takes the overlay's place, and its side of the hinge with it.
     const side = (overlay.layout as { foldSide?: string }).foldSide;
     return side === undefined ? overlay.children[0] : { ...overlay.children[0], layout: { ...overlay.children[0].layout, foldSide: side } } as CompositionNode;
-  })));
+  })), { deleted: [path] });
 }
 
 /** Puts the control at one of the five places of its overlay, keeping its inset (Medium, 12, when it has none yet). */

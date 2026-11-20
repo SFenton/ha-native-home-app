@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { textEditPath, UNDO_COALESCE_MS } from '../../useCompositionStudio';
-import { editSubtrees } from './provenance';
+import { documentEdit } from './documentEdit';
 
 /**
  * The copy of the document an editor works on. Edits go here; "Done" hands the whole copy back as one change (one undo step),
@@ -46,7 +46,8 @@ export function createDraft(initial: CompositionDocument, now: () => number = Da
     set(next, typing) {
       const before = doc.get();
       if (next === before) return;
-      next = editSubtrees(before, next);
+      next = documentEdit(before, next);
+      if (next === before) return;
       const path = typing ? `${typing}|${textEditPath(before, next) ?? ''}` : undefined;
       const joins = path !== undefined && typed?.at === path && now() - typed.time < UNDO_COALESCE_MS && past.length > 0;
       if (!joins) { past = [...past, before].slice(-DRAFT_HISTORY); }

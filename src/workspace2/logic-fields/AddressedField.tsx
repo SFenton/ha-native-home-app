@@ -10,6 +10,7 @@ import { ValuePickerRow } from '../expr/ValuePicker';
 import { useNameContext } from '../expr/useExpr';
 import { useLogicFields } from './LogicFields';
 import { describeLogic } from './presentation';
+import { rebuildField } from '../editors/provenance';
 
 export function AddressedField({ path, kind, label }: { path: EditorPath; kind: LogicFieldKind; label: string }) {
   const { document, onChange } = useRows();
@@ -30,7 +31,7 @@ export function DraftField({ draft, path, kind, label }: { draft: Draft; path: E
     <span className="w2-row-label">{label}</span>
     {control}
     {!literal && <ValuePickerRow draft={draft} title={label} primary={value ? describeLogic(value, ctx) : 'Choose a value'}
-      onPick={picked => draft.set(fieldAdapters.operand.write(picked.document, path, picked.operand))}/>}
+      onPick={picked => draft.set(rebuildField(picked.document, path, picked.operand))}/>}
     <div className="w2-logic-commands"><button type="button" onClick={() => canvas?.open({ draft, path, kind, label })} disabled={!canvas}>Edit in Canvas</button></div>
   </section>;
   return <LogicField draft={draft} path={path} kind={kind} label={label}>

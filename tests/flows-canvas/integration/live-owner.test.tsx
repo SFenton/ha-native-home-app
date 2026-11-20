@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); resetLiveRuns(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it('keeps a template rule opened from its slot view at the canonical body anchor through Apply and reopen', async () => {
+it('cleanly refuses a bound template body slot-view edit and retains its canonical owner on reopen', async () => {
   const path = ['logicLibrary', 1, 'body'];
   const body = { type: 'choose' as const, cases: [{ when: { type: 'viewer' as const, isAdmin: true }, then: { type: 'literal' as const, value: 'Owner' } }], otherwise: { type: 'literal' as const, value: 'Guest' } };
   const document = replaceAt(integrationDocument(), path, body);
@@ -44,14 +44,15 @@ it('keeps a template rule opened from its slot view at the canonical body anchor
   fireEvent.click(screen.getByRole('button', { name: 'Open template rule' }));
   expect(screen.queryByRole('alert')).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' })));
-  expect(globalThis.document.querySelector('.w2-canvas-footer [role=status]')?.textContent).toContain('Edits applied to the draft');
+  expect(screen.getAllByText(/This change can't keep its linked values/).length).toBeGreaterThan(0);
   const saved = operandBodyDraft(draft, path).get();
   expect(prepare).toHaveBeenCalledOnce();
-  expect(valueAt(saved, [...path, 'cases', 0, 'when'])).toEqual({ type: 'all', of: [{ type: 'viewer', isAdmin: true }, { type: 'viewer', isAdmin: true }] });
+  expect(valueAt(saved, path)).toEqual(body);
+  expect(draft.canUndo()).toBe(false);
   expect(saved.logicUseBindings).toEqual(document.logicUseBindings);
   const reopened = JSON.parse(JSON.stringify(saved)) as CompositionDocument;
   expect(readStudioCanvas(reopened).warnings).toEqual([]);
-  expect(JSON.stringify(saved.studioCanvas)).not.toContain('/body/value');
+  expect(saved.studioCanvas).toEqual(document.studioCanvas);
   expect(liftField(reopened, path, 'operand').graph.roots[0].anchor).toEqual({ kind: 'logic', id: 'samples', field: '/body' });
 });
 

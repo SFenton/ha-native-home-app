@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { moveCompositionNode, replaceAt, valueAt, type EditorPath } from '../../../src/composition-editor';
+import { changeFieldVariant, compositionSourceText, fieldVariants, importCompositionText, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
-import { bodyNodes, derivedId, expandDocument, fieldSteps, ownedSources, readField, renameSources } from '../../../src/shared/composition/components';
+import { bodyNodes, derivedId, expandDocument, expandSources, fieldSteps, ownedSources, readField, renameSources } from '../../../src/shared/composition/components';
 import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic/anchors';
 import { resolveLogicUseBindings } from '../../../src/shared/composition/studio-logic/bindings';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
@@ -16,25 +16,26 @@ import { liftField } from '../../../src/workspace2/logic-fields/registry';
 import { saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
 import { projectGraph } from '../../../src/shared/composition/graph/lower';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
-import { fieldPointer, pointerPath } from '../../../src/workspace2/logic-fields/registry';
+import { fieldAnchor, fieldPointer, pointerPath } from '../../../src/workspace2/logic-fields/registry';
 import { setPerPlace } from '../../../src/workspace2/params';
 import TokenField, { writeParts } from '../../../src/workspace2/expr/TokenField';
 import TokenSettings from '../../../src/workspace2/expr/TokenSettings';
 import RulesList from '../../../src/workspace2/expr/RulesList';
 import RulePage, { duplicateRule } from '../../../src/workspace2/expr/RulePage';
-import { bodyWithSamples, deleteEntry, saveLogicTemplate, workedOut } from '../../../src/workspace2/data/logic/logicModel';
+import { bodyWithSamples, deleteEntry, removeSetting, saveLogicTemplate, workedOut } from '../../../src/workspace2/data/logic/logicModel';
 import { resolvedLogicValue, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
 import { evaluateOperand as editorValue, registerFill } from '../../../src/workspace2/data/logic/logicEval';
 import { useSentence } from '../../../src/workspace2/data/logic/logicNames';
-import { evaluateOperand, resolveText, type TextSlot, type Environment } from '../../../src/shared/composition/evaluator';
+import { evaluateOperand, evaluatePredicate, resolveText, type TextSlot, type Environment } from '../../../src/shared/composition/evaluator';
 import { operandBase } from '../../../src/shared/composition/expression';
 import { record } from '../../../src/shared/composition/studio-logic/anchors';
 import { encodeStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
 import { newToken, operandSlot, slotOperand } from '../../../src/workspace2/expr/tokens';
+import { toSlot } from '../../../src/workspace2/expr/value';
 import { authoredNodes } from '../../../src/workspace2/logic-fields/registry';
 import { canvasReferences, copySubtree, editSubtrees, rebuildField } from '../../../src/workspace2/editors/provenance';
-import { documentEdit } from '../../../src/workspace2/editors/documentEdit';
+import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { houseFrom } from '../../../src/preview2/projections';
 import { binding, componentDocument, draftDocument, labelTemplate, privateSourceFixture, tile } from '../draft/fixtures';
@@ -43,7 +44,7 @@ import lamps from '../../fixtures/templates-lamps.json';
 import type { Operand } from '../../../src/shared/composition/expression';
 import type { ReactNode } from 'react';
 import { duplicateNode, moveNodeBy, moveNodeTo, putControlsOnTop, takeOffOverlay } from '../../../src/workspace2/nodeActions';
-import { addPage, duplicateSurface } from '../../../src/workspace2/navigation/edit';
+import { addPage, blankSheet, duplicateSurface } from '../../../src/workspace2/navigation/edit';
 import { deleteComponent, forkPlace, insertPlace, saveAsComponent, settleHeld, unlinkPlace } from '../../../src/workspace2/linked';
 import { edit as editCanvas, initialEditState } from '../../../src/workspace2/canvas/edit';
 import { lower } from '../../../src/shared/composition/graph';
@@ -51,6 +52,17 @@ import { moveToSlot } from '../../../src/workspace2/dnd/moves';
 import { endOf } from '../../../src/workspace2/add/insert';
 import { convertTiles } from '../../../src/workspace2/repeats/convertTiles';
 import type { CompositionNode } from '../../../src/shared/composition/schema';
+import { toastManager } from '../../../src/workspace2/toasts';
+import { sameJson } from '../../../src/sameJson';
+import { documentWithTabs } from '../../support/layout-fixture';
+import { areaAt, duplicateArea } from '../../../src/workspace2/layout/areaOps';
+import { buildDocumentIndex } from '../../../src/preview2/model';
+import { groupPredicate } from '../../../src/workspace2/expr/condition';
+import { writeRule } from '../../../src/workspace2/expr/useRule';
+import { moveStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
+import { duplicateStyle } from '../../../src/shared/composition/state-style-library';
+import { builtInStyles } from '../../../src/shared/composition/state-styles';
+import type { Json } from '../../../src/shared/types';
 
 afterEach(cleanup);
 vi.mock('../../../src/api', async original => ({ ...await original<typeof import('../../../src/api')>(), request: vi.fn() }));
@@ -171,7 +183,7 @@ function meaningFixture(kind: string, policy: 'fallback' | 'keep' = 'fallback') 
   }]);
   if (kind.startsWith('component') || kind === 'private sources') {
     const draft = createDraft(document);
-    draft.set(moveCompositionNode(document, 'place-1', { kind: 'surface', id: 'other-page' }));
+    draft.set(moveNodeTo(document, 'place-1', { kind: 'surface', id: 'other-page' }));
     document = draft.get();
   }
   for (const location of authoredNodes(document)) {
@@ -295,7 +307,7 @@ function preservesMeaning(before: CompositionDocument, after: CompositionDocumen
         if (retired.has(node.id)) continue;
         const origins = node.origins.map(originAfter);
         const candidates = following.nodes.filter(candidate => JSON.stringify(candidate.origins) === JSON.stringify(origins));
-        expect(candidates, `${root.key}:${node.id}`).toHaveLength(1);
+        expect(candidates, `${root.key}:${node.id} expected ${JSON.stringify(origins)} in ${JSON.stringify(following.nodes)}`).toHaveLength(1);
         expect({ x: candidates[0].x, y: candidates[0].y, groups: candidates[0].groups }, `${root.key}:${node.id}`)
           .toEqual({ x: node.x, y: node.y, groups: node.groups });
         const stable = following.nodes.find(candidate => candidate.id === node.id);
@@ -354,8 +366,8 @@ describe('binding meaning invariant: every structural edit and undo/redo preserv
       if (operation === 'insert text before token') writeParts(draft, { path, wrap: 'operand' }, [{ text: 'Before ' }, { token: newToken(use) }], false);
       else if (operation === 'replace rebuilt canvas subtree') draft.set(rebuildField(before, path, copySubtree({ type: 'format', pattern: 'Before {a}', args: { a: use } })));
       else if (operation === 'remove token' || operation === 'remove value') writeParts(draft, { path, wrap: 'operand' }, [], false);
-      else if (operation === 'remove use' || operation === 'replace operand') draft.set(replaceAt(before, path, text(operation)));
-      else if (operation === 'cross-page Move To') draft.set(moveCompositionNode(before, before.pages[0].components[0].id, { kind: 'surface', id: 'other-page' }));
+      else if (operation === 'remove use' || operation === 'replace operand') draft.set(rebuildField(before, path, text(operation)));
+      else if (operation === 'cross-page Move To') draft.set(moveNodeTo(before, before.pages[0].components[0].id, { kind: 'surface', id: 'other-page' }));
       else if (operation === 'unlink component use') draft.set(unlinkTemplate(before, path));
       else if (operation === 'save as Logic Template') draft.set(saveLogicTemplate(before, path, 'operand', 'Saved meaning', []));
       else if (operation === 'delete template') draft.set(deleteEntry(before, 'tile-label'));
@@ -369,7 +381,8 @@ describe('binding meaning invariant: every structural edit and undo/redo preserv
         const base = [...slot, 'value', 'cases'], cases = valueAt(before, base) as { when: typeof check; then: Operand }[];
         const next = operation === 'add rule' ? [...cases, { when: check, then: text('Added') }]
           : operation === 'remove rule' ? cases.slice(1) : [...cases].reverse();
-        draft.set(replaceAt(before, base, next));
+        const choose = valueAt(before, [...slot, 'value']) as Extract<Operand, { type: 'choose' }>;
+        draft.set(rebuildField(before, slot, toSlot('rules', { rules: { cases: next, otherwise: choose.otherwise } }, 'text', valueAt(before, slot))));
       }
       expect(changes).toHaveBeenCalledTimes(1);
       if (['remove token', 'remove use', 'remove value', 'replace operand', 'remove rule'].includes(operation)) {
@@ -439,7 +452,7 @@ it('round 4 regression: Canvas Apply distinguishes two identical bound uses thro
     state = editCanvas(state, { type: 'update', nodeId: root.id, value: { ...root.payload.value as object, pattern } });
     const lowered = lower(state.graph);
     if (!lowered.ok) throw new Error(JSON.stringify(lowered.errors));
-    const next = documentEdit(draft.get(), replaceAt(draft.get(), path, lowered.ast), canvasReferences([path], baseline, { graph: state.graph, sourceMap: lowered.sourceMap }));
+    const next = editSubtrees(draft.get(), replaceAt(draft.get(), path, lowered.ast), canvasReferences([path], baseline, { graph: state.graph, sourceMap: lowered.sourceMap }));
     draft.set(next); valid(draft.get());
     expect(draft.get().logicUseBindings!.filter(binding => 'nodeId' in binding.use && binding.use.nodeId === 'tile-a')).toHaveLength(2);
     expect(meaning(draft.get()).nodes['tile-a'].values).toEqual([true, false].map(() => ({ status: 'value', value: pattern.replace('{left}', 'sensor.demo_1').replace('{right}', 'sensor.demo_1') })));
@@ -481,14 +494,22 @@ const auditedOperations = [
   'canvas Apply pattern', 'canvas Apply re-parent', 'add page',
 ] as const;
 
-function placementValues(document: CompositionDocument) {
+function placementValues(document: CompositionDocument, sourceOwners: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map()) {
   const expanded = expandDocument(compileCompositionDocument(document).expanded);
   const names = new Map(expanded.dataSources.map(({ id, ...source }) => [id, JSON.stringify(source)]));
   const snapshot = meaning(document).nodes;
   return Object.fromEntries([...expanded.pages, ...expanded.modals].flatMap(page => page.components.flatMap(root => bodyNodes(root).flatMap(node => {
     if (!('props' in node && 'subtitle' in node.props) && !('glyphTint' in node)) return [];
     const { id: _id, title: _title, layout: _layout, ...fixed } = snapshot[node.id].fixed as Record<string, unknown>;
-    return [[node.id, { ...snapshot[node.id], fixed: renameSources(fixed, names) }]];
+    const prefix = derivedId(node.id, '');
+    const owned = sourceOwners.get(node.id) ?? new Map(expanded.dataSources.filter(source => source.id.startsWith(prefix)).map(source => [source.id.slice(prefix.length), source.id]));
+    const privateSources = Object.fromEntries([...owned].map(([key, id]) => {
+      const source = expanded.dataSources.find(source => source.id === id);
+      expect(source, `${node.id}:${key}`).toBeDefined();
+      const { id: _source, ...value } = source!;
+      return [key, renameSources(value, names)];
+    }));
+    return [[node.id, { ...snapshot[node.id], privateSources, fixed: renameSources(fixed, names) }]];
   }))));
 }
 
@@ -510,6 +531,7 @@ describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fal
     const component = ['duplicate placement', 'detach placement', 'delete component', 'fork placement', 'save held change as new component', 'place component'].includes(operation);
     const fixture = meaningFixture(component ? 'private sources' : 'page tile', policy);
     let document = fixture.document, slot = fixture.slot;
+    if (operation === 'place component') document = replaceAt(document, ['pages', 1, 'components', 1, 'args', 'privateEntity'], privateSourceFixture.source.entityId.value);
     const root: EditorPath = ['pages', 0, 'components', 0];
     if (['duplicate section', 'drag between sections'].includes(operation)) {
       document = editSubtrees(document, replaceAt(document, ['pages', 0, 'components'],
@@ -517,9 +539,7 @@ describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fal
       slot = [...root, 'children', 0, 'props', 'subtitle'];
     }
     if (operation === 'duplicate sheet') {
-      const made = copySubtree(document.pages[0]);
-      const { navigation: _navigation, ...surface } = made;
-      document = { ...document, modals: [{ ...document.modals[0], ...surface, id: 'bound-sheet', components: [] }] };
+      document = { ...document, modals: [{ ...blankSheet(document, 'Bound sheet', 'fitted'), id: 'bound-sheet' }] };
       document = moveNodeTo(document, 'tile-a', { kind: 'surface', id: 'bound-sheet' });
       slot = ['modals', 0, 'components', 0, 'props', 'subtitle'];
     }
@@ -543,35 +563,56 @@ describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fal
       document = rebuildField(document, [...slot, 'value'], { type: 'format', pattern: '{left}/{right}', args: { left: value, right: copySubtree(value) } });
     }
     document = withMeaningCanvas(document, slot);
-    const before = document, draft = createDraft(before), aliases = new Map<string, string>();
+    const before = document, draft = createDraft(before), aliases = new Map<string, string>(), sourceOwners = new Map<string, Map<string, string>>();
+    const transfers: { from: EditorPath; to: EditorPath; keep: boolean }[] = [];
     const resolved = resolveLogicUseBindings(before);
     expect(resolved.bindings.some(binding => valueAt(before, [...pointerPath(binding.usePointer), 'args', binding.argument]) !== binding.sourceId)).toBe(true);
     const old = placementValues(before);
     const copyPairs = (oldPath: EditorPath, newPath: EditorPath) => { for (const [to, from] of pairs(before, oldPath, document, newPath)) aliases.set(to, from); };
     if (operation === 'duplicate tile' || operation === 'duplicate section' || operation === 'duplicate placement') {
       const duplicated = duplicateNode(before, root); document = duplicated.document; copyPairs(root, duplicated.path);
+      transfers.push({ from: root, to: duplicated.path, keep: true });
     } else if (operation === 'duplicate page' || operation === 'duplicate sheet') {
       const key = operation === 'duplicate page' ? 'pages' : 'modals';
       document = duplicateSurface(before, { kind: key === 'pages' ? 'page' : 'modal', id: before[key][0].id }).document;
       before[key][0].components.forEach((_, at) => copyPairs([key, 0, 'components', at], [key, 1, 'components', at]));
+      transfers.push({ from: [key, 0], to: [key, 1], keep: true });
     } else if (operation === 'detach placement' || operation === 'delete component') {
       document = operation === 'detach placement' ? unlinkPlace(before, root) : deleteComponent(before, 'saved-tile');
+      let sourceIndex = before.dataSources.length;
       for (const [pageIndex, page] of before.pages.entries()) page.components.forEach((node, index) => {
-        if (node.type === 'component-ref' && node.componentId === 'saved-tile') copyPairs(['pages', pageIndex, 'components', index], ['pages', pageIndex, 'components', index]);
+        if (node.type !== 'component-ref' || node.componentId !== 'saved-tile' || operation === 'detach placement' && node.id !== 'place-0') return;
+        copyPairs(['pages', pageIndex, 'components', index], ['pages', pageIndex, 'components', index]);
+        transfers.push({ from: ['componentLibrary', 0, 'node'], to: ['pages', pageIndex, 'components', index], keep: operation !== 'delete component' });
+        const entry = before.componentLibrary!.find(entry => entry.id === node.componentId)!;
+        const sources = expandSources(node, entry), owners = new Map<string, string>();
+        sources.forEach((expected, at) => {
+          const actual = document.dataSources[sourceIndex++];
+          const { id: _old, ...left } = expected, { id: _new, ...right } = actual;
+          expect(right, node.id).toEqual(left);
+          owners.set(ownedSources(entry)[at].id, actual.id);
+        });
+        sourceOwners.set(node.id, owners);
       });
     } else if (operation === 'fork placement') {
       document = forkPlace(before, 'place-0', 'Forked component').document; copyPairs(root, root);
+      transfers.push({ from: ['componentLibrary', 0, 'node'], to: ['componentLibrary', before.componentLibrary!.length, 'node'], keep: true });
     } else if (operation === 'save held change as new component') {
-      const changed = replaceAt(before, ['componentLibrary', 0, 'name'], 'Edited component');
+      const changed = documentEdit(before, replaceAt(before, ['componentLibrary', 0, 'name'], 'Edited component'));
       document = settleHeld(before, changed, 'place-0', { kind: 'new', name: 'Saved component' }).at(-1)!; copyPairs(root, root);
+      transfers.push({ from: ['componentLibrary', 0, 'node'], to: ['componentLibrary', before.componentLibrary!.length, 'node'], keep: true });
     } else if (operation === 'Save as Component') {
       document = saveAsComponent(before, root, 'Captured bound tile').document; copyPairs(root, root);
+      transfers.push({ from: root, to: ['componentLibrary', before.componentLibrary!.length, 'node'], keep: false });
     } else if (operation === 'place component') {
       const destination = endOf(before, `page:${before.pages[0].id}`)!;
       document = insertPlace(before, 'saved-tile', destination).document;
       // The unoverridden placement on the other page supplies the resolved component defaults.
       copyPairs(['pages', 1, 'components', 1], [...destination.list, destination.index]);
-    } else if (operation === 'save repeated pieces') document = convertTiles(before, { name: 'Repeated bound tiles', nodeIds: ['tile-a', 'tile-b'], labels: {} }).document;
+    } else if (operation === 'save repeated pieces') {
+      document = convertTiles(before, { name: 'Repeated bound tiles', nodeIds: ['tile-a', 'tile-b'], labels: {} }).document;
+      transfers.push({ from: root, to: ['componentLibrary', before.componentLibrary!.length, 'node'], keep: false });
+    }
     else if (operation === 'wrap overlay') document = putControlsOnTop(before, root);
     else if (operation === 'unwrap overlay') document = takeOffOverlay(before, root);
     else if (operation === 'move sibling') document = moveNodeBy(before, root, 1);
@@ -609,9 +650,10 @@ describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fal
     } else if (operation === 'add page') document = addPage(before, 'Added page').document;
     else throw new Error(`Missing audited operation: ${operation}`);
     if (document !== draft.get()) draft.set(document);
+    expect(draft.get(), `${operation} must be applied, not silently refused`).not.toBe(before);
     const assertMeaning = () => {
       valid(draft.get());
-      const current = placementValues(draft.get());
+      const current = placementValues(draft.get(), sourceOwners);
       for (const [id, expected] of Object.entries(old)) {
         const actualId = [...aliases].find(([to, from]) => from === id && !Object.hasOwn(old, to))?.[0];
         const actual = current[id] ?? (actualId ? current[actualId] : undefined);
@@ -629,6 +671,7 @@ describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fal
         expect(draft.get().logicUseBindings!.map(item => JSON.stringify(item))).toContain(JSON.stringify(binding));
       }
       const layout = readStudioCanvas(draft.get()); expect(layout.warnings).toEqual([]);
+      transformedLayouts(before, draft.get(), transfers, operation);
       if (operation.startsWith('canvas Apply')) {
         const saved = studioCanvasMetadataSchema.parse(layout.raw).canvases;
         const original = studioCanvasMetadataSchema.parse(before.studioCanvas).canvases;
@@ -640,13 +683,52 @@ describe('exhaustive subtree-operation meaning matrix: stale A / resolved B, fal
     draft.undo(); expect(draft.get()).toEqual(before); expect(placementValues(draft.get())).toEqual(old); valid(draft.get());
     draft.redo(); expect(draft.get()).toEqual(after); assertMeaning();
   });
+
+  function transformedLayouts(before: CompositionDocument, after: CompositionDocument,
+    transfers: readonly { from: EditorPath; to: EditorPath; keep: boolean }[], operation: typeof auditedOperations[number]) {
+    const old = studioCanvasMetadataSchema.parse(before.studioCanvas), next = studioCanvasMetadataSchema.parse(after.studioCanvas);
+    const following = next.canvases.flatMap(canvas => canvas.roots.map(root => ({ canvas, root })));
+    for (const [canvasIndex, canvas] of old.canvases.entries()) for (const root of canvas.roots) {
+      if (operation === 'save repeated pieces' && canvasIndex === 1) continue;
+      const pointer = resolveLogicAnchor(before, root.anchor)!.pointer;
+      const moved = transfers.filter(({ from }) => pointer === fieldPointer(from) || pointer.startsWith(`${fieldPointer(from)}/`));
+      const anchors = moved.map(({ from, to }) => fieldAnchor(after, [...to, ...pointerPath(pointer.slice(fieldPointer(from).length))]));
+      if (!moved.length || moved.some(move => move.keep)) {
+        const originalNode = 'nodeId' in root.anchor && root.anchor.nodeId;
+        const retained = authoredNodes(after).find(location => location.node.id === originalNode && (root.anchor.kind !== 'component' || location.path[0] === 'componentLibrary' && after.componentLibrary![Number(location.path[1])].id === root.anchor.id));
+        anchors.push(retained ? fieldAnchor(after, [...retained.path, ...pointerPath(root.anchor.field)]) : root.anchor);
+      }
+      for (const anchor of anchors) {
+        const saved = following.find(({ root }) => sameJson(root.anchor, anchor));
+        expect(saved, `${operation}:${JSON.stringify(anchor)}`).toBeDefined();
+        if (operation.startsWith('canvas Apply') && canvasIndex === 0) continue;
+        for (const node of canvas.nodes.filter(node => node.rootId === root.id)) {
+          const origins = node.origins.flatMap(origin => {
+            if (canvasIndex !== 0) return [origin];
+            if (operation === 'paste text' && origin.startsWith('/value')) return [`/value/args/a${origin.slice('/value'.length)}`];
+            if (operation === 'cut text') return origin === '/value' ? [] : [origin.replace('/value/args/a', '/value')];
+            if (operation === 'Duplicate Rule') return [origin.replace(/\/cases\/(\d+)(?=\/|$)/, (_, at) => `/cases/${Number(at) > 0 ? Number(at) + 1 : 0}`)];
+            return [origin];
+          });
+          for (const origin of origins) {
+            const candidates = saved!.canvas.nodes.filter(candidate => candidate.rootId === saved!.root.id && candidate.origins.includes(origin));
+            expect(candidates, `${operation}:${root.id}:${origin}`).toHaveLength(1);
+            const candidate = candidates[0];
+            expect([candidate.x, candidate.y]).toEqual([node.x, node.y]);
+            const groups = (canvas: typeof old.canvases[number], id: string) => canvas.groups?.filter(group => group.nodeIds.includes(id)).map(({ nodeIds: _members, ...group }) => group);
+            expect(groups(saved!.canvas, candidate.id)).toEqual(groups(canvas, node.id));
+          }
+        }
+      }
+    }
+  }
 });
 
 it('round 3 regression: Move To another page keeps the rebound B source and canvas groups', () => {
   const { document, slot } = meaningFixture('page tile'), before = withMeaningCanvas(document, slot), draft = createDraft(before);
   expect(valueAt(before, [...slot, 'value', 'args', 'source'])).toBe('source-a');
   expect(meaning(before).nodes['tile-a'].values).toEqual([{ status: 'value', value: 'sensor.demo_1' }, { status: 'value', value: 'sensor.demo_1' }]);
-  draft.set(moveCompositionNode(before, 'tile-a', { kind: 'surface', id: 'other-page' }));
+  draft.set(moveNodeTo(before, 'tile-a', { kind: 'surface', id: 'other-page' }));
   expect(draft.get().logicUseBindings![0].use).toMatchObject({ kind: 'page', id: 'other-page', nodeId: 'tile-a' });
   preservesMeaning(before, draft.get(), 'cross-page Move To');
   history(draft, before);
@@ -753,7 +835,7 @@ it('whole-node canvas roots and group members keep their stable node anchor acro
   const before = { ...document, studioCanvas: studioCanvasMetadataSchema.parse({ ...encoded, canvases: encoded.canvases.map(canvas => ({
     ...canvas, groups: [{ id: 'group', label: 'Whole tile', nodeIds: canvas.nodes.map(node => node.id) }],
   })) }) }, draft = createDraft(before);
-  draft.set(moveCompositionNode(before, 'tile-a', { kind: 'surface', id: 'other-page' }));
+  draft.set(moveNodeTo(before, 'tile-a', { kind: 'surface', id: 'other-page' }));
   expect(readStudioCanvas(draft.get()).warnings).toEqual([]);
   const saved = studioCanvasMetadataSchema.parse(draft.get().studioCanvas).canvases[0];
   expect(saved.roots[0].anchor).toMatchObject({ kind: 'page', id: 'other-page', nodeId: 'tile-a', field: '' });
@@ -779,7 +861,7 @@ it('regression: replacing a tile-bound nested template operand through the real 
   expect(draft.get().logicUseBindings).toHaveLength(1);
   history(draft, document);
 });
-it('the workspace apply boundary reconciles raw structural edits before storing undo/redo snapshots', async () => {
+it('the workspace apply boundary refuses undeclared structural edits without recording history', async () => {
   const { document, slot } = fixture('component parameters');
   vi.mocked(request).mockResolvedValueOnce({ document, revision: 1 });
   const { result } = renderHook(useCompositionStudio);
@@ -788,8 +870,7 @@ it('the workspace apply boundary reconciles raw structural edits before storing 
   act(() => result.current.apply(replaceAt(document, slot, { type: 'expr', value: { type: 'format', pattern: 'Before {a}', args: { a: use } } })));
   const next = result.current.document!;
   valid(next);
-  expect(next.componentLibrary![0].bindings![1].field).toBe('props/subtitle/value/args/a/args/sourceId');
-  expect(unchanged(next)).toEqual(unchanged(document));
+  expect(next).toBe(document);
   act(() => result.current.undo());
   expect(result.current.document).toEqual(document);
   valid(result.current.document!);
@@ -804,7 +885,7 @@ it('component parameter references reconcile even without automatic logic-use bi
   expect(draft.get().componentLibrary![0].bindings![1].field).toBe('props/subtitle/value/args/a/args/sourceId');
   valid(draft.get());
   const wrapped = draft.get();
-  draft.set(replaceAt(draft.get(), slot, { type: 'literal', value: '' }));
+  draft.set(rebuildField(draft.get(), slot, { type: 'literal', value: '' }));
   expect(draft.get().componentLibrary![0].bindings).toEqual([before.componentLibrary![0].bindings![0]]);
   valid(draft.get());
   history(draft, wrapped);
@@ -835,7 +916,7 @@ it.each(['id', 'type'])('preserves automatic fill when an unrelated text argumen
   }
   valid(before);
   const draft = createDraft(before), path = pointerPath(resolveLogicUseBindings(before).bindings[0].usePointer);
-  draft.set(replaceAt(before, [...path, 'args', name], 'After'));
+  draft.set(rebuildField(before, [...path, 'args', name], 'After'));
   expect(draft.get().logicUseBindings).toEqual(before.logicUseBindings);
   history(draft, before);
 });
@@ -919,4 +1000,179 @@ it.each(['type before token', 'remove token'])('regression: setPerPlace componen
   }
   expect(observed).toHaveBeenCalledTimes(1);
   history(draft, document);
+});
+
+function originalLayouts(before: CompositionDocument, after: CompositionDocument, skip: ReadonlySet<string> = new Set(),
+  originsAfter: (root: string, origin: string) => string[] = (_root, origin) => [origin]) {
+  const previous = studioCanvasMetadataSchema.parse(before.studioCanvas), following = studioCanvasMetadataSchema.parse(after.studioCanvas);
+  for (const canvas of previous.canvases) for (const root of canvas.roots) {
+    if (skip.has(root.id)) continue;
+    const saved = following.canvases.find(canvas => canvas.roots.some(candidate => candidate.id === root.id));
+    expect(saved, root.id).toBeDefined();
+    expect(saved!.roots.find(candidate => candidate.id === root.id)).toEqual(root);
+    for (const node of canvas.nodes.filter(node => node.rootId === root.id)) {
+      const expected = node.origins.flatMap(origin => originsAfter(root.id, origin));
+      for (const origin of expected) {
+        const matches = saved!.nodes.filter(candidate => candidate.rootId === root.id && candidate.origins.includes(origin));
+        expect(matches, node.id).toHaveLength(1);
+        const candidate = matches[0];
+        expect({ x: candidate.x, y: candidate.y }).toEqual({ x: node.x, y: node.y });
+        const membership = (groups: typeof canvas.groups, id: string) => groups?.filter(group => group.nodeIds.includes(id)).map(({ nodeIds: _members, ...group }) => group);
+        expect(membership(saved!.groups, candidate.id), node.id).toEqual(membership(canvas.groups, node.id));
+        const stable = saved!.nodes.find(candidate => candidate.id === node.id);
+        if (stable) expect(stable).toEqual(candidate);
+      }
+    }
+  }
+}
+
+const remainingOperations = ['duplicate local-tab area', 'group and duplicate predicate', 'value mode transition',
+  'action mode transition', 'remove bound logic setting', 'reorder flow steps', 'duplicate style', 'typed conversion', 'import'] as const;
+describe('fail-closed meaning matrix for remaining transformation areas', () => {
+  for (const policy of ['fallback', 'keep'] as const) it.each(remainingOperations)(`${policy}: %s preserves meaning or is cleanly refused`, operation => {
+    const fixture = meaningFixture('page tile', policy);
+    let before = fixture.document, slot = fixture.slot;
+    const root = ['pages', 0, 'components', 0], rulePath = [...root, 'visibleWhen'], actionPath = [...root, 'action'];
+    let flowId = '';
+    if (operation === 'duplicate local-tab area') {
+      const tabs = documentWithTabs();
+      before = { ...before, localState: tabs.localState };
+      before = replaceAt(before, ['pages', 0, 'components'], [...before.pages[0].components, tabs.pages[0].components[0]]);
+      before = moveToSlot(before, 'node:tile-a', endOf(before, 'local-tab:area-tabs/one')!).document;
+      slot = [...buildDocumentIndex(before).get('node:tile-a')!.path, 'props', 'subtitle'];
+    } else if (operation === 'group and duplicate predicate') {
+      const use = structuredClone(valueAt(before, [...slot, 'value']));
+      before = replaceAt(before, root, { ...valueAt(before, root) as object, visibleWhen: { type: 'compare', op: 'eq', left: use, right: text('sensor.demo_1') }, whenUnknown: 'keep' });
+      before = { ...before, logicUseBindings: [...before.logicUseBindings!, { ...before.logicUseBindings![0], use: { ...before.logicUseBindings![0].use, field: '/visibleWhen/left' } }] };
+    } else if (operation === 'action mode transition') {
+      before = replaceAt(before, actionPath, { type: 'conditional', cases: [{ when: check, then: valueAt(before, actionPath) }], otherwise: { type: 'none' } });
+    } else if (operation === 'reorder flow steps') {
+      const made = newFlow(before, 'group'); flowId = made.id;
+      before = updateFlow(made.document, flowId, inputs => ({ ...inputs, steps: [{ id: 'one', op: 'limit', count: 10 }, { id: 'two', op: 'limit', count: 20 }] }));
+    }
+    before = withMeaningCanvas(before, slot);
+    if (flowId) {
+      const path = ['dataSources', before.dataSources.findIndex(source => source.id === flowId), 'inputs'];
+      const graph = liftField(before, path, 'flow').graph;
+      const extra = encodeStudioCanvas(before, [{ id: 'flow-layout', roots: [{ anchor: graph.roots[0].anchor,
+        nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 100, y: 600 })) }] }]);
+      before = { ...before, studioCanvas: { ...studioCanvasMetadataSchema.parse(before.studioCanvas),
+        canvases: [...studioCanvasMetadataSchema.parse(before.studioCanvas).canvases, ...extra.canvases] } };
+    }
+    valid(before);
+    const expected = placementValues(before), draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
+    let proposed = before, copyId: string | undefined;
+    if (operation === 'duplicate local-tab area') {
+      const at = areaAt(before, buildDocumentIndex(before), 'local-tab:area-tabs/one')!;
+      const result = duplicateArea(before, at); proposed = result.document;
+      const tabs = buildDocumentIndex(proposed).get('node:area-tabs')!.node;
+      if (tabs?.type === 'local-tabs') copyId = tabs.blocks!.find(block => block.id === result.areaId)!.children[1].id;
+    } else if (operation === 'group and duplicate predicate') {
+      const rule = valueAt(before, rulePath) as Parameters<typeof groupPredicate>[0]['items'][number];
+      proposed = writeRule(before, rulePath, groupPredicate({ mode: 'all', items: [rule, copySubtree(rule)] }));
+    } else if (operation === 'value mode transition') {
+      const value = slotOperand(valueAt(before, slot) as { type: string })!;
+      proposed = rebuildField(before, slot, toSlot('rules', { rules: { cases: [{ when: check, then: copySubtree(value) }], otherwise: value } }, 'text', valueAt(before, slot)));
+    } else if (operation === 'action mode transition') {
+      proposed = rebuildField(before, actionPath, copySubtree(valueAt(before, [...actionPath, 'cases', 0, 'then'])));
+    } else if (operation === 'remove bound logic setting') proposed = removeSetting(before, 'tile-label', 'source');
+    else if (operation === 'reorder flow steps') proposed = updateFlow(before, flowId, inputs => ({ ...inputs, steps: moveStep(inputs.steps, 0, 1) }));
+    else if (operation === 'duplicate style') proposed = { ...before, stateStyles: duplicateStyle(before.stateStyles, builtInStyles[0]).library };
+    else if (operation === 'typed conversion') {
+      const type = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
+      proposed = replaceAt(before, root, changeFieldVariant(type, valueAt(before, root) as Json, before, 'component'));
+    } else proposed = importCompositionText(compositionSourceText({ ...before, name: 'Imported layout' }), before.id);
+    draft.set(proposed);
+    const refused = ['remove bound logic setting', 'reorder flow steps', 'typed conversion', 'import'].includes(operation);
+    if (refused) {
+      expect(draft.get()).toBe(before);
+      expect(draft.canUndo()).toBe(false); expect(draft.canRedo()).toBe(false);
+      expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+      draft.undo(); draft.redo(); expect(draft.get()).toBe(before);
+    } else {
+      expect(draft.get()).not.toBe(before);
+      const current = placementValues(draft.get());
+      for (const [id, old] of Object.entries(expected)) {
+        const next = current[id];
+        if (id !== 'tile-a' || !['group and duplicate predicate', 'value mode transition', 'action mode transition'].includes(operation)) expect(next, id).toEqual(old);
+        else if (operation === 'value mode transition') {
+          expect(next.values).toEqual(old.values); expect(next.unavailable).toEqual(old.unavailable);
+          expect(next.thens).toEqual([old.values[0]]);
+        } else {
+          const field = operation === 'action mode transition' ? 'action' : 'visibleWhen';
+          const normalize = (value: typeof old) => ({ ...value, fixed: Object.fromEntries(Object.entries(value.fixed).filter(([key]) => key !== field)) });
+          expect(normalize(next)).toEqual(normalize(old));
+          if (field === 'visibleWhen') for (const status of ['value', 'loading', 'unavailable'] as const) {
+            const env: Environment = { read: () => status === 'value' ? { status, value: 'sensor.demo_1' } : { status } };
+            const predicate = (document: CompositionDocument) => valueAt(compileCompositionDocument(document).expanded, rulePath) as Parameters<typeof evaluatePredicate>[0];
+            expect(evaluatePredicate(predicate(draft.get()), env)).toEqual(evaluatePredicate(predicate(before), env));
+          }
+        }
+      }
+      if (copyId) expect(current[copyId]).toEqual(expected['tile-a']);
+      const editedRoot = studioCanvasMetadataSchema.parse(before.studioCanvas).canvases[0].roots[0].id;
+      originalLayouts(before, draft.get(), new Set(), (root, origin) => operation === 'value mode transition' && root === editedRoot && origin === '/value'
+        ? ['/value/cases/0/then', '/value/otherwise'] : [origin]);
+      history(draft, before);
+    }
+    valid(draft.get()); notice.mockRestore();
+  });
+});
+
+it.each(['automatic target', 'automatic metadata', 'component metadata', 'private-source metadata', 'canvas root', 'canvas node', 'canvas group', 'canvas position', 'scoped-layout escape'])(
+  'strict boundary refuses an undeclared %s change atomically', mutation => {
+    const fixture = meaningFixture(mutation === 'component metadata' ? 'component parameters' : mutation === 'private-source metadata' ? 'private sources' : 'page tile');
+    const before = withMeaningCanvas(fixture.document, fixture.slot), draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
+    let next = before;
+    if (mutation === 'automatic target') next = replaceAt(before, [...fixture.slot, 'value'], text('Removed without intent'));
+    else if (mutation === 'automatic metadata') next = { ...before, logicUseBindings: before.logicUseBindings!.slice(1) };
+    else if (mutation === 'component metadata' || mutation === 'private-source metadata') next = replaceAt(before, ['componentLibrary', 0, 'bindings'],
+      before.componentLibrary![0].bindings!.filter(binding => mutation === 'private-source metadata' ? !binding.sourceId : binding.field !== 'props/subtitle/value/args/sourceId'));
+    else {
+      const layout = studioCanvasMetadataSchema.parse(before.studioCanvas), canvas = layout.canvases[mutation === 'scoped-layout escape' ? 1 : 0];
+      if (mutation === 'canvas root') { canvas.roots = []; canvas.nodes = []; canvas.groups = []; }
+      else if (mutation === 'canvas node') {
+        const id = canvas.nodes.pop()!.id;
+        canvas.groups = canvas.groups?.map(group => ({ ...group, nodeIds: group.nodeIds.filter(node => node !== id) }));
+      } else if (mutation === 'canvas group') canvas.groups![0].nodeIds = [];
+      else canvas.nodes[0].x += 200;
+      next = { ...before, name: 'Rename with undeclared metadata change', studioCanvas: layout };
+    }
+    draft.set(mutation === 'scoped-layout escape' ? documentEdit(before, next, { layout: [fixture.slot] }) : next);
+    expect(draft.get()).toBe(before);
+    expect(draft.canUndo()).toBe(false); expect(draft.canRedo()).toBe(false);
+    expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    draft.undo(); draft.redo(); expect(draft.get()).toBe(before); valid(draft.get()); notice.mockRestore();
+  });
+
+it.each([1, 16, 64])('measures strict per-edit overhead independently of the compiler (%i bound tiles)', count => {
+  const fixture = meaningFixture('page tile');
+  let before: CompositionDocument = withMeaningCanvas(fixture.document, fixture.slot);
+  for (let index = 1; index < count; index++) before = duplicateNode(before, ['pages', 0, 'components', 0]).document;
+  const samples: number[] = [], baseline: number[] = [], warmups = 10, measured = 31;
+  let result = before;
+  for (let index = -warmups; index < measured; index++) {
+    const start = performance.now(), proposed = { ...before, name: `Rename ${index}` }, constructed = performance.now();
+    result = documentEdit(before, proposed);
+    const elapsed = performance.now() - constructed;
+    expect(result.name).toBe(proposed.name);
+    expect(result.logicUseBindings).toBe(before.logicUseBindings);
+    expect(result.studioCanvas).toBe(before.studioCanvas);
+    if (index >= 0) { samples.push(elapsed); baseline.push(constructed - start); }
+  }
+  valid(result);
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  process.stdout.write(`Linked edit overhead: ${count} primary bound tiles; ${before.logicUseBindings!.length} bindings; ${studioCanvasMetadataSchema.parse(before.studioCanvas).canvases.flatMap(canvas => canvas.roots).length} canvas roots; boundary median ${median(samples).toFixed(2)} ms; raw edit median ${median(baseline).toFixed(4)} ms; 31 samples after 10 warmups; no compiler work included.\n`);
+  expect(median(samples)).toBeLessThan(1500);
+}, 30_000);
+
+it('reconciles an independently branched edit after an exact historical document is reapplied', () => {
+  const { document } = meaningFixture('page tile');
+  const next = documentEdit(document, { ...document, name: 'First edit' });
+  expect(documentEdit(next, document)).toBe(document);
+  const branch = { ...document, name: 'Independent branch' };
+  const applied = documentEdit(branch, next);
+  expect(applied.name).toBe('First edit');
+  expect(placementValues(applied)).toEqual(placementValues(document));
+  valid(applied);
 });

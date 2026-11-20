@@ -13,6 +13,8 @@ import { expandLogic } from '../shared/composition/logic-library';
 import { editSubtrees } from './editors/provenance';
 import { fieldPointer, pointerPath } from './logic-fields/registry';
 import { resolveLogicAnchor } from '../shared/composition/studio-logic/anchors';
+import { canonicalOfBounded } from '../shared/composition/json';
+import { restoreComponentLayout } from './logic-fields/layout';
 
 /**
  * Templates as pure operations over the document (`.agents`' studio-linked spec, L-studio, and the templates spec). A template is an entry of
@@ -246,13 +248,22 @@ export function unlinkPlace(document: CompositionDocument, path: EditorPath): Co
   const base = fieldPointer(from), to = fieldPointer(path);
   const copied = [{ from, to: path }, ...expansion.sourceMap.flatMap(location => location.authoredPointer.startsWith(`${base}/`) && location.pointer.startsWith(`${base}/`)
     ? [{ from: pointerPath(location.authoredPointer), to: pointerPath(`${to}${location.pointer.slice(base.length)}`) }] : [])];
-  return editSubtrees(document, next, { copied });
+  for (const [at, source] of ownedSources(entry).entries()) {
+    const collection = source.kind === 'ha-entity' ? 'sources' : 'flows';
+    const index = (source.kind === 'ha-entity' ? entry.sources?.indexOf(source) : entry.flows?.indexOf(source)) ?? -1;
+    if (index >= 0) copied.push({ from: [...from.slice(0, -1), collection, index], to: ['dataSources', document.dataSources.length + at] });
+  }
+  return editSubtrees(document, next, { copied, fields: new Map([[to, [to]]]) });
 }
 
 /** The document with every place that uses `id` made a plain copy, in document order, and their private sources added to `dataSources`. */
 function unlinkAll(document: CompositionDocument, id: string): CompositionDocument {
   let next = document;
-  for (const use of componentReferences(document).filter(use => use.ref.componentId === id)) next = unlinkPlace(next, use.path);
+  for (const use of componentReferences(document).filter(use => use.ref.componentId === id)) {
+    const updated = unlinkPlace(next, use.path);
+    if (updated === next) return document;
+    next = updated;
+  }
   return next;
 }
 
@@ -262,9 +273,11 @@ function unlinkAll(document: CompositionDocument, id: string): CompositionDocume
  */
 export function deleteComponent(document: CompositionDocument, id: string): CompositionDocument {
   const unlinked = unlinkAll(document, id);
+  if (componentReferences(unlinked).some(use => use.ref.componentId === id)) return document;
   const rest = (unlinked.componentLibrary ?? []).filter(entry => entry.id !== id);
   const { componentLibrary: _library, ...without } = unlinked;
-  return editSubtrees(unlinked, (rest.length ? { ...without, componentLibrary: rest } : without) as CompositionDocument);
+  return editSubtrees(unlinked, (rest.length ? { ...without, componentLibrary: rest } : without) as CompositionDocument,
+    { deleted: [['componentLibrary', unlinked.componentLibrary!.findIndex(entry => entry.id === id)]] });
 }
 
 /** Renames a component. Every place shows the new name at once. */
@@ -375,6 +388,7 @@ export function settleHeld(current: CompositionDocument, next: CompositionDocume
   const { document: forked, entryId, ids } = forkPlace(current, refId, answer.name);
   const edited = next.componentLibrary?.find(entry => entry.id === original);
   const fork = forked.componentLibrary!.find(entry => entry.id === entryId)!;
+  if (!fork) return [current];
   if (!edited) return [forked];
   const moved: ComponentEntry = { ...fork, node: renameIds(edited.node, ids, true), ...(edited.params ? { params: edited.params } : {}),
     ...(edited.bindings ? { bindings: edited.bindings.map(binding => binding.nodeId === undefined ? binding : { ...binding, nodeId: ids.get(binding.nodeId) ?? binding.nodeId }) } : {}) };
@@ -394,7 +408,11 @@ export function settleHeld(current: CompositionDocument, next: CompositionDocume
   const from = ['componentLibrary', next.componentLibrary!.findIndex(entry => entry.id === original)];
   result = editSubtrees(next, result, { relocated: new Map([[fieldPointer(from), [fieldPointer(['componentLibrary', restored.length])]]]) });
   const originalBindings = current.logicUseBindings?.filter(binding => binding.use.kind === 'component' && binding.use.id === original) ?? [];
-  if (originalBindings.length) result = { ...result, logicUseBindings: [...result.logicUseBindings ?? [], ...originalBindings] };
+  const missing = originalBindings.filter(binding => !result.logicUseBindings?.some(next => canonicalOfBounded([next.use, next.argument]) === canonicalOfBounded([binding.use, binding.argument])));
+  if (missing.length) result = editSubtrees(result, { ...result, logicUseBindings: [...result.logicUseBindings ?? [], ...missing] });
+  const restoredLayout = restoreComponentLayout(current, result, original);
+  if (!restoredLayout) return [current];
+  result = restoredLayout;
   return [forked, result];
 }
 

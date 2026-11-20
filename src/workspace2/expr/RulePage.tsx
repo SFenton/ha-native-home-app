@@ -12,8 +12,8 @@ import { MAX_RULES, rulesOf, toSlot, type Kind, type RulesDraft } from './value'
 import { words } from './words';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
-import { documentEdit } from '../editors/documentEdit';
-import { rebuildField } from '../editors/provenance';
+import { rebuildField, editSubtrees } from '../editors/provenance';
+import { fieldPointer } from '../logic-fields/registry';
 
 /** The path of the rules node inside a value slot: a look is the `conditional` itself, text is the `choose` inside an `expr`. */
 export const rulesPath = (path: EditorPath, kind: Kind): EditorPath => kind === 'text' ? [...path, 'value'] : path;
@@ -25,7 +25,7 @@ export function duplicateRule(document: CompositionDocument, path: EditorPath, k
   const next = replaceAt(document, path, toSlot('rules', { rules: { ...rules, cases: [
     ...rules.cases.slice(0, index + 1), copy, ...rules.cases.slice(index + 1),
   ] } }, kind, valueAt(document, path)) as unknown as Json);
-  return documentEdit(document, next, { copied: [{ from, to: [...rulesPath(path, kind), 'cases', index + 1] }] });
+  return editSubtrees(document, next, { copied: [{ from, to: [...rulesPath(path, kind), 'cases', index + 1] }], fields: new Map([[fieldPointer(path), [fieldPointer(path)]]]) });
 }
 
 /**

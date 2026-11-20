@@ -9,6 +9,7 @@ import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/l
 import { fieldAdapters, fieldAnchor, fieldPointer, liftField, schemaFieldKind, type LogicFieldKind } from '../../../src/workspace2/logic-fields/registry';
 import { explicitTemplateUse, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
 import { createDraft } from '../../../src/workspace2/editors/draft';
+import { rebuildField } from '../../../src/workspace2/editors/provenance';
 import { saveCanvasLayout } from '../../../src/workspace2/logic-fields/layout';
 import { componentDocument, draftDocument } from '../draft/fixtures';
 import type { Json } from '../../../src/shared/types';
@@ -118,7 +119,7 @@ it('reanchors a moved component-owned use with its canonical owner and resolves 
   const path = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
   const use = valueAt(document, [...path, 'value']);
   const draft = createDraft(document);
-  draft.set(replaceAt(document, path, {
+  draft.set(rebuildField(document, path, {
     type: 'expr', value: { type: 'format', pattern: 'Room: {value}', args: { value: use } },
   }));
   const next = draft.get();

@@ -8,7 +8,7 @@ import { logicUseBindingsSchema } from '../../shared/composition/studio-logic/sc
 import type { Json } from '../../shared/types';
 import { fieldPointer, pointerPath } from './registry';
 import { fieldSteps } from '../../shared/composition/components';
-import { documentEdit } from '../editors/documentEdit';
+import { editSubtrees } from '../editors/provenance';
 
 const resolvedValues = new WeakMap<object, WeakMap<object, unknown>>();
 export function resolvedLogicValue<T>(document: unknown, value: T): T {
@@ -89,5 +89,5 @@ export function unlinkTemplate(document: CompositionDocument, path: EditorPath):
   for (const location of expansion?.sourceMap ?? []) if (inside(location.authoredPointer)) {
     relocated.set(location.authoredPointer, [...relocated.get(location.authoredPointer) ?? [], location.pointer]);
   }
-  return documentEdit(document, next, { relocated });
+  return editSubtrees(document, next, { relocated, deleted: [path], fields: new Map([[at, [at]]]) });
 }

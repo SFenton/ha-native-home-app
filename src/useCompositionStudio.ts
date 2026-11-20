@@ -4,7 +4,7 @@ import { compileCompositionDocument } from './shared/composition/compiler';
 import { CompositionValidationError } from './shared/composition/json';
 import { normaliseFoldSides } from './shared/composition/fold-sides-normalise';
 import { pruneEntitySources } from './workspace2/dialogs/sources';
-import { editSubtrees } from './workspace2/editors/provenance';
+import { documentEdit } from './workspace2/editors/documentEdit';
 import { sameJson } from './sameJson';
 import type { CompositionDocument, CompositionPublication } from './shared/composition/schema';
 import type { HaPublishResult } from './ha-publication';
@@ -98,7 +98,11 @@ export function useCompositionStudio() {
   const apply = useCallback((edit: CompositionDocument, group?: string) => {
     if (!current.current || sameJson(edit, current.current)) return;
     // A side of the hinge lives only on a page's top-level components: whatever the edit nested, moved or copied, it leaves none elsewhere (`sh.fold-sides@1`).
-    const next = pruneEntitySources(current.current, normaliseFoldSides(editSubtrees(current.current, edit)));
+    const linked = documentEdit(current.current, edit);
+    if (linked === current.current) return;
+    const normalised = pruneEntitySources(current.current, normaliseFoldSides(linked));
+    const next = documentEdit(linked, normalised);
+    if (next === linked && normalised !== linked && !sameJson(normalised, linked)) return;
     if (sameJson(next, current.current)) return;
     const path = group ? `group:${group}` : textEditPath(current.current, next), at = Date.now();
     const joins = path !== undefined && typing.current?.path === path && (group !== undefined || at - typing.current.at < UNDO_COALESCE_MS) && past.current.length > 0;

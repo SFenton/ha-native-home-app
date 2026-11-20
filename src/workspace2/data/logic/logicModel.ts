@@ -8,7 +8,6 @@ import { resolveLogicUseBindings } from '../../../shared/composition/studio-logi
 import { replacePointer, resolveLogicAnchor } from '../../../shared/composition/studio-logic/anchors';
 import { fieldSteps } from '../../../shared/composition/components';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../logic-fields/registry';
-import { documentEdit } from '../../editors/documentEdit';
 import { operandSlot, slotOperand } from '../../expr/tokens';
 import { copySubtree, editSubtrees } from '../../editors/provenance';
 import {
@@ -331,7 +330,8 @@ export function unlinkAll(document: CompositionDocument, id: string): Compositio
 /** Deletes an entry; with `unlink`, each use keeps its logic. */
 export function deleteEntry(document: CompositionDocument, id: string, unlink = true): CompositionDocument {
   const base = unlink ? unlinkAll(document, id) : document;
-  return withLibrary(base, libraryOf(base).filter(entry => entry.id !== id));
+  if (unlink && usesOf(base, id).length) return document;
+  return editSubtrees(base, withLibrary(base, libraryOf(base).filter(entry => entry.id !== id)), { deleted: [['logicLibrary', libraryOf(base).findIndex(entry => entry.id === id)]] });
 }
 
 // MARK: Save as Logic Template
@@ -460,7 +460,7 @@ export function saveLogicTemplate(document: CompositionDocument, path: EditorPat
     });
     if (generated.length) next = replaceAt(next, ['componentLibrary', path[1], 'bindings'], [...raw.bindings ?? [], ...generated]);
   }
-  return documentEdit(document, next, { relocated });
+  return editSubtrees(document, next, { relocated, deleted: [path], fields: new Map([[fieldPointer(path), [fieldPointer(path)]]]) });
 }
 
 // MARK: Count cases

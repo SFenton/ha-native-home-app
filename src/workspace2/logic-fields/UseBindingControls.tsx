@@ -7,6 +7,7 @@ import { logicUseBindingsSchema } from '../../shared/composition/studio-logic/sc
 import { useDraftDocument, type Draft } from '../editors/draft';
 import { fieldAnchor, fieldPointer } from './registry';
 import { SelectMenu } from '../SelectMenu';
+import { editSubtrees } from '../editors/provenance';
 
 export function UseBindingControls({ draft, path, argument }: { draft: Draft; path: EditorPath; argument: string }) {
   const document = useDraftDocument(draft), [error, setError] = useState('');
@@ -23,7 +24,8 @@ export function UseBindingControls({ draft, path, argument }: { draft: Draft; pa
       onChange={field => {
         try {
           const base = index < 0 ? document : unbindLogicUse(document, index);
-          draft.set((field === 'explicit' ? base : bindLogicUse(base, { use: anchor, argument, from: { kind: 'use-tile', field } })) as CompositionDocument);
+          const next = (field === 'explicit' ? base : bindLogicUse(base, { use: anchor, argument, from: { kind: 'use-tile', field } })) as CompositionDocument;
+          draft.set(editSubtrees(document, next, { deleted: [path] }));
           setError('');
         } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
       }}/>
