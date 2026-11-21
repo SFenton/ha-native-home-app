@@ -5,7 +5,7 @@ import { z } from 'zod/v4';
 import { buildAllowedHosts, isAllowedHostHeader } from './allowed-hosts';
 import { isLoopbackHost, localDevelopment, type ServerConfig } from './config';
 import { HomeAssistantClient, PICTURE_ENTITY } from './ha';
-import { openLiveSession, pictureWanted, wantedEntities } from './ha-live';
+import { openLiveSession, pictureWanted, wantedAttributes, wantedEntities } from './ha-live';
 import { listEntityAreas } from './ha-entities';
 import { draftTodoIds } from './native-home';
 import { registerFlowRun } from './flow-run';
@@ -291,7 +291,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const write = (event: string, data: unknown) => { if (!res.destroyed) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
     write('hello', {});
     const stop = openLiveSession(ha.live, wantedEntities(() => references, () => store.native.peekDraft()), message => write(message.type, message),
-      { credentials: [config.haToken ?? '', config.supervisorToken ?? '', config.authToken ?? ''] });
+      { credentials: [config.haToken ?? '', config.supervisorToken ?? '', config.authToken ?? ''], attributes: wantedAttributes(() => store.native.peekDraft()) });
     const keepalive = setInterval(() => { if (!res.destroyed) res.write(': keepalive\n\n'); }, 15000);
     const refresh = setInterval(() => { void ha.liveReferences().then(next => { references = next; }); }, 30000);
     res.once('close', () => { clearInterval(keepalive); clearInterval(refresh); stop(); liveClients -= 1; });

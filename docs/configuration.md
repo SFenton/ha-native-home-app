@@ -24,6 +24,9 @@ Beside it:
 | `GET api/health` | None | `{status,mode,haConnected,draftRevision}`; `draftRevision` is the composition draft's |
 | `GET api/native-home` | Authenticated session, bearer or verified admin Ingress | `NativeSnapshot`: `{mode:'live',houseConfig:{schema:2,hash,config},states,currentUser?}`; the house configuration `fenton_home` serves plus the projected states it references. Read-only; feeds the preview |
 
+Authenticated `GET api/live/states` streams `snapshot`, `update` and connection `status` events; per draft revision, literal `ha-entity` sources also receive HA attributes explicitly read as `['attributes', name]` in a separate `attributes` map (dynamic entity-id operands are skipped).
+Names or nested keys matching `/token|password|passwd|secret|api_?key|credential|auth/i`, `access_token` and `entity_picture` are denied, non-JSON or bounded-JSON values exceeding 4 KiB are skipped, and the session's server-credential scrubber still applies; known projected fields take precedence.
+
 Unknown `/api/*` and `/native/api/*` paths answer `404`. The schema-1 routes
 (`api/draft`, `api/validate`, `api/export`, `api/schema`, `api/data/:id`,
 `api/read-endpoints`, `api/actions/execute`, `api/feedback`, `api/cameras/*`,

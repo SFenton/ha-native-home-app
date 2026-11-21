@@ -58,13 +58,14 @@ const snake = (name: string) => name.replace(/_([a-z0-9])/g, (_, letter: string)
 const attributeAliases: Record<string, keyof NativeState> = {
   friendly_name: 'name', unit_of_measurement: 'unit', device_class: 'deviceClass',
 };
-/** A Home Assistant attribute from a flat `NativeState`, by its snake-case name. */
+/** Known projected fields take precedence over the draft-scoped live attribute map. */
 export function attributeOf(entity: NativeState, name: string): Json | undefined {
   const field = attributeAliases[name] ?? snake(name);
   // The time of last change is the `last-changed` operand's, never an attribute: the phone reads Home Assistant's attributes, which have none.
   if (field === 'lastChanged') return undefined;
-  const found = (entity as Record<string, unknown>)[field];
-  return found === undefined ? undefined : found as Json;
+  const found = field !== 'attributes' && Object.hasOwn(entity, field) ? (entity as Record<string, unknown>)[field] : undefined;
+  if (found !== undefined) return found as Json;
+  return entity.attributes && Object.hasOwn(entity.attributes, name) ? entity.attributes[name] : undefined;
 }
 
 /** `RoomFormat.compact`: the state a tile line shows. */
