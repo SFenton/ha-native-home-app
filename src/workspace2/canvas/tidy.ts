@@ -56,7 +56,8 @@ function boxesFor(graph: LogicGraph, measure?: Measure): ReadonlyMap<string, Box
     }));
     return [node.id, {
       width: measured?.width ?? 190,
-      height: measured?.height ?? 64 + (node.inputs.length + node.outputs.length) * 29 + detail,
+      // Before DOM measurements exist, reserve room for labels, notes, actions and coarse-pointer ports.
+      height: measured?.height ?? 180 + (node.inputs.length + node.outputs.length) * 44 + detail,
       inputs: ports('input'), outputs: ports('output'),
     }];
   }));

@@ -4,7 +4,7 @@
 .w2-canvas:where([data-panel]) button, .w2-canvas-dialog button, .w2-canvas:where([data-panel]) summary, .w2-canvas-dialog summary { cursor: pointer; }
 .w2-canvas:where([data-panel]) button, .w2-canvas-dialog button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 9px; border: 1px solid var(--w2-line); border-radius: 8px; color: var(--w2-ink-card); background: var(--w2-card); font: inherit; }
 .w2-canvas:where([data-panel]) button:hover, .w2-canvas-dialog button:hover { background: var(--w2-hover); }
-.w2-canvas:where([data-panel]) button:disabled, .w2-canvas-dialog button:disabled { opacity: .5; cursor: default; }
+.w2-canvas:where([data-panel]) button:disabled, .w2-canvas-dialog button:disabled, .w2-canvas button[aria-disabled=true], .w2-canvas-dialog button[aria-disabled=true] { opacity: .5; cursor: default; }
 .w2-canvas:where([data-panel]) :focus-visible, .w2-canvas-dialog :focus-visible { outline: 3px solid var(--w2-canvas-focus); outline-offset: 3px; }
 .w2-canvas:where([data-panel]) .w2-canvas-primary, .w2-canvas-dialog .w2-canvas-primary { color: var(--w2-on-primary); background: var(--w2-primary-fill); border-color: transparent; font-weight: 600; }
 .w2-canvas:where([data-panel]) input, .w2-canvas:where([data-panel]) select, .w2-canvas:where([data-panel]) textarea, .w2-canvas-dialog input, .w2-canvas-dialog select, .w2-canvas-dialog textarea { color: var(--w2-ink-card); background: var(--w2-field); border: 1px solid var(--w2-line); border-radius: 8px; padding: 8px; min-width: 0; width: 100%; font: inherit; }
