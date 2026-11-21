@@ -6,11 +6,11 @@ import { sameJson } from '../../sameJson';
 import type { EditorPath } from '../../composition-editor';
 import type { GraphSourceMap, LogicGraph } from '../../shared/composition/graph';
 import { canonicalOfBounded } from '../../shared/composition/json';
-import { changeFieldVariant, compilerIssuesOf, replaceAt, valueAt, type SchemaField } from '../../composition-editor';
+import { changeFieldVariant, replaceAt, valueAt, type SchemaField } from '../../composition-editor';
 import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { ownedSources } from '../../shared/composition/components';
 import type { Json } from '../../shared/types';
-import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
+import { studioCanvasMetadataSchema } from '../../shared/composition/studio-logic/schemas';
 import { encodeStudioCanvas, readStudioCanvas } from '../../shared/composition/studio-logic/layout';
 import { CompositionValidationError } from '../../shared/composition/json';
 import type { LogicAnchor } from '../../shared/composition/graph/types';
@@ -103,15 +103,10 @@ export interface ScopedEdit {
  * layout both changed differently, is refused.
  */
 export function editWithin(before: CompositionDocument, edit: ScopedEdit): CompositionDocument {
-  const { scope, references, retained } = edit;
-  if (before === edit.candidate) return edit.candidate;
+  const { candidate, scope, references, retained } = edit;
+  if (before === candidate) return candidate;
   const scoped = scope.map(path => fieldPointer(path));
   const within = (pointer: string) => scoped.some(base => pointer === base || pointer.startsWith(`${base}/`));
-  // A document root at the whole document or at an ancestor of a scope reads the scope through its fingerprint: no
-  // operation writes it. Its canvas is taken as `before` holds it, and the boundary rebases it like any other edit's (below).
-  const covering = (canvas: StoredCanvas) => canvas.roots.some(root => root.anchor.kind === 'document'
-    && scoped.some(base => base === root.anchor.field || base.startsWith(`${root.anchor.field}/`)));
-  const candidate = references.layout?.length ? withCanvases(edit.candidate, before, covering) : edit.candidate;
   // The operation was made at these paths of `before`; in the candidate they must still name the same owners.
   if (!scope.every(path => sameOwners(path, scope, before, candidate))) return refused(before);
   // A scope the candidate or `before` does not hold cannot be put back: the whole candidate is then an ordinary edit.
@@ -180,41 +175,12 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
   const inside = (paths: readonly EditorPath[] | undefined) => paths?.filter(path => within(fieldPointer(path)));
   const deleted = inside(references.deleted), discardLayouts = inside(references.discardLayouts), layoutPaths = inside(references.layout);
   const copied = references.copied?.filter(copy => within(fieldPointer(copy.from)) && within(fieldPointer(copy.to)));
-  const declarations = { relocated, fields, ...(deleted?.length ? { deleted } : {}), ...(copied?.length ? { copied } : {}) };
-  const held = studioCanvasMetadataSchema.safeParse(from.studioCanvas);
-  if (layoutPaths?.length && held.success && held.data.canvases.some(covering) && !sameJson(target.studioCanvas, from.studioCanvas)) {
-    // A layout the operation writes, beside a root over its scope: the boundary checks a written layout as written and
-    // rebases only one left alone, so the change is made in two steps. First the change with `from`'s layout (the
-    // operation's own roots discarded), rebasing that root as for any other edit; then only the operation's own canvases,
-    // the rest as rebased.
-    const semantic = withLayout(target, from.studioCanvas);
-    const rebased = documentEdit(from, semantic, { ...declarations, discardLayouts: [...discardLayouts ?? [], ...layoutPaths] });
-    if (rebased === from) return before;
-    const next = documentEdit(rebased, withLayout(rebased, withCanvases(target, rebased, canvas => !canvas.roots.some(root => {
-      const pointer = resolveLogicAnchor(rebased, root.anchor)?.pointer;
-      return pointer !== undefined && layoutPaths.some(path => pointer === fieldPointer(path) || pointer.startsWith(`${fieldPointer(path)}/`));
-    })).studioCanvas), { layout: layoutPaths });
-    return next === rebased && !sameJson(rebased.studioCanvas, next.studioCanvas) ? before : next;
-  }
   const next = documentEdit(from, target, {
-    ...declarations, ...(discardLayouts?.length ? { discardLayouts } : {}), ...(layoutPaths?.length ? { layout: layoutPaths } : {}),
+    relocated, fields,
+    ...(deleted?.length ? { deleted } : {}), ...(discardLayouts?.length ? { discardLayouts } : {}),
+    ...(layoutPaths?.length ? { layout: layoutPaths } : {}), ...(copied?.length ? { copied } : {}),
   });
   return next === from ? before : next;
-}
-
-type StoredCanvas = StoredStudioCanvasMetadata['canvases'][number];
-/** `document` with `layout` as its saved layout (none when undefined). */
-function withLayout(document: CompositionDocument, layout: unknown): CompositionDocument {
-  if (document.studioCanvas === layout) return document;
-  const { studioCanvas: _layout, ...rest } = document;
-  return (layout === undefined ? rest : { ...rest, studioCanvas: layout }) as CompositionDocument;
-}
-/** `document`'s layout with each canvas `taken` replaced by `source`'s canvas of the same ID, where `source` has one. */
-function withCanvases(document: CompositionDocument, source: CompositionDocument, taken: (canvas: StoredCanvas) => boolean): CompositionDocument {
-  const mine = studioCanvasMetadataSchema.safeParse(document.studioCanvas), theirs = studioCanvasMetadataSchema.safeParse(source.studioCanvas);
-  if (!mine.success || !theirs.success || !mine.data.canvases.some(taken)) return document;
-  const canvases = mine.data.canvases.map(canvas => taken(canvas) ? theirs.data.canvases.find(other => other.id === canvas.id) ?? canvas : canvas);
-  return canvases.every((canvas, at) => canvas === mine.data.canvases[at]) ? document : withLayout(document, { ...mine.data, canvases });
 }
 
 /**
@@ -371,30 +337,17 @@ export function fieldTypeEdit(document: CompositionDocument, path: EditorPath, s
 }
 
 /**
- * `next`, a change of the field at `path` in `document`, or `document` (after the boundary's notice) when `next` has a
- * compile issue outside that field which `document` does not have: the change broke something it does not own. Issues
- * inside the field are its new value's own, incomplete until the author fills it in (a new source type's empty inputs).
- */
-export function compiledBeyond(document: CompositionDocument, next: CompositionDocument, path: EditorPath): CompositionDocument {
-  if (next === document) return next;
-  const field = `/document${fieldPointer(path)}`, key = (issue: { code: string; pointer: string }) => `${issue.code} ${issue.pointer}`;
-  const known = new Set(compilerIssuesOf(document).map(key));
-  const broken = compilerIssuesOf(next).some(issue => issue.pointer !== field && !issue.pointer.startsWith(`${field}/`) && !known.has(key(issue)));
-  return broken ? refused(document) : next;
-}
-
-/**
  * A field's type change (the variant picker) as a declared edit. The old value is rebuilt as the new type: whatever lived
  * under it is declared deleted, so an automatic binding or component parameter binding into it is removed, and every saved
  * canvas layout rooted inside it is discarded. A binding is kept only when it is unambiguous: its target sits under a key
  * the new type copies verbatim from the old one (`id`, `title`, `label`, `icon`, `layout`), so the same value stays at the
  * same pointer. A value parameter's binding to an optional field the new type does not have is removed too. Every other
  * link is untouched. `bindings` and `layouts` say what the change removes (both 0 when nothing linked is lost, so nothing
- * needs asking). `document` comes back unchanged when the boundary refuses, or when the result has a compile issue
- * outside the field that the document did not have (`compiledBeyond`): a type change never breaks what it does not own.
+ * needs asking). `document` comes back unchanged when the boundary refuses. A type incompatibility elsewhere (a source
+ * the field refers to, say) shows as compile issues, as after any other edit; Publish validates.
  */
 export function changeFieldType(document: CompositionDocument, path: EditorPath, schema: SchemaField, key: string): { document: CompositionDocument; bindings: number; layouts: number } {
-  const next = compiledBeyond(document, editWithin(document, fieldTypeEdit(document, path, schema, key)), path);
+  const next = editWithin(document, fieldTypeEdit(document, path, schema, key));
   return { document: next, bindings: next === document ? 0 : linkCount(document) - linkCount(next), layouts: next === document ? 0 : layoutCount(document) - layoutCount(next) };
 }
 

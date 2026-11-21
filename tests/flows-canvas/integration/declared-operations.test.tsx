@@ -20,7 +20,7 @@ import StepList from '../../../src/workspace2/data/StepList';
 import { RowsProvider } from '../../../src/workspace2/rowsContext';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
 import { operandSlot } from '../../../src/workspace2/expr/tokens';
-import { changeFieldType, compiledBeyond, editWithin, fieldTypeEdit, replaceDocument } from '../../../src/workspace2/editors/provenance';
+import { changeFieldType, editWithin, fieldTypeEdit, replaceDocument } from '../../../src/workspace2/editors/provenance';
 import { flowStepMoveEdit, moveFlowStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import LogicSettings from '../../../src/workspace2/data/logic/LogicSettings';
 import { removeSettingPlan } from '../../../src/workspace2/data/logic/logicModel';
@@ -29,7 +29,7 @@ import { fieldAnchor, fieldPointer, liftField } from '../../../src/workspace2/lo
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { toastManager } from '../../../src/workspace2/toasts';
 import { houseFrom } from '../../../src/preview2/projections';
-import { projectGraph } from '../../../src/shared/composition/graph';
+import { lift, projectGraph } from '../../../src/shared/composition/graph';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
 import { binding, componentDocument, tile } from '../draft/fixtures';
 import { LiveHouse } from '../../../src/preview2/live-house';
@@ -626,10 +626,31 @@ describe('Final review: real handlers and edge layouts', () => {
       const after = seen.mock.calls[0][0] as CompositionDocument;
       expect(after.id).toBe(before.id);
       expect(readStudioCanvas(after).warnings).toEqual([]);
-      // Re-anchored to this workspace's identity, each node kept where it was saved.
+      // Re-anchored to this workspace's identity, each node carried by its origins to where it was saved.
       const [canvas] = canvases(after), [old] = canvases(source);
       expect(canvas.roots.map(root => [root.anchor.kind, root.anchor.id, root.anchor.field, root.ownerId])).toEqual([['document', before.id, fieldPointer(path), before.id]]);
-      expect(canvas.nodes.map(node => [node.nodeId, node.origins, node.x, node.y])).toEqual(old.nodes.map(node => [node.nodeId, node.origins, node.x, node.y]));
+      expect(canvas.nodes.map(node => [node.origins, node.x, node.y])).toEqual(old.nodes.map(node => [node.origins, node.x, node.y]));
+    });
+
+    it.each([{ path: [] as EditorPath }, { path: ['id'] as EditorPath }])('a foreign root at $path is lifted again under the new identity: no stale association, every position kept', ({ path }) => {
+      const kind = path.length ? 'operand' : 'document', plain = foreign(), graph = liftField(plain, path, kind).graph;
+      const source = { ...plain, studioCanvas: encodeStudioCanvas(plain, [{ id: 'positioned', roots: [{ anchor: graph.roots[0].anchor,
+        nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 100 + 10, y: 120 })) }] }]) };
+      const liftOf = (document: CompositionDocument) => {
+        const [canvas] = canvases(document);
+        return lift((path.length ? valueAt(document, path) : document) as Json, { anchor: canvas.roots[0].anchor, kind, metadata: readStudioCanvas(document).metadata });
+      };
+      // "Stale or ambiguous saved layout associations ignored" is an `invalid_layout` warning of the lift.
+      const stale = (result: ReturnType<typeof liftOf>) => result.warnings.filter(warning => warning.code === 'invalid_layout');
+      const placed = (result: ReturnType<typeof liftOf>) => Object.fromEntries(result.graph.nodes.map(node => [node.origins.join(','), node.position]));
+      expect(stale(liftOf(source))).toEqual([]);
+      const imported = importCompositionText(compositionSourceText(source), 'receiving-project'), lifted = liftOf(imported);
+      expect(stale(lifted)).toEqual([]);
+      expect(lifted.graph.nodes.find(node => node.origins.join(',') === graph.nodes[0].origins.join(','))!.position).toEqual({ x: 10, y: 120 });
+      expect(placed(lifted)).toEqual(Object.fromEntries(graph.nodes.map((node, at) => [node.origins.join(','), { x: at * 100 + 10, y: 120 }])));
+      expect(placed(lifted)).toEqual(placed(liftOf(source)));
+      // The root's own node reads the document's identity, so its lifted ID is the new document's, not the export's.
+      expect(new Set(canvases(imported)[0].nodes.map(node => node.nodeId))).toEqual(new Set(lifted.graph.nodes.map(node => node.id)));
     });
 
     it('imports a same-workspace exported draft with a whole-document layout unchanged', async () => {
@@ -652,7 +673,20 @@ describe('Final review: real handlers and edge layouts', () => {
       expect(readStudioCanvas(imported).warnings).toEqual([]);
       const [canvas] = canvases(imported);
       expect(canvas.groups![0].nodeIds).toEqual(canvas.nodes.slice(0, 2).map(node => node.id));
-      expect(canvas.groups![0].nodeIds).not.toEqual(stored.groups?.[0]?.nodeIds ?? grouped.studioCanvas.canvases[0].groups[0].nodeIds);
+      expect(canvas.groups![0].nodeIds).not.toEqual(grouped.studioCanvas.canvases[0].groups[0].nodeIds);
+      expect(canvas.nodes.map(node => [node.origins, node.x, node.y])).toEqual(stored.nodes.map(node => [node.origins, node.x, node.y]));
+    });
+
+    it('rejects, before asking, a document root it cannot carry: one naming a third document, or one into the layout itself', () => {
+      const plain = foreign(), graph = liftField(plain, [], 'document').graph;
+      const whole = { ...plain, studioCanvas: encodeStudioCanvas(plain, [{ id: 'whole', roots: [{ anchor: graph.roots[0].anchor, nodes: [] }] }]) };
+      const [canvas] = canvases(whole);
+      const third = { ...whole, studioCanvas: { ...whole.studioCanvas, canvases: [{ ...canvas, roots: canvas.roots.map(root => ({ ...root, anchor: { ...root.anchor, id: 'third-project' } })) }] } };
+      expect(() => importCompositionText(compositionSourceText(third), 'draft-fixture')).toThrow(CompositionValidationError);
+      const holder = { ...plain, studioCanvas: { version: 2, canvases: [] } } as CompositionDocument;
+      const version = { ...holder, studioCanvas: encodeStudioCanvas(holder, [{ id: 'version', roots: [{ anchor: { kind: 'document', id: plain.id, field: '/studioCanvas/version', fingerprint: '2' }, nodes: [] }] }]) };
+      expect(readStudioCanvas(version).warnings).toEqual([]);
+      expect(() => importCompositionText(compositionSourceText(version), 'draft-fixture')).toThrow(CompositionValidationError);
     });
 
     it('rejects, before asking, an export whose layout still does not fit once re-anchored', async () => {
@@ -806,19 +840,7 @@ describe('Final review: real handlers and edge layouts', () => {
       valid(change.document);
     });
 
-    it('refuses, and never applies, a type change whose result breaks what it does not own', () => {
-      const made = meaningFixture('page tile'), at = made.optionalIndex, path: EditorPath = ['componentLibrary', at, 'node', 'children', 0], notice = refusals();
-      const edit = fieldTypeEdit(made.document, path, fieldVariants(nodeDefinition())[textChoice()], 'tile');
-      // The result this change had before the fix: both placements fail at `values/tint`, outside the changed field.
-      const kept = editWithin(made.document, { ...edit, scope: [path], candidate: replaceAt(edit.candidate, ['componentLibrary', at, 'bindings'], made.document.componentLibrary![at].bindings) });
-      expect(compilerIssuesOf(kept).map(issue => issue.pointer)).toEqual(['/document/pages/0/components/3/values/tint', '/document/pages/1/components/0/values/tint']);
-      const before = refused(notice);
-      expect(compiledBeyond(made.document, kept, path)).toBe(made.document);
-      expect(refused(notice)).toBe(before + 1);
-      expect(compiledBeyond(made.document, editWithin(made.document, edit), path)).not.toBe(made.document);
-    });
-
-    it('lets a type change leave its own new value for the author to fill in, and a draft unfinished elsewhere still change', () => {
+    it('may leave its own new value for the author to fill in, and a draft unfinished elsewhere still changes type', () => {
       const made = meaningFixture('page tile'), notice = refusals();
       const source = { id: 'demo-source', kind: 'model', model: 'alarm-mode@1', inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo_unit' } } };
       const document = { ...made.document, dataSources: [...made.document.dataSources, source] } as CompositionDocument, at = document.dataSources.length - 1;
@@ -835,22 +857,23 @@ describe('Final review: real handlers and edge layouts', () => {
     });
   });
 
-  describe('a slot-view Apply and Done keep a whole-document layout as the boundary rebases it', () => {
+  describe('a slot-view Apply and Done refuse while a saved document root covers the template body', () => {
     beforeEach(() => {
       vi.useFakeTimers(); resetLiveRuns();
       vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
       HTMLElement.prototype.scrollIntoView = vi.fn();
     });
     const rule = () => replaceAt(base(), body, { type: 'choose', cases: [{ when: check, then: text('Owner') }], otherwise: text('Guest') });
-    /** A whole-document canvas saved over `document` with its layout set aside (the root's fingerprint never reads it), beside that layout. */
-    const withWhole = (document: CompositionDocument) => {
-      const { studioCanvas: kept, ...semantic } = document, whole = withCanvas(semantic as CompositionDocument, [], 'document', 'whole');
-      const old = studioCanvasMetadataSchema.safeParse(kept);
-      return { ...document, studioCanvas: { ...studioCanvasMetadataSchema.parse(whole.studioCanvas), canvases: [...(old.success ? old.data.canvases : []), ...canvases(whole)] } } as CompositionDocument;
+    const rootsOf = (document: CompositionDocument, path: EditorPath, kind: Parameters<typeof liftField>[2]) => {
+      const graph = liftField(document, path, kind).graph;
+      return { anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 100 + 10, y: 120 })) };
     };
-    const outsideBody = (document: CompositionDocument, id: string) => canvases(document).find(canvas => canvas.id === id)!.nodes
-      .filter(node => !node.origins.some(origin => origin.startsWith(fieldPointer(body))))
-      .map(node => [node.origins, node.x, node.y]);
+    /** A whole-document root and a body root, in one canvas (`shared`) or in two. */
+    const withLayouts = (document: CompositionDocument, shared: boolean): CompositionDocument => {
+      const whole = rootsOf(document, [], 'document'), own = rootsOf(document, body, 'operand');
+      return { ...document, studioCanvas: encodeStudioCanvas(document, shared ? [{ id: 'shared', roots: [whole, own] }] : [{ id: 'whole', roots: [whole] }, { id: 'body', roots: [own] }]) };
+    };
+    const unusable = "Apply failed. Canvas edits are preserved: Saved layout can't be used. Reset the saved layout explicitly before applying a new layout.";
 
     async function applyAnd(real: CompositionDocument) {
       const view = slotBodyView(real, body, valueAt(real, body) as Operand), pushed = createDraft(view);
@@ -866,65 +889,68 @@ describe('Final review: real handlers and edge layouts', () => {
       await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' })));
       return { view, pushed };
     }
+    /** Done of `view` (the slot view, edited or not) on a draft of `real`: what the draft then holds. */
+    const doneOn = (real: CompositionDocument, view: CompositionDocument) => {
+      const target = createDraft(real);
+      target.set(bodyFromSlotView(real, view, body));
+      return target;
+    };
 
-    it.each([false, true, 'whole-document'] as const)('slot Apply and Done, layout=%s', async saved => {
+    it.each([false, true] as const)('slot Apply and Done apply, layout=%s', async saved => {
       let real = rule();
-      if (saved) real = withCanvas(real, saved === 'whole-document' ? [] : body, saved === 'whole-document' ? 'document' : 'operand');
+      if (saved) real = withCanvas(real, body, 'operand');
       valid(real); expect(readStudioCanvas(real).warnings).toEqual([]);
       const { pushed } = await applyAnd(real);
       expect(screen.queryAllByText('Edits applied to the draft. Not published.').length).toBeGreaterThan(0);
       expect(valueAt(operandBodyDraft(pushed, body).get(), [...body, 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
       const applied = pushed.get();
       expect(readStudioCanvas(applied).warnings).toEqual([]);
-      const target = createDraft(real);
-      target.set(bodyFromSlotView(real, applied, body));
+      const target = doneOn(real, applied);
       expect(target.get()).not.toBe(real);
       valid(target.get()); expect(readStudioCanvas(target.get()).warnings).toEqual([]);
       history(target, real, target.get());
     });
 
-    it('the slot view rebases the whole-document root, and Done keeps every node outside the body where it was saved', async () => {
-      const real = withCanvas(rule(), [], 'document', 'whole');
-      const view = slotBodyView(real, body, valueAt(real, body) as Operand);
-      expect(readStudioCanvas(view).warnings).toEqual([]);
-      expect(outsideBody(view, 'whole')).toEqual(outsideBody(real, 'whole'));
-      expect(canonicalBody(view, body)).not.toBe(view);
-      const { pushed } = await applyAnd(real);
-      const after = bodyFromSlotView(real, pushed.get(), body);
-      expect(after).not.toBe(real);
-      expect(readStudioCanvas(after).warnings).toEqual([]);
-      const [root] = canvases(after).find(canvas => canvas.id === 'whole')!.roots;
-      const { studioCanvas: _layout, ...semantic } = after;
-      expect(root.anchor).toEqual(fieldAnchor(semantic as CompositionDocument, []));
-      expect(outsideBody(after, 'whole')).toEqual(outsideBody(real, 'whole'));
-      valid(after);
-    });
-
-    it('Done with both a body canvas and a whole-document canvas writes the body\'s and rebases the other', async () => {
-      const real = withWhole(withCanvas(rule(), body, 'operand', 'body-canvas'));
+    it.each([
+      { layout: 'whole-document', make: (document: CompositionDocument) => withCanvas(document, [], 'document') },
+      { layout: 'whole-document and body, in one canvas', make: (document: CompositionDocument) => withLayouts(document, true) },
+      { layout: 'whole-document and body, in two canvases', make: (document: CompositionDocument) => withLayouts(document, false) },
+    ])('with a $layout layout, Apply says the saved layout can\'t be used and Done changes nothing', async ({ make }) => {
+      const real = make(rule()), notice = refusals();
       valid(real); expect(readStudioCanvas(real).warnings).toEqual([]);
-      const { pushed } = await applyAnd(real);
-      expect(screen.queryAllByText('Edits applied to the draft. Not published.').length).toBeGreaterThan(0);
-      const after = bodyFromSlotView(real, pushed.get(), body);
+      const { view, pushed } = await applyAnd(real);
+      // The slot view wraps the body, so the covering root's fingerprint no longer holds there: the layout can't be used.
+      expect(readStudioCanvas(view).warnings.map(warning => warning.code)).toEqual(['invalid_layout']);
+      expect(screen.queryAllByText(unusable).length).toBeGreaterThan(0);
+      expect(screen.queryAllByText('Edits applied to the draft. Not published.')).toEqual([]);
+      expect(pushed.get()).toBe(view);
+      for (const edited of [view, replaceAt(view, body, operandSlot(text('Changed')))]) {
+        const target = doneOn(real, edited);
+        expect(target.get()).toBe(real); expect(target.canUndo()).toBe(false);
+      }
+      expect(refused(notice)).toBeGreaterThan(0);
+    });
+
+    it('a layout over a literal body, which the slot view does not wrap, still applies: Done keeps the owned layout move in a shared canvas', () => {
+      const real = withLayouts(replaceAt(rule(), body, text('Before')), true);
+      valid(real); expect(readStudioCanvas(real).warnings).toEqual([]);
+      const view = slotBodyView(real, body, valueAt(real, body) as Operand), stored = studioCanvasMetadataSchema.parse(view.studioCanvas);
+      const ownRoot = stored.canvases[0].roots[1].id;
+      const moved = { ...view, studioCanvas: { ...stored, canvases: stored.canvases.map(canvas => ({ ...canvas,
+        nodes: canvas.nodes.map(node => node.rootId === ownRoot ? { ...node, x: node.x + 777 } : node) })) } };
+      expect(readStudioCanvas(moved).warnings).toEqual([]);
+      const after = bodyFromSlotView(real, moved, body), xs = (document: CompositionDocument) => canvases(document)[0].nodes.filter(node => node.rootId === ownRoot).map(node => node.x);
       expect(after).not.toBe(real);
-      expect(readStudioCanvas(after).warnings).toEqual([]);
-      // The body's canvases are the editor's (its own, and the one Apply saved); the whole-document one is rebased.
-      const ids = canvases(after).map(canvas => canvas.id), written = canvases(canonicalBody(pushed.get(), body));
-      expect(ids.slice(0, 2)).toEqual(['body-canvas', 'whole']);
-      for (const id of ids.filter(id => id !== 'whole')) expect(canvases(after).find(canvas => canvas.id === id)).toEqual(written.find(canvas => canvas.id === id));
-      expect(outsideBody(after, 'whole')).toEqual(outsideBody(real, 'whole'));
+      expect(xs(after)).toEqual(xs(real).map(x => x + 777));
       valid(after);
     });
 
-    it('Done of a body replaced outright drops only the whole-document nodes inside it', () => {
-      const real = withCanvas(rule(), [], 'document', 'whole');
-      const view = slotBodyView(real, body, valueAt(real, body) as Operand);
-      const after = bodyFromSlotView(real, replaceAt(view, body, operandSlot(text('Changed'))), body);
-      expect(after).not.toBe(real);
-      expect(readStudioCanvas(after).warnings).toEqual([]);
-      expect(outsideBody(after, 'whole')).toEqual(outsideBody(real, 'whole'));
-      expect(canvases(after)[0].nodes.length).toBeLessThan(canvases(real)[0].nodes.length);
-      valid(after);
+    it('a Done whose layout the boundary refuses is refused whole', () => {
+      const real = withLayouts(rule(), false), notice = refusals();
+      let view = replaceAt(slotBodyView(real, body, valueAt(real, body) as Operand), body, operandSlot(text('Changed')));
+      view = { ...view, studioCanvas: { ...studioCanvasMetadataSchema.parse(view.studioCanvas), bundles: [{ id: 'new', name: 'New', outputs: [{ name: 'out', logicId: 'other-label' }] }] } };
+      expect(bodyFromSlotView(real, view, body)).toBe(real);
+      expect(refused(notice)).toBeGreaterThan(0);
     });
   });
 });
