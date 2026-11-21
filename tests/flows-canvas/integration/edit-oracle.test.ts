@@ -585,7 +585,12 @@ type OwnerList = keyof typeof brokenOwners;
 function malformed(document: Doc, rng: Rng): Step | undefined {
   const list = pick(rng, Object.keys(brokenOwners) as OwnerList[]), owners = (document as unknown as Record<string, unknown>)[list];
   const items = Array.isArray(owners) ? owners as unknown[] : [];
-  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list'] as const);
+  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list', 'bindings'] as const);
+  if (mode === 'bindings') {
+    const value = pick(rng, [{}, 'list', null, 'a missing entry'] as const);
+    const bindings = value === 'a missing entry' ? [...document.logicUseBindings ?? [], null] : value;
+    return { document: { ...document, logicUseBindings: bindings } as unknown as Doc, references: {}, label: `malformed logicUseBindings: ${JSON.stringify(value)}` };
+  }
   if (mode === 'list') {
     const value = pick(rng, [undefined, {}, 'list'] as const);
     const next = { ...document } as Record<string, unknown>;
@@ -668,7 +673,7 @@ const deviations = new Map<string, number>();
 /** Agreement, or a description of the disagreement. */
 function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome): string | undefined {
   if (oracle.kind === 'error') {
-    if (scoped.kind === 'error' && String(scoped.error) === String(oracle.error)) return undefined;
+    // The one deviation: where the oracle throws, the scoped boundary refuses. A matching raw error is not agreement.
     if (scoped.kind === 'result' && scoped.document === before) {
       const key = `${String(oracle.error)} at ${site(oracle.error)}`;
       deviations.set(key, (deviations.get(key) ?? 0) + 1);
@@ -852,6 +857,43 @@ describe('edit oracle regressions', () => {
     expect(oracle).not.toBe(before);
     expect(oracle.componentLibrary![0].bindings!.map(binding => binding.param)).toEqual(['source']);
     expect(scoped).toEqual(oracle);
+  });
+
+  // The one deviation: where the oracle throws on a shape it cannot read, the scoped boundary refuses (and never throws).
+  const unreadable = (before: Doc, edit: Doc) => {
+    expect(() => oracleEdit(before, edit)).toThrow(TypeError);
+    expect(documentEdit(before, edit)).toBe(before);
+  };
+
+  it('refuses a candidate whose component library cannot be read for links, before anything reads it', () => {
+    const before = { ...compiled(), logicUseBindings: [] };
+    expect(compiles(before)).toBe(true);
+    for (const componentLibrary of [[null], {}, 'list']) unreadable(before, { ...before, componentLibrary } as unknown as Doc);
+  });
+
+  it('refuses a candidate whose bindings list cannot be read where the revision holds bindings', () => {
+    const before = compiled();
+    for (const logicUseBindings of [{}, 'list', 5, [...before.logicUseBindings!, null]]) unreadable(before, { ...before, logicUseBindings } as unknown as Doc);
+  });
+
+  it('refuses every edit to a revision whose bindings value is not a list', () => {
+    // Installed by an edit both accept (no bindings before, and no length to check); the oracle then throws on every edit.
+    const empty = { ...compiled(), logicUseBindings: [] }, linked = framed(empty, [lifted(empty, slot(0))]);
+    for (const logicUseBindings of [{}, 5]) {
+      const before = { ...linked, logicUseBindings } as unknown as Doc;
+      expect(oracleEdit(linked, before)).toBe(before);
+      unreadable(before, retitle(before));
+    }
+  });
+
+  it('reads a bindings value that is not a list as the oracle does where the revision holds none', () => {
+    // Nothing reads the list for links here: one with a length is checked whole (and refused), one without passes.
+    const before = framed({ ...compiled(), logicUseBindings: [] }, [lifted({ ...compiled(), logicUseBindings: [] }, slot(0))]);
+    for (const logicUseBindings of [{}, 'list', 5]) {
+      const edit = { ...before, logicUseBindings } as unknown as Doc, oracle = oracleEdit(before, edit);
+      expect(documentEdit(before, edit)).toBe(oracle === before ? before : edit);
+      expect(oracle === before || oracle === edit).toBe(true);
+    }
   });
 
   it('lets an edit back to a descendant through on each implementation\'s own history, across a rebuilt result', () => {

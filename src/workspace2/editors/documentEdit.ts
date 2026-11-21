@@ -412,8 +412,29 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
 
 function reconcile(before: CompositionDocument, edit: CompositionDocument, references: EditReferences, shapes: { unshaped: boolean }): CompositionDocument {
   if (before === edit || sameJson(before, edit) && !references.relocated?.size && !references.copied?.length) return edit;
-  const linked = (document: CompositionDocument) => document.logicUseBindings?.length || document.componentLibrary?.some(entry => entry.bindings?.length) || document.studioCanvas;
+  /**
+   * Whether `document` holds anything linked, read as the whole-document reconciliation reads it, in the same order and
+   * stopping where it stops. Where that read throws (a component library that is not a list, or a missing entry before
+   * any entry with bindings), the shape is unreadable: refuse, before anything else reads the owners.
+   */
+  const linked = (document: CompositionDocument) => {
+    if (document.logicUseBindings?.length) return true;
+    const library: unknown = document.componentLibrary;
+    if (library !== null && library !== undefined) {
+      if (!Array.isArray(library)) return refuse();
+      if (library.some(entry => entry === null || entry === undefined ? refuse() : (entry as ComponentEntry).bindings?.length)) return true;
+    }
+    return Boolean(document.studioCanvas);
+  };
   if (!linked(before) && !linked(edit)) return edit;
+  // Past this point the whole-document reconciliation reads `before`'s bindings through `forEach`, which throws on anything
+  // but a list (a value without a length passes the checks of the edit that installs it). Where `before` holds bindings, it
+  // reads the candidate's through `some` (likewise) and each binding it keeps through its `use` (which throws on a missing
+  // entry). It accepts neither; refuse both before anything reads the lists.
+  const held: unknown = before.logicUseBindings, proposed: unknown = edit.logicUseBindings;
+  if (held !== null && held !== undefined && !Array.isArray(held)) refuse();
+  if (before.logicUseBindings?.length && proposed !== null && proposed !== undefined
+    && (!Array.isArray(proposed) || proposed.some(binding => binding === null || binding === undefined))) refuse();
   // Per-transaction memos of the candidate: never cached beyond this call, except for objects of committed revisions (those
   // `before`'s index has seen), which are immutable.
   let editPaths: Map<object, EditorPath[]> | undefined, editResolver: AnchorResolver | undefined, beforeResolver: AnchorResolver | undefined;
@@ -635,10 +656,11 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
   for (const copy of references.copied ?? []) touch(fieldPointer(copy.from));
   if (edit.logicUseBindings !== before.logicUseBindings) {
     // A binding the edit no longer holds by identity (removed, rebuilt or replaced) is reconciled; retained ones are not.
-    const kept = new Set(edit.logicUseBindings ?? []);
+    // A value that is not a list (only possible here when `before` holds none) is new, and checked whole like any addition.
+    const list = Array.isArray(proposed) ? proposed as NonNullable<CompositionDocument['logicUseBindings']> : [], kept = new Set(list);
     before.logicUseBindings?.forEach((binding, at) => { if (!kept.has(binding)) { scope.add(`a:${at}`); scope.add(`r:${at}`); } });
     const held = new Set(before.logicUseBindings ?? []);
-    if (edit.logicUseBindings?.some(binding => !held.has(binding))) scope.add('added');
+    if (Array.isArray(proposed) ? list.some(binding => !held.has(binding)) : proposed !== null && proposed !== undefined) scope.add('added');
   }
   for (const path of [...references.deleted ?? [], ...references.discardLayouts ?? []]) touch(fieldPointer(path));
   for (const root of index.uncertified) scope.add(`c:${root}`);

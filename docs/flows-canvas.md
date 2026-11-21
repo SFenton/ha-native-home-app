@@ -499,7 +499,10 @@ compiler (one that fills an argument the logic never reads). A `before` the
 compiler rejects that the boundary never accepted (a repeated component ID,
 say) is outside the contract. The one deliberate exception: where the oracle
 throws a raw error (a field without an unambiguous owner, an owner it cannot
-walk), the scoped boundary refuses and keeps `before`. Both pass an edit that
+walk, a component library or bindings value that is not a list), the scoped
+boundary refuses and keeps `before`; it never throws one itself. It checks
+those shapes before anything reads them, refusing only where the oracle's own
+read would throw; other errors still propagate. Both pass an edit that
 descends from `before` through accepted edits (a redo) without reconciling
 it.
 
@@ -511,7 +514,7 @@ nothing it built is ever remembered beyond the call.
 
 `edit-oracle.test.ts` enforces the contract on seeded random edit sequences
 (alias, rebuild, move/copy provenance, ID and binding edits, canvas edits,
-malformed owners, owner-list reorders and repeated owner or node IDs, refused
+malformed owners and bindings lists, owner-list reorders and repeated owner or node IDs, refused
 candidates mutated and resubmitted, candidates the compiler accepts installed
 as the next `before` refused or not, accepted content copied into a revision
 that never passed the boundary, and raw drafts with hidden bindings or a
@@ -522,8 +525,9 @@ result as the oracle's own, so both keep the same redo history. CI runs seeds
 unused ranges, set `EDIT_ORACLE_FROM`, `EDIT_ORACLE_SEEDS` and
 `EDIT_ORACLE_STEPS`, for example
 `EDIT_ORACLE_FROM=10001 EDIT_ORACLE_SEEDS=10000 npx vitest run tests/flows-canvas/integration/edit-oracle.test.ts`;
-`EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the documented
-deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
+A scoped raw error is a disagreement even where the oracle throws the same
+one. `EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the
+documented deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
 documents (as JSON, which drops the aliasing many disagreements depend on:
 replay the seed to reproduce one). `edit-boundary-cost.test.ts` reports the
 first edit after a structural change, gates a rename at 256 bindings and the
