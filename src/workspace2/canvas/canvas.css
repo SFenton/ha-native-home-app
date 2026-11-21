@@ -95,6 +95,8 @@
 .w2-canvas-port[data-direction=output] .w2-canvas-port-glyph { order: 4; margin-inline-end: -18px; }
 .w2-canvas-port-value { min-width: 21px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--w2-wire) 8%, transparent); color: var(--w2-wire); font-size: 10px; font-weight: 500; }
 .w2-canvas-port-value > svg { vertical-align: middle; margin-inline-end: 2px; }
+.w2-canvas-port-reading { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; max-width: 90px; }
+.w2-canvas-item-context { font-size: 9px; color: var(--w2-muted); white-space: nowrap; }
 .w2-canvas-port-value[data-has-value][data-source=pinned], .w2-canvas-port-value[data-has-value][data-source=scenario] { color: var(--w2-observation-pinned); background: color-mix(in srgb, var(--w2-observation-pinned) 9%, var(--w2-card)); }
 .w2-canvas-port[data-observation-state=unavailable], .w2-canvas-port[data-observation-state=cant-tell] { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--w2-line) 65%, transparent) 0 3px, transparent 3px 8px); }
 .w2-canvas-port-value:not([data-has-value]) { color: var(--w2-muted); background: var(--w2-card); }

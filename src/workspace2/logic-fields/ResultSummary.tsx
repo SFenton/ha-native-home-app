@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { LogicGraph } from '../../shared/composition/graph';
 import type { CanvasObservations, ObservedValue } from '../logic-simulation/observations';
-import { formatObservedValue } from '../logic-simulation/observations';
+import { formatObservedValue, itemContextText } from '../logic-simulation/observations';
 import { nodeFor, simulationInputs, sourceCaptureForNode, type SimulationProgram } from '../logic-simulation/program';
 import { Tag } from '../kit';
 import { nodeTitle } from '../canvas/blocks';
@@ -59,7 +59,10 @@ export default function ResultSummary({ graph, program, observations, blockNames
   return <section className="w2-logic-result-summary" aria-label="Result summary">
     <div className="w2-logic-result-line"><strong>Result</strong><output aria-label="Result value">{formatObservedValue(result, program?.roots[0].body.kind === 'flow' && program.roots[0].body.value.output.kind === 'rows')}</output>
       <Tag className={`tag ${badge === 'Live' ? 'live' : badge === 'Pinned' ? 'pinned' : ''}`} tone={badge === 'Live' ? 'success' : 'neutral'}>{badge}</Tag></div>
-    {inputs.length > 0 && <dl aria-label="Current inputs">{inputs.map(input => <div key={input.id}><dt>{input.label}</dt><dd>{formatObservedValue(observations?.blocks[input.blockId])}</dd></div>)}</dl>}
+    {inputs.length > 0 && <dl aria-label="Current inputs">{inputs.map(input => {
+      const value = observations?.blocks[input.blockId], item = itemContextText(value?.item);
+      return <div key={input.id}><dt>{input.label}</dt><dd>{formatObservedValue(value)}{item && <small> · {item}</small>}</dd></div>;
+    })}</dl>}
     {result?.freshness === 'held' && <p className="w2-caption">Last known values · waiting for Home Assistant.</p>}
     {error && <p role="status" className="w2-caption">{error}</p>}
   </section>;

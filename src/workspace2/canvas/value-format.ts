@@ -1,6 +1,7 @@
 import type { GraphJSON } from '../../shared/composition/graph';
 import type { PortObservation } from './observations';
 import { record } from '../../shared/composition/graph/json';
+import { noItemsText } from '../logic-simulation/per-item';
 
 export function primaryText(value: GraphJSON): string {
   return primaryTextAt(value, 0);
@@ -34,9 +35,10 @@ function primaryTextAt(value: GraphJSON, depth: number): string {
 
 export function formatObservation(observation?: PortObservation, rows = false, full = false, output = true): string {
   if (!observation) return 'Not observed';
+  if (observation.state === 'no-items') return noItemsText(observation.item);
   const state = observation.state === 'unavailable' ? 'Unavailable' : "Can't tell";
   if (observation.state === 'known') return formatValue(observation.value, { rows, full });
   return output && observation.kept ? `${state}; Kept: ${formatValue(observation.value, { rows, full })}` : state;
 }
 
-export const sourceText = (observation: PortObservation) => ({ live: 'Live', pinned: 'Pinned', scenario: 'Scenario' })[observation.source];
+export const sourceText = (observation: PortObservation) => observation.source && ({ live: 'Live', pinned: 'Pinned', scenario: 'Scenario' })[observation.source];

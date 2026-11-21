@@ -75,8 +75,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const run = useMemo(() => runSimulation(program, snapshot, { scenario, pins, clock, liveClock: clockLive, liveBlocks: muted }), [program, snapshot, scenario, pins, clock, clockLive, muted]);
   const observation = useMemo(() => canvasObservations(program, run, {
     pins: activePins, localPins: pins, scenario, clockPinned: Boolean(!clockLive && (clock || scenario?.clock)), localClockPinned: Boolean(clock), liveClock: clockLive,
-    freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText,
-  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale]);
+    freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText, blockNames,
+  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale, blockNames]);
   useEffect(() => onObservation?.(observation), [onObservation, observation]);
   const onRun = useCallback((ids: readonly string[], state: FlowState) => {
     setFlows(previous => {
