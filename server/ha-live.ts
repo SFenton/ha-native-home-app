@@ -1,4 +1,4 @@
-import { projectNativeAttributes, projectNativeState } from './native-home';
+import { isForwardedAttributeName, projectNativeAttributes, projectNativeState } from './native-home';
 import { expandDocument, ownedSources } from '../src/shared/composition/components';
 import { publishedDocument } from '../src/shared/composition/logic-library';
 import type { CompositionDocument } from '../src/shared/composition/schema';
@@ -423,7 +423,7 @@ export function documentAttributeReads(document: CompositionDocument): NativeAtt
     if (!isRecord(value) || value.type === 'literal') return;
     const from = value.type === 'state' || value.type === 'numeric' ? value
       : ['read', 'list-count', 'list-includes'].includes(String(value.type)) && isRecord(value.from) && value.from.type === 'source' ? value.from : undefined;
-    if (from && typeof from.sourceId === 'string' && Array.isArray(from.path) && from.path[0] === 'attributes' && typeof from.path[1] === 'string') {
+    if (from && typeof from.sourceId === 'string' && Array.isArray(from.path) && from.path[0] === 'attributes' && typeof from.path[1] === 'string' && isForwardedAttributeName(from.path[1])) {
       const id = ids.get(from.sourceId);
       if (id) {
         const names = wanted.get(id) ?? new Set<string>();
