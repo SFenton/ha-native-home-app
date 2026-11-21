@@ -435,6 +435,176 @@ surviving origins and are re-encoded against freshly lifted blocks. Only removed
 blocks lose their associations; invalid imported layout stays available for
 explicit reset/export.
 
+#### Dependency scoping and the equivalence contract
+
+`documentEdit()` does not reconcile the whole document on every edit. For each
+accepted revision it builds a dependency index (`editDependencies.ts`): every
+pointer the canonical resolvers read for each automatic binding, component
+parameter binding and canvas root, including owner-list ID scans and node
+scans recorded through a proxy over the resolver itself, plus retention
+witnesses (the deepest object on a located path that occurs exactly once). An
+edit reconciles only the keys its changed pointers reach, the keys whose
+witnesses it placed somewhere new, and the keys the index could not certify
+(below). A guarded read (an owner list, an ID, a binding array, a component's
+params or bindings, the canvas metadata) drops the index; the next edit builds
+a new one. Typing reuses the index it was carried to.
+
+The index also certifies that the revision is a fixed point of the
+whole-document reconciliation. A canvas root, an automatic use or a component
+node binding whose stored address is not the one the reconciliation would
+derive for its own location (for example a node `resolveLogicAnchor` finds in a
+`local-tabs` node's `children`, which the authored walk skips) is reconciled
+by every edit, as the oracle would.
+
+Building an index is memoized by the identity of committed objects:
+
+- canvas metadata parses, by the stored `studioCanvas` object (a rebase's
+  output is recorded as its own parse, as the index carried with it already
+  takes it);
+- each owner's logic nodes by ID, and each owner's and walked node's recorded
+  scan reads (shared read tries mounted where the object sits), by the owner or
+  node object;
+- each canvas root's certification, by the node (or owner, or value) its anchor
+  resolves to, then by the root's stored content (at most four answers per
+  object, so repeated layout moves do not accumulate);
+- each binding's certification, by the top-level authored node it sits in;
+- each lifted value's nodes, by the value object;
+- the automatic binding resolution, by the bindings array and library, per
+  binding: a binding is reused when its use resolves to the same node (and
+  component entry) with the same bindings in its place (its node, or a
+  component use's entry); the others are resolved again, place by place;
+- whether layout metadata is usable, by the `studioCanvas` object and a
+  revision known to accept it, when every root resolves to the same value on
+  an owner with the same ID.
+
+Every read outside the memoized object is checked afresh on every build: owner
+list ID scans and node-ID uniqueness are rebuilt per build, root and binding
+memos apply only after the anchor resolves to the same object, and object
+multiplicity is counted over the whole revision. Candidate-built objects are
+never memo keys beyond one call.
+
+This makes a rebuild cheap where owners and nodes are kept, not proportional to
+the edit. A rebuild still walks the whole revision once to count objects, and
+lists every binding and root. An edit that reconciles a located binding finds
+where retained objects went from those counts and the edit's own placements
+when its index was built for `before` (an object counted once there, placed
+nowhere new, is still at its own path or gone); otherwise, and for any object
+that test cannot settle, it indexes the candidate's object paths. It still
+walks the candidate's authored nodes, and automatic bindings walk the uses of
+their logic entry, over the whole candidate.
+
+The scoped boundary is defined by equivalence with the whole-document
+reconciliation of `5b28fc4`, kept verbatim in
+`tests/flows-canvas/integration/oracle/`: for every edit to a covered `before`
+it must make the same accept/refuse decision and give the same output
+(`sameJson`, `studioCanvas` included). A `before` is covered when the boundary
+accepted it or `compileCompositionDocument` accepts it, whether or not it
+ever passed the boundary: reload compiles the stored authored draft and
+installs it as is, and expansion can hide a broken component binding from the
+compiler (one that fills an argument the logic never reads). A `before` the
+compiler rejects that the boundary never accepted (a repeated component ID,
+say) is outside the contract.
+
+The contract covers documents and candidates that are JSON values: plain
+objects and arrays as `JSON.parse` produces them, holding strings, numbers,
+booleans and null. Like mutating a committed revision in place, these are
+outside it, and neither boundary is checked against them: an own property
+that shadows an array method (`some: 0`), symbol keys (`Symbol.iterator`
+included), non-enumerable or accessor properties, and objects with any other
+prototype. An array with a hole or with an own enumerable key other than an
+index is not JSON either, but it stays covered: the scoped boundary refuses it
+wherever the edit reaches it (below).
+
+Two deviations are allowed, both refusals that keep `before`, never an
+acceptance with a different result:
+
+- where the oracle throws a raw error (a field without an unambiguous owner,
+  an owner it cannot walk, a component library or bindings value it cannot
+  read), the scoped boundary refuses;
+- the scoped boundary may also refuse a candidate, or an installed `before`,
+  that holds a value of a type the schema forbids where either boundary reads
+  it, even where the oracle accepts: an `edit` that is not a plain object, or
+  a value other than a list where the schema requires one (an owner list, the
+  bindings list, a surface's components, a component entry's bindings, params,
+  sources or flows, a node's children, a `local-tabs` node's tabs or blocks,
+  or their children), or, anywhere, an array that is not JSON: one with a
+  hole, or with an own enumerable key other than an index. The oracle iterates
+  a string there as an empty list and skips holes and extra keys; the scoped
+  boundary does not mirror that.
+
+These are checks, not errors turned into refusals: an error from anything
+else still propagates, so a raw error on some shape no check covers remains
+possible and is a bug. They do not all run before the candidate is read:
+
+- an `edit` that is not a plain object is refused before anything reads it,
+  the redo walk included;
+- the linked check and the bindings checks then read the lists the oracle
+  reads first, in its order, and refuse the shapes on which those reads throw:
+  a component library that is not a list, or a missing entry the oracle
+  reaches before any entry with bindings; a `before` bindings value that is
+  not a list; and, where `before` holds bindings, a candidate bindings value
+  that is not a list or holds a missing entry. The duplicate check refuses any
+  binding entry that is not an object with an object `from` before reading
+  it: the oracle throws on such an entry only when an earlier binding shares
+  its `use`, `argument` and `logicId` (it then reads both entries'
+  `from.field`), and otherwise refuses it when it validates the bindings
+  last. These cover only those reads, not every throw: the oracle's later
+  reads (walking owners, anchoring fields) throw on shapes these checks pass,
+  and the scoped boundary refuses those through the checks below or its
+  reconciliation;
+- the revision's index is then built or reused (it reads only `before`), and
+  every array the edit changed or placed is checked as `changedPaths` hands
+  it over, before anything else of the candidate is read; the paths that
+  skip reconciliation (an unlinked revision, an edit equal to it as JSON) run
+  that scan too;
+- the owner, list and node shape checks walk lists by index, so a hole or an
+  extra key fails them, and `editSubtrees` hands a document they reject to the
+  boundary without walking it.
+
+Arrays the edit did not change are not checked again: they are `before`'s. Both
+boundaries pass an edit that descends from `before` through accepted edits (a
+redo) without reconciling it.
+
+Caches are keyed only by committed revisions: a `before` the caller holds, or a
+result the boundary accepted. **Committed revisions must not be mutated in
+place**; their objects may be shared by later revisions and candidates. A
+refused candidate belongs to its caller and may be mutated and resubmitted, so
+nothing it built is ever remembered beyond the call.
+
+`edit-oracle.test.ts` enforces the contract on seeded random edit sequences
+(alias, rebuild, move/copy provenance, ID and binding edits, canvas edits,
+malformed owners, bindings lists and list fields (strings, numbers and objects
+where a list belongs, sparse lists and lists with extra keys), owner-list reorders and repeated owner or node IDs, refused
+candidates mutated and resubmitted, candidates the compiler accepts installed
+as the next `before` refused or not, accepted content copied into a revision
+that never passed the boundary, and raw drafts with hidden bindings or a
+binding addressed through an ancestor node). Where both
+accept with distinct but identical results, the harness records the scoped
+result as the oracle's own, so both keep the same redo history. CI runs seeds
+1–256 with 14 steps, plus pinned regression seeds. For long local runs on
+unused ranges, set `EDIT_ORACLE_FROM`, `EDIT_ORACLE_SEEDS` and
+`EDIT_ORACLE_STEPS`, for example
+`EDIT_ORACLE_FROM=10001 EDIT_ORACLE_SEEDS=10000 npx vitest run tests/flows-canvas/integration/edit-oracle.test.ts`.
+A scoped raw error is a disagreement even where the oracle throws the same
+one, and a scoped refusal where the oracle accepts is one unless the candidate
+or `before` fails the harness's schema type check (`schemaInvalid`), which is
+tallied as its own deviation. `EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the
+documented deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
+documents (as JSON, which drops the aliasing many disagreements depend on:
+replay the seed to reproduce one). `edit-boundary-cost.test.ts` reports the
+first edit after a structural change, gates a rename at 256 bindings (5 ms) and
+the first declared typing keystroke at 66 (8 ms), and reports the rebuild's
+share. The gates assert only with `EDIT_BOUNDARY_GATES=1`: CI runs the file on
+its own after `npm test`, and inside the parallel suite it only reports (its
+correctness assertions still run). To run the gated step locally, on an
+otherwise idle machine:
+`EDIT_BOUNDARY_GATES=1 npx vitest run tests/flows-canvas/integration/edit-boundary-cost.test.ts`
+(`EDIT_BOUNDARY_SLOWDOWN=<factor>` scales both gates).
+
+The `oracle/` copy is the specification. Never "fix" it to make a test pass: a
+disagreement is a bug in the scoped boundary unless the specification itself is
+being changed deliberately, which is a reviewed change of its own.
+
 The binding resolver is authoritative, not the cached authored argument.
 Save as Logic Template, duplication, Unlink and Delete Template read its resolved
 projection, as do inspector evaluation, setting displays and sentences.
