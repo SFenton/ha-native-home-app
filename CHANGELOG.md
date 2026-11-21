@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.24
+
+- The preview now shows sheet-to-page pushes, hidden tabs and buttons, the iPad's top tab bar, wide-window opening and the Duo rail's Back and Close as the app does.
+- Pages can hide the tab bar and header buttons for themselves, and choose how they open in a wide window; the Tabs and header buttons panel shows where each is used.
+- Hide on this page now treats the opening page of a document without tabs as its first page.
+
 ## 0.3.23
 
 - Maintenance and internal changes.
