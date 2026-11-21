@@ -103,8 +103,55 @@
 [data-wire-type=list] { --w2-wire: var(--w2-wire-list); }
 [data-wire-type=entity] { --w2-wire: var(--w2-wire-entity); }
 [data-wire-type=record] { --w2-wire: var(--w2-wire-record); }
-.w2-canvas-node-actions { display: flex; padding: 5px; gap: 3px; border-top: 1px solid var(--w2-line); }
-.w2-canvas-node-actions button { padding: 3px 5px; font-size: 10px; }
+.w2-canvas-node-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px; gap: 4px; border-top: 1px solid var(--w2-line); }
+.w2-canvas .w2-canvas-node-actions button { min-width: 0; min-height: 32px; padding: 4px; }
+.w2-canvas-node-header { display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; gap: 2px; padding-inline-end: 6px; min-height: 48px; }
+.w2-canvas .w2-canvas-node-head { min-width: 0; padding: 6px 8px; }
+.w2-canvas-node-title { min-width: 0; flex: 1; }
+.w2-canvas-node-title strong, .w2-canvas-node-title small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.w2-canvas .w2-canvas-eye { width: 32px; min-width: 0; padding: 4px; border-color: transparent; background: transparent; }
+.w2-canvas .w2-canvas-node-note { padding: 0 10px; margin: 0 0 8px; font-size: 11px; line-height: 16px; color: var(--w2-muted); }
+.w2-canvas-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.w2-canvas-annotation { padding: 10px; border-top: 1px solid var(--w2-line); font-size: 11px; }
+.w2-canvas-annotation .w2-canvas-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.w2-canvas .w2-canvas-annotation button { min-width: 0; padding-inline: 4px; font-size: 10px; }
+.w2-canvas .w2-canvas-annotation textarea, .w2-canvas-dialog .w2-canvas-annotation textarea { min-height: 80px; resize: vertical; font: inherit; }
+.w2-canvas-tooltip { position: fixed; z-index: 120; width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 12px; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: var(--w2-shadow); font: 12px/1.5 var(--w2-font); overflow-wrap: anywhere; }
+.w2-canvas-peek { position: absolute; z-index: 5; display: flex; flex-direction: column; border: 1px solid var(--w2-line); border-radius: 12px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: var(--w2-shadow); overflow: hidden; }
+.w2-canvas-peek .w2-canvas-panel-head { flex: none; }
+.w2-canvas-peek-body { display: grid; gap: 20px; padding: 12px; overflow: auto; min-height: 0; }
+.w2-canvas-peek-footer { flex: none; padding: 12px; border-top: 1px solid var(--w2-line); }
+.w2-canvas-value { overflow-wrap: anywhere; }
+.w2-canvas-value[data-state=unavailable], .w2-canvas-value[data-state=cant-tell], .w2-canvas-observed-port[data-state=unavailable], .w2-canvas-observed-port[data-state=cant-tell] { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--w2-line) 40%, transparent) 0 3px, transparent 3px 9px); }
+.w2-canvas-observed-port { margin-block: 10px; min-width: 0; }
+.w2-canvas-value-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+.w2-canvas-source { flex: none; padding: 2px 6px; border: 1px solid var(--w2-line); border-radius: 5px; }
+.w2-canvas-source[data-source=pinned], .w2-canvas-source[data-source=scenario] { color: var(--w2-observation-pinned); }
+.w2-canvas-sample { margin: 8px 0; padding-inline-start: 24px; }
+.w2-canvas-sample li { padding: 5px; overflow-wrap: anywhere; }
+.w2-canvas-sample small { display: block; }
+.w2-canvas-value-fields { margin: 8px 0; }
+.w2-canvas-value-fields > div { display: grid; grid-template-columns: minmax(60px, .7fr) minmax(0, 1.3fr); gap: 10px; padding-block: 4px; }
+.w2-canvas-value-fields dt { color: var(--w2-muted); overflow-wrap: anywhere; }
+.w2-canvas-value-fields dd { margin: 0; overflow-wrap: anywhere; }
+.w2-canvas-dialog[data-wide] { max-width: 1120px; }
+.w2-canvas-compare-toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.w2-canvas-compare-toolbar label:first-child { flex: 1; }
+.w2-canvas-compare-columns { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 20px; }
+.w2-canvas-compare-columns > section { min-width: 0; }
+.w2-canvas-table-scroll { max-width: 100%; overflow: auto; }
+.w2-canvas-table-scroll table { width: 100%; border-collapse: collapse; text-align: start; }
+.w2-canvas-table-scroll th, .w2-canvas-table-scroll td { border-bottom: 1px solid var(--w2-line); padding: 10px; overflow-wrap: anywhere; }
+.w2-canvas-table-scroll th { color: var(--w2-muted); background: var(--w2-field); }
+.w2-canvas-raw { margin-top: 16px; border-top: 1px solid var(--w2-line); }
+.w2-canvas-raw pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 599px), (pointer: coarse) {
+  .w2-canvas-node-actions { padding: 5px; gap: 0; }
+  .w2-canvas .w2-canvas-node-actions button { min-height: 44px; }
+}
+@media (max-width: 699px) {
+  .w2-canvas-compare-columns { grid-template-columns: minmax(0, 1fr); }
+}
 .w2-canvas-wires { position: absolute; inset: 0; pointer-events: none; }
 .w2-canvas-wire { fill: none; stroke-width: 1.6; stroke: var(--w2-wire-record); }
 .w2-canvas-wire-number { stroke: var(--w2-wire-number); }
@@ -200,6 +247,10 @@
   .w2-canvas-dialog[data-sheet] > .w2-canvas-dialog-body { padding: 0; max-height: calc(80dvh - 12px); overflow: auto; }
   .w2-canvas-dialog[data-sheet] .w2-canvas-palette { height: calc(80dvh - 12px); border-inline: 0; }
   .w2-canvas-dialog[data-sheet] .w2-canvas-inspector { border-inline: 0; }
+  .w2-canvas-dialog[data-sheet]:has(.w2-canvas-peek-body) { display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+  .w2-canvas-dialog[data-sheet]:has(.w2-canvas-peek-body) > .w2-canvas-panel-head { position: static; width: auto; height: auto; overflow: visible; clip-path: none; padding: 12px 16px; }
+  .w2-canvas-dialog[data-sheet]:has(.w2-canvas-peek-body) > .w2-canvas-panel-head button { display: inline-flex; min-width: 44px; }
+  .w2-canvas-dialog[data-sheet]:has(.w2-canvas-peek-body) > .w2-canvas-dialog-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) {
   .w2-canvas *, .w2-canvas-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

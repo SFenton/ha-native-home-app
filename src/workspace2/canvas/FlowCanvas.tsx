@@ -1,7 +1,6 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { Dialog } from '@base-ui/react/dialog';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleCheck, CircleHelp, ChevronRight, Ellipsis, GitBranch, List, Maximize, Minus, Plus, Redo2, SlidersHorizontal, Undo2, WandSparkles, X } from 'lucide-react';
-import { autoLayout, lower, type CanvasHost, type GraphSourceMap, type BlockCatalogEntry, type GraphBudget, type GraphEdge, type GraphNode, type LogicGraph } from '../../shared/composition/graph';
+import { lower, type CanvasHost, type GraphSourceMap, type BlockCatalogEntry, type GraphBudget, type GraphEdge, type GraphNode, type LogicGraph } from '../../shared/composition/graph';
 import type { DerivedTheme } from '../theme';
 import { blockSeed, nodeName, portLabel } from './blocks';
 import { detachedNodes, edit, initialEditState, orderedNodes, type CanvasFocus, type EditCommand } from './edit';
@@ -16,6 +15,10 @@ import { indexGraph } from './graph-index';
 import CanvasBlock, { type BlockActions } from './CanvasBlock';
 import { blockLayoutKey, presentBlocks, type BlockPresentation } from './presentation';
 import { intersectsWindow, useCanvasWindow } from './windowing';
+import { countCrossings, tidyCanvas, type TidyMeasure } from './tidy';
+import Modal from './CanvasDialog';
+import AnnotationEditor, { annotationError, type AnnotationDraft } from './AnnotationEditor';
+import DataPeek from './DataPeek';
 
 const focusKey = (focus: CanvasFocus) => JSON.stringify(focus);
 const editable = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
@@ -24,23 +27,7 @@ const CanvasWires = memo(function CanvasWires({ paths, width, height, observatio
   return <li className="w2-canvas-wires" aria-hidden><svg width={width} height={height}>{paths.map(wire => <path key={wire.id} data-observation-state={observations?.[wire.from.nodeId]?.outputs?.[wire.from.portId]?.state} d={wire.path} className={`w2-canvas-wire w2-canvas-wire-${wire.kind}`}/>)}</svg></li>;
 });
 export function arrangeCanvas(graph: LogicGraph): LogicGraph {
-  const arranged = autoLayout(graph, true), columns = new Map<number, number>(), positions = new Map<string, { x: number; y: number }>();
-  for (const node of orderedNodes(arranged)) {
-    const x = node.position?.x ?? 0, y = columns.get(x) ?? 24;
-    columns.set(x, y + 100 + (node.inputs.length + node.outputs.length) * 44);
-    positions.set(node.id, { x: x + 24, y });
-  }
-  return { ...arranged, nodes: arranged.nodes.map(node => ({ ...node, position: positions.get(node.id) })) };
-}
-function Modal({ title, children, close, theme, sheet = false }: { title: string; children: ReactNode; close: () => void; theme: DerivedTheme; sheet?: boolean }) {
-  return <Dialog.Root open onOpenChange={open => { if (!open) close(); }}>
-    <Dialog.Portal><Dialog.Backdrop className="w2-canvas-backdrop"/><Dialog.Viewport className="w2-canvas-dialog-viewport" data-sheet={sheet || undefined}>
-      <Dialog.Popup className="w2-canvas-dialog" data-sheet={sheet || undefined} style={{ ...theme.variables, ...canvasTheme(theme), colorScheme: theme.dark ? 'dark' : 'light' } as CSSProperties} finalFocus={false}>
-        <div className="w2-canvas-panel-head"><Dialog.Title>{title}</Dialog.Title><button type="button" aria-label={`Close ${title}`} onClick={close}><X size={18}/></button></div>
-        <div className="w2-canvas-dialog-body">{children}</div>
-      </Dialog.Popup>
-    </Dialog.Viewport></Dialog.Portal>
-  </Dialog.Root>;
+  return tidyCanvas(graph);
 }
 export interface FlowCanvasProps {
   readonly host: CanvasHostWithObservations;
@@ -58,6 +45,7 @@ export interface FlowCanvasProps {
 export interface CanvasLayoutHandoff {
   readonly graph: LogicGraph;
   readonly positions: Readonly<Record<string, { readonly x: number; readonly y: number }>>;
+  readonly annotations: Readonly<Record<string, NonNullable<GraphNode['annotation']>>>;
   readonly sourceMap: GraphSourceMap;
 }
 export default function FlowCanvas({ host, graph: initialGraph, title, theme, onClose, returnFocus, outputNames, onGraphChange, selectedNodeId, onSelectionChange, onApply }: FlowCanvasProps) {
@@ -66,6 +54,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const [entered, setEntered] = useState<string>(), [connection, setConnection] = useState<ConnectionRequest>();
   const [deleting, setDeleting] = useState<GraphNode>(), [leaving, setLeaving] = useState(false);
   const [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
+  const [peek, setPeek] = useState<{ nodeId: string; keyboard: boolean }>();
+  const [draft, setDraft] = useState<AnnotationDraft>(), draftRef = useRef(draft);
+  draftRef.current = draft;
+  const [pendingSelection, setPendingSelection] = useState<CanvasFocus>();
+  const [pendingClose, setPendingClose] = useState(false);
   const [more, setMore] = useState(false), [help, setHelp] = useState(false), [problemsOpen, setProblemsOpen] = useState(false);
   const [phone, setPhone] = useState(() => window.matchMedia?.('(max-width: 599px)').matches ?? false);
   useEffect(() => {
@@ -80,6 +73,8 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const [initialSnapshot] = useState(() => host.snapshot());
   const snapshot = useRef(initialSnapshot), baseline = useRef(state.graph), refs = useRef(new Map<string, HTMLButtonElement>());
   const viewport = useRef<HTMLDivElement>(null), board = useRef<HTMLUListElement>(null), addButton = useRef<HTMLButtonElement>(null), navigation = useRef<HTMLDivElement>(null);
+  const main = useRef<HTMLElement>(null), annotationOrigin = useRef<HTMLElement | null>(null);
+  const [sizes, setSizes] = useState<ReadonlyMap<string, TidyMeasure>>(new Map());
   const moreButton = useRef<HTMLButtonElement>(null), problemsButton = useRef<HTMLButtonElement>(null);
   const restore = useRef(false), connectionReturn = useRef<CanvasFocus | null>(null);
   const graph = state.graph;
@@ -106,6 +101,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const nameOf = (node: GraphNode) => names.get(node.id)!;
   const labelOf = (id: string, node?: GraphNode) => portLabel(id, node, graph, index);
   const selected = effectiveFocus ? index.nodes.get(effectiveFocus.nodeId) : undefined;
+  useEffect(() => { if (peek && selected?.id !== peek.nodeId) setPeek(undefined); }, [selected?.id, peek]);
   const ordered = useMemo(() => orderedNodes(graph, index), [graph, index]);
   const navigationOrder = useRef(ordered), previousModels = useRef<ReadonlyMap<string, BlockPresentation>>(undefined);
   const models = useMemo(() => presentBlocks(graph, index, names, host.data.sources, previousModels.current), [graph, index, names, host.data.sources]);
@@ -115,11 +111,14 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const detached = useMemo(() => detachedNodes(graph, index), [graph, index]);
   const dirty = graph !== baseline.current;
   const focus = useCallback((target: CanvasFocus) => {
+    if (draftRef.current?.dirty && draftRef.current.nodeId !== target.nodeId) { setPendingSelection(target); return false; }
+    if (draftRef.current && draftRef.current.nodeId !== target.nodeId) { setDraft(undefined); draftRef.current = undefined; }
     lastSelection.current = target.nodeId;
     if (selectedNodeId !== target.nodeId) onSelectionChange?.(target.nodeId);
     setState(held => ({ ...held, focus: target }));
     if (target.portId !== undefined) setEntered(target.nodeId);
     restore.current = true;
+    return true;
   }, [selectedNodeId, onSelectionChange]);
   const send = useCallback((command: EditCommand, origin?: CanvasFocus) => {
     notification.current.reason = command.type;
@@ -129,6 +128,31 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     if (origin?.portId) setEntered(origin.nodeId);
     if (command.type === 'add' || command.type === 'combine') setPanel(null);
   }, []);
+  const cancelDraft = (restoreFocus = true) => {
+    const location = draftRef.current?.location;
+    setDraft(undefined); draftRef.current = undefined;
+    if (restoreFocus) requestAnimationFrame(() => {
+      if (location === 'inspector') document.querySelector<HTMLInputElement>('.w2-canvas-inspector .w2-canvas-annotation input')?.focus();
+      else annotationOrigin.current?.focus();
+    });
+  };
+  const applyDraft = (restoreFocus = true) => {
+    const held = draftRef.current;
+    if (!held) { setMessage('Block details updated.'); return true; }
+    const error = held.error ?? annotationError(held.label, held.note);
+    if (error) { setDraft({ ...held, error }); return false; }
+    send({ type: 'annotate', nodeId: held.nodeId, label: held.label, note: held.note });
+    cancelDraft(restoreFocus);
+    return true;
+  };
+  const annotationEditor = (node: GraphNode, location: AnnotationDraft['location']) => <AnnotationEditor node={node} draft={draft?.nodeId === node.id ? draft : undefined}
+    change={(label, note) => {
+      const current = { nodeId: node.id, label, note, location, error: annotationError(label, note), dirty: label !== (node.annotation?.label ?? '') || note !== (node.annotation?.note ?? '') };
+      setDraft(current); draftRef.current = current;
+    }} reject={error => {
+      const current: AnnotationDraft = { nodeId: node.id, label: draftRef.current?.label ?? node.annotation?.label ?? '', note: draftRef.current?.note ?? node.annotation?.note ?? '', location, dirty: true, error };
+      setDraft(current); draftRef.current = current;
+    }} apply={applyDraft} cancel={cancelDraft}/>;
   const locate = useCallback((id: string) => { setEntered(undefined); focus({ nodeId: id }); setPanel(null); }, [focus]);
   const elementFor = useCallback((target: CanvasFocus) => refs.current.get(focusKey(target)), []);
   useLayoutEffect(() => {
@@ -138,14 +162,47 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     element?.focus(); element?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [state, view, entered, panel, connection, deleting, leaving, phone]);
   const positions = graph.nodes.map(node => node.id === moving?.nodeId ? { x: moving.x, y: moving.y } : node.position ?? { x: 24, y: 24 });
-  const width = Math.max(900, ...positions.map(position => position.x + 300)), height = Math.max(600, ...graph.nodes.map((node, index) => positions[index].y + 140 + (node.inputs.length + node.outputs.length) * 44));
+  const offsetX = 48 - Math.min(0, ...positions.map(position => position.x)), offsetY = 48 - Math.min(0, ...positions.map(position => position.y));
+  const width = Math.max(400, ...positions.map((position, i) => position.x + offsetX + (sizes.get(graph.nodes[i].id)?.width ?? 190) + 48));
+  const height = Math.max(300, ...graph.nodes.map((node, i) => positions[i].y + offsetY + (sizes.get(node.id)?.height ?? 140 + (node.inputs.length + node.outputs.length) * 44) + 144));
   const visible = useMemo(() => new Set(ordered.filter(node => {
     const position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
     return !windowed || node.id === selected?.id || node.id === entered
-      || intersectsWindow(canvasWindow, position.x, position.y, position.x + 190, position.y + 140 + (node.inputs.length + node.outputs.length) * 44);
-  }).map(node => node.id)), [windowed, canvasWindow, ordered, moving, selected?.id, entered]);
+      || intersectsWindow(canvasWindow, position.x + offsetX, position.y + offsetY, position.x + offsetX + 190, position.y + offsetY + 140 + (node.inputs.length + node.outputs.length) * 44);
+  }).map(node => node.id)), [windowed, canvasWindow, ordered, moving, selected?.id, entered, offsetX, offsetY]);
   const visibleKey = [...visible].join('\0');
-  const wireGeometry = useMemo(() => ({ ports: new Map<string, { x: number; y: number }>(), measured: new Set<string>() }), [layoutKey, moving, view, zoom, phone, host.observations]);
+  const wireGeometry = useMemo(() => ({ ports: new Map<string, { x: number; y: number }>(), measured: new Set<string>() }), [layoutKey, moving, view, zoom, phone, host.observations, entered, draft, sizes, offsetX, offsetY]);
+  const readMeasurements = useCallback(() => {
+    const measured = new Map<string, TidyMeasure>();
+    for (const card of board.current?.querySelectorAll<HTMLElement>('.w2-canvas-node') ?? []) {
+      const rect = card.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      const ports: Record<string, { direction: 'input' | 'output'; y: number }> = {};
+      for (const port of card.querySelectorAll<HTMLElement>('[data-port-id]')) {
+        const bounds = port.getBoundingClientRect(), direction = port.dataset.direction;
+        if (direction === 'input' || direction === 'output') ports[port.dataset.portId!] = { direction, y: (bounds.top + bounds.height / 2 - rect.top) / (view === 'graph' ? zoom : 1) };
+      }
+      measured.set(card.dataset.nodeId!, { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1), ports });
+    }
+    return measured;
+  }, [zoom, view]);
+  useLayoutEffect(() => {
+    if (view !== 'graph') return;
+    const measure = () => {
+      const measured = readMeasurements();
+      setSizes(held => {
+        const next = new Map([...held, ...measured]);
+        return [...next].every(([id, value]) => {
+          const previous = held.get(id);
+          return previous?.width === value.width && previous.height === value.height;
+        }) && next.size === held.size ? held : next;
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    board.current?.querySelectorAll('.w2-canvas-node').forEach(card => observer.observe(card));
+    return () => observer.disconnect();
+  }, [readMeasurements, view, layoutKey, entered, draft, visibleKey]);
   // Payload-only revisions retain both the block models and measured wire geometry.
   useLayoutEffect(() => {
     if (view !== 'graph' || !board.current) return;
@@ -166,7 +223,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
         }
         const node = index.nodes.get(socket.nodeId)!, model = models.get(node.id)!, position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
         const row = model.ports.findIndex(port => port.port.id === socket.portId && port.direction === direction);
-        const point = { x: position.x + (direction === 'output' ? 190 : 0), y: position.y + 40 + (model.detail ? 24 : 0) + (row + .5) * (phone ? 44 : 29) };
+        const point = { x: position.x + offsetX + (direction === 'output' ? 190 : 0), y: position.y + offsetY + 48 + (model.detail ? 24 : 0) + (row + .5) * (phone ? 44 : 29) };
         ports.set(key, point);
         return point;
       };
@@ -185,11 +242,13 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const close = () => { onClose(); returnFocus?.focus(); };
   const apply = async () => {
     if (!result.ok || detached.length || busy) return;
+    if (draftRef.current?.dirty) { setMessage('Apply or cancel the block details before applying the canvas to the draft.'); return; }
     setBusy(true);
     try {
       const transaction = { revision: snapshot.current.revision, label: `Edit ${title}`, replacements: result.replacements, generatedSources: result.generatedSources, generatedLibrary: result.generatedLibrary };
       const written = onApply ? await onApply(transaction, {
-        graph, positions: Object.fromEntries(graph.nodes.map(node => [node.id, node.position ?? { x: 24, y: 24 }])), sourceMap: result.sourceMap,
+        graph, positions: Object.fromEntries(graph.nodes.map(node => [node.id, node.position ?? { x: 24, y: 24 }])),
+        annotations: Object.fromEntries(graph.nodes.flatMap(node => node.annotation ? [[node.id, node.annotation]] : [])), sourceMap: result.sourceMap,
       }) : await host.apply(transaction);
       if (written.status === 'conflict') {
         host.compareConflict(snapshot.current, written.remote); setMessage('Conflict: canvas edits are preserved. Compare with the remote revision before trying again.');
@@ -247,17 +306,31 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const actions = useMemo<BlockActions>(() => ({
     register: target => element => { if (element) refs.current.set(focusKey(target), element); else refs.current.delete(focusKey(target)); },
     remember: target => {
+      if (draftRef.current?.dirty && draftRef.current.nodeId !== target.nodeId) { setPendingSelection(target); return; }
+      if (draftRef.current && draftRef.current.nodeId !== target.nodeId) { setDraft(undefined); draftRef.current = undefined; }
       lastSelection.current = target.nodeId;
       if (selectedNodeId !== target.nodeId) onSelectionChange?.(target.nodeId);
       setState(held => held.focus?.nodeId === target.nodeId && held.focus?.portId === target.portId && held.focus?.direction === target.direction ? held : { ...held, focus: target });
     },
     reveal: node => locate(node.id),
-    select: node => { focus({ nodeId: node.id }); setEntered(node.id); setPanel('inspector'); },
+    select: node => { if (focus({ nodeId: node.id })) setEntered(node.id); },
+    peek: (node, keyboard) => {
+      if (!focus({ nodeId: node.id })) return;
+      setEntered(node.id); if (phone) setPanel(null);
+      setPeek({ nodeId: node.id, keyboard });
+    },
+    annotate: node => {
+      setPeek(undefined); setPanel(null);
+      annotationOrigin.current = document.activeElement as HTMLElement;
+      const current: AnnotationDraft = { nodeId: node.id, label: node.annotation?.label ?? '', note: node.annotation?.note ?? '', location: 'inline' };
+      setDraft(current); draftRef.current = current;
+      requestAnimationFrame(() => elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
+    },
     headerKeys, nodeKeys, move: beginMove,
     connect: request => { connectionReturn.current = { ...request.socket, direction: request.direction }; setConnection(request); },
     disconnect: edgeId => send({ type: 'disconnect', edgeId }),
-    inspect: () => setPanel('inspector'), remove: setDeleting,
-  }), [focus, headerKeys, nodeKeys, beginMove, send, locate, selectedNodeId, onSelectionChange]);
+    inspect: () => { if (phone) setPeek(undefined); setPanel('inspector'); }, remove: setDeleting,
+  }), [focus, headerKeys, nodeKeys, beginMove, send, locate, selectedNodeId, onSelectionChange, phone, elementFor]);
   const add = (entry: BlockCatalogEntry) => {
     const seed = blockSeed(entry, host.data.sources[0]?.id), scopeId = selected?.scopeId ?? graph.scopes[0]?.id;
     if (seed && scopeId) send({ type: 'add', seed, scopeId });
@@ -269,12 +342,12 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   };
   const fit = (selection: boolean) => {
     if (selection && selected) { setZoom(1); requestAnimationFrame(() => elementFor({ nodeId: selected.id })?.scrollIntoView({ block: 'center', inline: 'center' })); }
-    else { setZoom(Math.max(.25, Math.min(1, (viewport.current?.clientWidth ?? width) / width))); viewport.current?.scrollTo(0, 0); }
+    else { setZoom(Math.min(1, (viewport.current?.clientWidth || width) / width, (viewport.current?.clientHeight || height) / height)); viewport.current?.scrollTo(0, 0); }
   };
   const problemCount = (result.ok ? 0 : result.errors.length) + detached.length;
   const closePanel = () => { setPanel(null); if (panel === 'palette') addButton.current?.focus(); else if (selected) focus({ nodeId: selected.id }); };
   const palette = <Palette graph={graph} index={index} locate={locate} scope={graph.scopes.find(scope => scope.id === selected?.scopeId)?.kind ?? graph.scopes[0].kind} capabilities={host.targetCapabilities} sourceId={host.data.sources[0]?.id} onAdd={add} close={closePanel}/>;
-  const inspector = selected && <Inspector key={`${selected.id}:${state.past.length}`} graph={graph} index={index} node={selected} host={host} send={send} locate={locate} close={closePanel} move={() => beginMove(selected)} remove={() => { setPanel(null); setDeleting(selected); }} budgets={result.budgets} onLocate={locatePointer} outputNames={outputNames}/>;
+  const inspector = selected && <Inspector key={`${selected.id}:${state.past.length}`} graph={graph} index={index} node={selected} host={host} send={send} locate={locate} close={closePanel} move={() => beginMove(selected)} remove={() => { setPanel(null); setDeleting(selected); }} budgets={result.budgets} onLocate={locatePointer} outputNames={outputNames} annotationEditor={annotationEditor(selected, 'inspector')}/>;
   return <div className="w2-canvas" style={{ ...theme.variables, ...canvasTheme(theme), colorScheme: theme.dark ? 'dark' : 'light' } as CSSProperties} data-panel={panel ?? 'none'} data-dark={theme.dark || undefined}
     onKeyDown={event => {
       if (editable(event.target)) return;
@@ -282,12 +355,12 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     }}>
     <header className="w2-canvas-header"><div><small>Flows <ChevronRight size={12} aria-hidden/> Canvas</small><h1>{title}</h1></div>
       <span className="w2-canvas-caption">Configuration only · No device actions</span>
-      <button type="button" aria-label="Close canvas" onClick={() => dirty ? setLeaving(true) : close()}><X size={18}/></button></header>
+      <button type="button" aria-label="Close canvas" onClick={() => draftRef.current?.dirty ? setPendingClose(true) : dirty ? setLeaving(true) : close()}><X size={18}/></button></header>
     <nav className="w2-canvas-toolbar" aria-label="Canvas controls">
       <div className="w2-canvas-segment"><button type="button" aria-label="Graph" aria-pressed={view === 'graph'} onClick={() => { setView('graph'); restore.current = true; }}><GitBranch size={16}/><span className="w2-canvas-toolbar-label">Graph</span></button>
         <button type="button" aria-label="Outline" aria-pressed={view === 'outline'} onClick={() => { setView('outline'); restore.current = true; }}><List size={16}/><span className="w2-canvas-toolbar-label">Outline</span></button></div>
       <button type="button" ref={addButton} aria-label="Add Block" aria-expanded={panel === 'palette'} onClick={() => setPanel(panel === 'palette' ? null : 'palette')}><Plus size={16}/><span className="w2-canvas-toolbar-label">Add Block</span></button>
-      <button type="button" aria-label="Inspector" aria-expanded={panel === 'inspector'} onClick={() => setPanel(panel === 'inspector' ? null : 'inspector')}><SlidersHorizontal size={16}/><span className="w2-canvas-toolbar-label">Inspector</span></button>
+      <button type="button" aria-label="Inspector" aria-expanded={panel === 'inspector'} onClick={() => { if (phone) setPeek(undefined); setPanel(panel === 'inspector' ? null : 'inspector'); }}><SlidersHorizontal size={16}/><span className="w2-canvas-toolbar-label">Inspector</span></button>
       <div className="w2-canvas-more">
         <button type="button" ref={moreButton} aria-label="More canvas controls" aria-expanded={more} onClick={() => setMore(!more)}><Ellipsis size={18}/></button>
         {more && <div className="w2-canvas-overflow" aria-label="More canvas controls" onKeyDown={event => { if (event.key === 'Escape') { setMore(false); moreButton.current?.focus(); } }}>
@@ -305,7 +378,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     </nav>
     <div className="w2-canvas-work">
       {!phone && panel === 'palette' && palette}
-      <main className="w2-canvas-main" aria-label="Flow canvas">
+      <main ref={main} className="w2-canvas-main" aria-label="Flow canvas">
         <p id="w2-canvas-key-help" className="w2-canvas-sr">Arrows select blocks or traverse their controls. Home and End reach the first and last blocks. Every block header remains in reading order; select an off-screen header to reveal its ports, or use Outline for all blocks and connections. Enter enters ports and actions. Escape returns to the header. Tab leaves the graph. Use Move for 8 px steps, Shift for 32 px. Delete removes a block. Control or Command Z undoes an edit.</p>
         <div className="w2-canvas-viewport" ref={viewport}>
           <div className="w2-canvas-scaled" style={view === 'graph' ? { width: width * zoom, height: height * zoom } : undefined}>
@@ -317,25 +390,35 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
                 const active = selected?.id === node.id;
                 return <CanvasBlock key={node.id} model={models.get(node.id)!} observation={host.observations?.[node.id]}
                   visible={visible.has(node.id)} position={positionInSet + 1} count={ordered.length}
-                  active={active} controls={entered === node.id} tabStop={active || !selected && ordered[0] === node} positioned={view === 'graph'} x={position?.x ?? 24} y={position?.y ?? 24} actions={actions}/>;
+                  annotationEditor={draft?.nodeId === node.id && panel !== 'inspector' ? annotationEditor(node, 'inline') : undefined}
+                  active={active} controls={entered === node.id} tabStop={active || !selected && ordered[0] === node} positioned={view === 'graph'} x={(position?.x ?? 24) + offsetX} y={(position?.y ?? 24) + offsetY} actions={actions}/>;
               })}
             </ul>
           </div>
+          {peek && selected?.id === peek.nodeId && <DataPeek key={peek.nodeId} model={models.get(peek.nodeId)!} observation={host.observations?.[peek.nodeId]} theme={theme} phone={phone}
+            anchor={elementFor({ nodeId: peek.nodeId }) ?? null} boundary={main} keyboard={peek.keyboard} close={() => setPeek(undefined)}/>}
           {view === 'outline' && <section className="w2-canvas-connections" aria-label="Connections"><h2>Connections</h2><ul aria-label="Wires">{graph.edges.map(edge => {
             const from = index.nodes.get(edge.from.nodeId)!, to = index.nodes.get(edge.to.nodeId)!, type = from.outputs.find(port => port.id === edge.from.portId)?.type.valueType;
             const observation = host.observations?.[from.id]?.outputs?.[edge.from.portId];
-            return <li key={edge.id}><button type="button" aria-label={`${nameOf(from)} Result, ${type}, to ${nameOf(to)} ${labelOf(edge.to.portId, to)}${describeObservation(observation, true)}; disconnect`} onClick={() => send({ type: 'disconnect', edgeId: edge.id }, { ...edge.to, direction: 'input' })}>{nameOf(from)} → {nameOf(to)} {labelOf(edge.to.portId, to)}{observation?.state === 'cant-tell' && <small>Can't tell</small>} <small>Disconnect</small></button>
+            return <li key={edge.id}><button type="button" aria-label={`${nameOf(from)} Result, ${type}, to ${nameOf(to)} ${labelOf(edge.to.portId, to)}${describeObservation(observation, true, from.catalogKey === 'output.rows')}; disconnect`} onClick={() => send({ type: 'disconnect', edgeId: edge.id }, { ...edge.to, direction: 'input' })}>{nameOf(from)} → {nameOf(to)} {labelOf(edge.to.portId, to)}{observation?.state === 'cant-tell' && <small>Can't tell</small>} <small>Disconnect</small></button>
               <button type="button" onClick={() => locate(from.id)}>Go to source</button><button type="button" onClick={() => locate(to.id)}>Go to destination</button></li>;
           })}</ul></section>}
         </div>
         <div className="w2-canvas-navigation" ref={navigation} aria-label="Graph navigation">
           <button type="button" aria-label="Zoom out" disabled={zoom <= .25} onClick={() => setZoom(Math.max(.25, zoom - .25))}><Minus size={16}/></button><output aria-label="Zoom">{Math.round(zoom * 100)}%</output>
           <button type="button" aria-label="Zoom in" disabled={zoom >= 2} onClick={() => setZoom(Math.min(2, zoom + .25))}><Plus size={16}/></button>
-          <button type="button" aria-label="Tidy Up" onClick={() => send({ type: 'layout', graph: arrangeCanvas(graph) })}><WandSparkles size={14}/><span className="w2-canvas-toolbar-label">Tidy Up</span></button>
+          <button type="button" aria-label="Tidy Up" onClick={event => {
+            const measured = view === 'graph' ? readMeasurements() : new Map<string, TidyMeasure>(), measure = (id: string) => measured.get(id);
+            const before = countCrossings(graph, measure), next = tidyCanvas(graph, measure), after = countCrossings(next, measure);
+            if (next !== graph) send({ type: 'layout', graph: next });
+            restore.current = false;
+            setMessage(next === graph ? 'Already tidy' : `Tidied: ${before} crossings → ${after}`);
+            event.currentTarget.focus();
+          }}><WandSparkles size={14}/><span className="w2-canvas-toolbar-label">Tidy Up</span></button>
           <button type="button" className="w2-canvas-problems-pill" ref={problemsButton} onClick={() => setProblemsOpen(true)}>{problemCount ? <AlertTriangle size={14}/> : <CircleCheck size={14}/>} {problemCount ? `${problemCount} Problems` : 'No Problems'}</button>
         </div>
       </main>
-      {!phone && (panel === 'inspector' || panel === 'palette') && inspector}
+      {!phone && panel === 'inspector' && inspector}
     </div>
     <footer className="w2-canvas-footer" data-message={Boolean(message || state.message) || undefined}><div role="status" aria-live="polite" aria-atomic="true">{message || state.message || (result.ok && !detached.length ? <><Check size={14} aria-hidden/> Compiler accepted</> : 'Complete the required connections before Apply.')}</div>
       <button type="button" disabled={busy || dirty} onClick={save}>Save draft</button><button type="button" className="w2-canvas-primary" disabled={busy || !result.ok || !!detached.length} onClick={apply}>Apply to draft</button></footer>
@@ -343,7 +426,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     {help && <Modal title="Keyboard help" theme={theme} close={() => { setHelp(false); moreButton.current?.focus(); }}><p>Arrows select blocks or traverse their controls. Enter enters ports and actions. Escape returns to the header. Tab leaves the graph.</p><p>Move: arrows 8 pixels, Shift and arrows 32. Enter commits. Escape cancels. Position also accepts numeric coordinates in the inspector.</p><p>Delete removes a block after confirmation. Control or Command Z undoes; add Shift to redo. All editing is available in Outline.</p></Modal>}
     {problemsOpen && <Modal title="Canvas problems" theme={theme} close={() => { setProblemsOpen(false); problemsButton.current?.focus(); }}>
       {!problemCount && <p>No Problems. Compiler accepted the current connections.</p>}
-      {!result.ok && <ul>{result.errors.map((error, index) => <li key={index}><button type="button" onClick={() => { setProblemsOpen(false); if (error.nodeId) locate(error.nodeId); else locatePointer(error.pointer); }}>{error.message} {error.pointer || 'Output'}</button></li>)}</ul>}
+      {!result.ok && <ul>{result.errors.map((error, i) => <li key={i}><button type="button" onClick={() => { setProblemsOpen(false); if (error.nodeId) locate(error.nodeId); else locatePointer(error.pointer); }}>{error.nodeId && names.get(error.nodeId)} {error.message} {error.pointer || 'Output'}</button></li>)}</ul>}
       {!!detached.length && <p>{detached.length} blocks are not connected to an output. Connect or delete them before Apply; nothing is silently dropped.</p>}
       {result.ok && result.diagnostics.filter(issue => issue.hint).map((issue, i) => <p key={i}>Wiring hint: {issue.message}</p>)}
     </Modal>}
@@ -355,6 +438,21 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     {leaving && <Modal title="Unsaved canvas edits" theme={theme} close={() => { setLeaving(false); if (selected) locate(selected.id); }}><p>Keep this canvas open, apply valid edits to the draft, or discard canvas edits. Apply is not Publish.</p>
       <button type="button" onClick={() => { setLeaving(false); if (selected) locate(selected.id); }}>Stay</button><button type="button" disabled={!result.ok || !!detached.length || busy} onClick={apply}>Apply valid edits</button><button type="button" onClick={close}>Discard canvas edits</button>
       {message && <p role="status">{message}</p>}</Modal>}
+    {(pendingSelection || pendingClose) && <Modal title="Unsubmitted block details" theme={theme} close={() => {
+      setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
+    }}>
+      <p>Apply or discard the block details before {pendingClose ? 'closing the canvas' : 'changing selection'}.</p>
+      <button type="button" onClick={() => { if (applyDraft(false)) {
+        const target = pendingSelection; setPendingSelection(undefined); setPendingClose(false);
+        if (target) focus(target); else setLeaving(true);
+      } }}>Apply</button>
+      <button type="button" onClick={() => {
+        cancelDraft(false); const target = pendingSelection; setPendingSelection(undefined); setPendingClose(false);
+        if (target) focus(target); else if (dirty) setLeaving(true); else close();
+      }}>Discard</button>
+      <button type="button" onClick={() => { setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus()); }}>Stay</button>
+      {draft?.error && <p role="alert">{draft.error}</p>}
+    </Modal>}
   </div>;
 }
 

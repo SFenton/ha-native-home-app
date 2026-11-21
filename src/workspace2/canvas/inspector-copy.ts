@@ -1,6 +1,7 @@
 import type { CanvasHost, GraphNode, LogicGraph } from '../../shared/composition/graph';
 import { blockFields, nodeDetail, nodeName, portLabel } from './blocks';
 import type { CanvasGraphIndex } from './graph-index';
+import { formatValue } from './value-format';
 
 type Sources = CanvasHost['data']['sources'];
 const comparisons: Readonly<Record<string, string>> = { eq: 'is', ne: 'is not', above: 'is above', below: 'is below', before: 'is before', after: 'is after' };
@@ -9,7 +10,7 @@ export function branchLabel(node: GraphNode, graph: LogicGraph, index: CanvasGra
   const value = blockFields(node.payload.value);
   const term = (binding: string) => {
     const source = index.source(node.id, binding), data = blockFields(source?.payload.value);
-    return data?.type === 'literal' ? JSON.stringify(data.value) : source ? nodeName(source, graph, index) : 'unconnected value';
+    return data?.type === 'literal' && data.value !== undefined ? formatValue(data.value) : source ? nodeName(source, graph, index) : 'unconnected value';
   };
   if (value) {
     if (value.type === 'not') {
