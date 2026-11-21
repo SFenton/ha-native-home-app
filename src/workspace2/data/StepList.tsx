@@ -57,7 +57,7 @@ export default function StepList({ flowId, inputs }: { flowId: string; inputs: P
     <Menu.Root>
       <Menu.Trigger className="w2-expr-add w2-data-addstep" disabled={full || fit.length === 0} aria-describedby={full ? 'w2-step-limit' : undefined}><Plus size={14} aria-hidden/>Add Step</Menu.Trigger>
       <Menu.Portal><Menu.Positioner sideOffset={4} align="start" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu" aria-label="Add a step">
-        {fit.map(op => <Menu.Item key={op} className="w2-menu-item" onClick={() => add(op)}>{stepNames[op]}{op === 'average' ? ' · Needs a newer app' : ''}</Menu.Item>)}
+        {fit.map(op => <Menu.Item key={op} className="w2-menu-item" onClick={() => add(op)}>{stepNames[op]}</Menu.Item>)}
       </Menu.Popup></Menu.Positioner></Menu.Portal>
     </Menu.Root>
     {full && <p id="w2-step-limit" className="w2-caption">{flowLimits.steps.words}</p>}

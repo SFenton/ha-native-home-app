@@ -4,7 +4,7 @@
  *
  *   tsx scripts/generate-fold-sides-corpus.ts   # rewrites contract/corpus/{accept,reject}/{pending-,}fold-sides-*.json and their index entries
  *
- * Accepted cases are `reject/pending-fold-sides-*` (the Studio compiles them, the shipped list refuses them first, `contract/corpus/README.md`, Pending cases);
+ * Accepted cases are `accept/fold-sides-*` (the id is shipped, so the Studio compiles them and the app's list accepts them, `contract/corpus/README.md`, Promotion);
  * refusals are `reject/fold-sides-*` with the Studio's first issue written here by hand. A document with none of the fields needs no id and is an ordinary accept.
  * Demo ids only. The automatic rule these documents rely on is `src/shared/composition/fold-sides.ts` (decision D1 of `studio-duo-sim`); `tests/fold-sides.test.ts` pins its answers.
  */

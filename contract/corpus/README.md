@@ -10,7 +10,7 @@ Both repositories carry this directory byte for byte; change it in one and copy 
 - `index.json`: every file once, its expected outcome and a note. A few older entries still carry a `houseScripts` list;
   it is ignored now that the app accepts any script (no house document is needed).
 - `capabilities.pending.json`: Studio-owned, sorted. Capabilities the Studio compiles and the corpus exercises that the app does not list
-  yet. Shipped and pending are disjoint and the Studio's supported list is their union. Twenty ids were promoted after verification against native-home main and `ios/v2611.18.09`; the original remaining nine are unchanged, with the new pending `sh.flow-average@1` and `sh.text-keep@1` beside them. When the app ships a capability, one app change
+  yet. Shipped and pending are disjoint and the Studio's supported list is their union. Twenty ids were promoted after verification against native-home main and `ios/v2611.18.09`; the original remaining nine are unchanged. `sh.flow-average@1`, `sh.text-keep@1` and `sh.state-style-glyph-tint@1` (shipped in `ios/v2611.19.09`) and `sh.fold-sides@1` are promoted to `capabilities.json`. When the app ships a capability, one app change
   adds it to its list, regenerates `capabilities.json`, moves its `pending-*` cases from `reject/` to `accept/` with the real expectation
   and drops it from this file.
 - `capabilities.json`: the capability strings the app compiler supports, sorted, generated from
@@ -86,7 +86,7 @@ the `compare`, `in` and `exists` leaves and reads of any model source (`sh.condi
 
 The `enabled-when-`, `tile-look-`, `bound-color-`, `bound-symbol-`, `text-fallback-`, `badge-`, `action-rules-`, `confirm-when-`, `tab-fallback-`, `list-parts-` and `date-format-` files (and their `pending-` twins) cover the lane L-asks ids (`sh.enabled-when@1`, `sh.tile-look@1`, `sh.rules@1` colors and symbols, `sh.badges@1`, `sh.action-rules@1`, `sh.confirm-when@1`, `sh.tab-fallback@1`, `sh.list-parts@1`, and the date format under `sh.pipeline-operands@1`). They are written by `scripts/asks-corpus.ts` through the same generator. Evaluation cases name a subject kind (`operand`, `condition`, `fill`, `symbol`, `text`, `badge`, `enabled`, `faces`, `action`, `asks`) with its answer.
 
-The `text-keep-*` cases add pending `sh.text-keep@1`: `read` and `expr` accept
+The `text-keep-*` cases cover shipped `sh.text-keep@1`: `read` and `expr` accept
 `whenUnavailable: "fallback" | "keep"`, reject unknown policies and require the
 capability when either policy is written. Keep uses the last answered text,
 never a fallback as an answer; before any answer it still draws the fallback.
@@ -102,7 +102,7 @@ splits at `_` and at a space, capitalizes an ASCII first letter, keeps empty par
 `solid-appearance { light, dark }` under `sh.solid-appearance@1` (shipped), in a glyph, a fill, a rule case, a bound colour's fallback, a room card colour and a state style fill. Both are written
 by `scripts/grammar2-corpus.ts` through the same generator. Two older refusals (`bound-color-glyph-standard-fallback`, `state-style-fills-fill-standard`) stay plain rejects but were re-pinned: widening a slot to take a pair changed their first issue from `missing_required` at `.../blue` to `unknown_variant` at `.../type` (a native promotion item).
 
-The `fold-sides-` files (22 cases, written by `scripts/generate-fold-sides-corpus.ts`) cover `sh.fold-sides@1`: nine accepted as `reject/pending-fold-sides-*`, twelve refused as `reject/fold-sides-*`, and `accept/fold-sides-no-fields-needs-no-id.json`, the page with neither field, which needs no id. Twelve `evaluation/fold-sides-*` cases (subject `foldsides`) pin each section's side and width.
+The `fold-sides-` files (22 cases, written by `scripts/generate-fold-sides-corpus.ts`) cover `sh.fold-sides@1`: nine accepted as `accept/fold-sides-*`, twelve refused as `reject/fold-sides-*`, and `accept/fold-sides-no-fields-needs-no-id.json`, the page with neither field, which needs no id. Twelve `evaluation/fold-sides-*` cases (subject `foldsides`) pin each section's side and width.
 The `tile-ink-` files (and their `pending-` twins) cover `sh.tile-ink@1` (TC5, shipped): a state tile's `glyphTint` and `discGlyphTint` (each a `solid-rgb` or a `solid-appearance`
 pair, so a pair also declares `sh.solid-appearance@1`) a state tile's `cellFit` (`fill` or `natural`, only a state tile) and a state style rule's `fillInk` (`white` or `soft`, only beside a `fill`, which also needs `sh.state-style@1` and
 `sh.state-style-fills@1`). They are written by `scripts/grammar2-corpus.ts` through the same generator; there are no evaluation cases, since the fields only draw. No case encodes the drawing: the tint is ignored on a filled, error or unavailable face (an unavailable tile draws the default grey icon at 50%), and the corpus pins only decode and refusal.
