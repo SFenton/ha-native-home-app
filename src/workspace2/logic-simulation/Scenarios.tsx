@@ -8,16 +8,25 @@ import { sourceCaptureForNode } from './program';
 import { anchorKey, sourceKey } from './contracts';
 import { capturedTime, displayValue, type ValuePresentation } from './presentation';
 import { Tag } from '../kit';
+import { nodeValueOptions } from '../canvas/value-format';
 
-export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, selectedId, savedVersionDiffers, run, results, inputNodes, blockLabel, outputLabel, outputKeys, onSelect, onCapture, onCreate, onRunAll, onEdit, onDelete, blocked, children }: {
+export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, timeZone, selectedId, savedVersionDiffers, run, results, inputNodes, blockLabel, outputLabel, outputKeys, onSelect, onCapture, onCreate, onRunAll, onEdit, onDelete, blocked, children }: {
   open: boolean; onClose: () => void; program: SimulationProgram; scenarios: readonly SimulationCase[]; snapshot: HeldSnapshot;
   selectedId: string; savedVersionDiffers: boolean; run: SimulationRun; results: readonly ScenarioResult[]; inputNodes: readonly GraphNode[];
   blockLabel: (node: GraphNode) => ValuePresentation; outputLabel: (index: number) => ValuePresentation;
   outputKeys?: readonly string[];
+  timeZone?: string;
   onSelect: (id: string) => void; onCapture: () => void; onCreate: () => void; onRunAll: () => void;
   onEdit: (scenario: SimulationCase) => void; onDelete: (scenario: SimulationCase) => void; blocked: boolean; children?: ReactNode;
 }) {
   const outputs = program.roots.map((root, index) => ({ root, index })).filter(({ root }) => !outputKeys || outputKeys.includes(anchorKey(root.anchor)));
+  const optionsFor = (scenario?: SimulationCase, node?: GraphNode) => ({
+    clock: scenario?.clock ?? scenario?.base.clock ?? snapshot.base.clock, timeZone, ...(node ? nodeValueOptions(node) : {}),
+  });
+  const outputValue = (result: SimulationResult | undefined, index: number, scenario?: SimulationCase) => {
+    const graph = program.roots[index].graph, node = graph.nodes.find(node => node.id === graph.roots[0].nodeId);
+    return displayValue(result, outputLabel(index), undefined, optionsFor(scenario, node));
+  };
   const inputValue = (node: GraphNode, scenario?: SimulationCase) => {
     const source = sourceCaptureForNode(node, program);
     if (!source) return { text: 'Not captured', pinned: false };
@@ -25,7 +34,7 @@ export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, s
     const captured = (scenario?.base ?? snapshot.base).reads.find(read => sourceKey(read) === sourceKey(source));
     const result: SimulationResult | undefined = pin?.kind === 'source' ? { kind: 'operand', answer: pin.answer }
       : captured ? { kind: 'operand', answer: captured.answer } : undefined;
-    return { text: displayValue(result, blockLabel(node)), pinned: Boolean(pin) };
+    return { text: displayValue(result, blockLabel(node), undefined, optionsFor(scenario, node)), pinned: Boolean(pin) };
   };
   return <Drawer.Root open={open} onOpenChange={next => { if (!next) onClose(); }} modal={false}>
     <Drawer.Portal><Drawer.Viewport className="w2-sim-scenarios-viewport">
@@ -49,17 +58,17 @@ export function ScenariosDrawer({ open, onClose, program, scenarios, snapshot, s
               <tbody>
                 <tr aria-selected={!selectedId}><th scope="row"><button type="button" onClick={() => onSelect('')}>Live now</button></th>
                   {inputNodes.map(node => <td key={node.id} className="w2-sim-live-value">{inputValue(node).text}</td>)}
-                  {outputs.map(({ root, index }) => <td key={anchorKey(root.anchor)}>{!selectedId ? displayValue(run.outputs[index]?.result, outputLabel(index)) : 'Not run'}</td>)}
+                  {outputs.map(({ root, index }) => <td key={anchorKey(root.anchor)}>{!selectedId ? outputValue(run.outputs[index]?.result, index) : 'Not run'}</td>)}
                   <td>—</td><td /></tr>
                 {scenarios.map(scenario => {
                   const result = results.find(result => result.id === scenario.id);
                   const mismatch = result?.outputs.filter(output => output.status === 'Failed');
                   const failed = mismatch?.find(output => output.expected?.kind === 'operand') ?? mismatch?.[0];
-                  const failure = failed?.expected ? displayValue(failed.expected) : undefined;
+                  const failure = failed?.expected ? displayValue(failed.expected, undefined, undefined, optionsFor(scenario)) : undefined;
                   return <tr key={scenario.id} aria-selected={selectedId === scenario.id}>
                     <th scope="row"><button type="button" aria-label={`Use scenario ${scenario.name}`} onClick={() => onSelect(scenario.id)} title={`Captured ${capturedTime(scenario.capturedAt)}`}>{scenario.name}</button></th>
                     {inputNodes.map(node => { const value = inputValue(node, scenario); return <td key={node.id} className={value.pinned ? 'w2-sim-pinned-value' : 'w2-sim-live-value'} title={value.pinned ? 'Pinned by the scenario' : 'Live at capture'}>{value.text}</td>; })}
-                    {outputs.map(({ root, index }) => <td key={anchorKey(root.anchor)}>{displayValue(result?.outputs[index]?.actual.result ?? (selectedId === scenario.id && !savedVersionDiffers ? run.outputs[index]?.result : undefined), outputLabel(index))}</td>)}
+                    {outputs.map(({ root, index }) => <td key={anchorKey(root.anchor)}>{outputValue(result?.outputs[index]?.actual.result ?? (selectedId === scenario.id && !savedVersionDiffers ? run.outputs[index]?.result : undefined), index, scenario)}</td>)}
                     <td aria-label={`${scenario.name}: ${result?.status ?? 'Not run'}`}>
                       {!scenario.expected.length ? '—' : !result ? <Tag>Not run</Tag> : <Tag tone={result.status === 'Passed' ? 'success' : result.status === 'Failed' ? 'error' : 'neutral'}>
                         {result.status === 'Passed' ? '✓ Matches' : result.status === 'Failed' ? `✗ Expected ${failure ?? 'a different result'}` : 'Incomplete'}

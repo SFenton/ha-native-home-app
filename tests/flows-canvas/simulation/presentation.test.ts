@@ -55,14 +55,22 @@ describe('human-readable simulation and canvas observation seam', () => {
     expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe('Yes');
     expect(run.outputs[0].result).toEqual({ kind: 'condition', answer: 'yes' });
   });
-  it.each([
-    [25, { name: 'Bedroom', unit: '°C' }, '25.0 °C'],
-    ['2026-11-18', { name: 'Today', format: 'date' as const }, 'Nov 18, 2026'],
-  ])('preserves unit and date presentation for observed value %s', (value, presentation, expected) => {
-    const graph = lift({ type: 'literal', value }, { kind: 'operand' }).graph;
+  it('preserves unit presentation for observed numbers', () => {
+    const graph = lift({ type: 'literal', value: 25 }, { kind: 'operand' }).graph;
     const program = createSimulationProgram([graph]), run = runSimulation(program, simulationFixture().held);
     const observation = canvasObservations(program, run);
-    expect(displayValue(run.outputs[0].result, presentation, observation.results?.[graph.roots[0].nodeId])).toBe(expected);
+    expect(displayValue(run.outputs[0].result, { name: 'Bedroom', unit: '°C' }, observation.results?.[graph.roots[0].nodeId])).toBe('25.0 °C');
+  });
+  it('presents the typed clock date against the simulation clock while keeping literal Text exact', () => {
+    const held = simulationFixture().held;
+    const graph = lift({ type: 'clock', part: 'today' }, { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph]), run = runSimulation(program, held);
+    const observation = canvasObservations(program, run, { clock: held.base.clock });
+    expect(displayValue(run.outputs[0].result, { name: 'Today', format: 'date' }, observation.results?.[graph.roots[0].nodeId])).toBe('Today');
+    const literal = lift({ type: 'literal', value: '2026-11-18' }, { kind: 'operand' }).graph;
+    const literalProgram = createSimulationProgram([literal]), literalRun = runSimulation(literalProgram, held);
+    const literalObservation = canvasObservations(literalProgram, literalRun, { clock: held.base.clock });
+    expect(displayValue(literalRun.outputs[0].result, { name: 'Text' }, literalObservation.results?.[literal.roots[0].nodeId])).toBe('2026-11-18');
   });
   it('formats units, unknowns, local clock and change times without IDs or ISO timestamps', () => {
     expect(displayValue({ kind: 'operand', answer: { status: 'value', value: 25 } }, { name: 'Bedroom', unit: '°C' })).toBe('25.0 °C');

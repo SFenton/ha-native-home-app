@@ -55,11 +55,12 @@ for (const empty of [true, false]) test(`todo per-item values with ${empty ? 'no
   await page.getByRole('textbox', { name: 'Label', exact: true }).fill('Keep overdue tasks');
   await page.getByRole('button', { name: 'Apply details', exact: true }).click();
   const today = page.locator('.w2-canvas-node').filter({ has: page.locator('.w2-canvas-node-title strong', { hasText: /^Today$/ }) }).first();
-  await expect(today.locator('[data-direction=output] .w2-canvas-port-value')).toHaveText('2026-11-21');
+  await expect(today.locator('[data-direction=output] .w2-canvas-port-value')).toHaveText('Today');
   await today.getByRole('button', { name: 'Show data peek for Today', exact: true }).click();
   let peek = page.getByRole('dialog', { name: isPhone(page) ? 'Data peek: Today' : 'Today', exact: true });
   await expect(peek.getByText('Result', { exact: true })).toHaveCount(1);
-  await expect(peek.getByText('2026-11-21', { exact: true })).toBeVisible();
+  await expect(peek.locator('.w2-canvas-value')).toHaveText('Today');
+  await expect(peek.locator('.w2-canvas-value')).toHaveAttribute('title', 'Today (2026-11-21)');
   await expect(peek.getByText('Live', { exact: true })).toBeVisible();
   await expect(peek).not.toContainText('Not observed');
   await closePeek(page);
@@ -67,8 +68,8 @@ for (const empty of [true, false]) test(`todo per-item values with ${empty ? 'no
   await dependent.click();
   peek = page.getByRole('dialog', { name: isPhone(page) ? 'Data peek: This Item' : 'This Item', exact: true });
   const chip = page.locator('.w2-canvas-node[data-selected] [data-direction=output] .w2-canvas-port-value');
-  const expected = empty ? "Didn't run: no items reached Keep overdue tasks" : 'needs_action';
-  await expect(chip).toHaveText(empty ? 'No items' : 'needs_action');
+  const expected = empty ? "Didn't run: no items reached Keep overdue tasks" : 'Needs action';
+  await expect(chip).toHaveText(empty ? 'No items' : 'Needs action');
   await expect(peek.getByText(expected, { exact: true })).toBeVisible();
   await expect(peek).not.toContainText('Not observed');
   if (!empty) {

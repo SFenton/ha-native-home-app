@@ -18,7 +18,8 @@ export function canvasPortObservations(observations: SimulationObservations): Ca
       const value: PortObservation = state === 'known' && port.value !== undefined ? { source, state, value: port.result?.kind === 'condition' ? port.value === 'yes' : port.value, ...(kept ? { kept } : {}) }
         : kept && port.value !== undefined ? { source, state: state === 'unavailable' ? state : 'cant-tell', value: port.value, kept: true }
           : { source, state: state === 'unavailable' ? state : 'cant-tell' };
-      (port.direction === 'input' ? inputs : outputs)[port.portId] = { ...value, ...(port.item ? { item: port.item } : {}) };
+      (port.direction === 'input' ? inputs : outputs)[port.portId] = { ...value, ...(port.item ? { item: port.item } : {}),
+        ...(port.valueFormat ? { valueFormat: port.valueFormat } : {}) };
     }
     blocks[id] = { inputs, outputs, ...(block.pinned && block.source === 'scenario' ? { scenarioPinned: true } : {}) };
   }

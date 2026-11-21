@@ -4,7 +4,7 @@ import type { GraphJSON, GraphNode } from '../../shared/composition/graph';
 import type { DerivedTheme } from '../theme';
 import type { BlockPresentation } from './presentation';
 import type { BlockObservation, PortObservation } from './observations';
-import { formatObservation, formatValue, primaryText, sourceText } from './value-format';
+import { childValueOptions, describeValue, formatObservation, formatValue, nodeValueOptions, primaryText, sourceText, type ValueFormatOptions } from './value-format';
 import CanvasDialog from './CanvasDialog';
 import { record } from '../../shared/composition/graph/json';
 import { itemContextText } from '../logic-simulation/per-item';
@@ -12,20 +12,26 @@ import { itemContextText } from '../logic-simulation/per-item';
 function Source({ observation }: { observation?: PortObservation }) {
   return observation?.source && <small className="w2-canvas-source" data-source={observation.source}>{sourceText(observation)}</small>;
 }
-function ValueView({ observation, rows = false, full = false, output = true }: { observation?: PortObservation; rows?: boolean; full?: boolean; output?: boolean }) {
-  if (!observation || observation.state !== 'known') return <p className="w2-canvas-value" data-state={observation?.state}>{formatObservation(observation, rows, full, output)}</p>;
+function ValueView({ observation, rows = false, full = false, output = true, options = {} }: { observation?: PortObservation; rows?: boolean; full?: boolean; output?: boolean; options?: ValueFormatOptions }) {
+  options = { ...options, ...observation?.valueFormat, full };
+  if (!observation || observation.state !== 'known') return <p className="w2-canvas-value" data-state={observation?.state}
+    title={formatObservation(observation, rows, full, output, options, true)}>{formatObservation(observation, rows, full, output, options)}</p>;
   const value = observation.value;
   if (Array.isArray(value)) {
     const shown = full ? value : value.slice(0, 3), unit = rows ? 'rows' : 'items';
-    return <><p>{value.length} {unit}</p><ol className="w2-canvas-sample">{shown.map((item, index) => <li key={index}><strong>{full ? formatValue(item, { full }) : primaryText(item)}</strong>
-      {item !== null && typeof item === 'object' && !Array.isArray(item) && (item.subtitle ?? item.description) !== undefined && <small>{formatValue(item.subtitle ?? item.description)}</small>}
+    const child = childValueOptions(options);
+    return <><p>{value.length} {unit}</p><ol className="w2-canvas-sample">{shown.map((item, index) => <li key={index} title={describeValue(item, { ...child, full: true })}><strong>{full ? formatValue(item, child) : primaryText(item, child)}</strong>
+      {item !== null && typeof item === 'object' && !Array.isArray(item) && (item.subtitle ?? item.description) !== undefined && <small>{formatValue(item.subtitle ?? item.description, childValueOptions(child, item.subtitle != null ? 'subtitle' : 'description'))}</small>}
     </li>)}</ol>{shown.length < value.length && <p>+{value.length - shown.length} more {unit}</p>}</>;
   }
   if (value !== null && typeof value === 'object') {
     const fields = Object.entries(value), shown = full ? fields : fields.slice(0, 4);
-    return <><dl className="w2-canvas-value-fields">{shown.map(([key, item]) => <div key={key}><dt>{key}</dt><dd>{formatValue(item, { depth: 1, full })}</dd></div>)}</dl>{shown.length < fields.length && <p>+{fields.length - shown.length} more fields</p>}</>;
+    return <><dl className="w2-canvas-value-fields">{shown.map(([key, item]) => {
+      const child = { ...childValueOptions(options, key), depth: 1 };
+      return <div key={key}><dt>{key}</dt><dd title={describeValue(item, child)}>{formatValue(item, child)}</dd></div>;
+    })}</dl>{shown.length < fields.length && <p>+{fields.length - shown.length} more fields</p>}</>;
   }
-  return <p className={`w2-canvas-value${full ? '' : ' w2-canvas-clamp'}`}>{typeof value === 'string' && value === 'unavailable' && <small>Text: </small>}{formatValue(value)}</p>;
+  return <p className={`w2-canvas-value${full ? '' : ' w2-canvas-clamp'}`} title={describeValue(value, options)}>{typeof value === 'string' && value === 'unavailable' && <small>Text: </small>}{formatValue(value, options)}</p>;
 }
 function ObservedPorts({ model, observation, direction, full = false }: { model: BlockPresentation; observation?: BlockObservation; direction: 'input' | 'output'; full?: boolean }) {
   const ports = model.ports.filter(port => port.direction === direction);
@@ -38,7 +44,7 @@ function ObservedPorts({ model, observation, direction, full = false }: { model:
         <div className="w2-canvas-value-heading">{!singleResult && <strong>{label}</strong>}<Source observation={reading}/>{direction === 'output' && reading?.state === 'known' && reading.kept && <small>Kept</small>}</div>
         {itemContextText(reading?.item) && <small>{itemContextText(reading?.item)}</small>}
         {direction === 'input' && model.node.catalogKey === 'output.rows' && <small>Observed item</small>}
-        <ValueView observation={reading} rows={direction === 'output' && model.node.catalogKey === 'output.rows'} full={full} output={direction === 'output'}/>
+        <ValueView observation={reading} rows={direction === 'output' && model.node.catalogKey === 'output.rows'} full={full} output={direction === 'output'} options={nodeValueOptions(model.node, port.type)}/>
       </div>;
     })}
   </section>;
@@ -51,7 +57,8 @@ function Comparison({ model, captured, theme, close, returnFocus }: { model: Blo
   const result = captured?.outputs?.[model.node.outputs[0]?.id], value = result && (result.state === 'known' || result.kept) ? result.value : undefined;
   const items = Array.isArray(value) ? value : undefined;
   const columns = items ? [...new Set(items.flatMap(item => Object.keys(rowRecord(item) ?? {})))] : [];
-  const matches = items?.filter(item => (column === 'all' ? formatValue(item, { full: true }) : formatValue(rowRecord(item)?.[column] ?? null, { full: true })).toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  const options = { ...nodeValueOptions(model.node), ...result?.valueFormat, full: true }, child = childValueOptions(options);
+  const matches = items?.filter(item => (column === 'all' ? formatValue(item, child) : formatValue(rowRecord(item)?.[column] ?? null, childValueOptions(child, column))).toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   return <CanvasDialog title={`Compare ${model.name}`} theme={theme} wide focusHeading close={close} returnFocus={returnFocus}>
     <p>Captured copy of host observations. Read-only; not a pin or a shared execution trace.</p>
     {items && <div className="w2-canvas-compare-toolbar"><label>Search result rows<input type="search" value={query} onChange={event => setQuery(event.target.value)}/></label>
@@ -66,10 +73,10 @@ function Comparison({ model, captured, theme, close, returnFocus }: { model: Blo
           <tbody>{matches.map((item, i) => {
             const row = rowRecord(item);
             // A non-record item in a mixed list keeps its own observed value across the row instead of per-column blanks.
-            return <tr key={i}>{columns.length && row ? columns.map(key => <td key={key}>{row[key] === undefined ? <span aria-label="No field">—</span> : formatValue(row[key], { full: true })}</td>)
-              : <td colSpan={Math.max(1, columns.length)}>{formatValue(item, { full: true })}</td>}</tr>;
+            return <tr key={i}>{columns.length && row ? columns.map(key => <td key={key} title={row[key] === undefined ? undefined : describeValue(row[key], childValueOptions(child, key))}>{row[key] === undefined ? <span aria-label="No field">—</span> : formatValue(row[key], childValueOptions(child, key))}</td>)
+              : <td colSpan={Math.max(1, columns.length)} title={describeValue(item, child)}>{formatValue(item, child)}</td>}</tr>;
           })}</tbody>
-        </table></div>}</> : <ValueView observation={result} full/>}
+        </table></div>}</> : <ValueView observation={result} full options={options}/>}
       </section></div>
     <details className="w2-canvas-raw" onToggle={event => setRaw(event.currentTarget.open)}><summary>Raw JSON · {raw ? 'On' : 'Off'}</summary>
       {raw && <><h3>Input values</h3><pre>{JSON.stringify(Object.fromEntries(model.node.inputs.flatMap(port => {

@@ -10,7 +10,7 @@ export function branchLabel(node: GraphNode, graph: LogicGraph, index: CanvasGra
   const value = blockFields(node.payload.value);
   const term = (binding: string) => {
     const source = index.source(node.id, binding), data = blockFields(source?.payload.value);
-    return data?.type === 'literal' && data.value !== undefined ? formatValue(data.value) : source ? nodeName(source, graph, index) : 'unconnected value';
+    return data?.type === 'literal' && data.value !== undefined ? formatValue(data.value, { literal: typeof data.value === 'string' }) : source ? nodeName(source, graph, index) : 'unconnected value';
   };
   if (value) {
     if (value.type === 'not') {
