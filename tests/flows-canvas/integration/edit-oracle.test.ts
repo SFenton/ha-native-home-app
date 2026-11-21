@@ -792,6 +792,8 @@ describe('edit oracle regressions', () => {
     ['already-aliased component parameter', 2000803, 40],
     // A revision whose component binding the whole-document reconciliation re-addresses on every edit.
     ['nested operand', 2000862, 40],
+    // A compiler-accepted draft whose hidden binding names an unknown parameter: declaring its target deleted removes it.
+    ['raw draft, hidden binding with an unknown parameter', 277, 14],
   ] as const)('%s, seed %i, %i steps', (fixture, seed, steps) => {
     expect(sequence(seed, steps, fixture).disagreement).toBeUndefined();
   });
@@ -810,6 +812,17 @@ describe('edit oracle regressions', () => {
     const before = untabbedUse(), own = untabbedUse();
     expect(oracleEdit(before, rename(before))).toBe(before);
     expect(documentEdit(own, rename(own))).toBe(own);
+  });
+
+  it('removes a binding naming an unknown parameter when its target is declared deleted', () => {
+    const before = hiddenBindingDraft('missing'), own = hiddenBindingDraft('missing'), subtitle = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
+    // A rename declaring the slot that holds the binding's target deleted (as seed 277 does).
+    const edit = rename;
+    const references = { relocated: new Map([[fieldPointer(subtitle), []]]) };
+    const oracle = oracleEdit(before, edit(before), references), scoped = documentEdit(own, edit(own), references);
+    expect(oracle).not.toBe(before);
+    expect(oracle.componentLibrary![0].bindings!.map(binding => binding.param)).toEqual(['source']);
+    expect(scoped).toEqual(oracle);
   });
 
   it('lets an edit back to a descendant through on each implementation\'s own history, across a rebuilt result', () => {

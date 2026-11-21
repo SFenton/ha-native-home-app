@@ -560,9 +560,11 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       let paths: Map<object, EditorPath[]> | undefined;
       entry.bindings?.forEach((binding, bindingIndex) => {
         const key = `p:${entry.id}:${bindingIndex}`, target = componentTarget(before, entry, binding, () => paths ??= entryObjectPaths(before, entry), anchor => resolver.resolve(anchor));
-        // An already-broken binding stays in every edit's scope, so only an edit that repairs or removes it is accepted.
+        // An already-broken binding stays in every edit's scope, so only an edit that repairs or removes it is accepted (one
+        // naming an unknown parameter may still be removed by declaring its target deleted: its target is kept for that).
+        if (target !== undefined) targets.set(key, target);
         if (target === undefined || !entry.params?.some(param => param.name === binding.param)) return dependencies.add('', key);
-        targets.set(key, target); witnessed(target, key);
+        witnessed(target, key);
         if (binding.nodeId && !certifiedAt(pointerPath(target), [entry.id, entry.params?.find(param => param.name === binding.param)?.kind, binding],
           () => fixedComponentBinding(entry, binding, target))) always.add(key);
         if (!binding.nodeId) {
