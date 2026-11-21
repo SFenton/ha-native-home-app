@@ -734,10 +734,12 @@ function listDefect(value: unknown): string | undefined {
 }
 /**
  * The first non-JSON array in `after` that `before` did not already hold, or undefined. An array is held when `before`
- * holds that same object anywhere, or holds at the same path an array with the same defects.
+ * holds that same object anywhere, or holds at the same path an array with the same defects. Every placement of a fresh
+ * object is checked against its own path (an alias placed twice is judged at each place); an object `before` holds, and
+ * so everything under it, is held wherever it is placed.
  */
 function newNonJsonArray(before: unknown, after: unknown): string | undefined {
-  const held = new Set<object>(), seen = new Set<object>();
+  const held = new Set<object>(), open = new Set<object>();
   const collect = (value: unknown) => {
     if (value === null || typeof value !== 'object' || held.has(value)) return;
     held.add(value);
@@ -745,14 +747,16 @@ function newNonJsonArray(before: unknown, after: unknown): string | undefined {
   };
   collect(before);
   const visit = (value: unknown, path: EditorPath): string | undefined => {
-    if (value === null || typeof value !== 'object' || seen.has(value)) return undefined;
-    seen.add(value);
+    if (value === null || typeof value !== 'object' || held.has(value) || open.has(value)) return undefined;
     const defect = listDefect(value);
-    if (defect && !held.has(value) && listDefect(valueAt(before, path)) !== defect) return `${fieldPointer(path) || '(root)'}: ${defect}`;
-    for (const [key, child] of Object.entries(value)) {
-      const found = visit(child, [...path, Array.isArray(value) && /^(0|[1-9]\d*)$/.test(key) ? Number(key) : key]);
-      if (found) return found;
-    }
+    if (defect && listDefect(valueAt(before, path)) !== defect) return `${fieldPointer(path) || '(root)'}: ${defect}`;
+    open.add(value);
+    try {
+      for (const [key, child] of Object.entries(value)) {
+        const found = visit(child, [...path, Array.isArray(value) && /^(0|[1-9]\d*)$/.test(key) ? Number(key) : key]);
+        if (found) return found;
+      }
+    } finally { open.delete(value); }
     return undefined;
   };
   return visit(after, []);
@@ -1133,6 +1137,14 @@ describe('edit oracle regressions', () => {
     for (const edit of [renamed, copied]) expect(compare(before, edit, { kind: 'result', document: edit }, run(() => oracleEdit(before, edit)))).toBeUndefined();
     const worse = replaceAt(renamed, at, defective({ alias: 'held', other: 'new' }));
     expect(compare(before, worse, { kind: 'result', document: worse }, run(() => oracleEdit(before, worse)))).toMatch(/^scoped accepts a non-JSON array \(\/studioCanvas\/canvases: /);
+    // A fresh copy with the held defects, placed both at the held path (where it is exempt) and at a new one: each placement
+    // is judged at its own path, whichever is visited first.
+    const fresh = defective({ alias: 'held' }), { studioCanvas: held, assets: _assets, ...rest } = before, studioCanvas = held as object;
+    for (const aliased of [{ studioCanvas: { ...studioCanvas, canvases: fresh }, ...rest, assets: fresh }, { assets: fresh, ...rest, studioCanvas: { ...studioCanvas, canvases: fresh } }] as unknown as Doc[]) {
+      const oracleOutcome = run(() => oracleEdit(before, aliased));
+      expect(compare(before, aliased, { kind: 'result', document: aliased }, oracleOutcome)).toMatch(/^scoped accepts a non-JSON array \(\/assets: /);
+      expect(compare(before, aliased, run(() => documentEdit(before, aliased)), oracleOutcome)).toBeUndefined();
+    }
   });
 
   it('agrees with jsonList on which lists are JSON: holes and extra enumerable keys, nothing more', () => {
