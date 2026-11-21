@@ -43,8 +43,11 @@ describe('block source labels', () => {
     expect(nodeDetail(reader, [], graph, indexGraph(graph))).toBe(detail);
     expect(nodeTitle(setting, graph)).toBe('Effective mode');
     expect(nodeName(setting, graph)).toBe('Effective mode, Template Setting');
-    const renamed = { ...setting, annotation: { label: 'Custom input' } };
-    expect(nodeName(renamed, graph)).toBe('Custom input, Template Setting');
+    const renamed = { ...setting, annotation: { label: 'Renamed input' } };
+    const renamedGraph = { ...graph, nodes: graph.nodes.map(node => node.id === setting.id ? renamed : node) };
+    expect(nodeTitle(renamed, renamedGraph)).toBe('Renamed input');
+    expect(nodeName(renamed, renamedGraph)).toBe('Renamed input, Template Setting');
+    expect(nodeDetail(reader, [], renamedGraph, indexGraph(renamedGraph))).toBe(detail.replace('Effective mode', 'Renamed input'));
     const disconnected = { ...graph, edges: [] };
     if (body.type === 'raw-state') expect(nodeDetail(reader, [], disconnected, indexGraph(disconnected))).toBe('Choose an entity');
   });

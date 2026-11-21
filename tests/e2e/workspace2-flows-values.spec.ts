@@ -20,7 +20,7 @@ async function openAway(page: Page) {
   if (await close.isVisible()) await close.click();
 }
 
-test('live Effective Away values are visible on open, literals are known, and the result is framed after Tidy Up', async ({ page, request }) => {
+test('held Effective Away values are visible on open, literals are known, and the result is framed after Tidy Up', async ({ page, request }) => {
   await seed(request, effectiveAwayDocument());
   const before = (await (await request.get('/native/api/draft')).json()).document;
   const errors: string[] = [];
@@ -33,7 +33,8 @@ test('live Effective Away values are visible on open, literals are known, and th
   const preview = page.getByRole('complementary', { name: 'Canvas preview', exact: true });
   const summary = preview.getByRole('region', { name: 'Result summary', exact: true });
   await expect(summary.getByLabel('Result value', { exact: true })).toHaveText('No');
-  await expect(summary.getByText('Live', { exact: true })).toBeVisible();
+  await expect(summary.getByText('Last value kept', { exact: true })).toHaveClass(/w2-tag-neutral/);
+  await expect(summary.getByText('Last known values · waiting for Home Assistant.', { exact: true })).toBeVisible();
   await expect(summary.locator('dl > div').filter({ has: page.getByText('Effective mode', { exact: true }) }).locator('dd')).toHaveText('Home');
   await expect(summary.locator('dl > div').filter({ has: page.getByText('Away fallback', { exact: true }) }).locator('dd')).toHaveText('No');
   const disclosure = preview.locator('details').filter({ has: page.getByText('Simulation · Studio only', { exact: true }) });

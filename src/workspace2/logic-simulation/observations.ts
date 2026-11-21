@@ -34,17 +34,16 @@ export interface CanvasObservations {
   readonly order: readonly string[];
   readonly truncated: boolean;
 }
-function answer(result: SimulationResult | undefined, computed = false, literal = false) {
+function answer(result: SimulationResult | undefined, sourceRead = false) {
   if (!result) return { observed: false, state: 'not-observed' as const };
   if (result.kind === 'condition') return {
     observed: true, result, value: result.answer, state: result.answer === 'unknown' ? 'cant-tell' as const : 'known' as const,
   };
   if (result.answer.status !== 'value') return { observed: true, result,
-    state: computed && result.answer.status === 'unavailable' ? 'cant-tell' as const : result.answer.status };
+    state: !sourceRead && result.answer.status === 'unavailable' ? 'cant-tell' as const : result.answer.status };
   return { observed: true, result, value: result.answer.value as Json,
-    state: !literal && result.answer.value === 'unavailable' ? 'unavailable' as const : !literal && result.answer.value === 'unknown' ? 'cant-tell' as const : 'known' as const };
+    state: sourceRead && result.answer.value === 'unavailable' ? 'unavailable' as const : sourceRead && result.answer.value === 'unknown' ? 'cant-tell' as const : 'known' as const };
 }
-const isLiteral = (node: GraphNode | undefined) => node?.payload.kind === 'operand' && node.payload.value.type === 'literal';
 
 export function formatObservedValue(observation?: ObservedValue, rows = false): string {
   if (!observation?.observed) return 'Not observed';
@@ -70,6 +69,10 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
     const source = sourceCaptureForNode(node, program);
     return source ? [sourceKey(source)] : [];
   }));
+  const readsSource = (node: GraphNode) => {
+    const source = sourceCaptureForNode(node, program);
+    return Boolean(source && !program.flows.has(source.sourceId));
+  };
   const provenance = (node: GraphNode) => {
     const sources = blockSources(program, node, pins, false, Boolean(options.clockPinned), options.liveBlocks);
     const localSources = blockSources(program, node, options.localPins ?? (options.scenario ? [] : pins), false, Boolean(options.localClockPinned ?? (!options.scenario && options.clockPinned)), options.liveBlocks);
@@ -88,7 +91,7 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
     for (const node of root.graph.nodes) {
       const events = output?.trace.events.filter(event => event.blockId === node.id) ?? [];
       const event = events.filter(event => event.output).at(-1);
-      const sourceRead = sourceCaptureForNode(node, program);
+      const sourceRead = readsSource(node);
       const isRoot = root.graph.roots.some(candidate => candidate.nodeId === node.id);
       const resolved = isRoot && root.body.kind === 'slot' ? output?.result : event?.output;
       const seed = options.previousText?.find(seed => anchorKey(seed.output) === anchorKey(root.anchor));
@@ -104,18 +107,18 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
         ...node.outputs.map(port => {
           // A single output is unambiguous. Multi-output nodes require a real matching port callback.
           const result = node.outputs.length === 1 ? resolved : events.filter(event => event.portId === port.id).at(-1)?.output;
-          return { portId: port.id, direction: 'output' as const, ...common, ...answer(result, !sourceRead, isLiteral(node)), ...(kept === undefined ? {} : { kept }) };
+          return { portId: port.id, direction: 'output' as const, ...common, ...answer(result, sourceRead), ...(kept === undefined ? {} : { kept }) };
         }),
         ...node.inputs.map(port => {
           const edge = root.graph.edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === port.id);
           const upstream = edge && root.graph.nodes.find(candidate => candidate.id === edge.from.nodeId);
           return { portId: port.id, direction: 'input' as const, ...(upstream ? provenance(upstream) : common),
             ...answer(event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result,
-              upstream ? !sourceCaptureForNode(upstream, program) : !sourceRead, isLiteral(upstream)) };
+              upstream ? readsSource(upstream) : sourceRead) };
         }),
       ];
-      blocks[node.id] = { blockId: node.id, ...common, ...answer(resolved, !sourceRead, isLiteral(node)), ...(kept === undefined ? {} : { kept }), ports };
-      if (isRoot) results[node.id] = { ...common, ...answer(output?.result, !sourceRead, isLiteral(node)), ...(kept === undefined ? {} : { kept }) };
+      blocks[node.id] = { blockId: node.id, ...common, ...answer(resolved, sourceRead), ...(kept === undefined ? {} : { kept }), ports };
+      if (isRoot) results[node.id] = { ...common, ...answer(output?.result, sourceRead), ...(kept === undefined ? {} : { kept }) };
     }
     for (const event of output?.trace.events ?? []) if (event.output && !order.includes(event.blockId)) order.push(event.blockId);
     if (root.body.kind === 'slot' && output?.result) for (const rootNode of root.graph.roots) if (!order.includes(rootNode.nodeId)) order.push(rootNode.nodeId);

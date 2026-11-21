@@ -180,7 +180,7 @@ function wiredSourceId(node: GraphNode, port: string, inline: unknown, index?: C
 }
 function wiredSettingLabel(node: GraphNode, port: string, graph?: LogicGraph, index?: CanvasGraphIndex): string | undefined {
   const wired = index?.source(node.id, port);
-  return wired ? settingLabel(wired, graph) : undefined;
+  return wired?.payload.kind === 'hole' ? nodeTitle(wired, graph, index) : undefined;
 }
 export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources'] = [], graph?: LogicGraph, index?: CanvasGraphIndex): string {
   index ??= graph ? indexGraph(graph) : undefined;
