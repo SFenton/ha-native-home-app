@@ -8,6 +8,32 @@ import { createSimulationProgram } from '../../../src/workspace2/logic-simulatio
 import { formatObservedValue } from '../../../src/workspace2/logic-simulation/observations';
 
 describe('human-readable simulation and canvas observation seam', () => {
+  it.each(['unknown', 'unavailable'])('keeps computed literal %s known on blocks, ports and the completed result', text => {
+    const formatted = { type: 'format', pattern: '{value}', args: { value: { type: 'literal', value: text } } } as const;
+    const graph = lift({ type: 'format', pattern: '{value}', args: { value: formatted } },
+      { kind: 'operand', anchor: { kind: 'logic', id: 'demo_format', field: '/body' } }).graph;
+    const program = createSimulationProgram([graph]), run = runSimulation(program, simulationFixture().held);
+    const observation = canvasObservations(program, run);
+    const inner = graph.nodes.find(node => node.catalogKey === 'operand.format.value' && node.id !== graph.roots[0].nodeId)!;
+    expect(observation.blocks[inner.id]).toMatchObject({ observed: true, state: 'known', value: text });
+    expect(observation.blocks[inner.id].ports).toContainEqual(expect.objectContaining({ direction: 'output', state: 'known', value: text }));
+    expect(observation.blocks[graph.roots[0].nodeId].ports).toContainEqual(expect.objectContaining({ direction: 'input', state: 'known', value: text }));
+    expect(observation.results?.[graph.roots[0].nodeId]).toMatchObject({ observed: true, state: 'known', value: text });
+    expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe(text);
+    expect(run.outputs[0].result).toEqual({ kind: 'operand', answer: { status: 'value', value: text } });
+  });
+  it.each(['unknown', 'unavailable'])('does not treat computed flow text %s as an HA sentinel reading', text => {
+    const graph = lift({ type: 'read', from: { type: 'source', sourceId: 'demo_flow', path: ['value'] }, as: 'string', missing: 'unavailable' },
+      { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph], { flows: [{ id: 'demo_flow', inputs: {
+      title: 'Demo text', parameters: [], request: { type: 'none', value: { type: 'literal', value: text } },
+      steps: [], output: { kind: 'scalar' }, schema: { kind: 'string' },
+    } }] });
+    const run = runSimulation(program, simulationFixture().held);
+    const observation = canvasObservations(program, run);
+    expect(observation.results?.[graph.roots[0].nodeId]).toMatchObject({ observed: true, state: 'known', value: text });
+    expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe(text);
+  });
   it.each(['unknown', 'unavailable', 'ordinary text'])('keeps literal %s known on its block and connected inputs while preserving real HA raw-state treatment', text => {
     const graph = lift({ type: 'compare', op: 'eq', left: { type: 'raw-state', sourceId: 'demo_mode' }, right: { type: 'literal', value: text } },
       { kind: 'condition', anchor: { kind: 'logic', id: 'demo_compare', field: '/body' } }).graph;

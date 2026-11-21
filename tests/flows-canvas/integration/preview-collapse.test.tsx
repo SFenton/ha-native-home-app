@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { LiveHouse } from '../../../src/preview2/live-house';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
+import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
 import { createDraft } from '../../../src/workspace2/editors/draft';
 import { LogicFieldsProvider, useLogicFields } from '../../../src/workspace2/logic-fields/LogicFields';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
@@ -12,9 +13,10 @@ import { effectiveAwayDocument, effectiveAwaySnapshot, integrationDocument, inte
 import { lift } from '../../../src/shared/composition/graph';
 import ResultSummary from '../../../src/workspace2/logic-fields/ResultSummary';
 import { createSimulationProgram } from '../../../src/workspace2/logic-simulation/program';
-import { canvasObservations } from '../../../src/workspace2/logic-simulation/observations';
+import { canvasObservations, type ObservedValue } from '../../../src/workspace2/logic-simulation/observations';
 import { captureScenario, runSimulation } from '../../../src/workspace2/logic-simulation/engine';
 import { simulationFixture } from '../simulation/fixture';
+import { previewGraph } from '../../../src/workspace2/logic-fields/lenses';
 
 const preferenceKey = 'sh-studio.canvas.preview-collapsed';
 beforeEach(() => {
@@ -27,7 +29,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function setup(document = integrationDocument(), index = 0, kind: 'operand' | 'condition' = 'operand', snapshot = integrationSnapshot) {
   const draft = createDraft(document), live = new LiveHouse();
   live.applySnapshot(snapshot.states);
-  const ws = Project.workspace(document);
+  const ws = Project.workspace(document, undefined, { extra: { houseStates: { status: 'ready', streaming: true } } });
   function Controls() {
     const fields = useLogicFields()!;
     return <button type="button" onClick={() => fields.open({
@@ -53,6 +55,80 @@ async function choose(label: string, option: string) {
 }
 function collapse() { fireEvent.click(screen.getByRole('button', { name: 'Collapse Preview' })); }
 function expand() { fireEvent.click(screen.getByRole('button', { name: 'Expand Preview' })); }
+
+it.each([
+  ['live', {}, 'Live'],
+  ['held/stale', { freshness: 'held' }, 'Last value kept'],
+  ['pinned', { source: 'pinned', pinned: true, freshness: 'held' }, 'Pinned'],
+  ['scenario', { source: 'scenario', freshness: 'captured' }, 'Scenario'],
+  ['captured live', { freshness: 'captured' }, 'Scenario'],
+  ["can't tell", { state: 'cant-tell' }, "Can't tell"],
+  ['unavailable', { state: 'unavailable' }, 'Unavailable'],
+  ['loading', { state: 'loading' }, 'Loading'],
+  ['not observed', { observed: false, state: 'not-observed' }, "Can't tell"],
+  ['mixed', { source: 'mixed', mode: 'Mixed', freshness: 'held' }, 'Mixed'],
+  ['sample', { freshness: 'sample' }, 'Demo'],
+] satisfies [string, Partial<ObservedValue>, string][])('shows a truthful %s result badge', (_name, changes, badge) => {
+  const graph = lift({ type: 'literal', value: 'Away' }, { kind: 'operand' }).graph;
+  const program = createSimulationProgram([graph]);
+  const result: ObservedValue = { observed: true, value: 'Away', source: 'live', mode: 'Live', state: 'known', freshness: 'live', pinned: false, ...changes };
+  render(<ResultSummary graph={graph} program={program} observations={{ blocks: {}, order: [], truncated: false,
+    results: { [graph.roots[0].nodeId]: result } }} blockNames={{}}/>);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  const tag = within(summary).getByText(badge, { selector: '.w2-tag' });
+  expect(tag.classList.contains('w2-tag-success')).toBe(badge === 'Live');
+  expect(tag.classList.contains('w2-tag-neutral')).toBe(badge !== 'Live');
+  expect(tag.classList.contains('pinned')).toBe(badge === 'Pinned');
+  expect(Boolean(within(summary).queryByText('Last known values · waiting for Home Assistant.'))).toBe(result.freshness === 'held');
+});
+it('keeps a retained HA result visible without marking it as a fresh live answer', () => {
+  const graph = lift({ type: 'raw-state', sourceId: 'demo_mode' }, { kind: 'operand' }).graph;
+  const program = createSimulationProgram([graph], { sourceEntities: { demo_mode: 'input_select.demo_mode' } });
+  const fixture = simulationFixture().held;
+  const held = { ...fixture, stale: true, base: { ...fixture.base,
+    reads: [{ sourceId: 'demo_mode', access: 'raw-state' as const, answer: { status: 'value' as const, value: 'Away' } }] } };
+  const run = runSimulation(program, held);
+  expect(run.outputs[0].source).toBe('Held/stale');
+  render(<ResultSummary graph={graph} program={program} observations={canvasObservations(program, run, { freshness: 'held' })} blockNames={{}}/>);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('Away');
+  expect(within(summary).getByText('Last value kept').classList.contains('w2-tag-neutral')).toBe(true);
+  expect(within(summary).queryByText('Live', { selector: '.w2-tag' })).toBeNull();
+});
+it('observes each named source setting before deduplicating readers of the same entity', () => {
+  const body = { type: 'format', pattern: '{first} / {second}', args: {
+    first: { type: 'raw-state', sourceId: { type: 'hole', name: 'first' } },
+    second: { type: 'raw-state', sourceId: { type: 'hole', name: 'second' } },
+  } };
+  const base = effectiveAwayDocument();
+  const document = compileCompositionDocument({ ...base, logicLibrary: [...base.logicLibrary ?? [], { id: 'demo_shared_source', name: 'Shared mode', kind: 'operand', params: [
+    { name: 'first', label: 'First mode', kind: 'source-id', sample: 'demo_mode' },
+    { name: 'second', label: 'Second mode', kind: 'source-id', sample: 'demo_mode' },
+  ], body }] }).document;
+  const path = ['logicLibrary', document.logicLibrary!.length - 1, 'body'];
+  const graph = lift(body, { kind: 'operand', anchor: { kind: 'logic', id: 'demo_shared_source', field: '/body' },
+    context: { document, pointer: `/logicLibrary/${document.logicLibrary!.length - 1}/body` } }).graph;
+  const program = createSimulationProgram([previewGraph(document, graph, path, { kind: 'values' })], {
+    sourceEntities: { demo_mode: 'input_select.demo_mode' },
+  });
+  const fixture = simulationFixture().held;
+  const held = { ...fixture, base: { ...fixture.base,
+    reads: [{ sourceId: 'demo_mode', access: 'raw-state' as const, answer: { status: 'value' as const, value: 'Home' } }] } };
+  const observations = canvasObservations(program, runSimulation(program, held));
+  const { rerender } = render(<ResultSummary graph={graph} program={program} observations={observations} blockNames={{}}/>);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('Home / Home');
+  expect([...summary.querySelectorAll('dl > div')].map(row => [row.querySelector('dt')?.textContent, row.querySelector('dd')?.textContent]))
+    .toEqual([['First mode', 'Home'], ['Second mode', 'Home']]);
+  const second = graph.nodes.find(node => node.payload.kind === 'hole' && node.payload.value.name === 'second')!;
+  const consumer = graph.edges.find(edge => edge.from.nodeId === second.id)!.to.nodeId;
+  const pins = [{ kind: 'output', blockId: consumer, portId: 'value', result: { kind: 'operand', answer: { status: 'value', value: 'Away' } } }] as const;
+  const pinned = canvasObservations(program, runSimulation(program, held, { pins }), { pins });
+  rerender(<ResultSummary graph={graph} program={program} observations={pinned} blockNames={{}}/>);
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('Home / Away');
+  expect([...summary.querySelectorAll('dl > div')].map(row => [row.querySelector('dt')?.textContent, row.querySelector('dd')?.textContent]))
+    .toEqual([['First mode', 'Home'], ['Second mode', 'Away']]);
+});
 
 it('shows the result, provenance and named live inputs above the controls with Simulation still collapsed', async () => {
   const { live, draft, session } = setup(effectiveAwayDocument(), 2, 'condition', effectiveAwaySnapshot);
