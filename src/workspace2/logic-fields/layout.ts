@@ -2,7 +2,7 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
 import { lift, type ASTReplacement, type LogicAnchor } from '../../shared/composition/graph';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
-import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
+import { resolveLogicAnchor, type ResolvedLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { encodeStudioCanvas, readStudioCanvas, type CanvasLayoutInput } from '../../shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
 import type { CanvasLayoutHandoff } from '../canvas/FlowCanvas';
@@ -221,6 +221,38 @@ export function uncertifiedCanvasRoots(document: CompositionDocument, stored: St
     }
   }
   return failed;
+}
+
+/**
+ * Whether `readStudioCanvas(document).metadata` is defined, where `stored` is the parse of `document.studioCanvas` and
+ * `resolve` is `resolveLogicAnchor` over `document`. That check reads the document only through each root's resolution:
+ * the value the root resolves to (each origin is looked up in it) and its owner's ID; the rest is the metadata itself. So
+ * a committed revision known to have usable metadata in the same `studioCanvas` object answers for any other whose every
+ * root resolves to the same value (the same object, or an equal primitive) on an owner with the same ID. A root over the
+ * whole document (its fingerprint reads everything) is always checked in full.
+ */
+const usableRevisions = new WeakMap<object, CompositionDocument>();
+/** Record that committed `document`'s layout metadata is usable. */
+export function knownUsable(document: CompositionDocument): void {
+  const raw: unknown = document.studioCanvas;
+  if (raw !== null && typeof raw === 'object') usableRevisions.set(raw, document);
+}
+export function usableLayout(document: CompositionDocument, stored: StoredStudioCanvasMetadata, resolve: (anchor: LogicAnchor) => ResolvedLogicAnchor | undefined): boolean {
+  const raw: unknown = document.studioCanvas, known = raw !== null && typeof raw === 'object' ? usableRevisions.get(raw) : undefined;
+  if (known === document) return true;
+  const roots = stored.canvases.flatMap(canvas => canvas.roots);
+  if (known && !roots.some(root => root.anchor.kind === 'document' && root.anchor.field === '')) {
+    const other = new AnchorResolver(known);
+    const same = roots.every(root => {
+      const here = resolve(root.anchor), there = other.resolve(root.anchor);
+      return here !== undefined && there !== undefined && Object.is(here.value, there.value)
+        && Reflect.get(here.owner.value as object, 'id') === Reflect.get(there.owner.value as object, 'id');
+    });
+    if (same) return true;
+  }
+  const usable = readStudioCanvas(document).metadata !== undefined;
+  if (usable) knownUsable(document);
+  return usable;
 }
 
 interface Rebased {

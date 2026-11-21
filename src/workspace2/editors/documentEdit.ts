@@ -6,7 +6,7 @@ import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/b
 import { sameJson } from '../../sameJson';
 import { usesOf } from '../data/logic/logicModel';
 import { AnchorResolver, authoredNodes, fieldAnchor, ownerAuthoredNodes, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
-import { canvasWalk, rebaseCanvasLayout, uncertifiedCanvasRoots, walkedNodes } from '../logic-fields/layout';
+import { canvasWalk, knownUsable, rebaseCanvasLayout, uncertifiedCanvasRoots, usableLayout, walkedNodes } from '../logic-fields/layout';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { toastManager } from '../toasts';
 import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
@@ -283,49 +283,97 @@ interface ResolvedBindings {
   /** The node each use resolved to, and for a component use its entry (whose `bindings` the resolution reads and extends). */
   readonly nodes: readonly object[];
   readonly entries: readonly (object | undefined)[];
-  /** Which uses share an owner: for each, the first binding resolved on the same owner. */
+  /** Which uses share a place (see `resolvedUses`): for each, the first binding resolved in the same place. */
   readonly places: readonly number[];
   /** The node and owner pointers each use resolved to, in the revision these results are for. */
   readonly bases: readonly { readonly node: string; readonly owner: string }[];
   readonly bindings: ResolvedUses;
 }
 /**
- * `resolveLogicUseBindings(document).bindings`, reused for a committed revision holding the same bindings array and
- * library when every use resolves (owner and node uniqueness included) to the same node object, a component use to the
- * same entry, and uses share owners alike. The canonical resolution reads, per binding: the owner list scan, the owner's
- * node scan, the resolved node (its use field, type and source field, after the arguments earlier bindings wrote into
- * it), the library, and for a component use its entry's `bindings` (after earlier appends). Its writes never change an
- * ID, a type or a child list (a use field cannot pass through `children`, `tabs` or `blocks`), so every binding resolves
- * to the same place in each intermediate document, and with the same objects in the same arrangement each step reads and
- * writes the same values: only the owners' and nodes' pointers differ, and they are put back in place. A resolution that
- * throws is not remembered.
+ * `resolveLogicUseBindings(document).bindings`, reused per binding for a committed revision holding the same bindings
+ * array and library. The canonical resolution reads, per binding: the owner list scan, the owner's node scan, the resolved
+ * node (its use field, type and source field, after the arguments earlier bindings wrote into it), the library, and for a
+ * component use its entry's `bindings` (after earlier appends). Its writes never change an ID, a type or a child list (a
+ * use field cannot pass through `children`, `tabs` or `blocks`), and they stay inside the use's own node and, for a
+ * component use, its entry: so bindings in different places (a component use's entry, any other use's node) never read
+ * each other's writes, and the duplicate check only ever matches within one place. A binding is reused when its use
+ * resolves (owner and node uniqueness included) to the same node object, a component use to the same entry, and the
+ * bindings sharing its place are the same ones as before; only the pointers can differ, and they are put back in place.
+ * Every other place's bindings are resolved again by the canonical resolution, together and in order, which reads and
+ * writes for them exactly what the whole run does. A resolution that throws is not remembered.
  */
 const resolvedBindings = new WeakMap<object, ResolvedBindings>();
+/**
+ * Binding certifications (see the index build) by the top-level authored node the binding's location is in (a page or
+ * modal component, or a component entry's `node`), then by the location below it and the binding. Whether the address
+ * derived there names the binding's own node and field is decided inside that node: the authored walk reaches every
+ * top-level node, a use field never runs through a child list, so the deepest walked node on the path is the bound node
+ * exactly when the walk inside the top-level node reaches it; and then the round trip resolves the stored address, which
+ * the binding's own resolution (owner and node uniqueness included, checked on every build) already found. Each build
+ * keeps, per node it consults, only the answers it used.
+ */
+const certifications = new WeakMap<object, Map<string, boolean>>();
 function resolvedUses(document: CompositionDocument, resolver: AnchorResolver): ResolvedUses {
   const list: unknown = document.logicUseBindings;
   const locate = (uses: readonly LogicAnchor[]) => uses.map(use => resolver.resolve({ ...use, field: '' }));
-  const places = (found: ReturnType<typeof locate>) => found.map(at => found.findIndex(other => other?.owner.pointer === at?.owner.pointer));
+  /** Where a use's resolution writes: a page or modal use's node; a component use's (or any other) owner. */
+  const place = (use: LogicAnchor, at: ReturnType<typeof locate>[number]) => at === undefined ? undefined
+    : use.kind === 'page' || use.kind === 'modal' ? `n:${at.node?.pointer}` : `o:${at.owner.pointer}`;
+  /** For each binding, the first binding in the same place. */
+  const places = (uses: readonly LogicAnchor[], found: ReturnType<typeof locate>) => {
+    const first = new Map<string | undefined, number>();
+    return found.map((at, index) => {
+      const key = place(uses[index], at), known = first.get(key);
+      if (known !== undefined) return known;
+      first.set(key, index);
+      return index;
+    });
+  };
+  const remember = (uses: readonly LogicAnchor[], found: ReturnType<typeof locate>, bindings: ResolvedUses) => {
+    const placed = found.every((at, index) => at?.node && bindings[index].usePointer.startsWith(at.node.pointer) && bindings[index].sourcePointer.startsWith(at.node.pointer)
+      && (!bindings[index].componentBindingPointer || bindings[index].componentBindingPointer!.startsWith(`${at.owner.pointer}/`)));
+    if (placed) resolvedBindings.set(list as object, { library: document.logicLibrary, uses, nodes: found.map(at => at!.node!.value),
+      entries: uses.map((use, index) => use.kind === 'component' ? found[index]!.owner.value : undefined), places: places(uses, found),
+      bases: found.map(at => ({ node: at!.node!.pointer, owner: at!.owner.pointer })), bindings });
+  };
   const memo = list !== null && typeof list === 'object' ? resolvedBindings.get(list) : undefined;
   if (memo && memo.library === document.logicLibrary) {
-    const found = locate(memo.uses), shared = places(found);
-    if (found.every((at, index) => at?.node && at.node.value === memo.nodes[index]
-      && (memo.entries[index] === undefined || at.owner.value === memo.entries[index]) && shared[index] === memo.places[index])) {
-      return memo.bindings.map((binding, index) => {
+    const found = locate(memo.uses);
+    if (found.every(at => at?.node)) {
+      const shared = places(memo.uses, found), at = (index: number) => place(memo.uses[index], found[index])!;
+      const same = (index: number) => found[index]!.node!.value === memo.nodes[index]
+        && (memo.entries[index] === undefined || found[index]!.owner.value === memo.entries[index]);
+      // Places (in this revision) whose bindings are resolved again: each place of a changed binding, and of any binding
+      // that shares, or shared, a place with one whose sharing changed.
+      const again = new Set<string>(), regroup: number[] = [];
+      found.forEach((_, index) => {
+        if (!same(index)) again.add(at(index));
+        if (shared[index] !== memo.places[index]) regroup.push(index);
+      });
+      if (regroup.length) {
+        const oldGroups = new Set(regroup.map(index => memo.places[index])), newGroups = new Set(regroup.map(index => shared[index]));
+        found.forEach((_, peer) => { if (oldGroups.has(memo.places[peer]) || newGroups.has(shared[peer])) again.add(at(peer)); });
+      }
+      const subset = memo.uses.flatMap((_, index) => again.has(at(index)) ? [index] : []);
+      const fresh = subset.length
+        ? resolveLogicUseBindings({ ...document, logicUseBindings: subset.map(index => (list as unknown[])[index]) } as CompositionDocument).bindings : [];
+      const redone = new Map(subset.map((index, at) => [index, { ...fresh[at], pointer: `/logicUseBindings/${index}` }]));
+      const bindings = memo.bindings.map((binding, index) => {
+        const resolved = redone.get(index);
+        if (resolved) return resolved;
         const { node, owner } = found[index]!, base = memo.bases[index];
         return { ...binding, usePointer: `${node!.pointer}${binding.usePointer.slice(base.node.length)}`, sourcePointer: `${node!.pointer}${binding.sourcePointer.slice(base.node.length)}`,
           ...(binding.componentBindingPointer ? { componentBindingPointer: `${owner.pointer}${binding.componentBindingPointer.slice(base.owner.length)}` } : {}) };
       });
+      if (subset.length) remember(memo.uses, found, bindings);
+      return bindings;
     }
   }
   const bindings = resolveLogicUseBindings(document).bindings;
   const parsed = logicUseBindingsSchema.safeParse(list);
   if (parsed.success && parsed.data.length === bindings.length && list !== null && typeof list === 'object') {
-    const uses = parsed.data.map(binding => binding.use as LogicAnchor), found = locate(uses);
-    const placed = found.every((at, index) => at?.node && bindings[index].usePointer.startsWith(at.node.pointer) && bindings[index].sourcePointer.startsWith(at.node.pointer)
-      && (!bindings[index].componentBindingPointer || bindings[index].componentBindingPointer!.startsWith(`${at.owner.pointer}/`)));
-    if (placed) resolvedBindings.set(list, { library: document.logicLibrary, uses, nodes: found.map(at => at!.node!.value),
-      entries: uses.map((use, index) => use.kind === 'component' ? found[index]!.owner.value : undefined), places: places(found),
-      bases: found.map(at => ({ node: at!.node!.pointer, owner: at!.owner.pointer })), bindings });
+    const uses = parsed.data.map(binding => binding.use as LogicAnchor);
+    remember(uses, locate(uses), bindings);
   }
   return bindings;
 }
@@ -368,7 +416,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
   if (!linked(before) && !linked(edit)) return edit;
   // Per-transaction memos of the candidate: never cached beyond this call, except for objects of committed revisions (those
   // `before`'s index has seen), which are immutable.
-  let editPaths: Map<object, EditorPath[]> | undefined, editResolver: AnchorResolver | undefined;
+  let editPaths: Map<object, EditorPath[]> | undefined, editResolver: AnchorResolver | undefined, beforeResolver: AnchorResolver | undefined;
   const committed = (value: object) => indexed !== undefined && (indexed.counts.has(value) || indexed.members.has(value));
   const walk = canvasWalk(committed), editNodes = walkedNodes(edit, walk);
   const pathsOfEdit = () => editPaths ??= objectPaths(edit);
@@ -442,6 +490,22 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
      */
     const always = new Set<string>();
     const anchorOf = (path: EditorPath) => fieldAnchor(before, path, ownerAuthoredNodes(before, path), anchor => resolver.resolve(anchor));
+    const consulted = new Map<Map<string, boolean>, Set<string>>();
+    const certifiedAt = (path: EditorPath, binding: unknown, check: () => boolean): boolean => {
+      const top = path[0] === 'componentLibrary' ? path[2] === 'node' ? 3 : undefined
+        : (path[0] === 'pages' || path[0] === 'modals') && path[2] === 'components' && path.length > 3 ? 4 : undefined;
+      const holder: unknown = top === undefined ? undefined : valueAt(before, path.slice(0, top));
+      if (holder === null || typeof holder !== 'object') return check();
+      const key = `${fieldPointer(path.slice(top))}\u0000${JSON.stringify(binding)}`;
+      let memo = certifications.get(holder);
+      if (!memo) { memo = new Map(); certifications.set(holder, memo); }
+      let used = consulted.get(memo);
+      if (!used) { used = new Set(); consulted.set(memo, used); }
+      used.add(key);
+      let known = memo.get(key);
+      if (known === undefined) { known = check(); memo.set(key, known); }
+      return known;
+    };
     let stored: ReturnType<typeof studioCanvasMetadataSchema.safeParse> | undefined;
     const resolved = before.logicUseBindings?.length ? resolvedUses(before, resolver) : [];
     // Bindings array edits are scoped per element below; any of them invalidates this index's positions.
@@ -459,9 +523,10 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       if (authored.use.kind !== 'document') build.bases.set(baseKey(authored.use), binding.usePointer.slice(0, binding.usePointer.length - authored.use.field.length));
       watchAnchor(build, authored.use, [key, reanchor]);
       // The reconciliation re-derives each located use's address; one that comes back different is rewritten.
-      let use: LogicAnchor | undefined;
-      try { use = anchorOf(pointerPath(binding.usePointer)); } catch { /* the reconciliation fails on it */ }
-      if (!use || !sameJson(use, authored.use)) { always.add(key); always.add(reanchor); }
+      const usePath = pointerPath(binding.usePointer);
+      if (!certifiedAt(usePath, authored.use, () => {
+        try { return sameJson(anchorOf(usePath), authored.use); } catch { return false; /* the reconciliation fails on it */ }
+      })) { always.add(key); always.add(reanchor); }
       if (authored.use.kind === 'component') {
         const owner = anchorPointer(build, { kind: 'component', id: authored.use.id, field: '' })!;
         dependencies.add(`${owner}/params`, key); dependencies.add(`${owner}/bindings`, key);
@@ -498,7 +563,8 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
         // An already-broken binding stays in every edit's scope, so only an edit that repairs or removes it is accepted.
         if (target === undefined || !entry.params?.some(param => param.name === binding.param)) return dependencies.add('', key);
         targets.set(key, target); witnessed(target, key);
-        if (binding.nodeId && !fixedComponentBinding(entry, binding, target)) always.add(key);
+        if (binding.nodeId && !certifiedAt(pointerPath(target), [entry.id, entry.params?.find(param => param.name === binding.param)?.kind, binding],
+          () => fixedComponentBinding(entry, binding, target))) always.add(key);
         if (!binding.nodeId) {
           // A source binding is found by its source object's unique identity inside its entry (that object is its second
           // witness; the sources lists and IDs are read under `e:`), and by the entry's ID-order position.
@@ -513,6 +579,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
         watchAnchor(build, anchor, [key]);
       });
     });
+    for (const [memo, used] of consulted) for (const key of memo.keys()) if (!used.has(key)) memo.delete(key);
     if (before.studioCanvas) {
       // Unusable metadata is left alone unless the edit changes it (`rebaseCanvasLayout` rechecks before rebasing).
       stored = parsedCanvas(before.studioCanvas);
@@ -608,6 +675,8 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
     // Every object of the result is in `before` or was placed by the edit (or, after a rebase, sits in the new metadata).
     for (const value of placements.keys()) index.members.add(value);
     if (document !== edit) changedPaths(edit, document, () => {}, value => index.members.add(value));
+    // Usable metadata of a committed result vouches for later revisions that resolve every root alike (see `usableLayout`).
+    if (carried.usable) knownUsable(document);
     revisions.set(document, always ? { ...carried, always } : carried);
     return document;
   };
@@ -760,7 +829,8 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       }
     }
   }
-  if (layouts && before.studioCanvas && next.studioCanvas === before.studioCanvas && index.stored && !index.usable && readStudioCanvas(before).metadata) index.usable = true;
+  if (layouts && before.studioCanvas && next.studioCanvas === before.studioCanvas && index.stored && !index.usable
+    && usableLayout(before, index.stored, anchor => (beforeResolver ??= new AnchorResolver(before)).resolve(anchor))) index.usable = true;
   const layout = next.studioCanvas, settled = next;
   if (layouts) next = rebaseCanvasLayout(before, next, locateAll, {
     fields: references.fields, discard: references.discardLayouts, deleted, refuse, walk,

@@ -119,7 +119,33 @@ describe('edit boundary cost after structural edits', () => {
     }
     report('insert before every bound tile', median(tops));
     report('first edit after inserting before every bound tile', median(afterTops));
+
+    // The field editor's first keystroke in a bound slot (declared typing of its fallback), on an indexed revision and as
+    // the first edit after a single-tile append (which rebuilds the index). The difference is the rebuild's own cost.
+    const slot = ['pages', 0, 'components', 0, 'props', 'subtitle'], pointer = fieldPointer(slot);
+    const typing = (from: Doc, index: number) => {
+      const proposed = replaceAt(from, [...slot, 'fallback'], `Typed ${index}`);
+      const [result, elapsed] = timed(() => documentEdit(from, proposed, { fields: new Map([[pointer, [pointer]]]) }));
+      expect(result).not.toBe(from);
+      return [result, elapsed] as const;
+    };
+    const steady: number[] = [], typed: number[] = [];
+    current = before;
+    for (let index = -5; index < 15; index++) {
+      const [settled] = typing(current, index), [, again] = typing(settled, index + 0.5);
+      const proposed = replaceAt(settled, ['pages', 0, 'components'], [...settled.pages[0].components, spacer(`typed-${count}-${index}`)]);
+      const inserted = documentEdit(settled, proposed);
+      expect(inserted).toBe(proposed);
+      const [result, first] = typing(inserted, index + 0.75);
+      current = result;
+      if (index >= 0) { steady.push(again); typed.push(first); }
+    }
+    const typingGate = count === 66 ? 8 * (Number(process.env.EDIT_BOUNDARY_SLOWDOWN) || 1) : undefined;
+    report('declared slot typing on an indexed revision', median(steady));
+    report('declared slot typing as the first edit after a single-tile insert', median(typed), typingGate);
+    report('index rebuild in that first typing edit (difference of medians)', median(typed) - median(steady));
     if (gate !== undefined) expect(median(firsts)).toBeLessThanOrEqual(gate);
+    if (typingGate !== undefined) expect(median(typed)).toBeLessThanOrEqual(typingGate);
   }, 60_000);
 
   it('the memoized index agrees with the whole-document reconciliation across structural edits at 66 bindings', () => {
