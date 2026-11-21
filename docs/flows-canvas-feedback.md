@@ -55,6 +55,17 @@ Yes/No, records as `field: value` pairs, lists as a count plus the first items
 Raw JSON is available only behind an explicit "Raw" toggle in the full view.
 Values still come only from host observations; no fallback values are invented.
 
+Dates and words (W5 follow-up): a value that is a date or date-time — by its
+declared type, or for an untyped string a strict full ISO-8601 match — shows
+readably in the house time zone against the simulation clock ("Today, 9:30 AM",
+"Yesterday, 8:00 PM", "Nov 21, 9:30 AM", "Today" for a date equal to today; the
+year only when it differs). Home Assistant snake_case tokens (`needs_action`,
+`armed_home`) show as words ("Needs action"); single words such as `on` keep
+their presentation. Literal Text blocks show exactly what the owner typed, and
+strings that merely contain a date (IDs) are left alone. The exact raw value is
+never lost: it stays in the accessible description and behind Raw in the full
+comparison.
+
 ## Tidy Up (F6)
 
 `src/workspace2/canvas/tidy.ts` exports
