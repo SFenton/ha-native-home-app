@@ -18,6 +18,7 @@ import { ScenariosDrawer } from './Scenarios';
 import { canvasObservations, formatObservedValue, type CanvasObservations } from './observations';
 import { changedAgo, clockInstant, displayValue, type SimulationPresentation, type ValuePresentation } from './presentation';
 import './simulation.css';
+import { nodeValueOptions } from '../canvas/value-format';
 
 export interface SimulationHostProps {
   readonly program: SimulationProgram;
@@ -76,7 +77,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const observation = useMemo(() => canvasObservations(program, run, {
     pins: activePins, localPins: pins, scenario, clockPinned: Boolean(!clockLive && (clock || scenario?.clock)), localClockPinned: Boolean(clock), liveClock: clockLive,
     freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText, blockNames,
-  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale, blockNames]);
+    clock: clockLive ? snapshot.base.clock : clock ?? scenario?.clock ?? scenario?.base.clock ?? snapshot.base.clock, timeZone: clockTimeZone,
+  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.clock, snapshot.base.previousText, snapshot.origin, snapshot.stale, blockNames, clockTimeZone]);
   useEffect(() => onObservation?.(observation), [onObservation, observation]);
   const onRun = useCallback((ids: readonly string[], state: FlowState) => {
     setFlows(previous => {
@@ -180,8 +182,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       {narrow && <button type="button" className="w2-primary" onClick={() => setInspecting(false)}>Done</button>}
     </header>
     <SourceInspector name={blockLabel(editingPin).name} presentation={blockLabel(editingPin)} source={Boolean(source)} choice={choice}
-      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin)) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
-      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin)) : 'Captured live value' } : undefined}
+      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: snapshot.base.clock, timeZone: clockTimeZone }) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
+      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: scenario.clock ?? scenario.base.clock, timeZone: clockTimeZone }) : 'Captured live value' } : undefined}
       onChoice={value => {
         setPinChoice(value);
         if (value !== 'live' && value !== 'scenario') return;
@@ -196,7 +198,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       <div className="w2-sim-trace-chips">{observation.order.map(id => {
         const block = observation.blocks[id], node = nodes.find(node => node.id === id);
         if (!node || !block?.observed || presentation?.traceBlocks && !presentation.traceBlocks.includes(id)) return null;
-        return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`}
+        return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`} aria-description={formatObservedValue(block, false, true)}
           key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : node.payload.kind === 'operand' && node.payload.value.type === 'literal' ? formatObservedValue(block) : displayValue(block.result, blockLabel(node), block)}</strong></button>;
       })}</div>
       {observation.truncated && <p className="w2-caption">Trace truncated. Unrecorded values are not evidence.</p>}
@@ -226,7 +228,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <h3 className="w2-group-title"><List size={15} aria-hidden />Just the Values</h3>
           <p className="w2-caption">The preview is a lens. These are the actual outputs, not device actions.{scenario ? ' Unpinned Live values are frozen at capture.' : ''}</p>
           <div className="w2-sim-values">{run.outputs.map((output, index) => <article className="kv2" key={anchorKey(output.output)} aria-label={`Output ${outputLabel(index).name}`}>
-            <span>{outputLabel(index).name}</span><output>{program.roots[index].body.kind === 'operand' && program.roots[index].body.value.type === 'literal' ? formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId]) : displayValue(output.result, outputLabel(index), observation.results?.[program.roots[index].graph.roots[0].nodeId])}</output>
+            <span>{outputLabel(index).name}</span><output title={formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId], false, true)}>{program.roots[index].body.kind === 'operand' && program.roots[index].body.value.type === 'literal' ? formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId]) : displayValue(output.result, outputLabel(index), observation.results?.[program.roots[index].graph.roots[0].nodeId])}</output>
             <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source === 'Held/stale' ? 'Last value kept' : output.source === 'Sample' ? 'Demo' : output.source}</Tag>
             {output.issues.length > 0 && <p className="w2-caption">{output.issues.map(issueText).join(' ')}</p>}
           </article>)}</div>
@@ -246,7 +248,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       {!narrow && <aside className="w2-sim-inspector w2-form" aria-label="Simulation inspector">{inspector}</aside>}
     </div>
     {narrow && <Overlay narrow open={inspecting} onOpenChange={setInspecting} label="Simulation inspector" className="w2-simulation-surface w2-form">{inspector}</Overlay>}
-    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot}
+    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot} timeZone={clockTimeZone}
       selectedId={scenarioId} savedVersionDiffers={savedVersionDiffers} run={run} results={results} inputNodes={uniqueInputs.filter(node => !presentation?.scenarioInputs || presentation.scenarioInputs.includes(node.id))} blockLabel={blockLabel} outputLabel={outputLabel}
       outputKeys={presentation?.scenarioOutputs}
       onSelect={selectScenario} onCapture={() => startCapture()} onCreate={() => startCapture(true)} blocked={stalePins.length > 0}

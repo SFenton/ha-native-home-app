@@ -55,13 +55,14 @@ export default function ResultSummary({ graph, program, observations, blockNames
     return [...rows.values()];
   }, [graph, program, blockNames, observations]);
   const result = program ? observations?.results?.[program.roots[0].graph.roots[0].nodeId] : undefined;
+  const rows = program?.roots[0].body.kind === 'flow' && program.roots[0].body.value.output.kind === 'rows';
   const badge = provenance(result);
   return <section className="w2-logic-result-summary" aria-label="Result summary">
-    <div className="w2-logic-result-line"><strong>Result</strong><output aria-label="Result value">{formatObservedValue(result, program?.roots[0].body.kind === 'flow' && program.roots[0].body.value.output.kind === 'rows')}</output>
+    <div className="w2-logic-result-line"><strong>Result</strong><output aria-label="Result value" title={formatObservedValue(result, rows, true)} aria-description={formatObservedValue(result, rows, true)}>{formatObservedValue(result, rows)}</output>
       <Tag className={`tag ${badge === 'Live' ? 'live' : badge === 'Pinned' ? 'pinned' : ''}`} tone={badge === 'Live' ? 'success' : 'neutral'}>{badge}</Tag></div>
     {inputs.length > 0 && <dl aria-label="Current inputs">{inputs.map(input => {
       const value = observations?.blocks[input.blockId], item = itemContextText(value?.item);
-      return <div key={input.id}><dt>{input.label}</dt><dd>{formatObservedValue(value)}{item && <small> · {item}</small>}</dd></div>;
+      return <div key={input.id}><dt>{input.label}</dt><dd title={formatObservedValue(value, false, true)} aria-description={formatObservedValue(value, false, true)}>{formatObservedValue(value)}{item && <small> · {item}</small>}</dd></div>;
     })}</dl>}
     {result?.freshness === 'held' && <p className="w2-caption">Last known values · waiting for Home Assistant.</p>}
     {error && <p role="status" className="w2-caption">{error}</p>}

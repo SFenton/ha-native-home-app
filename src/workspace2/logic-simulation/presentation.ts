@@ -1,6 +1,7 @@
 import type { SimulationClock, SimulationResult } from '../../shared/composition/graph/types';
 import { formatObservedValue, type ObservedValue } from './observations';
 import { resultText } from './words';
+import { formatValue, type ValueFormatOptions } from '../canvas/value-format';
 
 export interface ValuePresentation {
   readonly name: string;
@@ -21,21 +22,19 @@ export interface SimulationPresentation {
   readonly scenarioOutputs?: readonly string[];
 }
 /** Pass observations for completed values to distinguish computed text from HA availability. */
-export function displayValue(result: SimulationResult | undefined, presentation?: ValuePresentation, observation?: ObservedValue): string {
+export function displayValue(result: SimulationResult | undefined, presentation?: ValuePresentation, observation?: ObservedValue, options: ValueFormatOptions = {}): string {
   if (observation && (!observation.observed || observation.state !== 'known')) return formatObservedValue(observation);
   if (result?.kind === 'operand' && result.answer.status === 'value') {
     const value = result.answer.value;
-    if (typeof value === 'string' && presentation?.states?.[value]) return presentation.states[value];
-    if (presentation?.format === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`));
-    }
+    const valueOptions = { ...options, ...observation?.valueFormat,
+      ...(presentation?.format === 'date' ? { shape: { kind: 'string', format: 'date' } as const } : {}) };
+    if (!valueOptions.literal && typeof value === 'string' && presentation?.states?.[value]) return presentation.states[value];
     if (presentation?.unit && (typeof value === 'number' || typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))) {
       return `${Number(value).toFixed(1)} ${presentation.unit}`;
     }
-    if (Array.isArray(value)) return `${value.length} items`;
-    if (value !== null && typeof value === 'object') return `${Object.keys(value).length} fields`;
     if (!observation && value === 'unavailable') return 'Unavailable';
     if (!observation && value === 'unknown') return "Can't tell";
+    return formatValue(value, valueOptions);
   }
   return resultText(result);
 }

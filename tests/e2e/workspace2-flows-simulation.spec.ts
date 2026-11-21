@@ -195,13 +195,13 @@ test('S-pins / S-trace: pin, Live, clock edge, actual drawers and no simulation 
   await page.getByLabel('Date', { exact: true }).fill('2026-11-19');
   await page.getByLabel('Pinned time', { exact: true }).fill('00:00');
   await closeInspector(page);
-  await expect(output(page, 'Today')).toHaveText('Nov 19, 2026');
+  await expect(output(page, 'Today')).toHaveText('Today');
   expect(network.length - initialReads, 'Pinning and using simulation must not start requests.').toBe(0);
   const simulationFetches = network.length - initialReads;
   await page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Live', exact: true }).click();
   await expect(output(page, 'Bedroom')).toHaveText('21.9 °C');
   await expect(output(page, 'Subtitle')).toHaveText('Comfortable');
-  await expect(output(page, 'Today')).toHaveText('Nov 18, 2026');
+  await expect(output(page, 'Today')).toHaveText('Today');
   await page.screenshot({ path: info.outputPath('live-restored.png'), animations: 'disabled' });
   await attachNetwork(info, { initialReads, simulationFetches, requestsIncludingExplicitReturnLive: network });
   expect(network.every(request => request.method === 'POST' && request.url.endsWith('/native/api/ha/flow-run'))).toBe(true);

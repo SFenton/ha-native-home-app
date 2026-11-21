@@ -9,7 +9,7 @@ import PortGlyph from './PortGlyph';
 import PortReading, { describeObservation, type BlockObservation } from './observations';
 import { wireKind } from './theme';
 import Tooltip from './Tooltip';
-import { formatObservation, sourceText } from './value-format';
+import { formatObservation, nodeValueOptions, sourceText } from './value-format';
 
 export interface BlockActions {
   register(target: CanvasFocus): (element: HTMLButtonElement | null) => void;
@@ -53,15 +53,16 @@ export default memo(function CanvasBlock({ model, observation, active, controls,
     const target = { nodeId: node.id, portId: port.id, direction };
     const type = port.type.valueType === 'unresolved' ? 'Unresolved type' : port.type.valueType;
     const reading = observation?.[direction === 'input' ? 'inputs' : 'outputs']?.[port.id];
-    return <Tooltip key={`${direction}:${port.id}`} text={<><strong>{name} / {label}</strong><div>Type: {type}</div><div>{formatObservation(reading, node.catalogKey === 'output.rows' && direction === 'output')}</div>{reading && <div>{sourceText(reading)}</div>}</>}><button type="button" ref={actions.register(target)} tabIndex={controls ? 0 : -1}
+    const options = nodeValueOptions(node, port.type);
+    return <Tooltip key={`${direction}:${port.id}`} text={<><strong>{name} / {label}</strong><div>Type: {type}</div><div>{formatObservation(reading, node.catalogKey === 'output.rows' && direction === 'output', false, direction === 'output', options, true)}</div>{reading && <div>{sourceText(reading)}</div>}</>}><button type="button" ref={actions.register(target)} tabIndex={controls ? 0 : -1}
       className="w2-canvas-port" data-port-id={port.id} data-direction={direction} data-wire-type={kind === 'unknown' ? 'record' : kind} data-observation-state={reading?.state}
-      aria-label={`${name}, ${label} ${direction}, ${type}, ${port.type.representation}${port.type.nullable ? ', nullable' : ''}, ${links ? `connected to ${links}` : direction === 'input' && port.required ? 'required, unconnected' : 'unconnected'}${describeObservation(reading, direction === 'output', node.catalogKey === 'output.rows')}`}
+      aria-label={`${name}, ${label} ${direction}, ${type}, ${port.type.representation}${port.type.nullable ? ', nullable' : ''}, ${links ? `connected to ${links}` : direction === 'input' && port.required ? 'required, unconnected' : 'unconnected'}${describeObservation(reading, direction === 'output', node.catalogKey === 'output.rows', options)}`}
       onFocus={() => actions.remember(target)}
       onClick={() => actions.connect({ socket: { nodeId: node.id, portId: port.id }, direction })}
       onKeyDown={event => {
         if ((event.key === 'Delete' || event.key === 'Backspace') && disconnect) { event.preventDefault(); actions.disconnect(disconnect); }
       }}>
-      <PortGlyph kind={kind} itemKind={itemKind}/><span>{label}</span><PortReading observation={reading} output={direction === 'output'} rows={node.catalogKey === 'output.rows' && direction === 'output'}/>
+      <PortGlyph kind={kind} itemKind={itemKind}/><span>{label}</span><PortReading observation={reading} output={direction === 'output'} rows={node.catalogKey === 'output.rows' && direction === 'output'} options={options}/>
       {direction === 'input' && port.required && !connected && <span className="w2-canvas-error" aria-hidden>!</span>}
     </button></Tooltip>;
   };
