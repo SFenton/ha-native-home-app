@@ -360,9 +360,9 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     header = <Header onClose={onClose} icon="grid" title={title} line={cls ? repeatedText(cls.places.length) : ''}/>;
     body = <RepeatProposal ws={ws} onError={onError}/>;
   } else if (target.kind === 'header') {
-    title = 'Header Buttons';
-    header = <Header onClose={onClose} icon="sliders" title="Header Buttons" line="Used on every page"/>;
-    body = <HeaderPanel/>;
+    title = 'Tabs and header buttons';
+    header = <Header onClose={onClose} icon="sliders" title="Tabs and header buttons" line="Used on every page"/>;
+    body = <HeaderPanel onGo={ws.selectAnywhere}/>;
   } else if (target.kind === 'styles') {
     title = 'State Styles';
     header = <Header onClose={onClose} icon="sliders" title="State Styles" line="Used by state tiles"/>;

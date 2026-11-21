@@ -7,6 +7,7 @@ import { groupWithRoom } from '../capacity';
 import { cloneNode } from '../util';
 import { foldSidesShipped } from '../layout/fold-sides-edit';
 import { copySubtree, editSubtrees } from '../editors/provenance';
+import { newPageWideOpen } from './chromeRules';
 
 type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
@@ -33,7 +34,7 @@ export function blankPage(document: CompositionDocument, title: string, shipped 
   const model = document.pages[0];
   const spacing = { type: 'token' as const, name: 'l' as const };
   return {
-    id: uid('page'), title, icon: symbol('square.grid.2x2'), parameters: {}, toolbar: { type: 'inherit' }, navigation: { type: 'stack' },
+    id: uid('page'), title, icon: symbol('square.grid.2x2'), parameters: {}, toolbar: { type: 'inherit' }, navigation: { type: 'stack' }, ...newPageWideOpen(),
     layout: (({ foldSides: _sides, ...layout }) => ({ ...layout, ...(shipped ? { foldSides: 'auto' as const } : {}) }))((model ? structuredClone(model.layout) : { type: 'column', padding: { top: spacing, leading: spacing, bottom: spacing, trailing: spacing }, spacing, maxWidth: { type: 'unbounded' }, scroll: 'content-fit@1', chrome: 'canonical-page@1', ground: 'host' }) as Page['layout']),
     components: [],
   } as Page;

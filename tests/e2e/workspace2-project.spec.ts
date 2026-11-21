@@ -179,7 +179,7 @@ test('every Project dialog and panel has a screenshot at this size', async ({ pa
     await snap(page, `${size}-${name}`);
     await close();
   }
-  for (const [item, name] of [['Tabs', 'tabs'], ['Header Buttons', 'header-buttons']] as const) {
+  for (const [item, name] of [['Tabs', 'tabs'], ['Tabs and Header Buttons', 'header-buttons']] as const) {
     await project(page, item);
     await page.waitForTimeout(250);
     await snap(page, `${size}-${name}`);

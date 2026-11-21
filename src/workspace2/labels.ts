@@ -150,7 +150,8 @@ const authored: Record<string, FieldLabel> = {
   'page.navigation.type': entry('Open pages beside this one', { group: 'look', order: 1, options: { stack: 'Off', 'navigation-columns': 'On' } }),
   'page.navigation.placeholder': entry('Empty side text', { group: 'look', order: 2 }),
   'page.navigation.onDemand': advanced('Start with one pane'), 'page.navigation.standalone': advanced('Start a new column set here'),
-  // Global chrome (`sh.page-chrome-hide@1`, `sh.page-wide-open@1`): the contract fields exist, and the rows are the editor lane's (`gc-studio-editor`), so they stay hidden until then.
+  // Global chrome (`sh.page-chrome-hide@1`, `sh.page-wide-open@1`, `sh.tabs-visibility@1`): their rows are drawn by `navigation/HideOnThisPage.tsx`, `WideWindow.tsx` and `HeaderPanel`, not by the generic rows.
+  'navigation.tabsVisibility': entry('Show', { hidden: true, options: { always: 'Every page', 'root-only': 'First page only' } }),
   'page.hides.tabs': entry('Tabs', { group: 'look', order: 4, hidden: true }),
   'page.wideOpen': entry('Opens', { group: 'look', order: 5, hidden: true, options: { automatic: 'Automatic', full: 'Full width', beside: 'Beside' } }),
   'page.toolbar': entry('Header buttons', { group: 'look', order: 3, options: { inherit: 'Same as app', replace: 'Custom' } }),
@@ -167,7 +168,7 @@ const authored: Record<string, FieldLabel> = {
   'navigation.initialTabId': entry('Opens first', { order: 1 }), 'navigation.initialPageId': entry('First page', { group: 'advanced' }),
   'chrome.override': entry('Header buttons'),
   '*.rail': entry('On the side rail', { options: { eligible: 'Allowed', 'horizontal-only': 'Top bar only' } }),
-  '*.visibility': entry('Show', { options: { always: 'Always', 'root-only': 'First page only' } }),
+  '*.visibility': entry('Show', { options: { always: 'Every page', 'root-only': 'First page only' } }),
   '*.padding': advanced('Padding'), '*.spacing': advanced('Spacing'), '*.maxWidth': advanced('Max width'),
   '*.layout.padding': advanced('Padding'), '*.layout.spacing': advanced('Spacing'), '*.layout.maxWidth': advanced('Max width'),
   '*.path': entry('Path'), '*.aliases': entry('Aliases'), '*.keywords': entry('Keywords'), '*.siri': entry('Siri phrase'),

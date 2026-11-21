@@ -2,7 +2,7 @@ Home, Security, Climate and Camera
 Studio Appearance
 Follow System
 Tabs
-Header Buttons
+Tabs and Header Buttons
 Wallpaper
 State Styles
 Flows

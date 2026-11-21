@@ -2,6 +2,17 @@ import type { CompositionDocument } from '../shared/composition/schema';
 import { tabGroups } from './capacity';
 import { buildDocumentIndex, selectionKey, type DocumentIndex, type SelectionKey } from '../preview2/model';
 
+/** How many things a page hides for itself (`sh.page-chrome-hide@1`): the tab bar, and each header button. */
+export function hideCount(page: Pick<CompositionDocument['pages'][number], 'hides'>): number {
+  return (page.hides?.tabs ? 1 : 0) + (page.hides?.items?.length ?? 0);
+}
+
+/** The library row's "Hides 2" for a page that hides the tab bar and header buttons for itself; none when it hides nothing. */
+export function hidesTag(page: Pick<CompositionDocument['pages'][number], 'hides'>): `Hides ${number}`[] {
+  const count = hideCount(page);
+  return count ? [`Hides ${count}`] : [];
+}
+
 /** A page or sheet. */
 export interface SurfaceRef { kind: 'page' | 'modal'; id: string }
 
@@ -53,7 +64,7 @@ export interface OutlineRow {
   title: string;
   icon: string;
   /** The tags that apply, as their words. */
-  tags: ('Shared' | 'No Way In')[];
+  tags: ('Shared' | 'No Way In' | `Hides ${number}`)[];
   /** The second line of a sheet row. */
   via?: string;
   children: OutlineRow[];
@@ -87,7 +98,7 @@ export function buildOutline(document: CompositionDocument): Outline {
       const child = row(next, root);
       if (child) children.push(child);
     }
-    return { key: selectionKey('page', id), surface: { kind: 'page', id }, title: page.title, icon: page.icon.name, tags: [], children };
+    return { key: selectionKey('page', id), surface: { kind: 'page', id }, title: page.title, icon: page.icon.name, tags: hidesTag(page), children };
   };
   const tabRows: OutlineRow[] = [];
   document.navigation.tabs.forEach(tab => {
@@ -150,7 +161,7 @@ export interface LibraryRow {
   surface: SurfaceRef;
   title: string;
   icon: string;
-  tags: ('Shared' | 'No Way In')[];
+  tags: ('Shared' | 'No Way In' | `Hides ${number}`)[];
   /** The second line of a sheet row. */
   via?: string;
 }
@@ -171,9 +182,9 @@ export function libraryGroups(document: CompositionDocument, category: ListKind)
     const tabs = document.navigation.tabs;
     if (!tabs.length) {
       const start = document.pages.find(page => page.id === document.navigation.initialPageId);
-      return start ? [{ id: 'start', title: 'Start', rows: [{ key: selectionKey('page', start.id), surface: { kind: 'page', id: start.id }, title: start.title, icon: start.icon.name, tags: [] }] }] : [];
+      return start ? [{ id: 'start', title: 'Start', rows: [{ key: selectionKey('page', start.id), surface: { kind: 'page', id: start.id }, title: start.title, icon: start.icon.name, tags: hidesTag(start) }] }] : [];
     }
-    return [{ id: 'tabs', title: 'Tabs', rows: tabs.map(tab => ({ key: selectionKey('tab', tab.id), surface: { kind: 'page' as const, id: tab.pageId }, title: tab.label, icon: tab.icon.name, tags: [] })) }];
+    return [{ id: 'tabs', title: 'Tabs', rows: tabs.map(tab => ({ key: selectionKey('tab', tab.id), surface: { kind: 'page' as const, id: tab.pageId }, title: tab.label, icon: tab.icon.name, tags: hidesTag(document.pages.find(page => page.id === tab.pageId) ?? {}) })) }];
   }
   if (category === 'pages') {
     const groups: LibraryGroup[] = [];
