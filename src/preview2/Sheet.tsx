@@ -10,15 +10,19 @@ import { sheetAppearance } from './sheet-appearance';
 import { sheetReachesBottom } from './tab-dock';
 
 type Modal = CompositionDocument['modals'][number];
-type Page = CompositionDocument['pages'][number];
+type Page = CompositionDocument['pages'][number] | NonNullable<CompositionDocument['levels']>[number];
 
 /** Props of {@link SheetView}. */
 export interface SheetViewProps {
   modal: Modal;
   /** Where the window puts the sheet ({@link sheetFrame}). */
   frame: SheetFrame;
-  /** A page pushed inside the sheet, drawn in place of the modal's own components. */
+  /** A page (or, with `levels[]`, a level) pushed inside the sheet, drawn in place of the modal's own components. */
   page?: Page;
+  /** A level shows Close at every depth beside Back (a level stays in its sheet with Back and Close); neither is ever hidden. */
+  closeAlways?: boolean;
+  /** The folded Duo: Back and Close sit in the rail on the camera's centre line, below its keep-clear region, and the bar holds the title alone. */
+  rail?: { centre: number; top: number; side: 'leading' | 'trailing'; back: boolean };
   /** Only the top sheet takes input. */
   top: boolean;
   onClose: () => void;
@@ -30,7 +34,7 @@ export interface SheetViewProps {
  * to the large height; `Full` fills it. A full-screen sheet covers the whole window. The frame says where it sits: full-width
  * bottom card, the Duo's leading half, or a centred form or page sheet.
  */
-export function SheetView({ modal, frame, page, top, onClose, onBack }: SheetViewProps) {
+export function SheetView({ modal, frame, page, closeAlways, rail, top, onClose, onBack }: SheetViewProps) {
   const ctx = useRender();
   const selected = useIsSelected(ctx.store, `modal:${modal.id}`);
   // The present animation belongs to the sheet's arrival in Use. Fixed at mount: switching between Edit and Use never adds or
@@ -44,14 +48,18 @@ export function SheetView({ modal, frame, page, top, onClose, onBack }: SheetVie
       '--sheet-safe': sheetReachesBottom(frame) ? 'var(--sh-safe-bottom)' : '0px' } as React.CSSProperties}>
     <div className="sh-dim"/>
     <section className="sh-sheet" role="dialog" aria-label={surface.title} data-sel={`modal:${modal.id}`} data-selected={selected && ctx.mode === 'edit' ? '' : undefined}
-      data-height={presentation.height.type} data-full-screen={presentation.fullScreen ? '' : undefined} data-fills-height={frame.fillsHeight ? '' : undefined} data-appearance={sheetAppearance(presentation.appearance, ctx.appearance)} data-animate={animate ? '' : undefined}>
+      data-height={presentation.height.type} data-full-screen={presentation.fullScreen ? '' : undefined} data-fills-height={frame.fillsHeight ? '' : undefined} data-appearance={sheetAppearance(presentation.appearance, ctx.appearance)} data-rail-side={rail?.side} data-animate={animate ? '' : undefined}>
       <div className="sh-grabber" aria-hidden="true"/>
       <div className="sh-sheet-bar">
-        <div className="sh-bar-side">{page && <button type="button" className="sh-circle" aria-label="Back" title="Back" onClick={() => { if (ctx.mode === 'use') onBack(); }}><ChevronLeft size={22}/></button>}</div>
+        <div className="sh-bar-side">{page && !rail && <button type="button" className="sh-circle" aria-label="Back" title="Back" onClick={() => { if (ctx.mode === 'use') onBack(); }}><ChevronLeft size={22}/></button>}</div>
         <h2 className="sh-sheet-title">{surface.title}</h2>
-        <div className="sh-bar-side sh-trailing">{(presentation.close.visibility === 'all-depths' || !page) && <CloseButton onClose={onClose}/>}</div>
+        <div className="sh-bar-side sh-trailing">{!rail && (closeAlways || presentation.close.visibility === 'all-depths' || !page) && <CloseButton onClose={onClose}/>}</div>
       </div>
       <PageBody key={surface.id} surface={surface} largeTitle={false}/>
     </section>
+    {rail && <div className="sh-sheet-rail" data-side={rail.side} data-appearance={sheetAppearance(presentation.appearance, ctx.appearance)} style={{ left: rail.centre, top: rail.top } as React.CSSProperties}>
+      {rail.back && <button type="button" className="sh-circle" aria-label="Back" title="Back" data-leading="back" onClick={() => { if (ctx.mode === 'use') onBack(); }}><ChevronLeft size={22}/></button>}
+      {(closeAlways || presentation.close.visibility === 'all-depths' || !page) && <CloseButton onClose={onClose}/>}
+    </div>}
   </div>;
 }

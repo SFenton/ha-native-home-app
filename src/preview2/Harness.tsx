@@ -15,6 +15,7 @@ import { wgstyleStory } from './fixtures/wgstyle-story';
 import { wgflowRecords, wgflowStory } from './fixtures/wgflow-story';
 import { wgchartflowStory } from './fixtures/wgchartflow-story';
 import { wgdialStory } from './fixtures/wgdial-story';
+import { demoDocument } from './fixtures/gcprev-story';
 import type { SelectionKey } from './model';
 import Preview2, { previewWindows, type PreviewSurface } from './Preview2';
 import { useAppearance } from '../workspace2/appearance';
@@ -62,6 +63,7 @@ export default function Harness() {
     if (wgflow) { setDocument(wgflow.document); return; }
     if (wgchart) { setDocument(wgchart.document); return; }
     if (wgchartflow) { setDocument(wgchartflow.document); return; }
+    if (query.get('fixture') === 'gcprev') { setDocument(demoDocument()); return; }
     const name = query.get('fixture');
     const corpus = import.meta.glob('../../contract/corpus/accept/*.json', { import: 'default' });
     const file = `../../contract/corpus/accept/${name}.json`;

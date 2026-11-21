@@ -39,10 +39,11 @@ describe('Preview2 windows', () => {
     expect(narrow.container.querySelector('.sh-page[data-page=page-home]')).not.toBeNull();
   });
 
-  it('draws the host page and its first child, or the empty-side text when it links to none', () => {
+  it('draws the host page and its empty-side text while nothing is opened, even when it links to a page', () => {
     const { document, lonely } = columns();
     const host = mount(document, { window: ipadSideways });
-    expect(host.container.querySelectorAll('.sh-pane .sh-page')).toHaveLength(2);
+    expect(host.container.querySelectorAll('.sh-pane .sh-page')).toHaveLength(1);
+    expect(host.container.querySelector('.sh-empty-pane')?.textContent).toBe('Select a room');
     cleanup();
     const plainHome = { ...document, pages: document.pages.map(page => page.id === 'page-home' ? { ...page, navigation: { type: 'stack' } } : page) } as CompositionDocument;
     const empty = mount(plainHome, { window: ipadSideways, surface: { kind: 'page', id: lonely } });
@@ -67,17 +68,19 @@ describe('Preview2 windows', () => {
     expect(mount(document, { window: duoUpright }).container.querySelectorAll('.sh-pane')).toHaveLength(0);
   });
 
-  it('draws the flyout instead of the tab bar at regular width, opened by the header menu button', () => {
+  it('draws the tabs at the top at regular width, in the header row, with no menu button and no flyout', () => {
     const { container } = mount(base, { window: ipadSideways });
-    expect(container.querySelector('.sh-tabbar')).toBeNull();
-    const layer = container.querySelector('.sh-flyout-layer')!;
-    expect(layer.hasAttribute('data-open')).toBe(false);
-    fireEvent.click(container.querySelector('button[aria-label=Menu]')!);
-    expect(layer.hasAttribute('data-open')).toBe(true);
-    expect(layer.querySelectorAll('.sh-tab')).toHaveLength(base.navigation.tabs.length);
+    const screen = container.querySelector('.sh-screen')!;
+    expect(screen.hasAttribute('data-tabs-top')).toBe(true);
+    expect(container.querySelector('.sh-tabbar')).not.toBeNull();
+    expect(container.querySelectorAll('.sh-tabbar .sh-tab')).toHaveLength(base.navigation.tabs.length);
+    expect(container.querySelector('.sh-flyout-layer')).toBeNull();
+    expect(container.querySelector('button[aria-label=Menu]')).toBeNull();
+    expect(container.querySelector('button[aria-label=Sections]')).toBeNull();
     cleanup();
     const phone = mount(base, { window: iphone });
     expect(phone.container.querySelector('.sh-tabbar')).not.toBeNull();
+    expect(phone.container.querySelector('.sh-screen')!.hasAttribute('data-tabs-top')).toBe(false);
   });
 
   it('opens the same flyout from the iPhone header menu button, in Use, and closes it on the scrim or a pick', () => {
@@ -128,8 +131,9 @@ describe('Preview2 windows', () => {
     expect(455.3 + 40.4 + 372.3).toBeCloseTo(868, 5);
   });
 
-  it('names the flyout "Navigation"', () => {
-    const { container } = mount(base, { window: ipadSideways });
+  it('names the iPhone flyout "Navigation"', () => {
+    const { container } = mount(base, { window: iphone, mode: 'use' });
+    fireEvent.click(container.querySelector('button[aria-label=Sections]')!);
     expect(container.querySelector('.sh-flyout .sh-flyout-heading')?.textContent).toBe('Navigation');
   });
 
@@ -175,25 +179,25 @@ describe('Preview2 windows', () => {
     };
     const names = (container: HTMLElement) => [...container.querySelectorAll('.sh-page[data-current] .sh-header button')].map(button => button.getAttribute('aria-label'));
 
-    it('draws the hamburger leading, Quick Links then Profile trailing and the large title below, on every tab root', () => {
+    it('draws no hamburger, Quick Links then Profile trailing and the large title below, on every tab root', () => {
       const document = withChrome();
       for (const win of [ipadSideways, previewWindows[4]]) {
         for (const tab of document.navigation.tabs) {
           const { container } = mount(document, { window: win, surface: { kind: 'page', id: tab.pageId } });
-          expect(names(container), `${win.name} ${tab.label}`).toEqual(['Menu', 'Quick Links', 'Profile']);
+          expect(names(container), `${win.name} ${tab.label}`).toEqual(['Quick Links', 'Profile']);
           expect(container.querySelector('.sh-page[data-current] .sh-large-title')).not.toBeNull();
-          expect(container.querySelector('.sh-page[data-current] .sh-bar-side .sh-circle')?.getAttribute('aria-label')).toBe('Menu');
+          expect(container.querySelector('.sh-page[data-current] .sh-bar-side:not(.sh-trailing) .sh-circle')).toBeNull();
           expect(container.querySelector('.sh-page[data-current] .sh-trailing')?.textContent).toBe('');
           cleanup();
         }
       }
     });
 
-    it('follows the page when it replaces the chrome: a root that authors no groups keeps only the hamburger, as the app does', () => {
+    it('follows the page when it replaces the chrome: a root that authors no groups draws no button at all', () => {
       const document = withChrome();
       const bare = { ...document, pages: document.pages.map(page => page.id === 'page-home' ? { ...page, toolbar: { type: 'replace', groups: [] } } : page) } as CompositionDocument;
       const { container } = mount(bare, { window: ipadSideways });
-      expect(names(container)).toEqual(['Menu']);
+      expect(names(container)).toEqual([]);
     });
   });
 });

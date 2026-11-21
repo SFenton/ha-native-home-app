@@ -52,10 +52,10 @@ export function splitGeometry(win: PreviewWindow): SplitGeometry | undefined {
 }
 
 /**
- * Whether the window shows a flyout instead of the tab bar: regular width on a device with no hinge (`ShellChrome`; a Duo keeps its tab bar flat or folded). A short
- * window that turns the tab bar into a rail (the Duo) keeps the rail.
+ * Whether the system draws the tabs at the top of the window, in the navigation bar's row, with no menu button (proposal `global-chrome`, section 1): regular width with no hinge and
+ * no rail, the full-screen iPad in both orientations. `UITabBarController` places the bar from the size class; the preview tests the same geometry. A Duo keeps its bottom bar or its rail.
  */
-export const usesFlyout = (win: PreviewWindow) => isRegularWidth(win.width) && !win.hinge && !win.bookHinge && !win.rail;
+export const tabsAtTop = (win: PreviewWindow) => isRegularWidth(win.width) && !win.hinge && !win.bookHinge && !win.rail;
 
 /** The Window menu's read-out line: "Split view: off" or "Split view: on, 433 and 434 pt". */
 export function splitReadout(win: PreviewWindow): string {

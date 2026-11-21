@@ -29,6 +29,8 @@ export const isNavAction = (action: { type: string }): action is NavAction => na
 const rootKey = (tabId: string | undefined) => tabId ?? '';
 const hasPage = (document: CompositionDocument, id: string) => document.pages.some(page => page.id === id);
 const hasModal = (document: CompositionDocument, id: string) => document.modals.some(modal => modal.id === id);
+/** Whether `id` is a level of a sheet (`levels[]`, `sh.sheet-levels@1`): a surface a push inside a sheet reaches without leaving it. */
+export const isLevel = (document: CompositionDocument, id: string) => document.levels?.some(level => level.id === id) ?? false;
 const same = (a: NavSurface | undefined, b: NavSurface | undefined) => a?.kind === b?.kind && a?.id === b?.id;
 /** Whether two surfaces are the same page or sheet. */
 export const sameSurface = same;
@@ -49,7 +51,8 @@ export const basePageId = (document: CompositionDocument, state: NavState): stri
 /** What is on top now: the top sheet (or a page pushed inside it), else the top page. */
 export function currentSurface(document: CompositionDocument, state: NavState): NavSurface {
   const sheet = state.sheets.at(-1);
-  if (sheet) return sheet.pages.length ? { kind: 'page', id: sheet.pages.at(-1)! } : { kind: 'modal', id: sheet.modalId };
+  // A level is part of its sheet: the shell has no page to show for it, so it reports the sheet.
+  if (sheet) return sheet.pages.length && !isLevel(document, sheet.pages.at(-1)!) ? { kind: 'page', id: sheet.pages.at(-1)! } : { kind: 'modal', id: sheet.modalId };
   return { kind: 'page', id: basePageId(document, state) };
 }
 
@@ -61,16 +64,28 @@ function pushOnto(stack: readonly string[], pageId: string): { stack: readonly s
   return at >= 0 ? { stack: stack.slice(0, at + 1), motion: 'pop' } : { stack: [...stack, pageId], motion: 'push' };
 }
 function pushPage(document: CompositionDocument, state: NavState, pageId: string): NavState {
-  if (!hasPage(document, pageId)) return state;
   const sheet = state.sheets.at(-1);
-  if (sheet) {
-    const next = pushOnto(sheet.pages, pageId);
+  const inSheet = (): NavState => {
+    const next = pushOnto(sheet!.pages, pageId);
     if (next.motion === 'none') return state;
-    return { ...state, sheets: [...state.sheets.slice(0, -1), { ...sheet, pages: next.stack }], motion: next.motion };
-  }
-  const next = pushOnto(tabStack(document, state), pageId);
-  if (next.motion === 'none') return state;
-  return { ...state, stacks: withStack(state, next.stack), motion: next.motion };
+    return { ...state, sheets: [...state.sheets.slice(0, -1), { ...sheet!, pages: next.stack }], motion: next.motion };
+  };
+  // A level opens inside its sheet and nowhere else: a page cannot open one.
+  if (isLevel(document, pageId)) return sheet ? inSheet() : state;
+  if (!hasPage(document, pageId)) return state;
+  // A document without levels keeps the push inside the sheet it has always had (the rule is scoped to documents that declare `levels`).
+  if (sheet && document.levels === undefined) return inSheet();
+  // A push to an entry of `pages[]` from a sheet or a level closes every level and the sheet, then pushes on the tab's stack: Back returns to the page under the sheet.
+  const base: NavState = sheet ? { ...state, sheets: [], emptyBase: false } : state;
+  const next = pushOnto(tabStack(document, base), pageId);
+  if (next.motion === 'none') return base === state ? state : { ...base, motion: 'none' };
+  return { ...base, stacks: withStack(base, next.stack), motion: next.motion };
+}
+/** Cuts the selected stack back to the page that sent a push, so opening from the leading column replaces the trailing one (the columns' one rule). */
+function cutToSender(document: CompositionDocument, state: NavState, sender: string | undefined): NavState {
+  if (!sender || state.sheets.length) return state;
+  const stack = tabStack(document, state), at = stack.lastIndexOf(sender);
+  return at >= 0 && at < stack.length - 1 ? { ...state, stacks: withStack(state, stack.slice(0, at + 1)) } : state;
 }
 function dismissTop(state: NavState): NavState {
   return state.sheets.length ? { ...state, sheets: state.sheets.slice(0, -1), motion: 'none', emptyBase: state.sheets.length > 1 ? state.emptyBase : false } : state;
@@ -79,16 +94,18 @@ function dismissTop(state: NavState): NavState {
 /**
  * Applies one navigation action. Pure: an action that changes nothing returns `state` itself.
  *
- * - `push` opens a page on the selected tab's stack (inside the top sheet when one is open); a page already on the stack
- *   is popped back to (`reuse-nearest`).
+ * - `push` opens a page on the selected tab's stack; a page already on the stack is popped back to (`reuse-nearest`). From a sheet:
+ *   a level of `levels[]` opens inside the sheet, with Back and Close; an entry of `pages[]` closes every level and the sheet first, then
+ *   pushes on the tab's stack (a document without `levels` keeps the push inside the sheet). `sender` is the page the push came from, when
+ *   it is a column that is not on top: the stack is cut back to it first.
  * - `present` opens a sheet over the current page; when that sheet is already on top, `reject` does nothing and `replace` restarts it.
  * - `select-tab` is rejected while a sheet is open; selecting the selected tab pops it to its root and asks for a scroll to the top.
  * - `dismiss-then-push` closes the top sheet and then pushes.
  * - `back` pops a page of the top sheet or tab; `dismiss` closes the top sheet.
  */
-export function reduceNavigation(document: CompositionDocument, state: NavState, action: NavAction): NavState {
+export function reduceNavigation(document: CompositionDocument, state: NavState, action: NavAction, sender?: string): NavState {
   switch (action.type) {
-    case 'push': return pushPage(document, state, action.pageId);
+    case 'push': return pushPage(document, cutToSender(document, state, sender), action.pageId);
     case 'present': {
       if (!hasModal(document, action.modalId)) return state;
       const top = state.sheets.at(-1);
@@ -156,19 +173,4 @@ export function firstChildPage(document: CompositionDocument, pageId: string): s
   };
   visit(page?.components);
   return found;
-}
-
-/**
- * The panes a columns page draws when the window may split: the first columns page of the stack hosts, the page on top of the
- * stack (else the host's first child, else the empty-side text) is the detail. `onDemand` hosts stay one pane until something opens.
- * Undefined when the base page does not split.
- */
-export function columnPanes(document: CompositionDocument, stack: readonly string[]): { host: string; hostIndex: number; detail?: string; placeholder: string } | undefined {
-  const hostIndex = stack.findIndex(id => document.pages.find(page => page.id === id)?.navigation.type === 'navigation-columns');
-  if (hostIndex < 0) return undefined;
-  const host = document.pages.find(page => page.id === stack[hostIndex])!;
-  if (host.navigation.type !== 'navigation-columns') return undefined;
-  const opened = stack.length > hostIndex + 1 ? stack.at(-1) : undefined;
-  if (!opened && host.navigation.onDemand) return undefined;
-  return { host: host.id, hostIndex, detail: opened ?? firstChildPage(document, host.id), placeholder: host.navigation.placeholder };
 }

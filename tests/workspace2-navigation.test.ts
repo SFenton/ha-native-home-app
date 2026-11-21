@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { buildDocumentIndex } from '../src/preview2/model';
-import { allowsSplit, contentSize, isRegularWidth, previewWindows, splitGeometry, splitReadout, usesFlyout, windowLabel, withPose } from '../src/preview2';
+import { allowsSplit, contentSize, isRegularWidth, previewWindows, splitGeometry, splitReadout, tabsAtTop, windowLabel, withPose } from '../src/preview2';
 import { fillTabGroups, groupWithRoom, tabGroups, type TabGroup } from '../src/workspace2/capacity';
 import { compilerIssues, runChecks } from '../src/workspace2/checks';
 import { addPage, addSheet, addTab, deleteSurface, duplicateSurface, openerCount, renameSurface, tabRoom } from '../src/workspace2/navigation/edit';
@@ -125,9 +125,9 @@ describe('windows and the split rule', () => {
     expect(splitGeometry(ipadSideways)).toMatchObject({ hinge: false, band: 1 });
   });
 
-  it('shows the flyout at regular width with no hinge and no rail (the iPad), and the tab bar or its rail otherwise', () => {
-    expect(previewWindows.map(win => usesFlyout(win))).toEqual([false, false, false, false, true, true, false]);
-    expect(usesFlyout(withPose(duoSideways, 'book'))).toBe(false);
+  it('puts the tabs at the top at regular width with no hinge and no rail (the iPad), and keeps the tab bar or its rail otherwise', () => {
+    expect(previewWindows.map(win => tabsAtTop(win))).toEqual([false, false, false, false, true, true, false]);
+    expect(tabsAtTop(withPose(duoSideways, 'book'))).toBe(false);
   });
 
   it('lists the windows by name, without their sizes', () => {
