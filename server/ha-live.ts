@@ -1,5 +1,5 @@
 import { projectNativeAttributes, projectNativeState } from './native-home';
-import { expandDocument } from '../src/shared/composition/components';
+import { expandDocument, ownedSources } from '../src/shared/composition/components';
 import { publishedDocument } from '../src/shared/composition/logic-library';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { NativeState } from '../src/shared/native-state';
@@ -412,8 +412,8 @@ export function documentAttributeReads(document: CompositionDocument): NativeAtt
   const entities = (sources: CompositionDocument['dataSources'], inherited: ReadonlyMap<string, string> = new Map()) => {
     const ids = new Map(inherited);
     for (const source of sources) {
-      if (source.kind !== 'ha-entity') continue;
       ids.delete(source.id);
+      if (source.kind !== 'ha-entity') continue;
       if (source.entityId.type === 'literal' && /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/.test(source.entityId.value)) ids.set(source.id, source.entityId.value);
     }
     return ids;
@@ -435,7 +435,7 @@ export function documentAttributeReads(document: CompositionDocument): NativeAtt
   const collect = (view: CompositionDocument) => {
     const ids = entities(view.dataSources);
     visit(view, ids);
-    for (const entry of view.componentLibrary ?? []) visit(entry, entities(entry.sources ?? [], ids));
+    for (const entry of view.componentLibrary ?? []) visit(entry, entities(ownedSources(entry), ids));
   };
   collect(document);
   collect(expandDocument(publishedDocument(document)));

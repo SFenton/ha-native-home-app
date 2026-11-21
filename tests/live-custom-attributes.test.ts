@@ -15,6 +15,8 @@ import { expandDocument } from '../src/shared/composition/components';
 import { publishedDocument } from '../src/shared/composition/logic-library';
 import type { CompositionDocument, CompositionNode } from '../src/shared/composition/schema';
 import type { Operand } from '../src/shared/composition/expression';
+import { objectOf, STRING } from '../src/shared/composition/pipeline/shape';
+import type { PipelineSource } from '../src/shared/composition/pipeline/schema';
 import type { NativeState } from '../src/shared/native-state';
 import fixture from './fixtures/composition-first-slice.json';
 import { fakeHomeAssistant } from './fake-ha-publication';
@@ -34,6 +36,36 @@ const draft = (...components: CompositionNode[]) => compileCompositionDocument({
   pages: fixture.document.pages.map((page, index) => index === 2 ? { ...page, components } : page),
 }).document;
 const raw = (attributes: Record<string, unknown>) => ({ entity_id: entityId, state: 'off', attributes });
+function privateFlowDraft(useLogic = false): CompositionDocument {
+  const base = draft();
+  const node = text('demo-private-body');
+  const flow: PipelineSource = {
+    id: sourceId, kind: 'model', model: 'pipeline@1',
+    inputs: {
+      title: 'Private line', parameters: [],
+      request: { type: 'none', value: { type: 'object', fields: {
+        attributes: { type: 'object', fields: { line: { type: 'literal', value: 'Private' } } },
+      } } },
+      steps: [], output: { kind: 'record' }, schema: objectOf({ attributes: objectOf({ line: STRING }) }),
+    },
+  };
+  return compileCompositionDocument({
+    ...base,
+    ...(useLogic ? { logicLibrary: [{
+      id: 'demo-private-logic', name: 'Private line', kind: 'operand', params: [{ name: 'src', kind: 'source-id' }],
+      body: { ...read('line'), from: { type: 'source', sourceId: { type: 'hole', name: 'src' }, path: ['attributes', 'line'] } },
+    }] } : {}),
+    componentLibrary: [{
+      id: 'demo-private-component', name: 'Private line', flows: [flow],
+      node: { ...node, props: { ...node.props, value: { type: 'expr', value: useLogic
+        ? { type: 'logic-ref', logicId: 'demo-private-logic', args: { src: sourceId } }
+        : read('line') } } },
+    }],
+    pages: base.pages.map((page, index) => index === 2 ? { ...page, components: [{
+      id: 'demo-private-instance', type: 'component-ref', componentId: 'demo-private-component', layout: { span: 1 },
+    }] } : page),
+  }).document;
+}
 const cleanup: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
@@ -108,6 +140,28 @@ describe('draft-scoped Home Assistant attribute reads', () => {
     expect(JSON.stringify(document)).toBe(before);
   });
 
+  it.each([false, true])('does not request global attributes shadowed by a private flow (logic: %s)', useLogic => {
+    const document = privateFlowDraft(useLogic);
+    const before = JSON.stringify(document);
+    expect(documentAttributeReads(document).get(entityId)).toBeUndefined();
+    const expanded = expandDocument(publishedDocument(document));
+    const env = createEnvironment(expanded, houseFrom({ states: [projectNativeState(raw({ line: 'Global' }), new Set(['line']))] }));
+    expect(env.read(sourceId, ['attributes', 'line'])).toEqual(value('Global'));
+    expect(env.read('demo-private-instance~demo-source', ['attributes', 'line'])).toEqual(unavailable);
+    expect(JSON.stringify(document)).toBe(before);
+    document.pages[2].components = [];
+    expect(documentAttributeReads(document).get(entityId)).toBeUndefined();
+  });
+
+  it('keeps inherited global reads inside a private flow when their source id is not shadowed', () => {
+    const document = privateFlowDraft();
+    document.dataSources.push({ ...source, id: 'demo-global-source' });
+    document.componentLibrary![0].flows![0].inputs.parameters.push({
+      name: 'line', type: 'string', value: read('line', 'string', 'demo-global-source'),
+    });
+    expect(documentAttributeReads(compileCompositionDocument(document).document).get(entityId)).toEqual(new Set(['line']));
+  });
+
   it('recomputes wanted attributes by revision even when the entity ids do not change', () => {
     let current = { revision: 1, document: draft(text('demo-line')) };
     const wanted = wantedAttributes(() => current);
@@ -122,8 +176,61 @@ describe('draft-scoped Home Assistant attribute reads', () => {
 });
 
 describe('safe custom attribute projection', () => {
-  it.each(['access_token', 'entity_picture', 'Entity_Picture', 'token_count', 'PASSWORD', 'passwd', 'session_secret', 'api_key', 'apiKey', 'credential_bundle', 'Authorization'])('never forwards denied name %s', name => {
-    expect(projectNativeState(raw({ [name]: 'private', line: 'Off' }), new Set([name, 'line'])).attributes).toEqual({ line: 'Off' });
+  it.each([
+    'access_token', 'entity_picture', 'Entity_Picture', 'Entity.Picture', 'token_count', 'PASSWORD', 'passwd', 'session_secret',
+    'api_key', 'apiKey', 'api-key', 'Api.Key', 'x_api_key', 'credential_bundle', 'Authorization',
+    'bearer', 'BeArEr', 'session', 'Session.Id', 'cookie', 'Set-Cookie', 'signature', 'Signature', 'sig', 'X-Sig',
+    'private-key', 'push_url', 'webhook',
+  ])('drops the entire attribute for denied top-level, nested and array key %s', name => {
+    const attributes = {
+      [name]: 'demo-private', line: 'Off',
+      nested: { label: 'Safe', details: { [name]: 'demo-private' } },
+      array: ['Safe', { [name]: 'demo-private' }],
+    };
+    expect(projectNativeState(raw(attributes), new Set(Object.keys(attributes))).attributes).toEqual({ line: 'Off' });
+  });
+
+  it.each([
+    '/api/camera_proxy/camera.demo_front?token=demo-private',
+    'https://demo.invalid/image?access_token=demo-private',
+    '/image?authSig=demo-private',
+    '/image?signature=demo-private',
+    '/image?key=demo-private',
+    '/image?sig=demo-private',
+    '/image?size=small&Api.Key=demo-private',
+    '/image?x_api_key=demo-private',
+    '/image?%74oken=demo-private',
+    'token=demo-private',
+    'access_token=demo-private',
+    'authSig=demo-private',
+    'signature=demo-private',
+    'key=demo-private',
+    'metadata:token=demo-private',
+    'metadata:key=demo-private',
+    'Image URL: /image?TOKEN=demo-private',
+    'Bearer demo-private',
+    'bearer demo-private',
+    'Authorization:Bearer demo-private',
+    'https://demo-user:demo-password@demo.invalid/image',
+    '//demo-user:demo-password@demo.invalid/image',
+    String.raw`https:\demo-user:demo-password@demo.invalid/image`,
+    'Image URL: https://demo-user:demo-password@demo.invalid/image',
+  ])('drops the entire attribute for credential-bearing strings at any depth: %s', input => {
+    const attributes = {
+      line: 'Off', thumbnail: input,
+      nested: { label: 'Safe', details: { url: input } },
+      array: ['Safe', { url: input }],
+      deep_array: [['Safe'], [input]],
+    };
+    expect(projectNativeState(raw(attributes), new Set(Object.keys(attributes))).attributes).toEqual({ line: 'Off' });
+  });
+
+  it('keeps ordinary strings, public URLs and non-sensitive keys', () => {
+    const attributes = {
+      thumbnail: '/api/camera_proxy/camera.demo_front?width=120',
+      details: { signal: 'Strong', design: 'Compact', key: 'demo-row', note: 'Token count is 3', url: 'https://demo.invalid/image?size=small' },
+    };
+    expect(projectNativeState(raw(attributes), new Set(Object.keys(attributes))).attributes).toEqual(attributes);
   });
 
   it('keeps JSON scalars, arrays and objects, but rejects non-JSON values and nested credential fields', () => {
@@ -184,6 +291,21 @@ const statesOf = (message: LiveMessage): NativeState[] => message.type === 'stat
 
 describe('live draft revisions and session isolation', () => {
   beforeEach(() => vi.useFakeTimers());
+
+  it('does not stream global attributes requested only through a shadowing private flow', () => {
+    const { hub, socket } = liveHub();
+    const messages: LiveMessage[] = [], document = privateFlowDraft(true);
+    cleanup.push(openLiveSession(hub, () => new Set([entityId]), message => messages.push(message), {
+      attributes: wantedAttributes(() => ({ revision: 1, document })),
+    }));
+    socket.connect({ line: 'Global' });
+    vi.advanceTimersByTime(60);
+    expect(statesOf(messages.at(-1)!)).toEqual([projectNativeState(raw({ line: 'Global' }))]);
+    messages.length = 0;
+    socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: 'Unrequested update' } } } } } });
+    vi.advanceTimersByTime(60);
+    expect(messages).toEqual([]);
+  });
 
   it('adds, replaces and removes custom attributes without needing an HA state change', () => {
     const { hub, socket } = liveHub();
