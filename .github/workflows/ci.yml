@@ -22,6 +22,11 @@ jobs:
       - run: npm run scan:house
       - run: npm run check:release
       - run: npm test
+      # The edit boundary's timing gates, on their own: inside the parallel suite above they only report.
+      - name: edit boundary timing gates
+        run: npx vitest run tests/flows-canvas/integration/edit-boundary-cost.test.ts
+        env:
+          EDIT_BOUNDARY_GATES: '1'
       - run: npm run build
 
   # The browser specs share one dev server and data directory per run, so each shard is its own runner and keeps that

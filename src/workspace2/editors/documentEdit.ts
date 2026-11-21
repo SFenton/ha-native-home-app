@@ -58,6 +58,8 @@ interface ReferenceIndex {
   readonly members: WeakSet<object>;
   /** How often each object occurs in the indexed revision. */
   readonly counts: ReadonlyMap<object, number>;
+  /** The indexed revision itself: `counts` are exact for it, and only for it (not for the revisions the index is carried to). */
+  readonly revision: CompositionDocument;
   /** Keys whose witness could not be carried forward; every edit reconciles these. */
   readonly always: ReadonlySet<string>;
   /** Canvas roots a full rebase would not give back unchanged; every edit rebases these. */
@@ -441,7 +443,24 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
   const committed = (value: object) => indexed !== undefined && (indexed.counts.has(value) || indexed.members.has(value));
   const walk = canvasWalk(committed), editNodes = walkedNodes(edit, walk);
   const pathsOfEdit = () => editPaths ??= objectPaths(edit);
-  const locate = (pointer: string) => referencePaths(before, pathsOfEdit())(pointer);
+  /**
+   * `referencePaths(before, objectPaths(edit))`, without indexing the candidate where the index counts `before` exactly. An
+   * object occurring once in `before` that the edit placed nowhere new (`placements` sees every position where the
+   * candidate holds an object `before` did not hold there) occurs in the candidate once if it is still at its own path,
+   * and nowhere if not. Any other object is looked up in the candidate's full index.
+   */
+  const locate = (pointer: string): EditorPath | undefined => {
+    const exact = indexed?.revision === before ? indexed.counts : undefined;
+    if (!exact) return referencePaths(before, pathsOfEdit())(pointer);
+    const path = pointerPath(pointer);
+    for (let depth = path.length; depth > 0; depth--) {
+      const prefix = path.slice(0, depth), value = valueAt(before, prefix);
+      if (value === null || typeof value !== 'object') continue;
+      if (exact.get(value) !== 1 || placements.has(value)) return referencePaths(before, pathsOfEdit())(pointer);
+      if (valueAt(edit, prefix) === value) return path;
+    }
+    return undefined;
+  };
   /** A field's anchor in the candidate; a field without one owner (duplicate IDs, say) refuses rather than throws. */
   const anchorAt = (path: EditorPath) => {
     try { return fieldAnchor(edit, path, editNodes, anchor => (editResolver ??= new AnchorResolver(edit, committed)).resolve(anchor)); } catch { return refuse(); }
@@ -614,7 +633,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
         watchAnchor(build, root.anchor, [key]);
       }
     }
-    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, counts, always,
+    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, counts, revision: before, always,
       uncertified: stored?.success ? uncertifiedCanvasRoots(before, stored.data) : new Set(), unshaped, ...(stored?.success ? { stored: stored.data } : {}) };
     revisions.set(before, indexed);
   }
@@ -681,6 +700,9 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       const uncertified = new Set([...index.uncertified].filter(root => !reached.has(root)));
       for (const root of uncertifiedCanvasRoots(document, rebased, reached, walk)) uncertified.add(root);
       carried = { ...index, stored: rebased, usable: true, uncertified };
+      // The carried index takes the rebased metadata as its own parse; a later index of a revision holding this object
+      // reads the same (and so keeps the per-root memos keyed by its root objects).
+      if (!parsedLayouts.has(rebased)) parsedLayouts.set(rebased, { success: true, data: rebased } as ReturnType<typeof studioCanvasMetadataSchema.safeParse>);
     }
     if (!carried) return document;
     // A witness is still proof when it stayed in place (it was placed nowhere new) or is a fresh object (in no earlier

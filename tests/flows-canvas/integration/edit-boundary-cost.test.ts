@@ -7,8 +7,14 @@
  *
  * The fixture is the binding invariant suite's per-edit overhead document (copied tiles, each with an automatic binding
  * and a canvas root; at 256, half are component parameters on a forked template). Medians print as
- * `Edit boundary cost: ...`. Gated: a rename as the first edit after a single-tile insert at 256 bindings, and the field
- * editor's first declared typing keystroke after one at 66; everything else reports.
+ * `Edit boundary cost: ...`. Gated: a rename as the first edit after a single-tile insert at 256 bindings (<= 5 ms), and the
+ * field editor's first declared typing keystroke after one at 66 (<= 8 ms); everything else reports.
+ *
+ * The gates assert only with `EDIT_BOUNDARY_GATES=1`, on a runner doing nothing else: CI runs this file on its own, serially,
+ * after `npm test`, with
+ * `EDIT_BOUNDARY_GATES=1 npx vitest run tests/flows-canvas/integration/edit-boundary-cost.test.ts`. Inside the parallel
+ * suite the gated medians are reported (marked report-only) and every correctness assertion still runs.
+ * `EDIT_BOUNDARY_SLOWDOWN` scales both gates for slower hardware.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { replaceAt, valueAt } from '../../../src/composition-editor';
@@ -55,6 +61,9 @@ function document(count: number): Doc {
   return before;
 }
 
+/** Whether the timing gates assert (see the header); otherwise they are reported only. */
+const GATED = process.env.EDIT_BOUNDARY_GATES === '1';
+const SLOWDOWN = Number(process.env.EDIT_BOUNDARY_SLOWDOWN) || 1;
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const spacer = (id: string) => ({ ...tile(id, 'source-a'), props: { family: 'neutral', selected: 'navigation-path', titleProviderId: 'source-a' } }) as unknown as CompositionNode;
 /** Run `measure` 5 times to warm up, then 15 times; the median of the last 15. */
@@ -80,7 +89,7 @@ describe('edit boundary cost after structural edits', () => {
     let before = document(count);
     before = documentEdit(before, { ...before, name: 'Indexed' });
     const roots = studioCanvasMetadataSchema.parse(before.studioCanvas).canvases.flatMap(canvas => canvas.roots).length;
-    const report = (edit: string, value: number, gate?: number) => process.stdout.write(`Edit boundary cost: ${count} bindings (${roots} canvas roots); ${edit}; median ${value.toFixed(4)} ms; ${gate === undefined ? 'report-only' : `<=${gate}ms gate`}.\n`);
+    const report = (edit: string, value: number, gate?: number) => process.stdout.write(`Edit boundary cost: ${count} bindings (${roots} canvas roots); ${edit}; median ${value.toFixed(4)} ms; ${gate === undefined ? 'report-only' : `<=${gate}ms gate${GATED ? `, margin ${(gate / value).toFixed(2)}x` : ' (report-only: EDIT_BOUNDARY_GATES is not 1)'}`}.\n`);
 
     // A revision nothing indexed, sharing every owner with an indexed one.
     report('first edit of an unindexed revision', sample(index => {
@@ -104,7 +113,7 @@ describe('edit boundary cost after structural edits', () => {
       if (index >= 0) { inserts.push(insert); firsts.push(first); }
     }
     report('single-tile insert at the end of the bound page', median(inserts));
-    const gate = count === 256 ? 5 * (Number(process.env.EDIT_BOUNDARY_SLOWDOWN) || 1) : undefined;
+    const gate = count === 256 ? 5 * SLOWDOWN : undefined;
     report('first edit after a single-tile insert', median(firsts), gate);
 
     // A tile inserted at the top of the bound page (shifting every bound tile there), then the next edit.
@@ -143,12 +152,12 @@ describe('edit boundary cost after structural edits', () => {
       current = result;
       if (index >= 0) { steady.push(again); typed.push(first); }
     }
-    const typingGate = count === 66 ? 8 * (Number(process.env.EDIT_BOUNDARY_SLOWDOWN) || 1) : undefined;
+    const typingGate = count === 66 ? 8 * SLOWDOWN : undefined;
     report('declared slot typing on an indexed revision', median(steady));
     report('declared slot typing as the first edit after a single-tile insert', median(typed), typingGate);
     report('index rebuild in that first typing edit (difference of medians)', median(typed) - median(steady));
-    if (gate !== undefined) expect(median(firsts)).toBeLessThanOrEqual(gate);
-    if (typingGate !== undefined) expect(median(typed)).toBeLessThanOrEqual(typingGate);
+    if (GATED && gate !== undefined) expect(median(firsts)).toBeLessThanOrEqual(gate);
+    if (GATED && typingGate !== undefined) expect(median(typed)).toBeLessThanOrEqual(typingGate);
   }, 60_000);
 
   it('the memoized index agrees with the whole-document reconciliation across structural edits at 66 bindings', () => {

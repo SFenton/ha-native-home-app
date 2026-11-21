@@ -458,7 +458,9 @@ by every edit, as the oracle would.
 
 Building an index is memoized by the identity of committed objects:
 
-- canvas metadata parses, by the stored `studioCanvas` object;
+- canvas metadata parses, by the stored `studioCanvas` object (a rebase's
+  output is recorded as its own parse, as the index carried with it already
+  takes it);
 - each owner's logic nodes by ID, and each owner's and walked node's recorded
   scan reads (shared read tries mounted where the object sits), by the owner or
   node object;
@@ -483,9 +485,13 @@ never memo keys beyond one call.
 
 This makes a rebuild cheap where owners and nodes are kept, not proportional to
 the edit. A rebuild still walks the whole revision once to count objects, and
-lists every binding and root; an edit that reconciles a located binding still
-indexes the candidate's object paths and authored nodes, and automatic
-bindings walk the uses of their logic entry, over the whole candidate.
+lists every binding and root. An edit that reconciles a located binding finds
+where retained objects went from those counts and the edit's own placements
+when its index was built for `before` (an object counted once there, placed
+nowhere new, is still at its own path or gone); otherwise, and for any object
+that test cannot settle, it indexes the candidate's object paths. It still
+walks the candidate's authored nodes, and automatic bindings walk the uses of
+their logic entry, over the whole candidate.
 
 The scoped boundary is defined by equivalence with the whole-document
 reconciliation of `5b28fc4`, kept verbatim in
@@ -530,8 +536,14 @@ one. `EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the
 documented deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
 documents (as JSON, which drops the aliasing many disagreements depend on:
 replay the seed to reproduce one). `edit-boundary-cost.test.ts` reports the
-first edit after a structural change, gates a rename at 256 bindings and the
-first declared typing keystroke at 66, and reports the rebuild's share.
+first edit after a structural change, gates a rename at 256 bindings (5 ms) and
+the first declared typing keystroke at 66 (8 ms), and reports the rebuild's
+share. The gates assert only with `EDIT_BOUNDARY_GATES=1`: CI runs the file on
+its own after `npm test`, and inside the parallel suite it only reports (its
+correctness assertions still run). To run the gated step locally, on an
+otherwise idle machine:
+`EDIT_BOUNDARY_GATES=1 npx vitest run tests/flows-canvas/integration/edit-boundary-cost.test.ts`
+(`EDIT_BOUNDARY_SLOWDOWN=<factor>` scales both gates).
 
 The `oracle/` copy is the specification. Never "fix" it to make a test pass: a
 disagreement is a bug in the scoped boundary unless the specification itself is
