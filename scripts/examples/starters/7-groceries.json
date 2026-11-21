@@ -1,0 +1,75 @@
+{
+  "id": "groceries",
+  "title": "Groceries count and checklist",
+  "purpose": "Shows the grocery count on its link while keeping an empty checklist available for adding items.",
+  "where": "Groceries navigation tile subtitle and Groceries page checklist provider",
+  "construct": "operand",
+  "entities": [
+    { "id": "todo.demo_todo_2", "provenance": "synthetic-demo", "replaceWith": "The owner's grocery to-do list, whose state supplies its open-item count" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.assets.publisher@1", "sh.backdrop@1", "sh.bindings@1",
+    "sh.chrome@1", "sh.collection@1", "sh.composition@1", "sh.grid@1", "sh.operands@1",
+    "sh.page@1", "sh.power-toggle@1", "sh.rules@1", "sh.sheet@1", "sh.shell@1",
+    "sh.symbols@1", "sh.text@1", "sh.tile-ink-default@1", "sh.tiles@1", "sh.todo-collection@1"
+  ],
+  "changes": [
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "groceries", "kind": "ha-entity", "entityId": { "type": "literal", "value": "todo.demo_todo_2" } } },
+    {
+      "op": "add", "pointer": "/dataSources/-",
+      "value": {
+        "id": "grocery-checklist", "kind": "model", "model": "todo-collection@1",
+        "inputs": {
+          "title": "Groceries",
+          "lists": [{ "title": "Grocery List", "entityId": { "type": "literal", "value": "todo.demo_todo_2" }, "hideCompleted": true, "hideWhenNoOpenItems": false }],
+          "addAction": { "type": "grocery", "entityId": { "type": "literal", "value": "todo.demo_todo_2" } },
+          "hideListHeaders": false, "hiddenByVacation": false,
+          "empty": { "title": "No Groceries Listed", "description": "Add some groceries to see them appear." }
+        }
+      }
+    },
+    { "op": "replace", "pointer": "/pages/0/components/0/children/1/title", "value": "Groceries" },
+    { "op": "replace", "pointer": "/pages/2/title", "value": "Groceries" },
+    {
+      "op": "replace", "pointer": "/pages/0/components/0/children/1/props/subtitle",
+      "value": {
+        "type": "expr",
+        "value": {
+          "type": "map",
+          "of": { "type": "read", "from": { "type": "source", "sourceId": "groceries", "path": ["state"] }, "as": "number", "missing": "unavailable" },
+          "cases": [
+            { "equals": 0, "then": { "type": "literal", "value": "No groceries listed" } },
+            { "equals": 1, "then": { "type": "literal", "value": "1 item" } }
+          ],
+          "otherwise": {
+            "type": "format", "pattern": "{count} items",
+            "args": { "count": { "type": "read", "from": { "type": "source", "sourceId": "groceries", "path": ["state"] }, "as": "number", "missing": "unavailable" } }
+          }
+        },
+        "fallback": "Groceries unavailable"
+      }
+    },
+    {
+      "op": "add", "pointer": "/pages/2/components/-",
+      "value": {
+        "id": "grocery-items", "title": "Groceries", "type": "collection", "layout": {},
+        "props": { "providerId": "grocery-checklist", "template": "todo", "loadingText": "Loading groceries", "emptyText": "No Groceries Listed" }
+      }
+    }
+  ],
+  "simulation": [
+    { "name": "Zero still leaves the list and navigation available", "inputs": { "entities": { "todo.demo_todo_2": { "state": "0", "todoList": { "status": "ready", "items": [] } } } }, "expect": { "answer": { "status": "value", "value": "No groceries listed" }, "text": { "status": "value", "value": "No groceries listed" }, "visible": true, "checklist": { "items": [], "listVisible": true, "message": null } } },
+    { "name": "One item with completed rows hidden", "inputs": { "entities": { "todo.demo_todo_2": { "state": "1", "todoList": { "status": "ready", "items": [{ "uid": "g1", "summary": "Milk", "status": "needs_action" }, { "uid": "g2", "summary": "Bread", "status": "completed" }] } } } }, "expect": { "answer": { "status": "value", "value": "1 item" }, "text": { "status": "value", "value": "1 item" }, "visible": true, "checklist": { "items": ["Milk"], "listVisible": true, "message": null } } },
+    { "name": "Plural count with open rows", "inputs": { "entities": { "todo.demo_todo_2": { "state": "3", "todoList": { "status": "ready", "items": [{ "uid": "g1", "summary": "Milk", "status": "needs_action" }, { "uid": "g2", "summary": "Bread", "status": "needs_action" }, { "uid": "g3", "summary": "Apples", "status": "needs_action" }] } } } }, "expect": { "answer": { "status": "value", "value": "3 items" }, "text": { "status": "value", "value": "3 items" }, "visible": true, "checklist": { "items": ["Milk", "Bread", "Apples"], "listVisible": true, "message": null } } },
+    { "name": "Only completed items keep the empty list reachable", "inputs": { "entities": { "todo.demo_todo_2": { "state": "0", "todoList": { "status": "ready", "items": [{ "uid": "g2", "summary": "Bread", "status": "completed" }] } } } }, "expect": { "answer": { "status": "value", "value": "No groceries listed" }, "text": { "status": "value", "value": "No groceries listed" }, "visible": true, "checklist": { "items": [], "listVisible": true, "message": null } } },
+    { "name": "Unavailable count is fallback, never zero", "inputs": { "entities": { "todo.demo_todo_2": { "state": "unavailable", "todoList": { "status": "unavailable", "message": "Groceries unavailable" } } } }, "expect": { "answer": { "status": "unavailable" }, "text": { "status": "value", "value": "Groceries unavailable" }, "visible": true, "checklist": { "items": [], "listVisible": true, "message": "Groceries unavailable" } } },
+    { "name": "Unknown count is fallback, never zero", "inputs": { "entities": { "todo.demo_todo_2": { "state": "unknown", "todoList": { "status": "unavailable", "message": "Groceries unavailable" } } } }, "expect": { "answer": { "status": "unavailable" }, "text": { "status": "value", "value": "Groceries unavailable" }, "visible": true, "checklist": { "items": [], "listVisible": true, "message": "Groceries unavailable" } } },
+    { "name": "Malformed count is not silently repaired to zero", "inputs": { "entities": { "todo.demo_todo_2": { "state": "not a count", "todoList": { "status": "unavailable", "message": "Groceries unavailable" } } } }, "expect": { "answer": { "status": "unavailable" }, "text": { "status": "value", "value": "Groceries unavailable" }, "visible": true, "checklist": { "items": [], "listVisible": true, "message": "Groceries unavailable" } } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/composition-first-slice.json. The existing navigation tile already pushes the detail page; these changes preserve that action and add the checklist there.",
+    "No grammar correction. Count words assume HA's nonnegative integer count; they do not implement malformed-count sanitization. Unknown, unavailable and nonnumeric input use the authored fallback.",
+    "Checklist cases render the real todo provider with pinned todoList data. They do not operate Add/Complete or claim native Undo parity.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest."
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "id": "selected-lights-on",
+  "title": "Selected Lights On",
+  "purpose": "Lists the selected lights that currently report On in the Lights detail.",
+  "where": "Home, Lights detail page, Selected Lights On row collection provider",
+  "construct": "flow",
+  "entities": [
+    { "id": "light.demo_office_light_item_1", "provenance": "synthetic-demo", "replaceWith": "An Office light to include in this explicit selection" },
+    { "id": "light.demo_kitchen_light_1", "provenance": "synthetic-demo", "replaceWith": "The Kitchen Table light to include in this selection" },
+    { "id": "light.demo_gym_light_item_1", "provenance": "synthetic-demo", "replaceWith": "A Gym light to include in this selection" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.backdrop@1", "sh.bindings@1", "sh.chrome@1", "sh.composition@1",
+    "sh.grid@1", "sh.home-light@1", "sh.home-status@1", "sh.home-weather@1", "sh.light-group-tile@1",
+    "sh.page@1", "sh.pipeline-operands@1", "sh.pipeline@1", "sh.room-overview-tile@1", "sh.row-collection@1",
+    "sh.sheet@1", "sh.shell@1", "sh.status-chip@1", "sh.status-rail@1", "sh.symbols@1",
+    "sh.tile-ink-default@1", "sh.weather-panel@1"
+  ],
+  "changes": [
+    {
+      "op": "add", "pointer": "/dataSources/-",
+      "value": {
+        "id": "selected-lights-on", "kind": "model", "model": "pipeline@1",
+        "inputs": {
+          "title": "Selected Lights On", "parameters": [],
+          "request": {
+            "type": "entities", "entityIds": [
+              { "type": "literal", "value": "light.demo_office_light_item_1" },
+              { "type": "literal", "value": "light.demo_kitchen_light_1" },
+              { "type": "literal", "value": "light.demo_gym_light_item_1" }
+            ], "attributes": []
+          },
+          "steps": [
+            { "id": "on", "op": "filter", "where": { "type": "compare", "op": "eq", "left": { "type": "item", "path": ["state"] }, "right": { "type": "literal", "value": "on" } } },
+            {
+              "id": "labels", "op": "map", "fields": {
+                "id": { "type": "item", "path": ["entityId"] },
+                "title": {
+                  "type": "map", "of": { "type": "item", "path": ["entityId"] },
+                  "cases": [
+                    { "equals": "light.demo_office_light_item_1", "then": { "type": "literal", "value": "Office Light" } },
+                    { "equals": "light.demo_kitchen_light_1", "then": { "type": "literal", "value": "Kitchen Table Light" } },
+                    { "equals": "light.demo_gym_light_item_1", "then": { "type": "literal", "value": "Gym Light" } }
+                  ],
+                  "otherwise": { "type": "item", "path": ["entityId"] }
+                }
+              }
+            }
+          ],
+          "output": { "kind": "rows", "max": 3, "row": { "id": { "type": "item", "path": ["id"] }, "title": { "type": "item", "path": ["title"] }, "subtitle": { "type": "literal", "value": "On" } } },
+          "schema": { "kind": "array", "of": { "kind": "object", "fields": { "id": { "shape": { "kind": "string" } }, "title": { "shape": { "kind": "string" } } } } }
+        }
+      }
+    },
+    {
+      "op": "add", "pointer": "/pages/1/components/-",
+      "value": {
+        "id": "selected-lights-on-list", "title": "Selected Lights On", "type": "row-collection", "layout": {},
+        "props": {
+          "providerId": "selected-lights-on", "loadingText": "Loading light states",
+          "emptyText": "No selected lights report On", "unavailableText": "Light states unavailable",
+          "errorText": "Unable to read light states", "staleText": "Showing earlier light states"
+        }
+      }
+    }
+  ],
+  "simulation": [
+    { "name": "Office and Gym are On in configured order", "inputs": { "entities": { "light.demo_office_light_item_1": { "state": "on" }, "light.demo_kitchen_light_1": { "state": "off" }, "light.demo_gym_light_item_1": { "state": "on" } } }, "expect": { "answered": true, "rows": [{ "id": "light.demo_office_light_item_1", "title": "Office Light", "subtitle": "On" }, { "id": "light.demo_gym_light_item_1", "title": "Gym Light", "subtitle": "On" }], "emptyText": null } },
+    { "name": "All Off gives qualified empty copy", "inputs": { "entities": { "light.demo_office_light_item_1": { "state": "off" }, "light.demo_kitchen_light_1": { "state": "off" }, "light.demo_gym_light_item_1": { "state": "off" } } }, "expect": { "answered": true, "rows": [], "emptyText": "No selected lights report On" } },
+    { "name": "Unavailable is not a claim that all lights are Off", "inputs": { "entities": { "light.demo_office_light_item_1": { "state": "unavailable" }, "light.demo_kitchen_light_1": { "state": "off" }, "light.demo_gym_light_item_1": { "state": "off" } } }, "expect": { "answered": true, "rows": [], "emptyText": "No selected lights report On" } },
+    { "name": "Missing entities use the real request's unavailable rows", "inputs": { "entities": {} }, "expect": { "answered": true, "rows": [], "emptyText": "No selected lights report On" } },
+    { "name": "Unknown excluded while known On is retained", "inputs": { "entities": { "light.demo_office_light_item_1": { "state": "unknown" }, "light.demo_kitchen_light_1": { "state": "on" } } }, "expect": { "answered": true, "rows": [{ "id": "light.demo_kitchen_light_1", "title": "Kitchen Table Light", "subtitle": "On" }], "emptyText": null } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/home-primitives.json, existing Lights detail page. The full overview is retained for unavailable-state diagnostics.",
+    "No grammar correction. The actual entities request builds unavailable rows for missing members; this is a list of reporting-On lights, not an availability monitor or an All Off assertion.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest."
+  ]
+}

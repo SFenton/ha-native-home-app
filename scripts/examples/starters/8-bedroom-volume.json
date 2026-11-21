@@ -1,0 +1,51 @@
+{
+  "id": "bedroom-volume",
+  "title": "Bedroom Streamer volume visibility",
+  "purpose": "Hides the Bedroom Streamer's volume controls when their own player is off or unavailable.",
+  "where": "Bedroom 1 page, Streamer remote, volume node visibleWhen and whenUnknown fields",
+  "construct": "visibility",
+  "entities": [
+    { "id": "media_player.demo_media_player_4", "provenance": "synthetic-demo", "replaceWith": "The Bedroom 1 remote's volume entity, not its separate control entity" },
+    { "id": "media_player.demo_streamer_control", "provenance": "synthetic-demo", "replaceWith": "Simulation-only stand-in for the remote's separate control entity; retain the owner's existing remote provider mapping" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.backdrop@1", "sh.bindings@1", "sh.chrome@1",
+    "sh.composition@1", "sh.conditions@1", "sh.media-remote@1", "sh.operands@1",
+    "sh.page@1", "sh.raw-state@1", "sh.remote-app@1", "sh.remote-card@1", "sh.remote-device@1",
+    "sh.remote-hue-brightness@1", "sh.remote-hue-choice@1", "sh.remote-hue-input@1",
+    "sh.remote-hue-toggle@1", "sh.remote-keyboard@1", "sh.remote-keys@1", "sh.remote-volume@1",
+    "sh.shell@1", "sh.symbols@1", "sh.tile-ink-default@1", "sh.visible-when@1"
+  ],
+  "changes": [
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "bedroom-volume", "kind": "ha-entity", "entityId": { "type": "literal", "value": "media_player.demo_media_player_4" } } },
+    {
+      "op": "add", "pointer": "/pages/0/components/2/visibleWhen",
+      "value": {
+        "type": "not",
+        "of": {
+          "type": "in", "value": { "type": "raw-state", "sourceId": "bedroom-volume" },
+          "in": [{ "type": "literal", "value": "off" }, { "type": "literal", "value": "unknown" }, { "type": "literal", "value": "unavailable" }]
+        }
+      }
+    },
+    { "op": "add", "pointer": "/pages/0/components/2/whenUnknown", "value": "hide" }
+  ],
+  "simulation": [
+    { "name": "On volume is visible", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "on" } } }, "expect": { "answer": "yes", "visible": true, "powerVisible": true } },
+    { "name": "Playing volume is visible", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "playing" } } }, "expect": { "answer": "yes", "visible": true, "powerVisible": true } },
+    { "name": "Idle volume is visible", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "idle" } } }, "expect": { "answer": "yes", "visible": true, "powerVisible": true } },
+    { "name": "Off volume is hidden, not power", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "off" } } }, "expect": { "answer": "no", "visible": false, "powerVisible": true } },
+    { "name": "Unknown volume is hidden", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "unknown" } } }, "expect": { "answer": "no", "visible": false, "powerVisible": true } },
+    { "name": "Unavailable volume is hidden", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "unavailable" } } }, "expect": { "answer": "no", "visible": false, "powerVisible": true } },
+    { "name": "Missing volume is Can't Tell and hidden", "inputs": { "entities": {} }, "expect": { "answer": "unknown", "visible": false, "powerVisible": true } },
+    { "name": "Separate control On does not reveal Off volume", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "off" }, "media_player.demo_streamer_control": { "state": "on" } } }, "expect": { "answer": "no", "visible": false, "powerVisible": true } },
+    { "name": "Separate control Off does not hide On volume", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "on" }, "media_player.demo_streamer_control": { "state": "off" } } }, "expect": { "answer": "yes", "visible": true, "powerVisible": true } },
+    { "name": "Separate control unavailable does not hide On volume", "inputs": { "entities": { "media_player.demo_media_player_4": { "state": "on" }, "media_player.demo_streamer_control": { "state": "unavailable" } } }, "expect": { "answer": "yes", "visible": true, "powerVisible": true } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/remote-composition.json, existing volume node at components/2 and separate power key at components/0. Provider binding, volume keys and power node remain unchanged.",
+    "No grammar correction. The visibility fields belong on the node, not inside props.",
+    "The extra demo_streamer_control entity is an explicitly invented simulation-only input, not a historically verified entity ID or an added provider mapping.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest. This is browser/pure-evaluator proof, not real volume control or native behavior proof."
+  ]
+}

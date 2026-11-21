@@ -6,9 +6,11 @@ entity-state binding, not a flow.** The strongest actual flow starters are a
 list of lights reporting On and a due-sorted list of overdue tasks. Reusable
 Home/Away logic and contextual visibility rules solve different problems.
 
-This is a research handoff, not an applied change, publication, or device test.
-The [F7 delivery contract][feedback], [Flows decisions and grammar][flows],
-and [configuration/storage rules][configuration] remain authoritative.
+This research now has [compiler-proven configuration change files](../scripts/examples/starters/README.md)
+and local simulation evidence in [Verification](#verification). It is not an
+applied change, publication, or device test. The [F7 delivery contract][feedback],
+[Flows decisions and grammar][flows], and [configuration/storage rules][configuration]
+remain authoritative.
 
 ## Evidence boundary and entity provenance
 
@@ -127,9 +129,25 @@ on. Native evidence: [PC config][pc-config], [old PC golden][pc-golden].
 
 **Schema:** `stateTileBindingSchema`/`stateOverrideSchema`
 ([state-styles.ts:109][state-binding]); `stateTile`
-([schema.ts:342][state-tile-schema]). The built-in switch style accepts
-`input_boolean` and has no authored service action in this sketch
-([state-styles.ts:224][switch-style]).
+([schema.ts:342][state-tile-schema]). **Compiler correction:** the built-in
+switch style has domain `switch`; it rejects this `input_boolean` binding,
+despite the Studio's suggestion helper offering it. Keep the cited power
+helper and add this display-only entry to `document.stateStyles.styles`
+(create the `{"type":"state-styles@1","styles":[...]}` library only if absent):
+
+```json
+{
+  "id":"pc-power-display","name":"PC power display","domain":"input_boolean",
+  "rules":[
+    {"states":["on"],"class":"resting","active":true,"text":"On"},
+    {"states":["off"],"class":"resting","active":false,"text":"Off"},
+    {"states":["unknown","unavailable"],"class":"unknown","active":false,"text":"Unavailable"}
+  ],
+  "fallback":{"class":"unknown","active":false,"text":"Unavailable"}
+}
+```
+
+It declares no service action and does not change the power helper's domain.
 
 Insert/replace the corresponding tile node, preserving an existing action if
 the downstream scope is display-only:
@@ -143,8 +161,7 @@ the downstream scope is display-only:
   "icon":{"type":"sf-symbol","name":"desktopcomputer","rendering":"canonical","unavailable":"fallback"},
   "binding":{
     "entityId":"input_boolean.demo_power_2",
-    "builtIn":"switch",
-    "overrides":[{"state":"on","text":"On"},{"state":"off","text":"Off"}]
+    "styleId":"pc-power-display"
   },
   "props":{}
 }
@@ -780,22 +797,59 @@ option). The script refuses owner unpublished edits, stale bases, a mismatched
 Studio/document, invalid evidence or excess scope. It must not be bypassed
 with the import/migration scripts. The [F7 fallback][feedback] requires a
 validated reviewable change plus corpus proof when no loopback Studio exists;
-**this research document is not that delivery artifact**, and the real-ID
-mapping remains a dependency for owner-targeted content.
+the [eight reviewable change files](../scripts/examples/starters/README.md)
+and [their fixture-based compiler tests](../tests/flows-starters.test.ts) now
+supply that offline delivery artifact. The real-ID mapping and actual Studio
+base remain dependencies for owner-targeted content.
 
-## Research evidence and remaining verification
+## Verification
 
-All JSON fences are intended to be parsed as independent JSON values; types,
-scopes and consumers are tied to the source citations above. Existing corpus
-precedents were inspected, not executed.
+Local verification on 2026-11-20 installed the lockfile with `npm ci` and ran
+`npx vitest run tests/flows-starters.test.ts`: **72 tests passed**, comprising
+eight independent compiler/manifest proofs, 63 simulation cases, and the
+eight-file inventory check. `npm run typecheck` also passed. Unlike the
+initial research checkout, this worktree has `tsx` available.
 
-An in-memory compiler import was attempted with
-`node --import tsx --input-type=module`; it failed with
-`ERR_MODULE_NOT_FOUND: Cannot find package 'tsx'` in this checkout. No
-dependencies were installed because this worker owns only this document.
-Accordingly this handoff makes **no compiler-pass, browser-scenario-pass,
-publish, or native-runtime claim**. The simulation cases above are acceptance
-instructions for the content/verifier task, not fabricated observations.
+The required full checks also passed: `npm test` completed with **295 test
+files passed, 15,175 tests passed, and 1 skipped**; `npm run build` completed
+TypeScript checking and the Vite production build. These checks used isolated
+test resources, not the owner's data. The build reported dependency annotation
+and bundle-size warnings, not errors.
+
+| Starter | Compiler and exact capabilities | Simulation results | Recipe corrections / limits proved |
+| --- | --- | --- | --- |
+| 1. Office PC | Pass | 6/6 pass | Replaced the rejected built-in `switch` binding with an `input_boolean` display style; unknown, unavailable and absent power never say Off. Caption remains an independent read. |
+| 2. Predictive PC heat | Pass | 6/6 pass | No grammar correction. Missing attribute/model is Can't Tell and hidden; only inclusion in the model's declared activity list reveals the explanation. |
+| 3. Effective Away | Pass | 11/11 pass | No grammar correction. Explicit unknown/unavailable mode uses the known fallback; a missing mode is Can't Tell with the neutral notice shown. The template expands away. |
+| 4. Office Windows | Pass | 13/13 pass | No grammar correction. Closed first, armed before Away, explicit unavailable copy, and missing-read Choose stalling/retention all proved. The test-only tile uses the valid `notice` style for its binary sensor; no `contact` built-in exists. |
+| 5. Selected Lights On | Pass | 5/5 pass | No grammar correction. Real `entityRows` preserves configured order and represents missing members as unavailable strings. Empty output says only "No selected lights report On," never "All Off." |
+| 6. Past Due Tasks | Pass | 5/5 pass | No grammar correction. Oldest-first rows show 7/4 days overdue and singular yesterday; completed/today/future/undated rows are excluded. Both failed and not-yet-answered captures have no result and a missing-response diagnostic, not an empty-list claim. |
+| 7. Groceries | Pass | 7/7 pass | No grammar correction. Real text evaluation and checklist rendering prove count words, unavailable fallback, completed-item hiding, empty-list visibility, and preservation of the navigation action. |
+| 8. Bedroom volume | Pass | 10/10 pass | No grammar correction. Rule is on the node; missing volume is Can't Tell/hidden. Provider/volume keys and the separate visible power node are unchanged. Varying the synthetic control entity does not alter volume visibility. |
+
+Every file under `scripts/examples/starters/` records its fixture-relative
+RFC 6901 changes, purpose, semantic destination, synthetic entity mappings,
+full compiler-derived capability manifest, simulations, and correction notes.
+Tests clone documents from `tests/fixtures`; they never edit the fixtures or
+the native-shared corpus. Starters 3 and 4 independently include the same
+template so each file stands alone; a combined owner change must reuse it.
+No starter was removed.
+
+The real shared evaluator, pipeline evaluator, request-row builder, and
+simulation host execute pinned inputs with the frozen clock
+`2026-11-16T12:00:00`, UTC offset -480. Checklist cases render the existing
+provider in jsdom; `fetch` is forbidden. Failed subscription cases deliberately
+omit the captured response in the real simulation host rather than sending
+`null`/`[]` through total pipeline steps and mistaking that output for success.
+No HA, existing Studio, credential, development data, or live device was
+contacted, and no server was started for these starter proofs.
+
+These are local compiler/evaluator/provider proofs, **not** interactive
+browser-scenario, owner-document, publish, native-runtime, or physical-device
+proof. No owner draft was available or modified; the loopback Studio remains
+not running. Follow only [the agent publish path][agent-publish] for any
+eventual mapped owner change, with its own base, capability and screenshot
+evidence.
 
 ## Source links
 
