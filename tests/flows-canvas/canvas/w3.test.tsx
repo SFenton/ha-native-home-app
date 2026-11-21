@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { LogicGraph } from '../../../src/shared/composition/graph';
 import { supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
@@ -177,6 +177,23 @@ it('M4 port tooltips delay hover, open on focus, format observations, and dismis
   fireEvent.focus(port);
   act(() => vi.advanceTimersByTime(0));
   expect(screen.getByRole('tooltip')).toBeTruthy();
+});
+it('M4 dismisses a port tooltip on blur or activation so it cannot consume a connection dialog Escape', async () => {
+  mount();
+  const header = screen.getByRole('button', { name: /^Select Rows / });
+  fireEvent.keyDown(header, { key: 'Enter' });
+  const port = screen.getByRole('button', { name: /^Rows, Row Id input/ });
+  fireEvent.focus(port);
+  expect(screen.getByRole('tooltip')).toBeTruthy();
+  fireEvent.blur(port);
+  expect(screen.queryByRole('tooltip')).toBeNull();
+  fireEvent.focus(port);
+  fireEvent.click(port);
+  expect(screen.queryByRole('tooltip', { hidden: true })).toBeNull();
+  const dialog = screen.getByRole('dialog');
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(document.activeElement).toBe(port);
 });
 it('observation updates do not steal peek control focus, and outside dismissal retains selection', () => {
   const { props, rerender } = mount();

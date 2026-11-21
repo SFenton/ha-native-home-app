@@ -172,9 +172,12 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   }).map(node => node.id)), [windowed, canvasWindow, ordered, moving, selected?.id, entered, offsetX, offsetY]);
   const visibleKey = [...visible].join('\0');
   const wireGeometry = useMemo(() => ({ ports: new Map<string, { x: number; y: number }>(), measured: new Set<string>() }), [layoutKey, moving, view, zoom, phone, host.observations, entered, draft, sizes, offsetX, offsetY]);
-  const readMeasurements = useCallback(() => {
+  const measuredCards = useMemo(() => new WeakMap<HTMLElement, TidyMeasure>(), [layoutKey, zoom, view]);
+  const readMeasurements = useCallback((cards: Iterable<HTMLElement> = board.current?.querySelectorAll<HTMLElement>('.w2-canvas-node') ?? [], cache?: WeakMap<HTMLElement, TidyMeasure>) => {
     const measured = new Map<string, TidyMeasure>();
-    for (const card of board.current?.querySelectorAll<HTMLElement>('.w2-canvas-node') ?? []) {
+    for (const card of cards) {
+      const cached = cache?.get(card);
+      if (cached) { measured.set(card.dataset.nodeId!, cached); continue; }
       const rect = card.getBoundingClientRect();
       if (!rect.width || !rect.height) continue;
       const ports: Record<string, { direction: 'input' | 'output'; y: number }> = {};
@@ -182,27 +185,41 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
         const bounds = port.getBoundingClientRect(), direction = port.dataset.direction;
         if (direction === 'input' || direction === 'output') ports[port.dataset.portId!] = { direction, y: (bounds.top + bounds.height / 2 - rect.top) / (view === 'graph' ? zoom : 1) };
       }
-      measured.set(card.dataset.nodeId!, { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1), ports });
+      const measurement = { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1), ports };
+      measured.set(card.dataset.nodeId!, measurement);
+      cache?.set(card, measurement);
     }
     return measured;
   }, [zoom, view]);
   useLayoutEffect(() => {
     if (view !== 'graph') return;
-    const measure = () => {
-      const measured = readMeasurements();
+    const measured = readMeasurements(undefined, measuredCards);
+    const updateSizes = (changes: ReadonlyMap<string, TidyMeasure>) => {
       setSizes(held => {
-        const next = new Map([...held, ...measured]);
+        const next = new Map([...held, ...changes]);
         return [...next].every(([id, value]) => {
           const previous = held.get(id);
           return previous?.width === value.width && previous.height === value.height;
         }) && next.size === held.size ? held : next;
       });
     };
-    measure();
-    const observer = new ResizeObserver(measure);
+    updateSizes(measured);
+    const observer = new ResizeObserver(entries => {
+      const changed = entries.flatMap(entry => {
+        if (!(entry.target instanceof HTMLElement)) return [];
+        const previous = measured.get(entry.target.dataset.nodeId!), size = entry.borderBoxSize[0];
+        if (previous && size && previous.width === size.inlineSize / zoom && previous.height === size.blockSize / zoom) return [];
+        return [entry.target];
+      });
+      if (!changed.length) return;
+      changed.forEach(card => measuredCards.delete(card));
+      const changes = readMeasurements(changed, measuredCards);
+      changes.forEach((value, id) => measured.set(id, value));
+      updateSizes(changes);
+    });
     board.current?.querySelectorAll('.w2-canvas-node').forEach(card => observer.observe(card));
     return () => observer.disconnect();
-  }, [readMeasurements, view, layoutKey, entered, draft, visibleKey]);
+  }, [readMeasurements, measuredCards, view, layoutKey, entered, draft, visibleKey, zoom]);
   // Payload-only revisions retain both the block models and measured wire geometry.
   useLayoutEffect(() => {
     if (view !== 'graph' || !board.current) return;

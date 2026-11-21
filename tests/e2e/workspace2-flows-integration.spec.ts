@@ -189,14 +189,16 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   await expect(canvas(page).getByText('Waiting for Home Assistant. Showing the last values.', { exact: true })).toBeVisible();
   await expect(canvas(page).getByText('Canvas preview', { exact: true })).toHaveCount(0);
   const block = canvas(page).getByRole('button', { name: /^Select Attribute/ });
-  const initialPosition = await block.locator('..').getAttribute('style');
+  const initialPosition = await block.locator('xpath=ancestor::li[1]').getAttribute('style');
   await block.click();
+  await page.getByRole('button', { name: /^Close (data peek|Data peek:)/ }).click();
+  await page.getByRole('button', { name: 'Inspect Attribute', exact: true }).click();
   await page.getByText('Position', { exact: true }).click();
   const x = page.getByRole('spinbutton', { name: 'X', exact: true });
   await x.fill(String(Number(await x.inputValue()) + 32));
   await page.getByRole('button', { name: 'Set position', exact: true }).click();
   await page.getByRole('button', { name: 'Close block inspector', exact: true }).first().click();
-  await expect(block.locator('..')).not.toHaveAttribute('style', initialPosition!);
+  await expect(block.locator('xpath=ancestor::li[1]')).not.toHaveAttribute('style', initialPosition!);
   await canvas(page).getByRole('button', { name: 'Apply to draft', exact: true }).click();
   await expect(canvas(page).locator('.w2-canvas-footer [role=status]')).toContainText('Edits applied to the draft');
   const apply = canvas(page).getByRole('button', { name: 'Apply to draft', exact: true });
@@ -221,7 +223,7 @@ for (const scheme of ['light', 'dark'] as const) test(`${scheme}: inline checks,
   const reopened = await template(page);
   await reopened.getByRole('button', { name: 'Edit in Canvas', exact: true }).first().click();
   await closePalette(page);
-  await expect(canvas(page).getByRole('button', { name: /^Select Attribute/ }).locator('..')).not.toHaveAttribute('style', initialPosition!);
+  await expect(canvas(page).getByRole('button', { name: /^Select Attribute/ }).locator('xpath=ancestor::li[1]')).not.toHaveAttribute('style', initialPosition!);
   await canvas(page).getByRole('combobox', { name: 'Preview lens' }).click();
   await page.getByRole('option', { name: 'Stand-in', exact: true }).click();
   await expect(canvas(page).getByRole('article', { name: 'Stand-in field preview' })).toBeVisible();
@@ -347,6 +349,8 @@ test('a real 409 preserves local canvas layout and bindings until Keep Mine expl
   await closePalette(page);
   const block = canvas(page).getByRole('button', { name: /^Select Attribute/ });
   await block.click();
+  await page.getByRole('button', { name: /^Close (data peek|Data peek:)/ }).click();
+  await page.getByRole('button', { name: 'Inspect Attribute', exact: true }).click();
   await page.getByText('Position', { exact: true }).click();
   await page.getByRole('spinbutton', { name: 'X', exact: true }).fill('456');
   await page.getByRole('button', { name: 'Set position', exact: true }).click();

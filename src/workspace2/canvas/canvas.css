@@ -67,7 +67,7 @@
 .w2-canvas-graph { position: absolute; transform-origin: 0 0; }
 .w2-canvas-node { border: 1px solid var(--w2-line); border-radius: 11px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: 0 2px 6px #0000000b; overflow: visible; }
 .w2-canvas-graph > .w2-canvas-node { position: absolute; width: 190px; }
-.w2-canvas-node[data-selected] { border-color: var(--w2-canvas-focus); box-shadow: 0 0 0 2px var(--w2-selected); }
+.w2-canvas-node[data-selected] { z-index: 1; border-color: var(--w2-canvas-focus); box-shadow: 0 0 0 2px var(--w2-selected); }
 .w2-canvas-node[data-scenario-pinned] { outline: 1.5px dashed var(--w2-observation-pinned); outline-offset: 3px; }
 .w2-canvas .w2-canvas-node-head { width: 100%; min-height: 40px; justify-content: flex-start; border: 0; border-radius: 11px 11px 0 0; text-align: start; padding: 7px 10px; background: transparent; }
 .w2-canvas-node-head strong { flex: 1; font-size: 12px; }

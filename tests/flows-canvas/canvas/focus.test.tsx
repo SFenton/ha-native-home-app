@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { lift, type CanvasHost } from '../../../src/shared/composition/graph';
 import { supportedCompositionCapabilities } from '../../../src/shared/composition/compiler';
 import FlowCanvas, { arrangeCanvas } from '../../../src/workspace2/canvas/FlowCanvas';
@@ -89,6 +89,26 @@ it('does not remeasure wire or port geometry for a valid literal-only edit', asy
   await waitFor(() => expect(host.apply).toHaveBeenCalledWith(expect.objectContaining({
     replacements: [expect.objectContaining({ ast: { type: 'math', op: 'add', args: [number(25), number(3)] } })],
   })));
+});
+it('does not remeasure ports for unchanged initial ResizeObserver reports', () => {
+  const notifications: (() => void)[] = [];
+  vi.stubGlobal('ResizeObserver', class {
+    targets: Element[] = [];
+    constructor(callback: (entries: readonly Pick<ResizeObserverEntry, 'target' | 'borderBoxSize'>[]) => void) {
+      notifications.push(() => callback(this.targets.map(target => ({ target, borderBoxSize: [{ inlineSize: 190, blockSize: 160 }] }))));
+    }
+    observe(target: Element) { this.targets.push(target); }
+    disconnect() { this.targets = []; }
+  });
+  let portReads = 0;
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function(this: Element) {
+    if (this.matches('.w2-canvas-port')) portReads++;
+    return new DOMRect(0, 0, 190, this.matches('.w2-canvas-node') ? 160 : 29);
+  });
+  mount();
+  portReads = 0;
+  act(() => notifications.forEach(notify => notify()));
+  expect(portReads).toBe(0);
 });
 it('does not steal editing keys, preserves local edits on conflict, and keeps save separate', async () => {
   const host = mount(true);

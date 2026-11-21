@@ -102,6 +102,8 @@ Port tooltips use `aria-describedby`, a 300ms hover delay, immediate focus,
 collision-aware placement, hover retention, and Escape dismissal. They name
 the block/port, static type, formatted observation and source; no native `title`
 attribute is needed. Activating a port still authors connections, not peeks.
+Blur and activation dismiss the trigger tooltip immediately so a lingering
+tooltip cannot consume Escape from a newly opened connection dialog.
 
 ## Measured geometry and Tidy Up
 
@@ -109,11 +111,16 @@ Selected actions are four equal, icon-only Move / Inspect / Rename or describe /
 Delete cells. At 190px the desktop row has four 41px cells; coarse-pointer
 targets are at least 44px. Header title columns use `minmax(0, 1fr)` so the eye,
 root marker and long annotations cannot force overflow. Socket/focus rings are
-not clipped by an overflow-hidden card.
+not clipped by an overflow-hidden card. The selected card is raised above its
+siblings so expanded actions remain clickable when saved or estimated positions
+overlap.
 
 The graph reads mounted card dimensions and port-center offsets, divided by the
 current zoom, into `TidyMeasure`. Resize observations track expanding annotation
-editors and selected chrome. Board extents include negative positions, 48px
+editors and selected chrome, remeasuring only cards whose border-box size changed
+since their initial measurement. Mounted cards retain their measurements when
+viewport windowing changes; layout changes invalidate them, and Tidy Up reads
+fresh measurements. Board extents include negative positions, 48px
 card-edge margins (at least 32px beyond sockets/focus), and another 96px bottom
 navigation clearance. Fit all uses both current viewport width and height after
 the host/Inspector/Preview layout; it does not rewrite positions.

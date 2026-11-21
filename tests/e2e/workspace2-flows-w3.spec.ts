@@ -14,6 +14,16 @@ async function closePalette(page: Page) {
   const close = page.getByRole('button', { name: 'Close block palette', exact: true });
   if (await close.isVisible()) await close.click();
 }
+async function openHarness(page: Page) {
+  await page.route(`**${harness}*`, async route => {
+    const response = await route.fetch(), html = await response.text(), entry = /src="\/src\/main\.tsx(?:\?[^"]*)?"/;
+    const body = entry.test(html) ? html.replace(entry, 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}</style></head>') : html;
+    if (!body.includes('harness.tsx')) throw new Error('The canvas harness requires the Vite development server or the standard Studio development test server.');
+    await route.fulfill({ response, body });
+  });
+  await page.goto(`${harness}?fixture=w3`);
+  await page.getByRole('button', { name: 'Close block palette', exact: true }).click();
+}
 async function openFormula(page: Page) {
   let panel;
   if (isPhone(page)) {
@@ -63,12 +73,7 @@ test('B7 annotation Apply survives real server save, reload, and canvas reopen',
 });
 test('B7 observed rows peek, captured comparison, overflow and real measured Tidy Up', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
-  await page.route(`**${harness}*`, async route => {
-    const response = await route.fetch(), html = await response.text();
-    await route.fulfill({ response, body: html.includes('src="/src/main.tsx"') ? html.replace('src="/src/main.tsx"', 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}</style></head>') : html });
-  });
-  await page.goto(`${harness}?fixture=w3`);
-  await closePalette(page);
+  await openHarness(page);
   await page.getByRole('button', { name: /^Select Rows / }).click();
   const peek = page.getByRole('dialog');
   await expect(peek).toContainText('+4 more rows');
@@ -114,13 +119,8 @@ test('B7 observed rows peek, captured comparison, overflow and real measured Tid
 test('review: the data peek stays beside its block after the canvas is scrolled', async ({ page }) => {
   test.skip(isPhone(page), 'Phones use the bottom-sheet peek, which is not anchored to the scrolled board.');
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
-  await page.route(`**${harness}*`, async route => {
-    const response = await route.fetch(), html = await response.text();
-    await route.fulfill({ response, body: html.includes('src="/src/main.tsx"') ? html.replace('src="/src/main.tsx"', 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}</style></head>') : html });
-  });
   await page.setViewportSize({ width: 900, height: 600 });
-  await page.goto(`${harness}?fixture=w3`);
-  await closePalette(page);
+  await openHarness(page);
   await page.locator('.w2-canvas-viewport').evaluate(viewport => viewport.scrollTo(240, 180));
   const header = page.getByRole('button', { name: /^Select Rows / });
   await header.scrollIntoViewIfNeeded();

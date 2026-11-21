@@ -4,8 +4,8 @@ import { createPortal } from 'react-dom';
 export default function Tooltip({ children, text }: { children: ReactElement<HTMLAttributes<HTMLElement>>; text: ReactNode }) {
   const id = useId(), timer = useRef<ReturnType<typeof setTimeout>>(undefined), trigger = useRef<HTMLElement | null>(null), popup = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false), [position, setPosition] = useState({ left: 0, top: 0 });
-  const dismissed = useRef(false);
-  const hide = () => { clearTimeout(timer.current); setOpen(false); };
+  const dismissed = useRef(false), popupHovered = useRef(false);
+  const hide = () => { clearTimeout(timer.current); popupHovered.current = false; setOpen(false); };
   const show = (element: HTMLElement, delay: number) => {
     trigger.current = element;
     clearTimeout(timer.current);
@@ -33,11 +33,12 @@ export default function Tooltip({ children, text }: { children: ReactElement<HTM
     onMouseEnter: event => { children.props.onMouseEnter?.(event); show(event.currentTarget, 300); },
     onMouseLeave: event => { children.props.onMouseLeave?.(event); leave(); },
     onFocus: event => { children.props.onFocus?.(event); show(event.currentTarget, 0); },
-    onBlur: event => { children.props.onBlur?.(event); leave(); },
+    onBlur: event => { children.props.onBlur?.(event); dismissed.current = false; if (!popupHovered.current) hide(); },
+    onClick: event => { hide(); children.props.onClick?.(event); },
   })}{open && createPortal(<div ref={popup} id={id} role="tooltip" className="w2-canvas-tooltip" style={{
     ...position,
     ...inheritedVariables(trigger.current),
-  }} onMouseEnter={() => clearTimeout(timer.current)} onMouseLeave={leave}>{text}</div>, document.body)}</>;
+  }} onMouseEnter={() => { popupHovered.current = true; clearTimeout(timer.current); }} onMouseLeave={() => { popupHovered.current = false; leave(); }}>{text}</div>, document.body)}</>;
 }
 
 function inheritedVariables(element: HTMLElement | null): Record<string, string> {

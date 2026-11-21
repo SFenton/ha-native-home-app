@@ -7,9 +7,9 @@ const harness = '/tests/flows-canvas/canvas/harness.html';
 const evidence = path.resolve('docs/evidence/w2-c');
 test.beforeEach(async ({ page }) => {
   await page.route(`**${harness}*`, async route => {
-    const response = await route.fetch(), html = await response.text();
-    if (html.includes('src="/src/main.tsx"')) {
-      await route.fulfill({ response, body: html.replace('src="/src/main.tsx"', 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}button,input,select{font:inherit}</style></head>') });
+    const response = await route.fetch(), html = await response.text(), entry = /src="\/src\/main\.tsx(?:\?[^"]*)?"/;
+    if (entry.test(html)) {
+      await route.fulfill({ response, body: html.replace(entry, 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}button,input,select{font:inherit}</style></head>') });
     } else {
       if (!html.includes('harness.tsx')) throw new Error('The canvas harness requires the Vite development server or the standard Studio development test server.');
       await route.fulfill({ response });
@@ -314,6 +314,8 @@ test('C-large: 2341 blocks mount, resolve ports, focus and edit within interacti
   const focus = performance.now() - focusStart;
   await expect(page.locator('.w2-canvas-node').getByRole('button', { name: /^Number, Result output/ }).first()).toBeFocused();
   await header.click();
+  await page.getByRole('button', { name: /^Close (data peek|Data peek:)/ }).click();
+  await page.getByRole('button', { name: 'Inspect Number', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Value', exact: true }).fill('2');
   const geometry = await page.evaluateHandle(() => {
     const reads = { ports: 0, boards: 0 }, original = Element.prototype.getBoundingClientRect;
