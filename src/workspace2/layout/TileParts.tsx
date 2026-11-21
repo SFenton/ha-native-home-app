@@ -16,6 +16,8 @@ import { ObjectRows, summarize, useRows } from '../rows';
 import { TextInput } from '../editors/controls';
 import { Rows } from '../rowsContext';
 import ValueField from '../expr/ValueField';
+import { AddressedField } from '../logic-fields/AddressedField';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 // MARK: Progress
 
@@ -52,6 +54,7 @@ const progressOperand = (form: 'fraction' | 'percentage', sourceId: string, path
 /** The tile's Progress row: None, or a number from an entity as a fraction or a percentage, with what it gives now. */
 export function ProgressRow({ path }: { path: EditorPath }) {
   const { document, onChange } = useRows();
+  const canvas = useLogicFields();
   const tile = valueAt(document, path) as Tile | undefined;
   const env = useDraftEnvironment(document), tag = useDataTag();
   if (!tile) return null;
@@ -84,7 +87,8 @@ export function ProgressRow({ path }: { path: EditorPath }) {
       <ChoiceRow label="Value is" value={parts.form} options={[{ value: 'percentage', label: 'A Percentage (0 to 100)' }, { value: 'fraction', label: 'A Fraction (0 to 1)' }]}
         onChange={form => onChange(set(progressOperand(form as 'fraction' | 'percentage', parts.sourceId, parts.path)))}/>
       {env && <ResultLine marker={now === undefined ? 'unknown' : 'check'} head={now === undefined ? 'No progress now.' : `Now: ${now}%`} tag={tag}/>}
-    </> : <p className="w2-caption">Progress is a formula. Edit it in Advanced.</p>}
+    </> : canvas ? <AddressedField path={progressPath} kind="operand" label="Progress"/> : <p className="w2-caption">Progress is a formula. Edit it in Advanced.</p>}
+    {canvas && parts && <AddressedField path={progressPath} kind="operand" label="Progress logic"/>}
     <button type="button" className="w2-remove" onClick={() => onChange(set(undefined))}>Remove Progress</button>
   </div>;
 }

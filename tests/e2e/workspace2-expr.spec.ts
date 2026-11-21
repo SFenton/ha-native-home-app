@@ -3,7 +3,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { isPhone, openWorkspace, previewRoot, seed, selectTile, snap } from './workspace2-helpers';
 import type { CompositionDocument } from '../../src/shared/composition/schema';
 import { buildDocumentIndex } from '../../src/preview2/model';
-import { replaceAt } from '../../src/composition-editor';
+import { replaceAt, valueAt } from '../../src/composition-editor';
+import { ensureSource } from '../../src/workspace2/add/sources';
+import type { Predicate } from '../../src/shared/composition/expression';
 
 const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 /** The fixture opened on its Climate tab, where a navigation tile holds a text slot. */
@@ -34,7 +36,11 @@ async function openOnlyShowWhen(page: Page) {
   return panel;
 }
 
-const result = (page: Page) => page.getByRole('status').filter({ hasText: /now\.|tell yet|Waiting|Not connected|Now: |Shows / }).first();
+const result = (page: Page) => page.getByRole('status').filter({ hasText: /right now|now\.|tell yet|Waiting|Not connected|Now: |Shows / }).first();
+async function chooseState(page: Page, panel: Locator, state: string) {
+  await panel.getByRole('button', { name: 'Value', exact: true }).click();
+  await page.getByRole('button', { name: state, exact: true }).click();
+}
 /** Selects a node the preview draws without its title (a status chip) by its id. */
 async function selectNode(page: Page, id: string, title: string) {
   await previewRoot(page).locator(`[data-sel="node:${id}"]`).first().click({ position: { x: 4, y: 4 } });
@@ -45,27 +51,25 @@ async function selectNode(page: Page, id: string, title: string) {
 const done = (page: Page) => page.getByRole('button', { name: 'Done', exact: true });
 const undoButton = (page: Page) => page.getByRole('button', { name: /^Undo/ }).first();
 
-test('Only show when: Simple builds "Guest Mode is on", the result line follows it, Logic keeps it, and Done is one step', async ({ page }) => {
+test('Only show when: compact pickers build one check, reopening keeps it, and Done is one step', async ({ page }) => {
   const panel = await openOnlyShowWhen(page);
-  await expect(panel.getByRole('radiogroup', { name: 'Condition view' })).toBeVisible();
+  await expect(panel.getByRole('radiogroup', { name: 'Condition view' })).toHaveCount(0);
   await panel.getByRole('button', { name: 'Entity' }).click();
   await page.getByRole('option', { name: /Guest Mode/ }).first().click();
-  await expect(result(page)).toContainText('Shown now. Guest Mode is on.');
+  await expect(result(page)).toContainText('Yes · Guest Mode is On right now');
   await snap(page, `${prefix(page)}-x-simple`);
   // Is off: the tile goes, and the result line says why.
-  await panel.getByRole('button', { name: 'off', exact: true }).click();
-  await expect(result(page)).toContainText('Hidden now.');
+  await chooseState(page, panel, 'Off');
+  await expect(result(page)).toContainText('No · Guest Mode is On right now');
   await done(page).click();
   // The editing view keeps a hidden tile in place, marked; Use mode drops it.
   await expect(previewRoot(page).locator('[data-hidden]').filter({ hasText: 'Demo Guests 1' })).toHaveCount(1);
   await panel.getByRole('button', { name: /^Only show when/ }).click();
-  await panel.getByRole('button', { name: 'on', exact: true }).click();
-  // Logic shows the same condition as one row; back to Simple changes nothing.
-  await panel.getByRole('radio', { name: 'Logic' }).click();
-  await expect(panel.getByRole('group', { name: /true, level 1, 1 condition/ })).toBeVisible();
+  await chooseState(page, panel, 'On');
+  await panel.getByRole('button', { name: 'Value', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'On', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  if (isPhone(page)) await page.locator('.w2-back').click(); else await page.keyboard.press('Escape');
   await snap(page, `${prefix(page)}-x-logic`);
-  await panel.getByRole('radio', { name: 'Simple' }).click();
-  await expect(panel.getByRole('button', { name: 'on', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await done(page).click();
   const field = panel.getByRole('button', { name: /^Only show when: Guest Mode is on\./ });
   await expect(field).toBeVisible();
@@ -79,35 +83,55 @@ test('Only show when: Simple builds "Guest Mode is on", the result line follows 
   }
 });
 
-test('Logic: three levels push a page, the result line counts every condition, Back keeps them and Done is one step', async ({ page }) => {
-  const panel = await openOnlyShowWhen(page);
-  await panel.getByRole('radio', { name: 'Logic' }).click();
-  await panel.getByRole('button', { name: 'Add Condition' }).click();
-  await page.getByRole('option', { name: /Guest Mode/ }).click();
-  await panel.getByRole('button', { name: 'Add Group' }).click();
-  await page.getByRole('option', { name: /Hall Lamp/ }).click();
-  await expect(panel.getByRole('group', { name: /^All of these are true, level 2, 1 condition$/ })).toBeVisible();
-  await panel.getByRole('button', { name: 'Add Group' }).first().click();
-  await page.getByRole('option', { name: /Lights On/ }).click();
-  // The third level is one row that opens a page.
-  const deep = panel.getByRole('button', { name: /^Group: all of 1 condition\. Not true now\. Opens a page\.$/ });
-  await expect(deep).toBeVisible();
-  await expect(panel.getByRole('radio', { name: 'Simple' })).toHaveAttribute('aria-disabled', 'true');
-  await expect(result(page)).toContainText('Hidden now. 1 of 3 are true.');
+test('Compound checks: the canvas keeps three levels, one true answer, and an atomic Apply', async ({ page, request }) => {
+  let document = fixture.document;
+  const ids: string[] = [];
+  for (const entityId of ['input_boolean.demo_guests', 'light.demo_lamp', 'sensor.demo_count']) {
+    const made = ensureSource(document, entityId); document = made.document; ids.push(made.sourceId);
+  }
+  const check = (sourceId: string): Predicate => ({ type: 'state', sourceId, path: ['state'], in: ['on'] });
+  const predicate: Predicate = { type: 'all', of: [check(ids[0]), { type: 'all', of: [check(ids[1]), { type: 'all', of: [check(ids[2])] }] }] };
+  const tile = [...buildDocumentIndex(document).entries.values()].find(entry => entry.node?.title === 'Demo Guests 1')!;
+  await seed(request, replaceAt(document, [...tile.path, 'visibleWhen'], predicate));
+  await stubHouse(page); await openWorkspace(page);
+  const panel = await selectTile(page, 'Demo Guests 1'); await full(page);
+  await expect(panel.getByTestId('logic-field-summary')).toContainText(/Guest Mode.*Hall Lamp.*Lights On/);
   await snap(page, `${prefix(page)}-x-nest`);
-  await deep.click();
-  await expect(panel.getByRole('heading', { name: 'All Of' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: /^Condition 1: Lights On is on/ })).toBeVisible();
+  const canvas = page.locator('.w2-logic-overlay .w2-canvas[data-panel]');
+  async function openGraph() {
+    await panel.getByRole('button', { name: 'Edit in Canvas', exact: true }).click();
+    const palette = page.getByRole('button', { name: 'Close block palette', exact: true });
+    if (await palette.isVisible()) await palette.click();
+    await canvas.getByRole('button', { name: 'More canvas controls', exact: true }).click();
+    await canvas.getByRole('button', { name: 'Fit all', exact: true }).click();
+    await expect(canvas.getByRole('button', { name: /^Select All Of/ })).toHaveCount(3);
+    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value yes/ })).toHaveCount(1);
+    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value no/ })).toHaveCount(2);
+  }
+  await openGraph();
   await snap(page, `${prefix(page)}-x-nest-page`);
-  // Back to the editor: nothing was lost.
-  await page.getByRole('button', { name: 'Only Show When' }).click();
-  await expect(panel.getByRole('button', { name: /^Group: all of 1 condition/ })).toBeVisible();
-  await done(page).click();
-  await expect(panel.getByRole('button', { name: /^Only show when: .*3 conditions/ })).toBeVisible();
+  await canvas.getByRole('button', { name: 'Close canvas', exact: true }).click();
+  await expect(canvas).toHaveCount(0);
+  await openGraph();
+  await canvas.getByRole('button', { name: /^Select All Of/ }).first().click();
+  const inspector = isPhone(page) ? page.getByRole('dialog', { name: 'Block inspector', exact: true }) : canvas;
+  await inspector.getByText('Position', { exact: true }).click();
+  const x = inspector.getByRole('spinbutton', { name: 'X', exact: true });
+  await x.fill(String(Number(await x.inputValue()) + 32));
+  await inspector.getByRole('button', { name: 'Set position', exact: true }).click();
+  if (isPhone(page)) await inspector.getByRole('button', { name: 'Close block inspector', exact: true }).click();
+  await canvas.getByRole('button', { name: 'Apply to draft', exact: true }).click();
+  await expect(canvas.locator('.w2-canvas-footer [role=status]')).toContainText('Edits applied to the draft');
+  await canvas.getByRole('button', { name: 'Close canvas', exact: true }).click();
+  await expect(canvas).toHaveCount(0);
+  await expect.poll(async () => (await (await request.get('/native/api/draft')).json()).document.studioCanvas).toBeDefined();
   if (!isPhone(page)) {
     await undoButton(page).click();
-    await expect(panel.getByRole('button', { name: /^Only show when/ })).toContainText('Always');
+    await expect.poll(async () => (await (await request.get('/native/api/draft')).json()).document.studioCanvas).toBeUndefined();
   }
+  const saved = (await (await request.get('/native/api/draft')).json()).document;
+  const savedTile = [...buildDocumentIndex(saved).entries.values()].find(entry => entry.node?.title === 'Demo Guests 1')!;
+  expect(valueAt(saved, [...savedTile.path, 'visibleWhen'])).toEqual(predicate);
 });
 
 /** Opens a chip's Fill as Rules and builds Rule 1: "Lights On is above 10, then Orange". */
@@ -339,16 +363,16 @@ test('Try Values: an override changes the result line and tags it Test, Reset to
   const panel = await openOnlyShowWhen(page);
   await panel.getByRole('button', { name: 'Entity' }).click();
   await page.getByRole('option', { name: /Guest Mode/ }).first().click();
-  await expect(result(page)).toContainText('Shown now. Guest Mode is on.');
+  await expect(result(page)).toContainText('Yes · Guest Mode is On right now');
   await panel.getByRole('button', { name: 'Try Values' }).click();
   await panel.getByRole('combobox', { name: 'Guest Mode for Try Values' }).click();
   await page.getByRole('option', { name: 'Unavailable' }).click();
-  await expect(result(page)).toContainText("Can't tell yet");
+  await expect(result(page)).toContainText('Waiting for Home Assistant');
   await expect(page.getByTestId('result-line').getByText('Test', { exact: true })).toBeVisible();
   await expect(panel.getByText(/Nothing is saved or sent to Home Assistant/)).toBeVisible();
   await snap(page, `${prefix(page)}-x-preview`);
   await panel.getByRole('button', { name: 'Reset to Live' }).click();
-  await expect(result(page)).toContainText('Shown now. Guest Mode is on.');
+  await expect(result(page)).toContainText('Yes · Guest Mode is On right now');
   await panel.getByRole('combobox', { name: 'Guest Mode for Try Values' }).click();
   await page.getByRole('option', { name: 'Unavailable' }).click();
   // Closing the page ends the test values and writes nothing.
@@ -365,14 +389,14 @@ test('Undo inside the editor steps the draft, never the document, and Done is on
   const panel = await openOnlyShowWhen(page);
   await panel.getByRole('button', { name: 'Entity' }).click();
   await page.getByRole('option', { name: /Guest Mode/ }).first().click();
-  await panel.getByRole('button', { name: 'off', exact: true }).click();
-  await expect(result(page)).toContainText('Hidden now.');
+  await chooseState(page, panel, 'Off');
+  await expect(result(page)).toContainText('No · Guest Mode is On right now');
   // Undo while the editor is open goes back in the editor.
   await page.getByRole('button', { name: /^Undo/ }).first().click();
-  await expect(result(page)).toContainText('Shown now. Guest Mode is on.');
+  await expect(result(page)).toContainText('Yes · Guest Mode is On right now');
   await expect(page.getByRole('button', { name: /^Undo/ }).first()).toBeEnabled();
   await page.getByRole('button', { name: /^Redo/ }).first().click();
-  await expect(result(page)).toContainText('Hidden now.');
+  await expect(result(page)).toContainText('No · Guest Mode is On right now');
   await done(page).click();
   // The editor is closed: Undo is the document's, and one press removes the whole condition.
   await expect(panel.getByRole('button', { name: /^Only show when: Guest Mode is off/ })).toBeVisible();
@@ -387,7 +411,7 @@ test('Discard changes? appears when leaving a page with changes, and Keep Editin
   await (isPhone(page) ? page.locator('.w2-back') : page.getByRole('button', { name: 'Cancel', exact: true })).click();
   await expect(page.getByRole('dialog', { name: 'Discard changes?' })).toBeVisible();
   await page.getByRole('button', { name: 'Keep Editing' }).click();
-  await expect(panel.getByRole('radiogroup', { name: 'Condition view' })).toBeVisible();
+  await expect(panel.getByTestId('simple-condition')).toBeVisible();
   await (isPhone(page) ? page.locator('.w2-back') : page.getByRole('button', { name: 'Cancel', exact: true })).click();
   await page.getByRole('button', { name: 'Discard Changes' }).click();
   await expect(panel.getByRole('button', { name: /^Only show when: Always/ })).toBeVisible();
@@ -414,17 +438,12 @@ for (const family of families) {
   test(`${family.name} ${family.width}x${family.height}: the condition editor has names, roles and no horizontal scroll`, async ({ page }) => {
     await page.setViewportSize({ width: family.width, height: family.height });
     const panel = await openOnlyShowWhen(page);
-    await panel.getByRole('radio', { name: 'Logic' }).click();
-    await panel.getByRole('button', { name: 'Add Condition' }).click();
+    await panel.getByRole('button', { name: 'Entity', exact: true }).click();
     await page.getByRole('option', { name: /Guest Mode/ }).click();
-    await panel.getByRole('button', { name: 'Add Group' }).click();
-    await page.getByRole('option', { name: /Hall Lamp/ }).click();
-    // The names the spec lists.
-    await expect(panel.getByRole('radiogroup', { name: 'Condition view' })).toBeVisible();
-    await expect(panel.getByRole('group', { name: /^All of these are true, level 1, 2 conditions$/ })).toBeVisible();
-    await expect(panel.getByRole('group', { name: /^All of these are true, level 2, 1 condition$/ })).toBeVisible();
-    await expect(panel.getByRole('button', { name: /^Condition 1: Guest Mode is on\. True now\.$/ })).toBeVisible();
-    await expect(panel.getByRole('radio', { name: 'Simple' })).toHaveAttribute('aria-disabled', 'true');
+    await expect(panel.getByRole('button', { name: 'Entity', exact: true })).toHaveText('Guest Mode');
+    await expect(panel.getByRole('combobox', { name: 'Comparison', exact: true })).toHaveText('is');
+    await expect(panel.getByRole('button', { name: 'Value', exact: true })).toHaveText('On');
+    await expect(panel.getByRole('radiogroup', { name: 'Condition view' })).toHaveCount(0);
     await expect(page.getByTestId('result-line')).toHaveAttribute('role', 'status');
     expect(await unnamed(panel)).toEqual([]);
     // No horizontal scroll in the inspector, and no control cut off at its right edge.
@@ -436,16 +455,26 @@ for (const family of families) {
       expect(small).toEqual([]);
     }
     await snap(page, `x-viewport-${family.width}x${family.height}`);
+    await panel.getByRole('button', { name: '+ And…', exact: true }).click();
+    const canvas = page.locator('.w2-logic-overlay .w2-canvas[data-panel]');
+    const palette = page.getByRole('button', { name: 'Close block palette', exact: true });
+    if (await palette.isVisible()) await palette.click();
+    await expect(canvas.getByRole('button', { name: /^Select Entity State/ })).toHaveCount(2);
+    await expect(canvas.getByRole('button', { name: /^Select All Of/ })).toHaveCount(1);
+    expect(await unnamed(canvas)).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   });
 }
 
 test('with reduced motion no transform transition runs on a row, a fold or the page', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const panel = await openOnlyShowWhen(page);
-  await panel.getByRole('radio', { name: 'Logic' }).click();
-  await panel.getByRole('button', { name: 'Add Condition' }).click();
+  await panel.getByRole('button', { name: 'Entity', exact: true }).click();
   await page.getByRole('option', { name: /Guest Mode/ }).click();
-  const moving = await panel.evaluate(element => [...element.querySelectorAll<HTMLElement>('.w2-expr-row, .w2-expr-fold, .w2-expr-rowbody, .w2-expr-chev, [data-testid=try-values]')]
+  await panel.getByRole('button', { name: 'Try Values', exact: true }).click();
+  await expect(panel.getByTestId('simple-condition')).toBeVisible();
+  await expect(panel.getByRole('combobox', { name: 'Guest Mode for Try Values' })).toBeVisible();
+  const moving = await panel.evaluate(element => [...element.querySelectorAll<HTMLElement>('.w2-picker-row, .w2-expr-chev, .w2-expr-try')]
     .filter(item => /transform/.test(getComputedStyle(item).transitionProperty) && parseFloat(getComputedStyle(item).transitionDuration) > 0).map(item => item.className));
   expect(moving).toEqual([]);
 });

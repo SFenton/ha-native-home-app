@@ -152,7 +152,25 @@ test('a use shows its settings, changes the tile, opens its template with a way 
 });
 
 /** The value picker's "Logic Templates" group lists the templates by name; a pick adds a use. */
-const pickTemplate = (page: Page, name: string) => page.getByRole('region', { name: 'Logic Templates' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+async function pickTemplate(page: Page, name: string) {
+  await page.getByRole('region', { name: 'Logic Templates' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  await setTemplateArguments(page, name);
+}
+async function setTemplateArguments(page: Page, name: string) {
+  const dialog = page.getByRole('dialog', { name: 'Use a Logic Template', exact: true });
+  await expect(dialog.getByRole('button', { name: 'Use Template', exact: true })).toBeDisabled();
+  if (name === 'Count or All') {
+    await dialog.getByRole('combobox', { name: 'Count value type' }).click();
+    await page.getByRole('option', { name: 'Number', exact: true }).click();
+    await dialog.getByRole('spinbutton', { name: 'Count', exact: true }).fill('3');
+    await dialog.getByRole('textbox', { name: 'Word', exact: true }).fill('On');
+    await dialog.getByRole('textbox', { name: 'When None', exact: true }).fill('All Closed');
+  } else {
+    await dialog.getByRole('spinbutton', { name: 'From', exact: true }).fill('1320');
+    await dialog.getByRole('spinbutton', { name: 'Until', exact: true }).fill('420');
+  }
+  await dialog.getByRole('button', { name: 'Use Template', exact: true }).click();
+}
 const useChips = (page: Page, name: string) => page.getByRole('button', { name: new RegExp(`^${name}, logic template`) });
 
 test.describe('inserting a use', () => {
@@ -187,26 +205,24 @@ test.describe('inserting a use', () => {
     const panel = await selectTile(page, 'Doors');
     await full(page);
     await panel.getByRole('button', { name: /^Only show when/ }).click();
-    await inspector(page).getByRole('radio', { name: 'Logic' }).click();
-    await inspector(page).getByRole('button', { name: 'Add Condition' }).click();
+    await inspector(page).getByRole('button', { name: 'Entity', exact: true }).click();
     await page.getByRole('button', { name: 'Time of day' }).click();
-    const row = inspector(page).getByRole('button', { name: /^Condition 1:/ });
-    if ((await row.getAttribute('aria-expanded')) === 'false') await row.click();
     await page.getByRole('button', { name: 'Compare With a Value…' }).click();
     await pickTemplate(page, 'Count or All');
-    await expect(inspector(page).getByRole('button', { name: /Time of day is above Count or All|Time is above Count or All/ })).toBeVisible();
+    await expect(inspector(page).getByRole('button', { name: 'Compare With a Value…' })).toContainText('Count or All');
   });
 });
 
-test('+ Template adds a condition template as a rule, and Done keeps it', async ({ page }) => {
+test('Use Template adds a condition template with explicit settings, and Done keeps it', async ({ page }) => {
   await openWorkspace(page);
   const panel = await selectTile(page, 'Doors');
   await full(page);
   await panel.getByRole('button', { name: /^Only show when/ }).click();
-  await inspector(page).getByRole('radio', { name: 'Logic' }).click();
-  await inspector(page).getByRole('button', { name: 'Add a Logic Template' }).click();
-  await page.getByRole('button', { name: /^Night Hours/ }).click();
-  await expect(inspector(page).getByRole('button', { name: /^Condition 1: Night Hours/ })).toBeVisible();
+  await inspector(page).getByRole('button', { name: 'Use Template', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Use a Logic Template', exact: true });
+  await dialog.getByRole('combobox', { name: 'Template', exact: true }).selectOption('night-hours');
+  await setTemplateArguments(page, 'Night Hours');
+  await expect(inspector(page).getByText('Night Hours', { exact: true })).toBeVisible();
   await snap(page, `${prefix(page)}-logic-condition-use`);
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect.poll(async () => refs(await saved(page), 'night-hours')).toBe(4);

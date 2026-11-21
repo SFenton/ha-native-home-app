@@ -3,16 +3,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CompositionDocument } from '../../../shared/composition/schema';
 import type { Operand, Predicate } from '../../../shared/composition/expression';
 import type { LogicEntry } from '../../../shared/composition/logic-library';
-import type { SelectionKey } from '../../../preview2/model';
 import { TextInput } from '../../editors/controls';
-import EditorRow from '../../editors/EditorRow';
-import ConditionField from '../../expr/ConditionField';
-import ValueEditor from '../../expr/ValueEditor';
-import { ThenSummary } from '../../expr/RulesList';
 import { ResultLine } from '../../expr/ResultLine';
 import { conditionResult } from '../../expr/ResultLine';
-import { slotOperand, operandSlot } from '../../expr/tokens';
-import { rulesOf, rulesProblem, type RulesDraft } from '../../expr/value';
 import { useDataTag, useDraftEnvironment, useNameContext } from '../../expr/useExpr';
 import { useWorkspaceData } from '../../pickers/WorkspaceData';
 import { RowsProvider, useRows } from '../../rowsContext';
@@ -24,21 +17,22 @@ import { logicWords } from './logicWords';
 import { UseRow } from './LogicRow';
 import { useLiveDraft } from './useLiveDraft';
 import { useLogicActions } from './useLogicActions';
+import { AddressedField } from '../../logic-fields/AddressedField';
+import { operandBodyDraft, useFieldDraft, useLogicFields } from '../../logic-fields/LogicFields';
+import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
+import { LogicScopeProvider } from './logicScope';
+import EditorRow from '../../editors/EditorRow';
+import ConditionField from '../../expr/ConditionField';
+import ValueEditor from '../../expr/ValueEditor';
+import { ThenSummary } from '../../expr/RulesList';
+import { operandSlot, slotOperand } from '../../expr/tokens';
+import { rulesOf, rulesProblem, type RulesDraft } from '../../expr/value';
 import type { Json } from '../../../shared/types';
-
+import { hasMultipleChecks } from '../../logic-fields/checks';
+import { liftField } from '../../logic-fields/registry';
+import { MiniMap } from '../../logic-fields/MiniMap';
+import { graphSentence } from '../../logic-fields/presentation';
 type Rec = Record<string, unknown>;
-const START_CONDITION = { type: 'viewer', isAdmin: true };
-
-/** The document the body's fields edit: the draft with the body at `__logic`, as a text slot for a value and as `{c: condition}` for a condition. */
-function viewOf(document: CompositionDocument, entry: LogicEntry): CompositionDocument {
-  return { ...document, __logic: entry.kind === 'operand' ? operandSlot(entry.body as unknown as Operand) : { c: entry.body } } as unknown as CompositionDocument;
-}
-/** The draft with the edited view written back into the entry. */
-function backOf(next: CompositionDocument, entry: LogicEntry): CompositionDocument {
-  const { __logic, ...rest } = next as unknown as Rec & { __logic: Rec };
-  const body = entry.kind === 'operand' ? slotOperand(__logic as { type: string }) ?? entry.body : (__logic.c as Rec | undefined) ?? START_CONDITION;
-  return setBody(rest as unknown as CompositionDocument, entry.id, body as Rec);
-}
 
 /** The result line: the body worked out with each setting's Try With value, tagged Test (Live when nothing is set). */
 function BodyResult({ document, entry }: { document: CompositionDocument; entry: LogicEntry }) {
@@ -53,34 +47,56 @@ function BodyResult({ document, entry }: { document: CompositionDocument; entry:
   const said = evaluateOperand(worked as Operand, env);
   const text = said.status === 'value' ? scalarText(said.value) : undefined;
   if (said.status !== 'value' || text === undefined || (text === '' && (entry.body as Rec).type === 'literal')) return <ResultLine marker="unknown" head={said.status === 'value' ? logicWords.resultNothing : "Can't tell yet."} tag={tag}>{logicWords.resultTry}</ResultLine>;
-  return <ResultLine marker="check" head={`Shows ${text}`} tag={tag}>{logicWords.resultTry}</ResultLine>;
+  return <ResultLine marker="check" head={`Shows ${typeof said.value === 'string' ? JSON.stringify(text) : text},`} tag={tag}>{logicWords.resultTry.charAt(0).toLowerCase() + logicWords.resultTry.slice(1)}</ResultLine>;
 }
 
 /** The body's own field: a value opens the value editor (in Rules the first time), a condition the condition editor. Both are the built editors. */
 function Body({ document, entry, apply }: { document: CompositionDocument; entry: LogicEntry; apply: (next: CompositionDocument) => void }) {
-  const view = useMemo(() => viewOf(document, entry), [document, entry]);
-  const onApply = (next: CompositionDocument) => apply(backOf(next, entry));
-  const rows = useRows();
-  const scoped = { ...rows, document: view, onChange: onApply };
-  return <RowsProvider value={scoped}>{entry.kind === 'condition'
-    ? <ConditionField label={logicWords.bodyCondition} title={logicWords.body} path={['__logic', 'c']} place="rule" itemName={entry.name}/>
-    : <ValueBody view={view} entry={entry} onApply={onApply}/>}</RowsProvider>;
+  const rows = useRows(), canvas = useLogicFields();
+  const draft = useFieldDraft(document, apply);
+  const path = ['logicLibrary', document.logicLibrary!.findIndex(item => item.id === entry.id), 'body'];
+  return <LogicScopeProvider value={{ entryId: entry.id }}><RowsProvider value={{ ...rows, document, onChange: apply }}>
+    {!canvas || entry.kind !== 'condition' || !hasMultipleChecks(entry.body) ? entry.kind === 'condition'
+      ? <ConditionField label={logicWords.bodyCondition} title={logicWords.body} path={path} place="rule" itemName={entry.name}/>
+      : <ValueBody document={document} entry={entry} path={path} onApply={apply}/>
+      :
+    <AddressedField label={entry.kind === 'condition' ? logicWords.bodyCondition : logicWords.bodyValue}
+      path={path} kind={entry.kind}/>}
+    {canvas && (entry.kind !== 'condition' || !hasMultipleChecks(entry.body)) && <div className="w2-logic-commands">
+      <button type="button" onClick={() => canvas.open({ draft, path, kind: entry.kind, label: logicWords.body })}>Edit in Canvas</button>
+    </div>}
+  </RowsProvider></LogicScopeProvider>;
 }
-
-function ValueBody({ view, entry, onApply }: { view: CompositionDocument; entry: LogicEntry; onApply: (next: CompositionDocument) => void }) {
-  const ctx = useNameContext(view);
-  const body = entry.body as unknown as Operand;
+function ValueBody({ document, entry, path, onApply }: { document: CompositionDocument; entry: LogicEntry; path: EditorPath; onApply: (next: CompositionDocument) => void }) {
+  const body = entry.body as unknown as Operand, ctx = useNameContext(document);
+  const canvas = useLogicFields();
+  const preview = useMemo(() => {
+    if (!canvas) return undefined;
+    try { return { graph: liftField(document, path, 'operand').graph }; }
+    catch (reason) { return { error: reason instanceof Error ? reason.message : String(reason) }; }
+  }, [canvas, document, path.join('/')]);
+  const view = replaceAt(document, path, operandSlot(body));
   const untouched = body.type === 'literal' && body.value === '';
-  const rules = rulesOf((view as unknown as Rec).__logic as never, 'text') as RulesDraft<Operand | Json> | undefined;
-  return <EditorRow label={logicWords.bodyValue} title={logicWords.body} summary="" itemName={entry.name} document={view} onApply={onApply}
-    blocked={doc => { const held = rulesOf((doc as unknown as Rec).__logic as never, 'text'); return held ? rulesProblem(held as RulesDraft<Operand | Json>, 'text') : undefined; }}
-    head={start => <div className="w2-expr-valuerow w2-logic-body" data-field-path="logic-body">
+  const rules = rulesOf(operandSlot(body), 'text') as RulesDraft<Operand | Json> | undefined;
+  return <><EditorRow label={logicWords.bodyValue} title={logicWords.body} summary="" itemName={entry.name} document={view}
+    onApply={next => {
+      const slot = valueAt(next, path) as { type: string };
+      const edited = slotOperand(slot);
+      if (!edited) throw new Error('The template body must have a value.');
+      onApply(setBody(next, entry.id, edited as unknown as Rec));
+    }}
+    blocked={doc => { const held = rulesOf(valueAt(doc, path) as never, 'text'); return held ? rulesProblem(held as RulesDraft<Operand | Json>, 'text') : undefined; }}
+    head={start => <div className="w2-expr-valuerow w2-logic-body" data-field-path={path.join('/')}>
       <span className="w2-row-label">{logicWords.bodyValue}</span>
       <button type="button" className="w2-expr-fieldbtn" data-testid="logic-body" data-two-line aria-label={`${logicWords.bodyValue}: ${rules ? `${rules.cases.length} rule${rules.cases.length === 1 ? '' : 's'}` : untouched ? logicWords.resultNothing : ''}`} onClick={start}>
         <span className="w2-expr-fieldtext"><span className="w2-expr-line1">{untouched ? logicWords.resultNothing : rules ? `${rules.cases.length} rule${rules.cases.length === 1 ? '' : 's'}` : <ThenSummary kind="text" then={body} ctx={ctx}/>}</span></span><ChevronRight size={16} aria-hidden/>
       </button></div>}>
-    {draft => <ValueEditor draft={draft} path={['__logic']} kind="text" modes={['fixed', 'entity', 'rules']} label={logicWords.bodyValue} initialMode={untouched ? 'rules' : undefined}/>}
-  </EditorRow>;
+    {draft => <ValueEditor draft={draft} path={path} kind="text" modes={['fixed', 'entity', 'rules']} label={logicWords.bodyValue} initialMode={untouched ? 'rules' : undefined}
+      canvasField={{ draft: operandBodyDraft(draft, path), path, kind: 'operand', label: logicWords.body }}/>}
+  </EditorRow>
+    {preview?.graph ? <MiniMap graph={preview.graph} ctx={ctx} description={graphSentence(preview.graph, ctx)}/>
+      : preview?.error ? <p role="alert" className="w2-error-text">{preview.error}</p> : null}
+  </>;
 }
 
 /** The uses of the template, two at first, each a button that shows its node. */

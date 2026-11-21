@@ -7,7 +7,8 @@ import { useRows } from '../rowsContext';
 import { addStepAt, countWords, defaultFieldFor, flowLimits, flowShapes, moveStep, newStep, stepId, stepNames, stepSummary, stepsThatFit, updateFlow, withoutStep } from './flow';
 import { setFlowFocus } from './focus';
 import StepPage from './StepPage';
-import { useFlowData } from './useFlowData';
+import { useWorkspaceFlowData } from '../logic-fields/live';
+import { useFieldDraft, useLogicFields } from '../logic-fields/LogicFields';
 
 /**
  * The Steps section (studio-pipes D1, "a step list"): a row for each step with its number, name, a line in words and what it did to the data ("42 → 18"),
@@ -16,7 +17,8 @@ import { useFlowData } from './useFlowData';
  */
 export default function StepList({ flowId, inputs }: { flowId: string; inputs: PipelineInputs }) {
   const { document, onChange } = useRows();
-  const shapes = flowShapes(inputs), data = useFlowData(flowId, inputs);
+  const canvas = useLogicFields(), draft = useFieldDraft(document, onChange);
+  const shapes = flowShapes(inputs), data = useWorkspaceFlowData(flowId, inputs);
   const trace = data.result?.status === 'ok' ? data.result.trace : [];
   const before = (index: number): number | null | undefined => index === 0 ? (Array.isArray(data.response) ? data.response.length : undefined) : trace[index - 1]?.size;
   const apply = (change: (value: PipelineInputs) => PipelineInputs) => onChange(updateFlow(document, flowId, change));
@@ -28,6 +30,7 @@ export default function StepList({ flowId, inputs }: { flowId: string; inputs: P
   };
   return <section className="w2-group w2-data-section" aria-label="Steps" data-testid="step-list">
     <h3 className="w2-group-title">Steps</h3>
+    {canvas && <button type="button" className="w2-link" onClick={() => canvas.open({ draft, path: ['dataSources', document.dataSources.findIndex(source => source.id === flowId)], kind: 'flow', label: inputs.title })}>Edit Flow in Canvas</button>}
     <ol className="w2-data-steps">{inputs.steps.map((step, index) => {
       const name = stepNames[step.op], bad = shapes.badStep !== undefined && index >= shapes.badStep, broken = shapes.badStep === index;
       const count = bad ? '' : countWords(before(index), trace[index]?.size);

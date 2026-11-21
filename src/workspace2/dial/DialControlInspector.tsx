@@ -16,6 +16,8 @@ import { operandName } from '../expr/condition';
 import { useNameContext } from '../expr/useExpr';
 import type { Draft } from '../editors/draft';
 import { EntityField } from '../pickers/PickerField';
+import { AddressedField } from '../logic-fields/AddressedField';
+import { useLogicFields } from '../logic-fields/LogicFields';
 import {
   addStopper, betweenChoices, recallThermostat, rememberThermostat, thermostatFor, rebindThermostat, betweenOf, callFormOf, callForms, dialStarts, fromThermostat, removeStopper, restart,
   stoppersOf, withBetween, withCallForm, isThermostatDial, thermostatView, withThermostatView, type BetweenChoice, type CallForm, type DialNodeShape, type DialStart,
@@ -59,6 +61,7 @@ function NumberValueRow({ path, label, scope, step = 0.01, min = -100000, max = 
   const draft = useRowsDraft();
   const ctx = useNameContext(document);
   const operand = valueAt(document, path) as Operand | undefined;
+  const canvas = useLogicFields();
   const plain = operand?.type === 'literal' && typeof operand.value === 'number';
   const pick = (picked: { document: CompositionDocument; operand: Operand }) => onChange(replaceAt(picked.document, path, picked.operand.type === 'read' ? { ...picked.operand, as: 'number', missing: 'unavailable' } : picked.operand));
   return <Mine path={path}><div className="w2-row" data-field-path={path.join('/')}>
@@ -68,10 +71,11 @@ function NumberValueRow({ path, label, scope, step = 0.01, min = -100000, max = 
         <ValuePickerRow draft={draft} title={`Use a Value for ${label}${scope ? ` of ${scope}` : ''}`} primary="Use a Value…" groups={['entities', 'counts', 'models', 'settings']} onPick={pick}/>
       </>
       : <>
-        <ValuePickerRow draft={draft} title={`${label}${scope ? ` of ${scope}` : ''}`} label={label} primary={operand ? operandName(operand, ctx) : 'Choose'} groups={['entities', 'counts', 'models', 'settings']} onPick={pick}/>
+        {canvas && operand ? <AddressedField path={path} kind="operand" label={label}/> : <ValuePickerRow draft={draft} title={`${label}${scope ? ` of ${scope}` : ''}`} label={label} primary={operand ? operandName(operand, ctx) : 'Choose'} groups={['entities', 'counts', 'models', 'settings']} onPick={pick}/>}
         <button type="button" className="w2-remove" aria-label={`Use a Number for ${label}${scope ? ` of ${scope}` : ''}`} onClick={() => onChange(replaceAt(document, path, literal(0)))}>Use a Number</button>
       </>}
     {onRemove && <button type="button" className="w2-remove" aria-label={`Remove ${label}${scope ? ` of ${scope}` : ''}`} onClick={onRemove}>Remove</button>}
+    {canvas && plain && <AddressedField path={path} kind="operand" label={`${label} logic`}/>}
   </div></Mine>;
 }
 

@@ -1,4 +1,5 @@
 import type { DateStyle, DurationStyle, DurationUnit, FormatSpec, Operand, Predicate, TextCase } from '../../shared/composition/expression';
+import { rebuiltFrom } from '../editors/provenance';
 
 /**
  * The token line's pure logic (spec "The token line"): between a text slot and the parts the line shows (typed text and value tokens).
@@ -119,7 +120,7 @@ export function operandSlot(operand: Operand, previous?: unknown): { type: strin
     : {};
   if (operand.type === 'literal' && typeof operand.value === 'string' && !Object.keys(settings).length) return { type: 'literal', value: operand.value };
   const slot = operand.type === 'read' ? operand : { type: 'expr', value: operand };
-  return { ...slot, ...settings };
+  return rebuiltFrom(previous, { ...slot, ...settings });
 }
 
 /** The rules "Wording for 0 and 1…" turns a line into: 0 reads "None", 1 reads the line with the number written out, otherwise the line as it was. */

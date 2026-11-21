@@ -23,7 +23,7 @@ async function stubHouse(page: Page) {
   ];
   await page.route('**/api/native-home', route => route.fulfill({ json: { mode: 'live', houseConfig: { schema: 2, hash: 'a'.repeat(64), config: {} }, states } }));
 }
-const result = (page: Page) => page.getByRole('status').filter({ hasText: /now\.|tell yet|Waiting|Not connected|Now: |Shows / }).first();
+const result = (page: Page) => page.getByRole('status').filter({ hasText: /right now|now\.|tell yet|Waiting|Not connected|Now: |Shows / }).first();
 
 async function openCondition(page: Page) {
   await stubHouse(page);
@@ -36,43 +36,54 @@ async function openCondition(page: Page) {
   return panel;
 }
 async function chooseRead(page: Page, panel: ReturnType<Page['getByLabel']>, name: string | RegExp) {
-  await panel.getByRole('combobox', { name: 'Read', exact: true }).click();
+  await panel.getByRole('button', { name: 'Entity', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Read', exact: true }).click();
   await page.getByRole('option', { name }).click();
+}
+async function closeRead(page: Page) {
+  if (isPhone(page)) await page.locator('.w2-back').click(); else await page.keyboard.press('Escape');
 }
 
 test('Conditions: Read offers Raw State, which tells Unavailable from not being able to tell', async ({ page }) => {
   const panel = await openCondition(page);
   await chooseRead(page, panel, 'Raw State');
-  await expect(panel.getByText(/Says Unknown or Unavailable/)).toBeVisible();
+  await expect(page.getByText(/Says Unknown or Unavailable/)).toBeVisible();
+  await closeRead(page);
   // Raw State starts at "unknown"; the fan is on, so the condition is not true.
-  await expect(panel.getByRole('button', { name: 'unknown', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(result(page)).toContainText('Hidden now.');
-  await panel.getByRole('button', { name: 'unavailable', exact: true }).click();
-  await expect(result(page)).toContainText('Hidden now.');
+  await expect(result(page)).toContainText('No ·');
+  await panel.getByRole('button', { name: 'Value', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Unknown', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Unavailable', exact: true }).click();
+  await expect(result(page)).toContainText('No ·');
   await panel.getByRole('button', { name: 'Try Values' }).click();
   await panel.getByRole('combobox', { name: 'Bath Fan for Try Values' }).click();
   await page.getByRole('option', { name: 'Unavailable' }).click();
   // The plain read cannot tell here; the raw read can, and says the fan is unavailable.
-  await expect(result(page)).toContainText('Shown now.');
+  await expect(result(page)).toContainText('Yes ·');
   await snap(page, `${prefix(page)}-x-raw-state`);
 });
 
 test('Conditions: a list attribute offers its count and "includes", and the result line follows', async ({ page }) => {
   const panel = await openCondition(page);
-  await panel.getByRole('combobox', { name: 'Read', exact: true }).click();
+  await panel.getByRole('button', { name: 'Entity', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Read', exact: true }).click();
   await expect(page.getByRole('option', { name: 'preset_modes · Number of Items' })).toBeVisible();
   await page.getByRole('option', { name: 'preset_modes · Includes…' }).click();
-  const item = panel.getByRole('textbox', { name: 'Item' });
+  const item = page.getByRole('textbox', { name: 'Item', exact: true });
   await item.fill('sleep');
   await item.press('Enter');
-  await expect(result(page)).toContainText('Shown now.');
+  await closeRead(page);
+  await expect(result(page)).toContainText('Yes ·');
+  await panel.getByRole('button', { name: 'Entity', exact: true }).click();
   await item.fill('turbo');
   await item.press('Enter');
-  await expect(result(page)).toContainText('Hidden now.');
+  await closeRead(page);
+  await expect(result(page)).toContainText('No ·');
   await snap(page, `${prefix(page)}-x-list-includes`);
   await chooseRead(page, panel, 'preset_modes · Number of Items');
+  await closeRead(page);
   // A count starts as "is above 0": the fan offers two modes.
-  await expect(result(page)).toContainText('Shown now.');
+  await expect(result(page)).toContainText('Yes ·');
   await expect(panel.getByRole('combobox', { name: 'Comparison' })).toContainText('is above');
 });
 

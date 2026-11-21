@@ -11,6 +11,7 @@ import { sentence } from './condition';
 import { useNameContext } from './useExpr';
 import { words } from './words';
 import { Segmented } from './ui';
+import { copySubtree, rebuildField } from '../editors/provenance';
 
 type Action = { type: string } & Record<string, unknown>;
 interface Case { when?: Predicate; then: Action }
@@ -55,7 +56,7 @@ export default function ActionRules({ draft, path, schema, itemName, action }: {
   if (!rule || !then) return null;
   const open = (index: number | 'otherwise') => push?.push({ title: index === 'otherwise' ? words.otherwise : `Rule ${index + 1}`, body: <CasePage draft={draft} path={path} index={index} schema={then} itemName={itemName} action={action}/> });
   const add = () => {
-    draft.set(replaceAt(draft.get(), path, { ...rule, cases: [...rule.cases, { then: structuredClone(rule.cases.at(-1)?.then ?? { type: 'back' }) }] } as unknown as Json));
+    draft.set(rebuildField(draft.get(), path, { ...rule, cases: [...rule.cases, { then: copySubtree(rule.cases.at(-1)?.then ?? { type: 'back' }) }] }));
     open(rule.cases.length);
   };
   return <div className="w2-expr-editor" data-testid="action-rules">
@@ -79,8 +80,8 @@ export default function ActionRules({ draft, path, schema, itemName, action }: {
 export function ActionModeSwitch({ draft, path, byRule }: { draft: Draft; path: EditorPath; byRule: boolean }) {
   const change = (next: string) => {
     const current = valueAt(draft.get(), path) as Action | ByRule | undefined;
-    if (next === 'rules' && current && current.type !== 'conditional') draft.set(replaceAt(draft.get(), path, { type: 'conditional', cases: [{ then: structuredClone(current) }], otherwise: { type: 'none' } } as unknown as Json));
-    if (next === 'one' && current?.type === 'conditional') draft.set(replaceAt(draft.get(), path, structuredClone((current as ByRule).cases[0]?.then ?? { type: 'back' }) as unknown as Json));
+    if (next === 'rules' && current && current.type !== 'conditional') draft.set(rebuildField(draft.get(), path, { type: 'conditional', cases: [{ then: copySubtree(current) }], otherwise: { type: 'none' } }));
+    if (next === 'one' && current?.type === 'conditional') draft.set(rebuildField(draft.get(), path, copySubtree((current as ByRule).cases[0]?.then ?? { type: 'back' })));
   };
   return <Segmented label="Action by" value={byRule ? 'rules' : 'one'} options={[{ value: 'one', label: words.oneAction }, { value: 'rules', label: words.byRule }]} onChange={change}/>;
 }

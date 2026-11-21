@@ -5,6 +5,7 @@ import { useWorkspaceData } from '../pickers/WorkspaceData';
 import { flowData, useSample } from './samples';
 import { studioClock } from './useFlowData';
 import { useLiveRun } from './liveRun';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 /** What a step did to the data: how many items arrived, how many it left, and the first item. `undefined` while there is no data. */
 export interface StepOutcome { before: number | null; after: number | null; first?: Json }
@@ -21,7 +22,8 @@ export function stepOutcome(inputs: PipelineInputs, index: number, held: Paramet
 /** The outcome of a step over the data the flow draws now (the draft's own steps, so the Result line follows each edit). */
 export function useStepOutcome(flowId: string, inputs: PipelineInputs | undefined, index: number): StepOutcome | undefined {
   const { house } = useWorkspaceData();
-  const { sample, hide } = useSample(flowId), run = useLiveRun(flowId, inputs);
+  const suspended = useLogicFields()?.suspended;
+  const { sample, hide } = useSample(flowId), run = useLiveRun(flowId, suspended ? undefined : inputs);
   return useMemo(() => inputs ? stepOutcome(inputs, index, { states: house?.states, sample, hide, live: run.answer?.response, context: { clock: studioClock(), viewer: house?.viewer } }) : undefined, [inputs, index, house?.states, house?.viewer, sample, hide, run.answer]);
 }
 

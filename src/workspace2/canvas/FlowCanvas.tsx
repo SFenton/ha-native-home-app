@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleCheck, CircleHelp, ChevronRight, Ellipsis, GitBranch, List, Maximize, Minus, Plus, Redo2, SlidersHorizontal, Undo2, WandSparkles, X } from 'lucide-react';
-import { autoLayout, lower, type BlockCatalogEntry, type GraphBudget, type GraphEdge, type GraphNode, type LogicGraph } from '../../shared/composition/graph';
+import { autoLayout, lower, type CanvasHost, type GraphSourceMap, type BlockCatalogEntry, type GraphBudget, type GraphEdge, type GraphNode, type LogicGraph } from '../../shared/composition/graph';
 import type { DerivedTheme } from '../theme';
 import { blockSeed, nodeName, portLabel } from './blocks';
 import { detachedNodes, edit, initialEditState, orderedNodes, type CanvasFocus, type EditCommand } from './edit';
@@ -50,8 +50,17 @@ export interface FlowCanvasProps {
   readonly onClose: () => void;
   readonly returnFocus?: HTMLElement | null;
   readonly outputNames?: readonly string[];
+  readonly onGraphChange?: (graph: LogicGraph, change: { readonly revision: number; readonly reason: 'initial' | EditCommand['type'] }) => void;
+  readonly selectedNodeId?: string | null;
+  readonly onSelectionChange?: (nodeId: string | null) => void;
+  readonly onApply?: (transaction: Parameters<CanvasHost['apply']>[0], layout: CanvasLayoutHandoff) => ReturnType<CanvasHost['apply']>;
 }
-export default function FlowCanvas({ host, graph: initialGraph, title, theme, onClose, returnFocus, outputNames }: FlowCanvasProps) {
+export interface CanvasLayoutHandoff {
+  readonly graph: LogicGraph;
+  readonly positions: Readonly<Record<string, { readonly x: number; readonly y: number }>>;
+  readonly sourceMap: GraphSourceMap;
+}
+export default function FlowCanvas({ host, graph: initialGraph, title, theme, onClose, returnFocus, outputNames, onGraphChange, selectedNodeId, onSelectionChange, onApply }: FlowCanvasProps) {
   const [state, setState] = useState(() => initialEditState(initialGraph));
   const [view, setView] = useState<'graph' | 'outline'>('graph'), [panel, setPanel] = useState<'palette' | 'inspector' | null>('palette');
   const [entered, setEntered] = useState<string>(), [connection, setConnection] = useState<ConnectionRequest>();
@@ -74,13 +83,29 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const moreButton = useRef<HTMLButtonElement>(null), problemsButton = useRef<HTMLButtonElement>(null);
   const restore = useRef(false), connectionReturn = useRef<CanvasFocus | null>(null);
   const graph = state.graph;
+  const notification = useRef({ graph: undefined as LogicGraph | undefined, revision: -1, reason: 'initial' as 'initial' | EditCommand['type'] });
+  useLayoutEffect(() => {
+    if (notification.current.graph === graph) return;
+    notification.current.graph = graph;
+    onGraphChange?.(graph, { revision: ++notification.current.revision, reason: notification.current.reason });
+  }, [graph, onGraphChange]);
+  const incomingSelection = useRef(selectedNodeId), lastSelection = useRef(state.focus?.nodeId ?? null);
+  useLayoutEffect(() => {
+    const changedByHost = incomingSelection.current !== selectedNodeId;
+    incomingSelection.current = selectedNodeId;
+    const id = state.focus?.nodeId ?? null;
+    if (!changedByHost && lastSelection.current !== id && (selectedNodeId === undefined || selectedNodeId !== id)) onSelectionChange?.(id);
+    lastSelection.current = id;
+  }, [state.focus?.nodeId, selectedNodeId, onSelectionChange]);
+  const effectiveFocus = selectedNodeId === undefined ? state.focus : selectedNodeId === null ? null
+    : state.focus?.nodeId === selectedNodeId ? state.focus : { nodeId: selectedNodeId };
   const windowed = view === 'graph' && graph.nodes.length > 200;
   const canvasWindow = useCanvasWindow(viewport, windowed, zoom);
   const index = useMemo(() => indexGraph(graph), [graph]);
   const names = useMemo(() => new Map(graph.nodes.map(node => [node.id, nodeName(node, graph, index)])), [graph, index]);
   const nameOf = (node: GraphNode) => names.get(node.id)!;
   const labelOf = (id: string, node?: GraphNode) => portLabel(id, node, graph, index);
-  const selected = state.focus ? index.nodes.get(state.focus.nodeId) : undefined;
+  const selected = effectiveFocus ? index.nodes.get(effectiveFocus.nodeId) : undefined;
   const ordered = useMemo(() => orderedNodes(graph, index), [graph, index]);
   const navigationOrder = useRef(ordered), previousModels = useRef<ReadonlyMap<string, BlockPresentation>>(undefined);
   const models = useMemo(() => presentBlocks(graph, index, names, host.data.sources, previousModels.current), [graph, index, names, host.data.sources]);
@@ -90,11 +115,14 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const detached = useMemo(() => detachedNodes(graph, index), [graph, index]);
   const dirty = graph !== baseline.current;
   const focus = useCallback((target: CanvasFocus) => {
+    lastSelection.current = target.nodeId;
+    if (selectedNodeId !== target.nodeId) onSelectionChange?.(target.nodeId);
     setState(held => ({ ...held, focus: target }));
     if (target.portId !== undefined) setEntered(target.nodeId);
     restore.current = true;
-  }, []);
+  }, [selectedNodeId, onSelectionChange]);
   const send = useCallback((command: EditCommand, origin?: CanvasFocus) => {
+    notification.current.reason = command.type;
     setMessage('');
     restore.current = true;
     setState(held => edit(origin ? { ...held, focus: origin } : held, command));
@@ -159,7 +187,10 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     if (!result.ok || detached.length || busy) return;
     setBusy(true);
     try {
-      const written = await host.apply({ revision: snapshot.current.revision, label: `Edit ${title}`, replacements: result.replacements, generatedSources: result.generatedSources, generatedLibrary: result.generatedLibrary });
+      const transaction = { revision: snapshot.current.revision, label: `Edit ${title}`, replacements: result.replacements, generatedSources: result.generatedSources, generatedLibrary: result.generatedLibrary };
+      const written = onApply ? await onApply(transaction, {
+        graph, positions: Object.fromEntries(graph.nodes.map(node => [node.id, node.position ?? { x: 24, y: 24 }])), sourceMap: result.sourceMap,
+      }) : await host.apply(transaction);
       if (written.status === 'conflict') {
         host.compareConflict(snapshot.current, written.remote); setMessage('Conflict: canvas edits are preserved. Compare with the remote revision before trying again.');
       } else if (written.status === 'invalid') setMessage(`Apply refused: ${written.diagnostics.map(issue => `${issue.message} ${issue.pointer}`).join('; ')}`);
@@ -215,14 +246,18 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   }, [elementFor, moving, focus]);
   const actions = useMemo<BlockActions>(() => ({
     register: target => element => { if (element) refs.current.set(focusKey(target), element); else refs.current.delete(focusKey(target)); },
-    remember: target => setState(held => held.focus?.nodeId === target.nodeId && held.focus?.portId === target.portId && held.focus?.direction === target.direction ? held : { ...held, focus: target }),
+    remember: target => {
+      lastSelection.current = target.nodeId;
+      if (selectedNodeId !== target.nodeId) onSelectionChange?.(target.nodeId);
+      setState(held => held.focus?.nodeId === target.nodeId && held.focus?.portId === target.portId && held.focus?.direction === target.direction ? held : { ...held, focus: target });
+    },
     reveal: node => locate(node.id),
     select: node => { focus({ nodeId: node.id }); setEntered(node.id); setPanel('inspector'); },
     headerKeys, nodeKeys, move: beginMove,
     connect: request => { connectionReturn.current = { ...request.socket, direction: request.direction }; setConnection(request); },
     disconnect: edgeId => send({ type: 'disconnect', edgeId }),
     inspect: () => setPanel('inspector'), remove: setDeleting,
-  }), [focus, headerKeys, nodeKeys, beginMove, send, locate]);
+  }), [focus, headerKeys, nodeKeys, beginMove, send, locate, selectedNodeId, onSelectionChange]);
   const add = (entry: BlockCatalogEntry) => {
     const seed = blockSeed(entry, host.data.sources[0]?.id), scopeId = selected?.scopeId ?? graph.scopes[0]?.id;
     if (seed && scopeId) send({ type: 'add', seed, scopeId });

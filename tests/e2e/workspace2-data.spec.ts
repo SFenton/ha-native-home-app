@@ -116,18 +116,22 @@ test.describe('the flow editor', () => {
     await expect(props.getByTestId('run-bar')).toContainText('Worked out on the phone. Nothing to run.');
     await expect(props.getByRole('textbox', { name: 'Value' })).toBeVisible();
   });
-  test('a step opens its page; Filter keeps items with Simple or Logic and has no "If it can\'t tell"', async ({ page }) => {
+  test('a Filter edits one check inline and opens compound logic in the canvas, without legacy cards', async ({ page }) => {
     const panel = await openData(page);
     await panel.getByRole('button', { name: /^Overdue Chores/ }).click();
     const props = page.getByLabel('Properties');
     await props.getByRole('button', { name: /^Step 2, Filter/ }).click();
     await expect(props.getByTestId('filter-page')).toBeVisible();
-    await expect(props.getByText('Keep items when')).toBeVisible();
-    await expect(props.getByRole('radiogroup', { name: 'Condition view' })).toBeVisible();
+    await expect(props.getByRole('heading', { name: 'Keep items when', exact: true })).toBeVisible();
+    await expect(props.getByRole('radiogroup', { name: 'Condition view' })).toHaveCount(0);
+    await expect(props.getByTestId('flow-simple-filter')).toBeVisible();
     await expect(props.getByText(/If it can/)).toHaveCount(0);
     await expect(props.getByTestId('filter-result')).toContainText(/Keeps \d+ of \d+ items\./);
-    await props.getByRole('radio', { name: 'Logic' }).click();
-    await expect(props.getByText('of these are true')).toBeVisible();
+    await props.getByRole('button', { name: '+ And…', exact: true }).click();
+    const canvas = page.locator('.w2-logic-overlay');
+    await expect(canvas).toBeVisible();
+    await expect(canvas.getByText('of these are true')).toHaveCount(0);
+    await canvas.getByRole('button', { name: 'Close canvas', exact: true }).click();
     await snap(page, `${prefix(page)}-data-filter`);
     await props.getByRole('button', { name: 'Cancel' }).click();
   });
@@ -152,7 +156,8 @@ test.describe('the flow editor', () => {
     await props.getByRole('button', { name: 'Add Step' }).click();
     await page.getByRole('menuitem', { name: 'Average', exact: true }).click();
     await props.getByRole('button', { name: /^Step 3, Average/ }).click();
-    await expect(props.getByRole('button', { name: 'Average of' })).toBeVisible();
+    const field = props.getByTestId('logic-field').filter({ hasText: 'Average of' });
+    await expect(field.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeVisible();
     await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toHaveCount(0);
     await props.getByRole('button', { name: 'Cancel' }).click();
   });
@@ -169,8 +174,11 @@ test.describe('the List', () => {
     await expect(props.getByRole('button', { name: 'Edit Data Flow' })).toBeVisible();
     await expect(props.getByRole('button', { name: /^Row tapped/ })).toBeVisible();
     await expect(props.getByRole('switch', { name: 'Pull to refresh' })).toHaveCount(0);
-    await expect(props.getByRole('button', { name: /^Only show when/ })).toBeVisible();
+    await expect(props.getByRole('button', { name: /^Only show when:/ })).toBeVisible();
     for (const label of ['Show state', 'Loading text', 'Empty text', 'Empty message', 'Out-of-date text', 'Error text', 'Unavailable text']) await expect(props.getByLabel(label).first()).toBeVisible();
+    await props.getByRole('button', { name: /^Only show when:/ }).click();
+    await expect(props.getByTestId('simple-condition')).toBeVisible();
+    await props.getByRole('button', { name: 'Done', exact: true }).click();
     await snap(page, `${prefix(page)}-data-list`);
   });
   test('Show state draws the Empty state, with the message under the title; focusing a text announces its state', async ({ page }) => {

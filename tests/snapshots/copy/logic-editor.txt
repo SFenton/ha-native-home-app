@@ -12,8 +12,8 @@ Text · tried with All Closed
 Add Setting…
 Value
 1 rule
-Shows 3 On
-Worked out with each setting’s Try With value.
+Shows "3 On",
+worked out with each setting’s Try With value.
 Test
 Used by
 Logic Gallery

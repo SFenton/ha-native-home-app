@@ -3,7 +3,7 @@ import { isHole, isUse, settingKindOf, type LogicParam } from './logicModel';
 import { logicWords } from './logicWords';
 
 /** What naming a use or a setting needs: the library, and the settings of the template being edited (a body names its settings by label). */
-export interface LogicNames { library: readonly LogicEntry[]; settings?: readonly LogicParam[] }
+export interface LogicNames { library: readonly LogicEntry[]; settings?: readonly LogicParam[]; resolve?: (value: unknown) => unknown }
 
 /** "10:00 PM" for 600 and 22:00 for 1320. */
 export const minutesWords = (minutes: number): string => { const hour = Math.floor(minutes / 60) % 24, minute = Math.round(minutes % 60); return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`; };
@@ -33,6 +33,8 @@ export function logicOperandName(operand: unknown, names: LogicNames | undefined
 
 /** A use's settings in a line: "Night Hours 10:00 PM, 7:00 AM". `say` names an operand argument. */
 export function useSentence(use: { logicId: string; args: Record<string, unknown> }, names: LogicNames | undefined, say: (value: unknown) => string, entityName: (sourceId: string) => string): string {
+  const resolved = names?.resolve?.(use);
+  if (isUse(resolved)) use = resolved;
   const entry = names?.library.find(item => item.id === use.logicId);
   if (!entry) return logicWords.missing;
   const parts = entry.params.map(param => {

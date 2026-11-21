@@ -11,6 +11,8 @@ import { useRows } from '../rowsContext';
 import { FlowScopeProvider } from './flowScope';
 import { fillsRow, flowShapes, itemFields, kindWords, rowSlotWords, type RowSlot } from './flow';
 import { setPickSlot } from './focus';
+import { AddressedField } from '../logic-fields/AddressedField';
+import { useLogicFields } from '../logic-fields/LogicFields';
 
 const givesWords = { rows: 'Rows', records: 'Records', record: 'One Record', scalar: 'One Value' } as const;
 
@@ -24,8 +26,9 @@ function PickFocus({ label, onPick, children }: { label: string; onPick: (path: 
  * The Output section: what the flow gives (Rows, One Record or One Value) and, for Rows, the Title, Subtitle, Value and ID of a row and "Up to". The slots are value
  * pickers over the item's fields; a focused slot also takes a click on a field of the Data panel's outline.
  */
-export default function OutputSection({ inputs, edit }: { inputs: PipelineInputs; edit: (change: (inputs: PipelineInputs) => PipelineInputs) => void }) {
+export default function OutputSection({ inputs, edit, flowId }: { inputs: PipelineInputs; edit: (change: (inputs: PipelineInputs) => PipelineInputs) => void; flowId?: string }) {
   const { document } = useRows();
+  const canvas = useLogicFields(), at = document.dataSources.findIndex(source => source.id === flowId);
   const names = useNameContext(document);
   const shapes = flowShapes(inputs), final = shapes.final, core = withoutNull(final), kinds = kindsOf(core);
   const options = [...(kinds.has('array') ? ['rows'] : []), ...(kinds.has('array') && elementOf(core) && hasObject(elementOf(core)!) ? ['records'] : []), ...(kinds.has('object') ? ['record'] : []), ...(core.kind !== 'any' && !kinds.has('array') && !kinds.has('object') ? ['scalar'] : [])] as (keyof typeof givesWords)[];
@@ -41,8 +44,10 @@ export default function OutputSection({ inputs, edit }: { inputs: PipelineInputs
     const set = (next: Operand | undefined) => edit(held => held.output.kind !== 'rows' ? held : { ...held, output: { ...held.output, row: Object.fromEntries(Object.entries({ ...held.output.row, [key]: next }).filter(([, value]) => value !== undefined)) as typeof held.output.row } });
     return <PickFocus key={key} label={rowSlotWords[key]} onPick={path => set({ type: 'item', path })}>
       <FlowScopeProvider item={final} params={inputs.parameters.map(item => ({ name: item.name, type: item.type }))}>
-        <ValuePickerRow draft={draft} label={rowSlotWords[key]} title={rowSlotWords[key]} stacked primary={operand ? operandName(operand, names) : <span className="w2-placeholder">None</span>}
-          onPick={picked => set(picked.operand)}/>
+        {canvas && at >= 0 && operand
+          ? <AddressedField path={['dataSources', at, 'inputs', 'output', 'row', key]} kind="operand" label={rowSlotWords[key]}/>
+          : <ValuePickerRow draft={draft} label={rowSlotWords[key]} title={rowSlotWords[key]} stacked primary={operand ? operandName(operand, names) : <span className="w2-placeholder">None</span>}
+            onPick={picked => set(picked.operand)}/>}
       </FlowScopeProvider>
       {optional && operand && <button type="button" className="w2-link w2-data-clear" onClick={() => set(undefined)}>{`Remove ${rowSlotWords[key]}`}</button>}
     </PickFocus>;

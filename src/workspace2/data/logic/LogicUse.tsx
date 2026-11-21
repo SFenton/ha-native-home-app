@@ -20,6 +20,14 @@ import { entityOfSource } from '../../expr/condition';
 import { entryOf, isUse, settingKindOf, useProblems, workedOut, type LogicParam } from './logicModel';
 import { minutesInput, parseMinutes } from './logicNames';
 import { logicWords } from './logicWords';
+import type { EditorPath } from '../../../composition-editor';
+import { DraftField } from '../../logic-fields/AddressedField';
+import { useLogicFields } from '../../logic-fields/LogicFields';
+import { UseBindingControls } from '../../logic-fields/UseBindingControls';
+import { valueAt } from '../../../composition-editor';
+import { resolveLogicUseBindings } from '../../../shared/composition/studio-logic/bindings';
+import { resolveLogicAnchor } from '../../../shared/composition/studio-logic/anchors';
+import { fieldPointer } from '../../logic-fields/registry';
 
 /** A use of a logic template: `{type: 'logic-ref', logicId, args}`. */
 export type UseValue = { type: 'logic-ref'; logicId: string; args: Record<string, Json> };
@@ -34,9 +42,11 @@ function PersonSetting({ label, value, onPick }: { label: string; value: string;
 }
 
 /** One setting of a use, drawn by its kind's own field. */
-export function SettingRow({ draft, param, arg, onArg }: { draft: Draft; param: LogicParam; arg: unknown; onArg: (next: Json, document?: CompositionDocument) => void }) {
+export function SettingRow({ draft, param, arg, onArg, path }: { draft: Draft; param: LogicParam; arg: unknown; onArg: (next: Json, document?: CompositionDocument) => void; path?: EditorPath }) {
   const document = useDraftDocument(draft), ctx = useNameContext(document);
+  const canvas = useLogicFields();
   const label = param.label ?? param.name, kind = settingKindOf(param);
+  if (canvas && path && arg !== undefined && (param.kind === 'condition' || param.kind === 'operand')) return <DraftField draft={draft} path={path} kind={param.kind} label={label}/>;
   if (kind === 'entity') {
     const entityId = typeof arg === 'string' ? entityOfSource(ctx, arg) : undefined;
     return <EntityField label={label} entityId={entityId} onPick={row => { const made = ensureSource(draft.get(), row.entityId); onArg(made.sourceId, made.document); }}/>;
@@ -64,27 +74,36 @@ export function SettingRow({ draft, param, arg, onArg }: { draft: Draft; param: 
  * What a use opened shows (proposal, "Using one"): one row per setting under the template's name, drawn by that kind's own field, the result line, then
  * Open Template, Unlink From Template and the remove command. Reads and writes through `onChange`, so a pushed page holds no closure.
  */
-export default function LogicUseSettings({ draft, use, kind, onChange, onUnlink, onRemove, removeLabel, onLeave }: {
+export default function LogicUseSettings({ draft, use, kind, onChange, onUnlink, onRemove, removeLabel, onLeave, path }: {
   draft: Draft; use: UseValue; kind: 'value' | 'condition';
-  onChange: (next: UseValue, document?: CompositionDocument) => void; onUnlink: () => void; onRemove: () => void; removeLabel: string; onLeave?: () => void;
+  onChange: (next: UseValue, document?: CompositionDocument) => void; onUnlink: () => void; onRemove?: () => void; removeLabel: string; onLeave?: () => void;
+  path?: EditorPath;
 }) {
   const document = useDraftDocument(draft), actions = useDataActions();
   const entry = entryOf(document, use.logicId);
   if (!entry) return <div className="w2-logic-use" data-testid="logic-use"><p className="w2-error-text" role="alert">{logicWords.missing}</p>
-    <button type="button" className="w2-expr-remove" onClick={onRemove}>{removeLabel}</button></div>;
-  const problems = useProblems(document, use);
-  const plain = workedOut(document, use);
+    {onRemove && <button type="button" className="w2-expr-remove" onClick={onRemove}>{removeLabel}</button>}</div>;
+  const resolved = path ? valueAt(resolveLogicUseBindings(document).document, path) : use;
+  const effectiveUse = isUse(resolved) ? resolved : use;
+  const problems = useProblems(document, effectiveUse);
+  const plain = workedOut(document, effectiveUse);
   return <div className="w2-logic-use" data-testid="logic-use">
     <p className="w2-expr-tokenname"><strong>{logicWords.useTitle(entry.name)}</strong></p>
     <div role="group" aria-label={entry.name} className="w2-logic-settings-group">
-      {entry.params.map(param => <SettingRow key={param.name} draft={draft} param={param} arg={use.args[param.name]}
-        onArg={(next, base) => onChange({ ...use, args: { ...use.args, [param.name]: next } }, base)}/>)}
+      {entry.params.map(param => <div key={param.name}>
+        {path && param.kind === 'source-id' && <UseBindingControls draft={draft} path={path} argument={param.name}/>}
+        {path && document.logicUseBindings?.some(binding => binding.argument === param.name && resolveLogicAnchor(document, binding.use)?.pointer === fieldPointer(path))
+          ? <p className="w2-caption">{param.label ?? param.name}: supplied by this tile. Choose “This use sets it” to change the value.</p>
+          : <SettingRow draft={draft} param={param} arg={effectiveUse.args[param.name]} path={path ? [...path, 'args', param.name] : undefined}
+          onArg={(next, base) => onChange({ ...use, args: { ...use.args, [param.name]: next } }, base)}/>
+        }
+      </div>)}
     </div>
     {problems.map(label => <p key={label} className="w2-error-text" role="alert">{logicWords.noValue(label)}</p>)}
     {kind === 'value' ? <TextResult operand={plain as Operand | undefined} document={document}/> : <ConditionResult document={document} predicate={plain as Predicate | undefined} place="rule"/>}
     <button type="button" className="w2-expr-wording" onClick={() => { if (draft.tryLeave()) { onLeave?.(); releaseDraft(draft); actions.openLogic(entry.id); } }}>{logicWords.openTemplate}</button>
     <button type="button" className="w2-expr-wording" onClick={() => { onUnlink(); toastManager.add({ title: logicWords.unlinked(entry.name) }); }}>{logicWords.unlink}</button>
-    <button type="button" className="w2-expr-remove" onClick={onRemove}>{removeLabel}</button>
+    {onRemove && <button type="button" className="w2-expr-remove" onClick={onRemove}>{removeLabel}</button>}
   </div>;
 }
 export { isUse };

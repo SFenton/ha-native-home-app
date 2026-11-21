@@ -276,7 +276,8 @@ test('a place sets its own rule in the rule page, and Done writes it to that pla
   await row.getByRole('button', { name: /^Only show when/ }).click();
   await panel(page).getByRole('button', { name: 'Entity' }).click();
   await page.getByRole('option', { name: /Guest Mode/ }).first().click();
-  await panel(page).getByRole('button', { name: 'on', exact: true }).click();
+  await panel(page).getByRole('button', { name: 'Value', exact: true }).click();
+  await page.getByRole('button', { name: 'On', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(row.getByText('Differs from the template.')).toBeVisible();
   await expect.poll(async () => places(await draft(request)).map(node => Object.keys(node.values ?? {}).length)).toEqual([0, 1]);

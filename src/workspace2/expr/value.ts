@@ -3,6 +3,8 @@ import type { Environment, Tri } from '../../shared/composition/evaluator';
 import { evaluatePredicate } from '../data/logic/logicEval';
 import type { Json } from '../../shared/types';
 import { isLogicOperand, operandSlot, slotOperand } from './tokens';
+import { copySubtree, rebuiltFrom } from '../editors/provenance';
+import { record } from '../../shared/composition/studio-logic/anchors';
 
 /**
  * The value field's pure logic (spec "Files"): which mode a slot is in, what each mode seeds from the others, and the slot each mode
@@ -59,7 +61,7 @@ export function fixedOf(slot: Slot, kind: Kind): Operand | Json {
 }
 
 /** Rules, seeded the first time the mode is entered: the current value as Otherwise and one empty rule (spec "Changing mode keeps work"). */
-export const seedRules = <T,>(current: T): RulesDraft<T> => ({ cases: [{ when: undefined, then: structuredClone(current) }], otherwise: current });
+export const seedRules = <T,>(current: T): RulesDraft<T> => ({ cases: [{ when: undefined, then: copySubtree(current) }], otherwise: current });
 
 /** Why Rules cannot be stored yet, in words, or undefined: a rule with no condition, or text that mixes kinds. */
 export function rulesProblem(rules: RulesDraft<Operand | Json>, kind: Kind): string | undefined {
@@ -87,8 +89,9 @@ export function toSlot(mode: Exclude<Mode, 'custom'>, content: { fixed?: Operand
   if (mode === 'rules') {
     const rules = content.rules!;
     const cases = rules.cases.map(entry => (entry.when ? { when: entry.when, then: entry.then } : { then: entry.then }) as { when: Predicate; then: typeof entry.then });
-    if (kind === 'text') return operandSlot({ type: 'choose', cases: cases as { when: Predicate; then: Operand }[], otherwise: rules.otherwise as Operand }, previous);
-    return { type: 'conditional', cases, otherwise: rules.otherwise };
+    if (kind === 'text') return operandSlot(rebuiltFrom(record(previous) && typeof previous.type === 'string' ? slotOperand(previous as Slot) : undefined,
+      { type: 'choose', cases: cases as { when: Predicate; then: Operand }[], otherwise: rules.otherwise as Operand } as const), previous);
+    return rebuiltFrom(previous, { type: 'conditional', cases, otherwise: rules.otherwise });
   }
   if (kind !== 'text') {
     if (mode === 'entity') return { type: kind === 'icon' ? 'bound-symbol' : 'bound-color', value: content.entity ?? { type: 'literal', value: '' }, fallback: content.fixed };
