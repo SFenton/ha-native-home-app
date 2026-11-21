@@ -28,6 +28,10 @@ export interface TreeItem {
   chosen?: string;
   /** An area none of whose tabs is the one the simulator shows: its title is muted (never dimmed; the row stays usable). */
   muted?: boolean;
+  /** A level's row with a note: the title alone on line 1, then the tags and the note, wrapping only when they do not fit (so up to three lines). Without a note it is the standard one-line row. */
+  stacked?: boolean;
+  /** The note on a stacked row, after its tags: a level's "Needs a newer app" while the app has not shipped levels. */
+  note?: string;
   /** A place that uses a saved component: the row carries the link tag, and its accessible name says so. */
   linked?: { places: number };
 }
@@ -63,7 +67,7 @@ export interface RowProps {
  */
 export default function LibraryRow({ item, selected, shown, active, handleColumn, use, more, badge, onActivate, onToggle, onHandleDown, onHandleKey, onContext }: RowProps) {
   const label = item.open ? `Hide what is in ${item.title}` : `Show what is in ${item.title}`;
-  return <div role="treeitem" className="w2-tree-row" data-row={item.key} data-open={item.open || undefined} data-selected={selected || undefined} data-muted={item.muted || undefined}
+  return <div role="treeitem" className="w2-tree-row" data-row={item.key} data-open={item.open || undefined} data-selected={selected || undefined} data-muted={item.muted || undefined} data-stacked={(item.stacked && item.note) || undefined}
     aria-label={item.linked ? `${item.title}, linked template, used in ${item.linked.places} ${item.linked.places === 1 ? 'place' : 'places'}` : undefined}
     aria-level={item.depth + 1} aria-expanded={item.container ? item.open : undefined} aria-current={shown ? 'page' : selected ? 'true' : undefined}
     tabIndex={active ? 0 : -1} data-active={active || undefined} style={{ paddingInlineStart: 6 + item.depth * 16 }} title={item.title}
@@ -74,8 +78,11 @@ export default function LibraryRow({ item, selected, shown, active, handleColumn
     }}>
     <span className="w2-tree-slot">{item.container && <button type="button" tabIndex={-1} className="w2-tree-disclosure" aria-label={label} aria-expanded={item.open} onClick={onToggle}><span aria-hidden className="w2-tree-triangle"/></button>}</span>
     <span className="w2-tree-icon" data-chosen={item.chosen ? '' : undefined}><RowGlyph icon={item.chosen ?? item.icon} type={item.type}/></span>
-    <span className="w2-tree-title">{item.title}</span>
-    {item.tags.map(tag => <Tag key={tag} tone={tag === 'No Way In' ? 'warning' : 'neutral'}>{tag}</Tag>)}
+    {item.stacked && item.note
+      // The title has the first line to itself; the tags, then the note, follow and wrap only when they do not fit. A whole title matters more than a shorter row in a narrow list.
+      ? <span className="w2-tree-text"><span className="w2-tree-title">{item.title}</span>
+        <span className="w2-tree-sub">{item.tags.map(tag => <Tag key={tag} tone={tag === 'No Way In' ? 'warning' : 'neutral'}>{tag}</Tag>)}<span className="w2-tree-path">{item.note}</span></span></span>
+      : <><span className="w2-tree-title">{item.title}</span>{item.tags.map(tag => <Tag key={tag} tone={tag === 'No Way In' ? 'warning' : 'neutral'}>{tag}</Tag>)}</>}
     {item.linked && <LinkedTag/>}
     {badge}
     {item.container && <span className="w2-tree-count">{item.count}</span>}

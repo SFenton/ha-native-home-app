@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { ChevronDown, Plus, Search, Settings } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Plus, Search, Settings } from 'lucide-react';
 import { buildDocumentIndex, selectionKey, type SelectionKey } from '../preview2/model';
 import type { CompositionDocument } from '../shared/composition/schema';
 import { valueAt } from '../composition-editor';
@@ -13,13 +13,14 @@ import LibraryRow, { type TreeItem } from './LibraryRow';
 import { categoryInfo } from './LibraryRail';
 import { isOverlayLevel, levelName, levelRows, OVERLAY_SLOT, pathTo, searchLevel, type Crumb } from './levels';
 import { moveTab, tabRoom } from './navigation/edit';
-import { libraryGroups, type LibraryRow as ListRow, type SurfaceRef } from './outline';
+import { flatRows, levelOwners, libraryGroups, matchGroups, surfaceWord, type LibraryRow as ListRow, type SurfaceRef } from './outline';
+import { isPending, NEWER_APP_WORDS, SHEET_LEVELS_CAPABILITY } from './navigation/chromeRules';
 import { NodeMenu, NodeMenuItems } from './PropertiesPanel';
 import { TabMenu, TabMenuItems } from './LibraryTabMenu';
 import RowGlyph from './RowGlyph';
 import ListIconHost, { ListIconOnlyMenu } from './ListIconPicker';
 import { listIcons, useListIcons } from './listIcons';
-import { LibraryFooter, RowMenu, SurfaceMenuItems, type PagesActions } from './PagesPanel';
+import { LevelMenuItems, LibraryFooter, RowMenu, SurfaceMenuItems, type PagesActions } from './PagesPanel';
 import { tabGroups } from './capacity';
 import type { Library } from './useLibrary';
 import { categoryOfSurface, enterLevel, followSelection, leaveLevel, rowKeyFor, setTrail, toggleOpen, trailOf, useTrailState, validTrail, type LibraryTrail } from './useLibraryTrail';
@@ -79,8 +80,8 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   const [tabCue, setTabCue] = useState<number>();
   const [said, setSaid] = useState('');
   const [refusal, setRefusal] = useState<string>();
-  const refusalTimer = useRef(0);
-  useEffect(() => () => window.clearTimeout(refusalTimer.current), []);
+  // A refusal stays until the person's next action in the library (a press, a key, another list): a line that goes by itself leaves slower readers and screen readers behind.
+  useEffect(() => { setRefusal(undefined); }, [category]);
   const list = useRef<HTMLDivElement>(null);
   const use = ws.mode === 'use';
   /** The icons the person chose for rows (L-icons): read once, and dropped for rows the document no longer has. */
@@ -101,22 +102,37 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     const item: TreeItem = { key: row.key, title: row.title, icon: row.icon, type: row.type, tags: [...(row.rule ? ['Rule'] : []), ...(row.tags ?? [])], count: row.count, container: row.container, depth, open: open.has(row.key), root: false, movable: node ? 'node' : area && area.node.blocks ? 'area' : false, hasMenu: node || Boolean(area), muted: muted || undefined, chosen: picked[row.key], ...(row.linked ? { linked: { places: row.places ?? 0 } } : {}) };
     return [item, ...(item.open && row.container ? nodeItems(row.key, depth + 1) : [])];
   });
+  /** A level's row: indented under its sheet, tagged Level, with the app-update note while the level is not in a shipped app. It opens nothing of its own: it shows its sheet. */
+  const levelItem = (row: ListRow): TreeItem => ({ key: row.key, title: row.title, icon: row.icon, type: 'page', tags: row.tags, count: 0, container: false, depth: row.level?.sheetId ? 1 : 0, open: false, root: true, movable: false, hasMenu: true, stacked: true, note: newerApp });
   const rootItems = (row: ListRow): TreeItem[] => {
+    if (row.level) return [levelItem(row)];
     const surface = surfaceKey(row.surface);
     const item: TreeItem = { key: row.key, title: row.title, icon: row.icon, type: surfaceType(category, row.surface), tags: row.tags, count: index.children(surface).length, container: true, depth: 0, open: open.has(row.key), root: true, movable: category === 'tabs' && document.navigation.tabs.length > 1 ? 'tab' : false, hasMenu: true, chosen: picked[row.key] };
-    return [item, ...(item.open ? nodeItems(surface, 1) : [])];
+    // An open sheet lists its levels, then its own rows; a closed one lists neither. Find still shows a level that matches, under its sheet, open or not.
+    const levels = item.open || needle ? (row.levels ?? []).map(levelItem) : [];
+    return [item, ...levels, ...(item.open ? nodeItems(surface, 1) : [])];
   };
   const needle = query.trim().toLowerCase();
-  const rootGroups = groups.map(group => ({ ...group, rows: group.rows.filter(row => !needle || row.title.toLowerCase().includes(needle)) })).filter(group => group.rows.length);
+  const newerApp = isPending(SHEET_LEVELS_CAPABILITY) ? NEWER_APP_WORDS : undefined;
+  const allRows = flatRows(groups);
+  const rootGroups = matchGroups(groups, query);
   const hits = !atRoot && needle ? searchLevel(document, index, level!, query) : [];
   const levelItems = !atRoot && !needle ? nodeItems(level!, 0) : [];
   const visible: TreeItem[] = atRoot ? rootGroups.flatMap(group => (library.groupOpen(group.id, true) ? group.rows.flatMap(rootItems) : [])) : levelItems;
+  // A level that is new under a sheet (+ Level, Move to Sheets) opens that sheet, so the person sees where it went.
+  const knownLevels = useRef<Set<string> | undefined>(undefined);
+  useEffect(() => {
+    const owned = levelOwners(document).bySheet, now = new Set<string>(), fresh: string[] = [];
+    for (const [sheet, ids] of owned) for (const id of ids) { now.add(id); if (knownLevels.current && !knownLevels.current.has(id)) fresh.push(sheet); }
+    knownLevels.current = now;
+    if (fresh.length) update(old => fresh.reduce((state_, sheet) => toggleOpen(state_, rowKeyFor(document, category, selectionKey('modal', sheet)), true), old));
+  }, [document]); // eslint-disable-line react-hooks/exhaustive-deps
   const handleColumn = visible.some(item => item.movable);
   const visibleKeys = useMemo(() => new Set(visible.map(item => item.key)), [visible]);
-  const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
+  const total = allRows.filter(row => !row.level).length, levelCount = allRows.length - total;
   const summary = category === 'tabs'
     ? (document.navigation.tabs.length ? `${document.navigation.tabs.length} of ${tabGroups[0].capacity ?? 5} in the tab bar` : 'Not using a tab bar')
-    : plural(total, category === 'pages' ? 'page' : category === 'sheets' ? 'sheet' : 'modal');
+    : `${plural(total, category === 'pages' ? 'page' : category === 'sheets' ? 'sheet' : 'modal')}${levelCount ? ` · ${plural(levelCount, 'level')}` : ''}`;
   const tabLabel = (page: SelectionKey) => document.navigation.tabs.find(tab => `page:${tab.pageId}` === page)?.label;
   const above: Crumb[] = atRoot ? [] : [{ key: RAIL_CRUMB, title: info.label }, ...pathTo(document, index, level!).map((crumb, at) => at === 0 && category === 'tabs' ? { ...crumb, title: tabLabel(crumb.key) ?? crumb.title } : crumb)];
   const title = atRoot ? info.label : levelName(document, index, level!);
@@ -167,8 +183,9 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   // --- Row actions -----------------------------------------------------------------------------------------------
   const actions: PagesActions = {
     onSettings: surface => ws.selectAnywhere(surfaceKey(surface)),
-    onChange: ws.studio.apply,
+    onChange: next => { setRefusal(undefined); ws.studio.apply(next); },
     onShow: surface => { ws.setSurface(surface); ws.select(undefined); },
+    onNotice: line => refuse(line),
   };
   const toggle = (item: TreeItem, event?: MouseEvent) => {
     const family = event?.altKey ? descendants(item.key) : [];
@@ -183,8 +200,14 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   };
   const activate = (item: TreeItem, event?: MouseEvent | KeyboardEvent) => {
     setActiveKey(item.key);
+    if (item.root && allRows.find(candidate => candidate.key === item.key)?.level) {
+      // A level has no page of its own in the simulator yet: its row shows the sheet that holds it.
+      const row = allRows.find(candidate => candidate.key === item.key)!;
+      if (row.level!.sheetId) { ws.setSurface(row.surface); ws.select(undefined); }
+      return;
+    }
     if (item.root) {
-      const row = groups.flatMap(group => group.rows).find(candidate => candidate.key === item.key)!;
+      const row = allRows.find(candidate => candidate.key === item.key)!;
       // A top-level row opens in place and shows its surface; a second click on the one on show closes it.
       const showing = ws.surface?.kind === row.surface.kind && ws.surface.id === row.surface.id;
       ws.setSurface(row.surface); ws.select(undefined);
@@ -209,8 +232,8 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     if (!item.root) { const entry = index.get(item.key)!; return <NodeMenu ws={ws} path={entry.path} selectionKey={item.key} onError={onError} label={`More for ${item.title}`} className="w2-icon-button"/>; }
     const tab = document.navigation.tabs.findIndex(candidate => `tab:${candidate.id}` === item.key);
     if (tab >= 0) return <TabMenu ws={ws} tabKey={item.key} title={item.title} at={tab} count={document.navigation.tabs.length} onMove={moveTabs}/>;
-    const row = groups.flatMap(group => group.rows).find(candidate => candidate.key === item.key)!;
-    return <RowMenu document={document} surface={row.surface} title={item.title} actions={actions}/>;
+    const row = allRows.find(candidate => candidate.key === item.key)!;
+    return <RowMenu document={document} surface={row.surface} title={item.title} actions={actions} level={row.level?.id}/>;
   };
 
   // --- The context menu ----------------------------------------------------------------------------------------
@@ -270,8 +293,8 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     const box = anchorRow.getBoundingClientRect();
     return { line: { left: box.left + 8, top: (next ? box.top : box.bottom) - 1, width: box.width - 16, height: 3 }, name: '', vertical: false };
   };
-  /** The line a refused drop says, shown under the list until the next drag (and read out). */
-  const refuse = (line: string) => { setRefusal(line); setSaid(line); window.clearTimeout(refusalTimer.current); refusalTimer.current = window.setTimeout(() => setRefusal(undefined), 4000); };
+  /** The line a refused drop or move says, shown under the list until the person's next action (and read out). */
+  const refuse = (line: string) => { setRefusal(line); setSaid(line); };
   const within = (key: SelectionKey, ancestor: SelectionKey) => key === ancestor || latest.current.index.ancestors(key).includes(ancestor);
   const locate = (dragged: SelectionKey): Locator => (x, y) => {
     const host = list.current;
@@ -449,8 +472,13 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   };
   const destination = level ? endOf(document, level) : undefined;
+  /** The sheet "+ Level" adds to: the one the simulator shows, when it is of this list's kind. */
+  const levelSheet = (() => {
+    const shown = ws.surface?.kind === 'modal' ? document.modals.find(modal => modal.id === ws.surface!.id) : undefined;
+    return shown && (surfaceWord(shown) === 'Modal') === (category === 'modals') ? { id: shown.id, title: shown.title } : undefined;
+  })();
   const footer = atRoot
-    ? <LibraryFooter scope={category} disabled={use} tabReason={category === 'tabs' ? tabRoom(document).reason : undefined} onEditTabs={() => { ws.select(undefined); ws.setPanel('tabs'); }}/>
+    ? <LibraryFooter scope={category} disabled={use} sheet={levelSheet} tabReason={category === 'tabs' ? tabRoom(document).reason : undefined} onEditTabs={() => { ws.select(undefined); ws.setPanel('tabs'); }}/>
     : tabsHere
     ? <footer className="w2-lib-foot w2-area-foot" aria-label="Add Area">
         <button type="button" className="w2-level-add" disabled={use} onClick={() => addArea(true)}><Plus size={16} aria-hidden/>Shared Area</button>
@@ -463,11 +491,11 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
       </footer>;
   const menuItem = menu ? visible.find(item => item.key === menu.key) : undefined;
   const menuTab = menuItem?.key.startsWith('tab:') ? document.navigation.tabs.findIndex(tab => `tab:${tab.id}` === menuItem.key) : -1;
-  const menuRow = menuItem?.root && menuTab < 0 ? groups.flatMap(group => group.rows).find(candidate => candidate.key === menuItem.key) : undefined;
+  const menuRow = menuItem?.root && menuTab < 0 ? allRows.find(candidate => candidate.key === menuItem.key) : undefined;
   const menuNode = menuItem && !menuItem.root ? index.get(menuItem.key) : undefined;
   const menuArea = menuNode?.kind === 'local-tab';
 
-  return <ListIconHost rowOf={key => list.current?.querySelector<HTMLElement>(`[data-row="${key}"]`) ?? null}><div className="w2-pages w2-tree-host" data-library={category} data-testid="library-tree" data-level={atRoot ? 'root' : 'level'}>
+  return <ListIconHost rowOf={key => list.current?.querySelector<HTMLElement>(`[data-row="${key}"]`) ?? null}><div className="w2-pages w2-tree-host" data-library={category} data-testid="library-tree" data-level={atRoot ? 'root' : 'level'} onPointerDownCapture={() => setRefusal(undefined)} onKeyDownCapture={() => setRefusal(undefined)}>
     <LibraryLevelHead title={title} summary={summary} path={above} onBack={back} onJump={jump} onClose={onClose}/>
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder={placeholder} aria-label={placeholder} value={query} onChange={event => setQuery(event.target.value)}/></label>
     <div className="w2-pages-scroll w2-lib-scroll" data-base-ui-swipe-ignore>
@@ -494,12 +522,12 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
         {atRoot && tabbedHits.map(tab => <p key={tab.id} className="w2-tree-note">{document.pages.find(page => page.id === tab.pageId)?.title} is a tab. <button type="button" onClick={() => { setQuery(''); onCategory('tabs'); }}>Show in Tabs</button></p>)}
       </div>
     </div>
-    {refusal && <p className="w2-tree-note w2-tree-refusal">{refusal}</p>}
+    {refusal && <p className="w2-tree-note w2-tree-refusal" data-testid="library-refusal"><AlertTriangle size={14} className="w2-tone-warning" aria-hidden/>{refusal}</p>}
     <p className="w2-sr" role="status" aria-live="polite">{said}</p>
     {footer}
     {menu && anchor && (menuRow || menuNode || menuTab >= 0) && <Menu.Root open onOpenChange={next => { if (!next) setMenu(undefined); }}>
       <Menu.Portal><Menu.Positioner anchor={anchor} side="bottom" align="start" sideOffset={2} className="w2-positioner"><Menu.Popup className="w2-scope w2-menu" data-testid="row-menu" aria-label={`${menuItem?.title} menu`}>
-        {menuTab >= 0 ? <TabMenuItems ws={ws} tabKey={menu.key} at={menuTab} count={document.navigation.tabs.length} onMove={moveTabs}/> : menuRow ? <SurfaceMenuItems document={document} surface={menuRow.surface} actions={actions}/> : menuArea ? <AreaMenuItems ws={ws} areaKey={menu.key} onError={onError}/> : menuNode ? <NodeMenuItems ws={ws} path={menuNode.path} selectionKey={menu.key} onError={onError}/> : null}
+        {menuTab >= 0 ? <TabMenuItems ws={ws} tabKey={menu.key} at={menuTab} count={document.navigation.tabs.length} onMove={moveTabs}/> : menuRow?.level ? <LevelMenuItems document={document} levelId={menuRow.level.id} actions={actions}/> : menuRow ? <SurfaceMenuItems document={document} surface={menuRow.surface} actions={actions}/> : menuArea ? <AreaMenuItems ws={ws} areaKey={menu.key} onError={onError}/> : menuNode ? <NodeMenuItems ws={ws} path={menuNode.path} selectionKey={menu.key} onError={onError}/> : null}
       </Menu.Popup></Menu.Positioner></Menu.Portal></Menu.Root>}
   </div></ListIconHost>;
 }

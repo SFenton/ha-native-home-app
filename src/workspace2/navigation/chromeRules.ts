@@ -1,7 +1,8 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
-import { PAGE_CHROME_HIDE_CAPABILITY, PAGE_WIDE_OPEN_CAPABILITY, TABS_VISIBILITY_CAPABILITY } from '../../shared/composition/global-chrome';
+import { PAGE_CHROME_HIDE_CAPABILITY, PAGE_WIDE_OPEN_CAPABILITY, SHEET_LEVELS_CAPABILITY, TABS_VISIBILITY_CAPABILITY } from '../../shared/composition/global-chrome';
 import { pendingCompositionCapabilities } from '../../shared/composition/pending';
-import { collectLinks, hideCount } from '../outline';
+import { collectLinks, levelOwners } from '../outline';
+import { chromeItems, hidesInForce, isTabFirstPage, pageHides, tabsShow, type ChromeItem, type Where } from './hidesInForce';
 import { wideOpenOf, type WideOpen } from '../../preview2/wide-open';
 
 /**
@@ -10,13 +11,13 @@ import { wideOpenOf, type WideOpen } from '../../preview2/wide-open';
  */
 
 type Page = CompositionDocument['pages'][number];
-type Where = 'every' | 'first';
-
-/** One app chrome item the app panel and a page's "Hide on this page" group list: the Quick Links and Profile pair, or a header button. The shell menu is not one: it cannot be hidden. */
-export interface ChromeItem { id: string; type: 'button' | 'shell-header'; name: string; /** Where the app shows it. */ shows: Where }
+export { chromeItems, hidesInForce, isTabFirstPage, pageHides, tabsShow };
+export type { ChromeItem, Where };
 
 /** What the editor says under a row that writes a capability the app has not shipped yet. */
 export const NEWER_APP_CAPTION = 'Needs a newer app. Publishing it waits for an app update.';
+/** The short form, for a library row that has no room for the whole caption. */
+export const NEWER_APP_WORDS = 'Needs a newer app';
 /** The footer of "Hide on this page". */
 export const HIDE_FOOTER = 'Hidden on this page only. Other pages follow the app.';
 /** The footer under the app panel's Show rows. */
@@ -26,33 +27,14 @@ export const SHOW_FOOTER = 'Every page: a page shows this however it is opened, 
 export const isPending = (capability: string): boolean => pendingCompositionCapabilities.includes(capability);
 /** The caption a row that writes `capability` carries, or none once it ships. */
 export const newerAppCaption = (capability: string): string | undefined => isPending(capability) ? NEWER_APP_CAPTION : undefined;
-export { PAGE_CHROME_HIDE_CAPABILITY, PAGE_WIDE_OPEN_CAPABILITY, TABS_VISIBILITY_CAPABILITY };
+export { PAGE_CHROME_HIDE_CAPABILITY, PAGE_WIDE_OPEN_CAPABILITY, SHEET_LEVELS_CAPABILITY, TABS_VISIBILITY_CAPABILITY };
 
 // MARK: Chrome items
-
-/** The app's chrome items a page may hide: the `shell-header`, then each `button` in the order the header lists them. */
-export function chromeItems(document: CompositionDocument): ChromeItem[] {
-  const items: ChromeItem[] = [];
-  for (const group of document.navigation.chrome.groups) for (const item of group.items) {
-    if (item.type === 'shell-menu') continue;
-    items.push({ id: item.id, type: item.type, name: item.type === 'shell-header' ? 'Quick Links and Profile' : item.label || 'Button', shows: item.visibility === 'root-only' ? 'first' : 'every' });
-  }
-  // Quick Links and Profile leads, the buttons follow in header order (proposal section 2: "Tabs · Quick Links and Profile · <button>").
-  return [...items.filter(item => item.type === 'shell-header'), ...items.filter(item => item.type === 'button')];
-}
-
-/** Where the app shows the tab bar: every page unless `navigation.tabsVisibility` says the root only. */
-export const tabsShow = (document: CompositionDocument): Where => document.navigation.tabsVisibility === 'root-only' ? 'first' : 'every';
 
 /** A button's name in the "Hide on this page" group and the app panel: "Alerts (button)"; Tabs and Quick Links and Profile are named as they are. */
 export const itemRowName = (item: ChromeItem): string => item.type === 'button' ? `${item.name} (button)` : item.name;
 
 // MARK: What a page hides
-
-/** What a page hides, whole: the tab bar and the item ids. Items the app no longer has are kept (the compiler names them). */
-export function pageHides(page: Pick<Page, 'hides'>): { tabs: boolean; items: string[] } {
-  return { tabs: page.hides?.tabs === true, items: [...(page.hides?.items ?? [])] };
-}
 
 /** The page with its `hides` set from `next`; the key is removed when nothing is hidden, and `items` when it is empty. Pure: the page is not changed. */
 export function withHides<T extends Page>(page: T, next: { tabs: boolean; items: readonly string[] }): T {
@@ -103,13 +85,6 @@ export interface HideRow {
 export const FIRST_PAGE_ONLY = 'First page only';
 
 /**
- * Whether a page is the first page of a tab: the one place the app's "First page only" items do show. A document with no tabs has one first page, `initialPageId`,
- * which is where the preview draws those items.
- */
-export const isTabFirstPage = (document: CompositionDocument, page: Pick<Page, 'id'>): boolean =>
-  document.navigation.tabs.length === 0 ? page.id === document.navigation.initialPageId : document.navigation.tabs.some(tab => tab.pageId === page.id);
-
-/**
  * The rows of "Hide on this page" for a page (a page with Custom shows only the Tabs row). A row the app shows on "First page only" is off, disabled and captioned on a page
  * that is not a tab's first page, where the app already hides it. On a tab's first page the app shows it, so the page may hide it: an ordinary switch that shows what `hides` says.
  */
@@ -143,7 +118,7 @@ export function chromeSummary(document: CompositionDocument): ChromeSummary {
   const rows: Where[] = [tabsShow(document), ...chromeItems(document).map(item => item.shows)];
   return {
     every: rows.filter(row => row === 'every').length, first: rows.filter(row => row === 'first').length,
-    hidden: document.pages.map(page => ({ id: page.id, title: page.title, count: hideCount(page) })).filter(page => page.count > 0),
+    hidden: document.pages.map(page => ({ id: page.id, title: page.title, count: hidesInForce(document, page) })).filter(page => page.count > 0),
   };
 }
 
@@ -203,21 +178,10 @@ function surfaceOf(document: CompositionDocument, path: readonly (string | numbe
   return undefined;
 }
 
-/** The sheet a level belongs to: the sheet whose links reach it, else the sheet that reaches a level that reaches it. */
+/** The title of the sheet a level belongs to: the sheet whose links reach it, directly or through another level (the first sheet that does). */
 export function sheetOfLevel(document: CompositionDocument, levelId: string): string | undefined {
-  const links = collectLinks(document);
-  const seen = new Set<string>();
-  const find = (id: string): string | undefined => {
-    if (seen.has(id)) return undefined;
-    seen.add(id);
-    for (const link of links) {
-      if (link.to.kind !== 'page' || link.to.id !== id) continue;
-      if (link.from.kind === 'modal') return document.modals.find(modal => modal.id === link.from.id)?.title;
-      if (link.from.kind === 'page' && (document.levels ?? []).some(level => level.id === link.from.id)) { const up = find(link.from.id); if (up) return up; }
-    }
-    return undefined;
-  };
-  return find(levelId);
+  const sheet = [...levelOwners(document).bySheet].find(([, ids]) => ids.includes(levelId))?.[0];
+  return document.modals.find(modal => modal.id === sheet)?.title;
 }
 
 /**

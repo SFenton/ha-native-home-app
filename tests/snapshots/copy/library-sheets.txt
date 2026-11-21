@@ -21,6 +21,9 @@ Demo Camera
 Advanced Controls
 1
 Sheet
+Level
+Choose a sheet first
+A level opens inside its sheet, with Back and Close. Move it to Pages and it opens as a page, with the tabs and header buttons.
 
 [names]
 Close

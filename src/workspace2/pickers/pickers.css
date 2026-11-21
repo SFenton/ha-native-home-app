@@ -9,7 +9,7 @@
 .w2-picker-primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .w2-picker-secondary { color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .w2-placeholder { color: var(--w2-muted); }
-.w2-scope .w2-picker-pop { width: 360px; max-width: calc(100vw - 24px); padding: 8px; }
+.w2-scope .w2-picker-pop, .w2-scope.w2-picker-pop { width: 360px; max-width: calc(100vw - 24px); padding: 8px; }
 .w2-picker-page { padding: 8px 12px 12px; }
 .w2-vlist { overflow-y: auto; border-radius: 8px; contain: strict; }
 .w2-vlist-empty { contain: none; display: flex; align-items: center; justify-content: center; min-height: 96px; }
@@ -56,5 +56,6 @@
 .w2-scope button.w2-choice { justify-content: flex-start; width: 100%; min-height: 48px; border-color: transparent; text-align: start; padding: 4px 10px; }
 .w2-scope button.w2-choice[aria-selected=true] { background: var(--w2-selected); }
 .w2-scope button.w2-choice-create { color: var(--w2-primary); font-weight: 600; }
+.w2-choice-heading { padding: 10px 10px 2px; font-size: 12px; font-weight: 600; color: var(--w2-muted); }
 
 .w2-picker-button > svg { flex: none; }

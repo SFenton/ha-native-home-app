@@ -6,6 +6,8 @@ export interface LinkLoss {
   readonly title: string;
   readonly text: string;
   readonly confirm: string;
+  /** `plain` draws the change's button in the ordinary primary style, for a question that removes nothing. Default: the danger style. */
+  readonly tone?: 'plain';
 }
 
 /**
@@ -24,7 +26,7 @@ export function LinkLossQuestion({ asking, onCancel, onConfirm }: { asking: Link
         <AlertDialog.Description className="w2-dialog-text">{shown.text}</AlertDialog.Description>
         <div className="w2-linked-actions">
           <button type="button" onClick={onCancel}>Cancel</button>
-          <button type="button" className="w2-danger-button" onClick={onConfirm}>{shown.confirm}</button>
+          <button type="button" className={shown.tone === 'plain' ? 'w2-primary' : 'w2-danger-button'} onClick={onConfirm}>{shown.confirm}</button>
         </div>
       </AlertDialog.Popup>}
     </AlertDialog.Viewport></AlertDialog.Portal>

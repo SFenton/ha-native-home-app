@@ -7,7 +7,7 @@ import AdvancedFold from '../AdvancedFold';
 import { fixedLine } from '../labels';
 import { ChromeGroups } from '../ChromeGroups';
 import { usePush } from '../kit';
-import { collectLinks } from '../outline';
+import { collectLinks, levelOwners } from '../outline';
 import { fieldOptions, gatherFixed, ObjectRows, useRows, type RowOverride } from '../rows';
 import type { Workspace2 } from '../useWorkspace2';
 import { useDeepRows } from '../editors/overrides';
@@ -25,13 +25,16 @@ type Key = `${'page' | 'modal' | 'node' | 'chrome-item'}:${string}`;
 /** "Opened from": the pages and tiles whose actions open this page or sheet; each row goes there (spec 5.2). */
 export function OpenedFrom({ document, kind, id, onGo }: { document: CompositionDocument; kind: 'page' | 'modal'; id: string; onGo: (key: Key) => void }) {
   const links = collectLinks(document).filter(link => link.to.kind === kind && link.to.id === id);
-  const surfaces = [...document.pages, ...document.modals];
+  const surfaces = [...document.pages, ...document.modals, ...(document.levels ?? [])];
+  const owners = levelOwners(document);
+  /** A level has no page of its own in the simulator: its row goes to the sheet that holds it. */
+  const fromKey = (from: Exclude<typeof links[number]['from'], { kind: 'chrome' }>): Key => from.kind === 'level' ? `modal:${[...owners.bySheet].find(([, ids]) => ids.includes(from.id))?.[0] ?? from.id}` : `${from.kind}:${from.id}`;
   const via = document.navigation.tabs.filter(tab => kind === 'page' && tab.pageId === id);
   return <section className="w2-group" aria-label="Opened from"><h3 className="w2-group-title">Opened from</h3>
     {links.length + via.length === 0 ? <p className="w2-caption">{kind === 'page' ? 'Nothing opens this page.' : 'Nothing opens this sheet.'}</p>
       : <ul className="w2-move-list">
         {via.map(tab => <li key={tab.id}><button type="button" className="w2-link-row" onClick={() => onGo(`page:${id}`)}><span>{tab.label}</span><span className="w2-page-via">Tab</span><ChevronRight size={16} aria-hidden/></button></li>)}
-        {links.map((link, at) => <li key={at}><button type="button" className="w2-link-row" onClick={() => onGo(link.from.kind === 'chrome' ? `chrome-item:${link.holder?.id ?? ''}` : link.holder ? `node:${link.holder.id}` : `${link.from.kind}:${link.from.id}`)}>
+        {links.map((link, at) => <li key={at}><button type="button" className="w2-link-row" onClick={() => onGo(link.from.kind === 'chrome' ? `chrome-item:${link.holder?.id ?? ''}` : link.holder ? `node:${link.holder.id}` : fromKey(link.from))}>
           <span>{link.holder?.title ?? (link.from.kind === 'chrome' ? 'Header' : surfaces.find(item => item.id === link.from.id)?.title)}</span><span className="w2-page-via">{link.from.kind === 'chrome' ? 'Header' : surfaces.find(item => item.id === link.from.id)?.title}</span><ChevronRight size={16} aria-hidden/></button></li>)}
       </ul>}
   </section>;

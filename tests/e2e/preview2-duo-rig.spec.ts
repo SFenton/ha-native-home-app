@@ -395,6 +395,8 @@ async function settledBox(page: Page, target: ReturnType<Page['locator']>) {
 }
 type Rect = { x: number; y: number; width: number; height: number } | null;
 const rounded = (box: Rect) => box ? [box.x, box.y, box.width, box.height].map(Math.round) : null;
+/** Whether two rounded boxes agree to within a pixel on each side: the cue is drawn from fractional layout, and an exact comparison flaked by 1px on CI. */
+const sameWithin1px = (box: number[] | null, expected: number[] | null) => box !== null && expected !== null && box.length === expected.length && box.every((value, at) => Math.abs(value - expected[at]) <= 1);
 /** The cue's box once it has stopped changing. */
 async function steadyCue(page: Page) {
   const cue = page.getByTestId('drop-cue');
@@ -440,7 +442,7 @@ test('the drop cue follows the rig as it finishes flattening under a pointer tha
   await page.mouse.move(point.x, point.y, { steps: 4 });
   expect(await flatNow(page), 'the rig is still flattening').toBeLessThan(0.9999);
   await expect.poll(() => flatNow(page), { timeout: 10_000 }).toBeGreaterThan(0.9999);
-  await expect.poll(async () => rounded(await page.getByTestId('drop-cue').boundingBox()), { timeout: 3000 }).toEqual(truth);
+  await expect.poll(async () => sameWithin1px(rounded(await page.getByTestId('drop-cue').boundingBox()), truth), { timeout: 3000, message: `the cue is within 1px of ${JSON.stringify(truth)}` }).toBe(true);
   await page.mouse.up();
 });
 
@@ -462,7 +464,7 @@ test('a cue drawn by an arrow key while the rig flattens is drawn again where th
   const settled = await steadyCue(page);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowUp');
-  await expect.poll(async () => rounded(await page.getByTestId('drop-cue').boundingBox()), { timeout: 3000 }).toEqual(settled);
+  await expect.poll(async () => sameWithin1px(rounded(await page.getByTestId('drop-cue').boundingBox()), settled), { timeout: 3000, message: `the cue is within 1px of ${JSON.stringify(settled)}` }).toBe(true);
   await page.keyboard.press('Escape');
 });
 
