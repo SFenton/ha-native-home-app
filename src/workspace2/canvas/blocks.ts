@@ -149,6 +149,16 @@ export function paletteAvailability(entry: BlockCatalogEntry, scope: GraphScopeK
   if (!available.enabled) return available;
   return blockSeed(entry, sourceId) ? available : { enabled: false, reason: 'Requires a destination or template supplied by the workspace host. Existing blocks remain preserved and editable in the canvas.' };
 }
+/**
+ * The source a block reads: the wired source block's selection when one is connected, else the id written in the block itself (a block
+ * lifted whole, such as a text slot whose read keeps its fallback). `graph-setting` marks a source that lives on a wired block, so a
+ * disconnected port still reads as unchosen.
+ */
+function wiredSourceId(node: GraphNode, port: string, inline: unknown, index?: CanvasGraphIndex): unknown {
+  const wired = index?.source(node.id, port)?.payload.value;
+  if (wired !== undefined) return wired;
+  return typeof inline === 'string' && inline !== 'graph-setting' ? inline : undefined;
+}
 export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources'] = [], graph?: LogicGraph, index?: CanvasGraphIndex): string {
   const value = blockFields(node.payload.value);
   if (node.payload.kind === 'source-selection') return sources.find(source => source.id === node.payload.value)?.name ?? String(node.payload.value);
@@ -159,11 +169,11 @@ export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources
   const from = value.from;
   const fromFields = blockFields(from);
   if (fromFields && typeof fromFields.sourceId === 'string') {
-    const sourceId = index ? index.source(node.id, '/from/sourceId')?.payload.value : fromFields.sourceId;
+    const sourceId = wiredSourceId(node, '/from/sourceId', fromFields.sourceId, index);
     return [sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity'), Array.isArray(fromFields.path) ? fromFields.path.join(' · ') : ''].filter(Boolean).join(' · ');
   }
   if (typeof value.sourceId === 'string') {
-    const sourceId = index ? index.source(node.id, '/sourceId')?.payload.value : value.sourceId;
+    const sourceId = wiredSourceId(node, '/sourceId', value.sourceId, index);
     return sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity');
   }
   if (value.type === 'math' || value.type === 'compare' || value.type === 'all' || value.type === 'any') return '';
