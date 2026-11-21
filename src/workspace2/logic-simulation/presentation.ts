@@ -1,4 +1,5 @@
 import type { SimulationClock, SimulationResult } from '../../shared/composition/graph/types';
+import { formatObservedValue, type ObservedValue } from './observations';
 import { resultText } from './words';
 
 export interface ValuePresentation {
@@ -19,7 +20,9 @@ export interface SimulationPresentation {
   readonly scenarioInputs?: readonly string[];
   readonly scenarioOutputs?: readonly string[];
 }
-export function displayValue(result: SimulationResult | undefined, presentation?: ValuePresentation): string {
+/** Pass observations for completed values to distinguish computed text from HA availability. */
+export function displayValue(result: SimulationResult | undefined, presentation?: ValuePresentation, observation?: ObservedValue): string {
+  if (observation && (!observation.observed || observation.state !== 'known')) return formatObservedValue(observation);
   if (result?.kind === 'operand' && result.answer.status === 'value') {
     const value = result.answer.value;
     if (typeof value === 'string' && presentation?.states?.[value]) return presentation.states[value];
@@ -31,8 +34,8 @@ export function displayValue(result: SimulationResult | undefined, presentation?
     }
     if (Array.isArray(value)) return `${value.length} items`;
     if (value !== null && typeof value === 'object') return `${Object.keys(value).length} fields`;
-    if (value === 'unavailable') return 'Unavailable';
-    if (value === 'unknown') return "Can't tell";
+    if (!observation && value === 'unavailable') return 'Unavailable';
+    if (!observation && value === 'unknown') return "Can't tell";
   }
   return resultText(result);
 }

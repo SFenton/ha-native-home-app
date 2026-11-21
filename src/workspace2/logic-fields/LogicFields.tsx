@@ -290,7 +290,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
           <LensChooser document={document} entry={field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined}
             lens={lens} onLens={setLens} onArguments={setTryWith}/>
           {lens.kind !== 'values' && <article className="w2-logic-field-preview" aria-label={lens.kind === 'stand-in' ? 'Stand-in field preview' : 'Use field preview'}>
-            <strong>{field.label}</strong><output>{displayValue(lastObservation?.blocks[working.roots[0].nodeId]?.result, { name: field.label })}</output>
+            <strong>{field.label}</strong><output>{displayValue(lastObservation?.blocks[working.roots[0].nodeId]?.result, { name: field.label }, lastObservation?.blocks[working.roots[0].nodeId])}</output>
             <small>{lens.kind === 'stand-in' ? 'Preview only - not saved' : 'Resolved for the selected use'}</small>
           </article>}
           <details><summary>Simulation · Studio only</summary>

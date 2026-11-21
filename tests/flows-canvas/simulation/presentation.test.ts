@@ -20,6 +20,7 @@ describe('human-readable simulation and canvas observation seam', () => {
     expect(observation.blocks[graph.roots[0].nodeId].ports).toContainEqual(expect.objectContaining({ direction: 'input', state: 'known', value: text }));
     expect(observation.results?.[graph.roots[0].nodeId]).toMatchObject({ observed: true, state: 'known', value: text });
     expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe(text);
+    expect(displayValue(run.outputs[0].result, { name: 'Formatted text' }, observation.results?.[graph.roots[0].nodeId])).toBe(text);
     expect(run.outputs[0].result).toEqual({ kind: 'operand', answer: { status: 'value', value: text } });
   });
   it.each(['unknown', 'unavailable'])('does not treat computed flow text %s as an HA sentinel reading', text => {
@@ -33,6 +34,7 @@ describe('human-readable simulation and canvas observation seam', () => {
     const observation = canvasObservations(program, run);
     expect(observation.results?.[graph.roots[0].nodeId]).toMatchObject({ observed: true, state: 'known', value: text });
     expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe(text);
+    expect(displayValue(run.outputs[0].result, { name: 'Flow text' }, observation.results?.[graph.roots[0].nodeId])).toBe(text);
   });
   it.each(['unknown', 'unavailable', 'ordinary text'])('keeps literal %s known on its block and connected inputs while preserving real HA raw-state treatment', text => {
     const graph = lift({ type: 'compare', op: 'eq', left: { type: 'raw-state', sourceId: 'demo_mode' }, right: { type: 'literal', value: text } },
@@ -48,8 +50,19 @@ describe('human-readable simulation and canvas observation seam', () => {
     expect(observation.blocks[graph.roots[0].nodeId].ports).toContainEqual(expect.objectContaining({ portId: '/right', state: 'known', value: text }));
     expect(formatObservedValue(observation.blocks[literal.id])).toBe(text);
     expect(observation.blocks[read.id].state).toBe(text === 'unknown' ? 'cant-tell' : text === 'unavailable' ? 'unavailable' : 'known');
+    expect(displayValue(observation.blocks[read.id].result, { name: 'HA state' }, observation.blocks[read.id]))
+      .toBe(text === 'unknown' ? "Can't tell" : text === 'unavailable' ? 'Unavailable' : text);
     expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe('Yes');
     expect(run.outputs[0].result).toEqual({ kind: 'condition', answer: 'yes' });
+  });
+  it.each([
+    [25, { name: 'Bedroom', unit: '°C' }, '25.0 °C'],
+    ['2026-11-18', { name: 'Today', format: 'date' as const }, 'Nov 18, 2026'],
+  ])('preserves unit and date presentation for observed value %s', (value, presentation, expected) => {
+    const graph = lift({ type: 'literal', value }, { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph]), run = runSimulation(program, simulationFixture().held);
+    const observation = canvasObservations(program, run);
+    expect(displayValue(run.outputs[0].result, presentation, observation.results?.[graph.roots[0].nodeId])).toBe(expected);
   });
   it('formats units, unknowns, local clock and change times without IDs or ISO timestamps', () => {
     expect(displayValue({ kind: 'operand', answer: { status: 'value', value: 25 } }, { name: 'Bedroom', unit: '°C' })).toBe('25.0 °C');
