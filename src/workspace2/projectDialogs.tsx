@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { compositionSourceText, importCompositionText } from '../composition-editor';
+import { compositionSourceText } from '../composition-editor';
+import { importCompositionText } from './editors/importDocument';
 import { CompositionValidationError } from '../shared/composition/json';
 import { formatCompositionIssue } from '../shared/composition/workspace';
 import { TextField } from '../ui';

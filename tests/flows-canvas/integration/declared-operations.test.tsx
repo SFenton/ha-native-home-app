@@ -6,7 +6,8 @@
  */
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { compilerIssuesOf, compositionEditorSchema, compositionSourceText, fieldVariants, resolveField, importCompositionText, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
+import { compilerIssuesOf, compositionEditorSchema, compositionSourceText, fieldVariants, resolveField, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
+import { importCompositionText } from '../../../src/workspace2/editors/importDocument';
 import CompositionFields from '../../../src/CompositionFields';
 import { CompositionValidationError } from '../../../src/shared/composition/json';
 import { encodeStudioCanvas, readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';

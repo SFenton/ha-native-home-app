@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { importCompositionText } from '../../composition-editor';
+import { importCompositionText } from '../editors/importDocument';
 import { CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES } from '../../shared/composition/json';
 import { formatCompositionIssue } from '../../shared/composition/workspace';
 import { Field } from '../../ui';

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { changeFieldVariant, compositionSourceText, fieldVariants, importCompositionText, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
+import { changeFieldVariant, compositionSourceText, fieldVariants, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
+import { importCompositionText } from '../../../src/workspace2/editors/importDocument';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
 import { bodyNodes, derivedId, expandDocument, expandSources, fieldSteps, ownedSources, readField, renameSources } from '../../../src/shared/composition/components';
 import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic/anchors';
