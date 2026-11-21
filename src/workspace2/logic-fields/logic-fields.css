@@ -25,6 +25,14 @@
 .w2-sheet-viewport:has(.w2-simulation-surface), .w2-dialog-viewport:has(.w2-simulation-surface), .w2-sim-scenarios-viewport { z-index: 150; }
 .w2-positioner:has(.w2-simulation-surface), .w2-positioner:has(.w2-logic-lens-menu) { z-index: 160; }
 .w2-logic-lens { display: grid; gap: 8px; padding-block-end: 12px; }
+.w2-logic-result-summary { display: grid; gap: 6px; padding: 8px 10px; margin-block-end: 12px; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-field); }
+.w2-logic-result-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.w2-logic-result-line output { flex: 1; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.w2-logic-result-summary dl { display: grid; gap: 4px; margin: 0; }
+.w2-logic-result-summary dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.w2-logic-result-summary dt, .w2-logic-result-summary dd { margin: 0; overflow-wrap: anywhere; }
+.w2-logic-result-summary dd { text-align: end; font-weight: 500; }
+.w2-logic-result-summary p { margin: 0; }
 .w2-logic-lens select, .w2-logic-lens input { width: 100%; min-height: 36px; border: 1px solid var(--w2-line); border-radius: 8px; padding: 6px 8px; background: var(--w2-field); color: var(--w2-ink-card); font: inherit; }
 .w2-logic-field-preview { display: grid; gap: 8px; padding: 12px; margin-block: 12px; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-field); }
 .w2-logic-field-preview output { font-size: 18px; overflow-wrap: anywhere; }

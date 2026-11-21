@@ -49,7 +49,7 @@ it('maps only supplied block/port observations, distinguishes scenario pins and 
 it("updates can't-tell wires without recompiling, changing the draft, or evaluating missing downstream values", () => {
   const { host, props, graph } = fixture(), compile = vi.spyOn(core, 'lower');
   const { container, rerender } = render(<FlowCanvas {...props} host={host}/>);
-  const header = screen.getByRole('button', { name: 'Select Add 1' });
+  const header = screen.getByRole('button', { name: 'Select Add 1, result' });
   act(() => header.focus());
   const observations = { [graph.nodes[1].id]: { outputs: { value: { state: 'cant-tell', source: 'live' } } } } as const;
   rerender(<FlowCanvas {...props} host={{ ...host, observations }}/>);

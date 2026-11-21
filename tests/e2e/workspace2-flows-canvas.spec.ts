@@ -66,7 +66,7 @@ for (const view of ['Graph', 'Outline'] as const) test(`C-keyboard ${view}: add,
   await page.keyboard.press('ArrowRight'); await page.keyboard.press('Shift+ArrowDown'); await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: 'moved to X 40' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select Number 4', exact: true })).toBeFocused();
-  await selectBlock(page, 'Select Add 1'); await page.keyboard.press('Enter'); await page.keyboard.press('Delete');
+  await selectBlock(page, 'Select Add 1, result'); await page.keyboard.press('Enter'); await page.keyboard.press('Delete');
   await expect(page.getByRole('button', { name: /Add, Value input, number.*required, unconnected/ })).toBeFocused();
   await page.keyboard.press('Escape');
   await selectBlock(page, 'Select Number 4');
@@ -97,7 +97,7 @@ for (const view of ['Graph', 'Outline'] as const) test(`C-keyboard ${view}: add,
 test('C-wire: cycles and incompatible types explain refusal accessibly', async ({ page }) => {
   await page.goto(harness);
   await activate(page, page.getByRole('button', { name: 'Close block palette' }));
-  await selectBlock(page, 'Select Add 1');
+  await selectBlock(page, 'Select Add 1, result');
   await page.keyboard.press('Enter');
   await nodeControl(page, 'Add, Result output, number, operand, unconnected');
   await page.keyboard.press('Enter');
@@ -152,7 +152,7 @@ test('C-themes: light, dark, custom HA tokens and narrow palette/canvas/summary 
     await page.goto(`${harness}?fixture=summary${scheme === 'custom' ? '&theme=custom' : ''}`);
     await activate(page, page.getByRole('button', { name: 'Close block palette' }));
     await expect(page.getByRole('button', { name: 'No Problems', exact: true })).toBeVisible();
-    await selectBlock(page, 'Select All Of 1'); await page.keyboard.press('Enter');
+    await selectBlock(page, 'Select All Of 1, result'); await page.keyboard.press('Enter');
     await nodeControl(page, 'Inspect All Of'); await page.keyboard.press('Enter');
     await expect(page.getByRole('figure', { name: 'All Of, 3 checks' })).toContainText("Viewer's person is home");
     await expect(page.getByRole('figure', { name: 'All Of, 3 checks' })).toContainText('Not → Hallway Light is off');
@@ -192,7 +192,7 @@ test('C-fidelity: Too Warm Warning recipe, compact chrome, outline wires and key
     await selectBlock(page, (await average.getAttribute('aria-label'))!);
   }
   await overflow(page, testInfo.project.name === 'phone' ? 'Fit selection' : 'Fit all');
-  for (const name of ['Average', 'Is Above', 'All Of', 'If / Otherwise']) await expect(page.getByRole('button', { name: new RegExp(`^Select ${name.replace('/', '\\/')} \\d+$`) })).toHaveCount(1);
+  for (const name of ['Average', 'Is Above', 'All Of', 'If / Otherwise']) await expect(page.getByRole('button', { name: new RegExp(`^Select ${name.replace('/', '\\/')} \\d+${name === 'If / Otherwise' ? ', result' : ''}$`) })).toHaveCount(1);
   const toolbar = page.getByRole('navigation', { name: 'Canvas controls' });
   const toolbarRows = await toolbar.getByRole('button').evaluateAll(buttons => new Set(buttons.map(button => { const bounds = button.getBoundingClientRect(); return Math.round(bounds.top + bounds.height / 2); })).size);
   expect(toolbarRows).toBe(1);
@@ -243,7 +243,7 @@ for (const view of ['Graph', 'Outline'] as const) test(`C-focus ${view}: undo re
   await page.goto(harness);
   await activate(page, page.getByRole('button', { name: 'Close block palette' }));
   if (view === 'Outline') await activate(page, page.getByRole('button', { name: 'Outline', exact: true }));
-  await selectBlock(page, 'Select Add 1');
+  await selectBlock(page, 'Select Add 1, result');
   await page.keyboard.press('Enter'); await page.keyboard.press('ArrowDown');
   const plus = page.getByRole('button', { name: /^Add, Plus input/ });
   await expect(plus).toBeFocused();
@@ -308,7 +308,7 @@ test('C-large: 2341 blocks mount, resolve ports, focus and edit within interacti
   const lookup = Number(await page.getByLabel('Large canvas lookup performance').getAttribute('data-milliseconds'));
   expect(Number(await page.getByLabel('Large canvas lookup performance').getAttribute('data-ports'))).toBe(2340);
   await page.getByRole('button', { name: 'Close block palette' }).click();
-  const header = page.locator('.w2-canvas-node').getByRole('button', { name: /^Select Number / }).first();
+  const header = page.getByRole('list', { name: 'Flow graph blocks', exact: true }).getByRole('button', { name: /^Select Number / }).first();
   const focusStart = performance.now();
   await header.focus(); await page.keyboard.press('Enter'); await paint();
   const focus = performance.now() - focusStart;
@@ -317,6 +317,7 @@ test('C-large: 2341 blocks mount, resolve ports, focus and edit within interacti
   await page.getByRole('button', { name: /^Close (data peek|Data peek:)/ }).click();
   await page.getByRole('button', { name: 'Inspect Number', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Value', exact: true }).fill('2');
+  await paint();
   const geometry = await page.evaluateHandle(() => {
     const reads = { ports: 0, boards: 0 }, original = Element.prototype.getBoundingClientRect;
     Element.prototype.getBoundingClientRect = function () {

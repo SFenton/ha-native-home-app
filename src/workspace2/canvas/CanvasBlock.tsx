@@ -43,8 +43,9 @@ interface Props {
 }
 export default memo(function CanvasBlock({ model, observation, active, controls, tabStop, positioned, x, y, actions, visible, position, count, annotationEditor }: Props) {
   const { node, name, detail } = model;
+  const accessibleName = `Select ${name} ${model.ordinal}${model.root ? ', result' : ''}`;
   if (!visible) return <li className="w2-canvas-sr" data-node-id={node.id} data-windowed aria-posinset={position} aria-setsize={count}>
-    <button type="button" ref={actions.register({ nodeId: node.id })} tabIndex={-1} aria-label={`Select ${name} ${model.ordinal}`}
+    <button type="button" ref={actions.register({ nodeId: node.id })} tabIndex={-1} aria-label={accessibleName}
       aria-description="Off-screen block. Select to bring it into view and edit its ports." onFocus={() => actions.reveal(node)} onClick={() => actions.reveal(node)}
       onKeyDown={event => actions.headerKeys(event, node)}>{name}</button>
   </li>;
@@ -64,11 +65,11 @@ export default memo(function CanvasBlock({ model, observation, active, controls,
       {direction === 'input' && port.required && !connected && <span className="w2-canvas-error" aria-hidden>!</span>}
     </button></Tooltip>;
   };
-  return <li className="w2-canvas-node" aria-posinset={position} aria-setsize={count} data-selected={active || undefined} data-node-id={node.id} data-scenario-pinned={observation?.scenarioPinned || undefined} style={positioned ? { left: x, top: y } : undefined} onKeyDown={event => actions.nodeKeys(event, node)}>
-    <div className="w2-canvas-node-header"><button type="button" ref={actions.register({ nodeId: node.id })} className="w2-canvas-node-head" aria-label={`Select ${name} ${model.ordinal}`} aria-description={observation?.scenarioPinned ? 'Pinned by scenario.' : undefined} aria-pressed={active}
+  return <li className="w2-canvas-node" aria-posinset={position} aria-setsize={count} data-selected={active || undefined} data-node-id={node.id} data-result={model.root || undefined} data-setting={node.payload.kind === 'hole' || undefined} data-scenario-pinned={observation?.scenarioPinned || undefined} style={positioned ? { left: x, top: y } : undefined} onKeyDown={event => actions.nodeKeys(event, node)}>
+    <div className="w2-canvas-node-header"><button type="button" ref={actions.register({ nodeId: node.id })} className="w2-canvas-node-head" aria-label={accessibleName} aria-description={observation?.scenarioPinned ? 'Pinned by scenario.' : undefined} aria-pressed={active}
       tabIndex={tabStop ? 0 : -1} onFocus={() => actions.remember({ nodeId: node.id })} onClick={event => { actions.select(node); actions.peek(node, event.detail === 0); }} onKeyDown={event => actions.headerKeys(event, node)}>
       <span className="w2-canvas-block-icon" data-wire-type={node.outputs[0] ? wireKind(node.outputs[0].type) : 'record'}><BlockIcon catalogKey={node.catalogKey}/></span>
-      <span className="w2-canvas-node-title"><strong>{node.annotation?.label ?? name}</strong>{node.annotation?.label && <small>{model.generated}</small>}{model.root && <small>Output</small>}</span>
+      <span className="w2-canvas-node-title"><strong>{model.title}</strong>{model.title !== model.generated && <small>{model.generated}</small>}{model.root && <small className="w2-canvas-result-badge">Result</small>}</span>
     </button><Tooltip text={`Show data peek for ${name}`}><button type="button" className="w2-canvas-eye" tabIndex={controls ? 0 : -1} aria-label={`Show data peek for ${name}`} onClick={event => actions.peek(node, event.detail === 0)}><Eye size={16}/></button></Tooltip></div>
     {node.annotation?.note && <p className="w2-canvas-node-note w2-canvas-clamp">{node.annotation.note}</p>}
     {detail && <div className="w2-canvas-node-detail">{detail}</div>}

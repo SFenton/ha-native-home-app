@@ -39,6 +39,10 @@ dependency flows and the source-ID -> literal HA entity-ID mapping. Graph IDs
 must be canvas-wide unique, including separately lifted roots. Root anchors,
 block IDs and source/port identities must survive layout-only changes. No
 position-based remapping is performed.
+The observation projection includes completed root results for the compact
+canvas Preview without running another evaluator. Literal operand values,
+including the text unknown and unavailable, stay known on output and connected
+input ports; real HA reading statuses retain their existing treatment.
 
 The host inherits `workspace2.css`, `useStudioTheme` and its `--w2-*` variables
 from the workspace; the isolated harness mounts those same styles/theme.

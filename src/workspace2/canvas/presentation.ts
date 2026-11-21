@@ -1,5 +1,5 @@
 import type { CanvasHost, GraphNode, GraphPort, LogicGraph } from '../../shared/composition/graph';
-import { generatedName, nodeDetail, portLabel } from './blocks';
+import { generatedName, nodeDetail, nodeTitle, portLabel } from './blocks';
 import type { CanvasGraphIndex } from './graph-index';
 import { listItemKind } from './PortGlyph';
 import { wireKind } from './theme';
@@ -17,6 +17,7 @@ export interface PortPresentation {
 export interface BlockPresentation {
   readonly node: GraphNode;
   readonly name: string;
+  readonly title: string;
   readonly generated: string;
   readonly detail: string;
   readonly ordinal: number | undefined;
@@ -41,7 +42,7 @@ export function presentBlocks(graph: LogicGraph, index: CanvasGraphIndex, names:
       };
     });
     const model: BlockPresentation = {
-      node, name: names.get(node.id)!, generated: generatedName(node, graph, index), detail: nodeDetail(node, sources, graph, index),
+      node, name: names.get(node.id)!, title: nodeTitle(node, graph, index), generated: generatedName(node, graph, index), detail: nodeDetail(node, sources, graph, index),
       ordinal: index.ordinals.get(node.id), root: index.roots.has(node.id), ports: [...ports('input'), ...ports('output')],
     };
     const held = previous?.get(node.id);

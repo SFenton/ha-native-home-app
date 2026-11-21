@@ -105,8 +105,8 @@ test('Compound checks: the canvas keeps three levels, one true answer, and an at
     await canvas.getByRole('button', { name: 'More canvas controls', exact: true }).click();
     await canvas.getByRole('button', { name: 'Fit all', exact: true }).click();
     await expect(canvas.getByRole('button', { name: /^Select All Of/ })).toHaveCount(3);
-    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value yes/ })).toHaveCount(1);
-    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value no/ })).toHaveCount(2);
+    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value Yes$/ })).toHaveCount(1);
+    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value No$/ })).toHaveCount(2);
   }
   await openGraph();
   await snap(page, `${prefix(page)}-x-nest-page`);

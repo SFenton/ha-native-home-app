@@ -29,6 +29,7 @@ import { canvasPortObservations } from './observations';
 import { RetireWorkspaceFlows } from './live';
 import { previewGraph, templateUses } from './lenses';
 import { LensChooser } from './LensChooser';
+import ResultSummary from './ResultSummary';
 import { displayValue } from '../logic-simulation/presentation';
 import { useNameContext } from '../expr/useExpr';
 import { graphBlockLabel, sourceLabel } from './presentation';
@@ -285,6 +286,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
               <PanelRightClose size={18} aria-hidden />
             </button>
           </header>
+          <ResultSummary graph={working} program={simulation.program} observations={lastObservation} blockNames={blockNames} error={simulation.error}/>
           <LensChooser document={document} entry={field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined}
             lens={lens} onLens={setLens} onArguments={setTryWith}/>
           {lens.kind !== 'values' && <article className="w2-logic-field-preview" aria-label={lens.kind === 'stand-in' ? 'Stand-in field preview' : 'Use field preview'}>

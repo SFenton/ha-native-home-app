@@ -3,8 +3,28 @@ import { canvasObservations } from '../../../src/workspace2/logic-simulation/obs
 import { displayValue, editClock, localTime, changedAgo } from '../../../src/workspace2/logic-simulation/presentation';
 import { runSimulation } from '../../../src/workspace2/logic-simulation/engine';
 import { simulationFixture } from './fixture';
+import { lift } from '../../../src/shared/composition/graph';
+import { createSimulationProgram } from '../../../src/workspace2/logic-simulation/program';
+import { formatObservedValue } from '../../../src/workspace2/logic-simulation/observations';
 
 describe('human-readable simulation and canvas observation seam', () => {
+  it.each(['unknown', 'unavailable', 'ordinary text'])('keeps literal %s known on its block and connected inputs while preserving real HA raw-state treatment', text => {
+    const graph = lift({ type: 'compare', op: 'eq', left: { type: 'raw-state', sourceId: 'demo_mode' }, right: { type: 'literal', value: text } },
+      { kind: 'condition', anchor: { kind: 'logic', id: 'demo_compare', field: '/body' } }).graph;
+    const program = createSimulationProgram([graph], { sourceEntities: { demo_mode: 'input_select.demo_mode' } });
+    const held = { ...simulationFixture().held, base: { ...simulationFixture().held.base,
+      reads: [{ sourceId: 'demo_mode', access: 'raw-state' as const, answer: { status: 'value' as const, value: text } }] } };
+    const run = runSimulation(program, held), observation = canvasObservations(program, run);
+    const literal = graph.nodes.find(node => node.payload.kind === 'operand' && node.payload.value.type === 'literal')!;
+    const read = graph.nodes.find(node => node.payload.kind === 'operand' && node.payload.value.type === 'raw-state')!;
+    expect(observation.blocks[literal.id]).toMatchObject({ state: 'known', value: text });
+    expect(observation.blocks[literal.id].ports).toContainEqual(expect.objectContaining({ direction: 'output', state: 'known', value: text }));
+    expect(observation.blocks[graph.roots[0].nodeId].ports).toContainEqual(expect.objectContaining({ portId: '/right', state: 'known', value: text }));
+    expect(formatObservedValue(observation.blocks[literal.id])).toBe(text);
+    expect(observation.blocks[read.id].state).toBe(text === 'unknown' ? 'cant-tell' : text === 'unavailable' ? 'unavailable' : 'known');
+    expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe('Yes');
+    expect(run.outputs[0].result).toEqual({ kind: 'condition', answer: 'yes' });
+  });
   it('formats units, unknowns, local clock and change times without IDs or ISO timestamps', () => {
     expect(displayValue({ kind: 'operand', answer: { status: 'value', value: 25 } }, { name: 'Bedroom', unit: '°C' })).toBe('25.0 °C');
     expect(displayValue({ kind: 'condition', answer: 'unknown' })).toBe("Can't tell");

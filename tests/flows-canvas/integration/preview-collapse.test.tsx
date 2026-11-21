@@ -8,7 +8,13 @@ import { LogicFieldsProvider, useLogicFields } from '../../../src/workspace2/log
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { deriveTheme } from '../../../src/workspace2/theme';
 import { Project } from '../../support/workspace2-surfaces';
-import { integrationDocument, integrationSnapshot } from './fixture';
+import { effectiveAwayDocument, effectiveAwaySnapshot, integrationDocument, integrationSnapshot } from './fixture';
+import { lift } from '../../../src/shared/composition/graph';
+import ResultSummary from '../../../src/workspace2/logic-fields/ResultSummary';
+import { createSimulationProgram } from '../../../src/workspace2/logic-simulation/program';
+import { canvasObservations } from '../../../src/workspace2/logic-simulation/observations';
+import { captureScenario, runSimulation } from '../../../src/workspace2/logic-simulation/engine';
+import { simulationFixture } from '../simulation/fixture';
 
 const preferenceKey = 'sh-studio.canvas.preview-collapsed';
 beforeEach(() => {
@@ -18,14 +24,14 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-function setup(document = integrationDocument(), index = 0) {
+function setup(document = integrationDocument(), index = 0, kind: 'operand' | 'condition' = 'operand', snapshot = integrationSnapshot) {
   const draft = createDraft(document), live = new LiveHouse();
-  live.applySnapshot(integrationSnapshot.states);
+  live.applySnapshot(snapshot.states);
   const ws = Project.workspace(document);
   function Controls() {
     const fields = useLogicFields()!;
     return <button type="button" onClick={() => fields.open({
-      draft, path: ['logicLibrary', index, 'body'], kind: 'operand', label: 'Fixture value',
+      draft, path: ['logicLibrary', index, 'body'], kind, label: 'Fixture value',
     })}>Open canvas</button>;
   }
   const rendered = render(<WorkspaceDataProvider document={document} house={live.house} live={live}>
@@ -48,6 +54,91 @@ async function choose(label: string, option: string) {
 function collapse() { fireEvent.click(screen.getByRole('button', { name: 'Collapse Preview' })); }
 function expand() { fireEvent.click(screen.getByRole('button', { name: 'Expand Preview' })); }
 
+it('shows the result, provenance and named live inputs above the controls with Simulation still collapsed', async () => {
+  const { live, draft, session } = setup(effectiveAwayDocument(), 2, 'condition', effectiveAwaySnapshot);
+  const before = draft.get();
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  await waitFor(() => expect(within(summary).getByLabelText('Result value').textContent).toBe('No'));
+  expect(within(summary).getByText('Live')).toBeTruthy();
+  expect(summary.querySelector('dl')?.textContent).toBe('Effective modeHomeAway fallbackNo');
+  const simulationDisclosure = screen.getByText('Simulation · Studio only', { exact: true }).closest('details')!;
+  expect(simulationDisclosure.open).toBe(false);
+  expect(summary.closest('details')).toBeNull();
+  expect(summary.compareDocumentPosition(session.querySelector('.w2-logic-lens')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const setting = screen.getAllByRole('button', { name: /^Select Effective mode, Template Setting/ })[0];
+  expect(setting.querySelector('strong')?.textContent).toBe('Effective mode');
+  expect(setting.querySelector('small')?.textContent).toBe('Template Setting');
+  const raw = session.querySelectorAll('.w2-canvas-node-detail');
+  expect([...raw].some(detail => detail.textContent === 'Effective mode')).toBe(true);
+  expect([...raw].some(detail => detail.textContent === 'Choose an entity')).toBe(false);
+  for (const text of ['unknown', 'unavailable']) {
+    expect(screen.getByRole('button', { name: new RegExp(`^Text, Result output.*known, live, value ${text}$`) }).textContent).toContain(text);
+  }
+  act(() => live.applyStream([{ entityId: 'input_select.demo_mode', name: 'Demo mode', state: 'Away' }]));
+  await waitFor(() => expect(within(summary).getByLabelText('Result value').textContent).toBe('Yes'));
+  expect(simulationDisclosure.open).toBe(false);
+  expect(draft.get()).toBe(before);
+});
+it('shows completed flow outputs and declared parameter inputs, including zero, unused parameters and scenario provenance', () => {
+  const graph = lift({
+    title: 'Demo flow', parameters: [
+      { name: 'Offset', type: 'number', value: { type: 'literal', value: 0 } },
+      { name: 'Unused', type: 'number', value: { type: 'literal', value: 4 } },
+    ],
+    request: { type: 'none', value: { type: 'param', name: 'Offset' } }, steps: [], output: { kind: 'scalar' }, schema: { kind: 'number' },
+  }, { kind: 'flow-inputs', sourceId: 'demo_flow', anchor: { kind: 'flow', id: 'demo_flow', field: '/inputs' } }).graph;
+  const program = createSimulationProgram([graph]), held = simulationFixture().held;
+  const observation = canvasObservations(program, runSimulation(program, held));
+  const { rerender } = render(<ResultSummary graph={graph} program={program} observations={observation} blockNames={{}}/>);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('0');
+  expect(summary.querySelector('dl')?.textContent).toBe('Offset0Unused4');
+  expect(within(summary).getByText('Live')).toBeTruthy();
+  const scenario = captureScenario(program, held, { id: 'demo_scenario', name: 'Demo scenario' });
+  const captured = canvasObservations(program, runSimulation(program, held, { scenario }), { scenario });
+  rerender(<ResultSummary graph={graph} program={program} observations={captured} blockNames={{}}/>);
+  expect(within(summary).getByText('Scenario')).toBeTruthy();
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('0');
+});
+it('keeps real unknown/unavailable readings distinct from literal text without changing their condition answer', async () => {
+  const { live } = setup(effectiveAwayDocument(), 2, 'condition', effectiveAwaySnapshot);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  act(() => live.applyStream([
+    { entityId: 'input_select.demo_mode', name: 'Demo mode', state: 'unknown' },
+    { entityId: 'input_boolean.demo_away_fallback', name: 'Demo away fallback', state: 'unavailable' },
+  ]));
+  await waitFor(() => expect(screen.getAllByRole('button', { name: /^Raw State, Result output.*can't tell, live$/ }).length).toBe(2));
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('No');
+  expect(screen.getByRole('button', { name: /^Text, Result output.*known, live, value unknown$/ }).textContent).toContain('unknown');
+  expect(screen.getByRole('button', { name: /^Text, Result output.*known, live, value unavailable$/ }).textContent).toContain('unavailable');
+});
+it('shows an unanswered root value and badge explicitly without an invented default', () => {
+  const graph = lift({ type: 'state', sourceId: 'demo_missing', path: ['state'], in: ['on'] }, { kind: 'condition' }).graph;
+  const program = createSimulationProgram([graph], { sourceEntities: { demo_missing: 'input_boolean.demo_missing' } });
+  const held = simulationFixture().held;
+  const missing = { ...held, base: { ...held.base, reads: [] } };
+  const observation = canvasObservations(program, runSimulation(program, missing));
+  render(<ResultSummary graph={graph} program={program} observations={observation} blockNames={{}}/>);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  expect(within(summary).getByLabelText('Result value').textContent).toBe("Can't tell");
+  expect(within(summary).getByText("Can't tell", { selector: '.w2-tag' })).toBeTruthy();
+});
+it('keeps the compact result visible when Simulation closes and reflects pinned values without changing the draft', async () => {
+  const { draft } = setup();
+  const before = draft.get();
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  fireEvent.click(screen.getByText('Simulation · Studio only', { exact: true }));
+  fireEvent.click(screen.getByRole('radio', { name: /^Pin a state/ }));
+  fireEvent.change(screen.getByRole('textbox', { name: /^State for/ }), { target: { value: 'pinned fixture' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply pin' }));
+  await waitFor(() => expect(within(summary).getByLabelText('Result value').textContent).toBe('pinned fixture'));
+  expect(within(summary).getByText('Pinned')).toBeTruthy();
+  fireEvent.click(screen.getByText('Simulation · Studio only', { exact: true }));
+  expect(summary.closest('details')).toBeNull();
+  expect(summary.closest('[hidden]')).toBeNull();
+  expect(within(summary).getByText('Pinned')).toBeTruthy();
+  expect(draft.get()).toBe(before);
+});
 it('toggles with no selection or a selection, hides controls accessibly, and transfers focus', () => {
   const { work, draft } = setup(), before = draft.get();
   const panel = screen.getByRole('complementary', { name: 'Canvas preview' });

@@ -11,7 +11,7 @@ export function canvasPortObservations(observations: SimulationObservations): Ca
       const source = port.source;
       const state = port.state === 'loading' ? 'cant-tell' : port.state;
       const kept = port.direction === 'output' && port.kept === true;
-      const value: PortObservation = state === 'known' && port.value !== undefined ? { source, state, value: port.value, ...(kept ? { kept } : {}) }
+      const value: PortObservation = state === 'known' && port.value !== undefined ? { source, state, value: port.result?.kind === 'condition' ? port.value === 'yes' : port.value, ...(kept ? { kept } : {}) }
         : kept && port.value !== undefined ? { source, state: state === 'unavailable' ? state : 'cant-tell', value: port.value, kept: true }
           : { source, state: state === 'unavailable' ? state : 'cant-tell' };
       (port.direction === 'input' ? inputs : outputs)[port.portId] = value;

@@ -14,11 +14,12 @@ import { describeObservation, type CanvasHostWithObservations } from './observat
 import { indexGraph } from './graph-index';
 import CanvasBlock, { type BlockActions } from './CanvasBlock';
 import { blockLayoutKey, presentBlocks, type BlockPresentation } from './presentation';
-import { intersectsWindow, useCanvasWindow } from './windowing';
+import { canvasWindowAt, intersectsWindow, useCanvasWindow } from './windowing';
 import { countCrossings, tidyCanvas, type TidyMeasure } from './tidy';
 import Modal from './CanvasDialog';
 import AnnotationEditor, { annotationError, type AnnotationDraft } from './AnnotationEditor';
 import DataPeek from './DataPeek';
+import { frameCanvas } from './framing';
 
 const focusKey = (focus: CanvasFocus) => JSON.stringify(focus);
 const editable = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
@@ -68,7 +69,10 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-  const [zoom, setZoom] = useState(1), [moving, setMoving] = useState<{ nodeId: string; x: number; y: number }>();
+  const [zoom, setZoom] = useState(initialGraph.nodes.length > 200 ? .6 : 1), [moving, setMoving] = useState<{ nodeId: string; x: number; y: number }>();
+  const [framing, setFraming] = useState(0), framed = useRef(-1);
+  const [framedScroll, setFramedScroll] = useState<{ left: number; top: number }>();
+  const pendingFramedScroll = useRef(framedScroll);
   const [wirePaths, setWirePaths] = useState<readonly WirePath[]>([]);
   const [initialSnapshot] = useState(() => host.snapshot());
   const snapshot = useRef(initialSnapshot), baseline = useRef(state.graph), refs = useRef(new Map<string, HTMLButtonElement>());
@@ -95,7 +99,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const effectiveFocus = selectedNodeId === undefined ? state.focus : selectedNodeId === null ? null
     : state.focus?.nodeId === selectedNodeId ? state.focus : { nodeId: selectedNodeId };
   const windowed = view === 'graph' && graph.nodes.length > 200;
-  const canvasWindow = useCanvasWindow(viewport, windowed, zoom);
+  const observedWindow = useCanvasWindow(viewport, windowed, zoom);
+  const canvasWindow = useMemo(() => {
+    const area = viewport.current, pending = pendingFramedScroll.current;
+    return windowed && area ? canvasWindowAt(pending?.left ?? area.scrollLeft, pending?.top ?? area.scrollTop, area.clientWidth, area.clientHeight, zoom) : observedWindow;
+  }, [observedWindow, windowed, zoom, framedScroll]);
   const index = useMemo(() => indexGraph(graph), [graph]);
   const names = useMemo(() => new Map(graph.nodes.map(node => [node.id, nodeName(node, graph, index)])), [graph, index]);
   const nameOf = (node: GraphNode) => names.get(node.id)!;
@@ -167,12 +175,13 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const height = Math.max(300, ...graph.nodes.map((node, i) => positions[i].y + offsetY + (sizes.get(node.id)?.height ?? 140 + (node.inputs.length + node.outputs.length) * 44) + 144));
   const visible = useMemo(() => new Set(ordered.filter(node => {
     const position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
-    return !windowed || node.id === selected?.id || node.id === entered
-      || intersectsWindow(canvasWindow, position.x + offsetX, position.y + offsetY, position.x + offsetX + 190, position.y + offsetY + 140 + (node.inputs.length + node.outputs.length) * 44);
-  }).map(node => node.id)), [windowed, canvasWindow, ordered, moving, selected?.id, entered, offsetX, offsetY]);
+    return !windowed || index.roots.has(node.id) || node.id === selected?.id || node.id === entered
+      || framed.current === framing && intersectsWindow(canvasWindow, position.x + offsetX, position.y + offsetY, position.x + offsetX + 190, position.y + offsetY + 140 + (node.inputs.length + node.outputs.length) * 44);
+  }).map(node => node.id)), [windowed, canvasWindow, ordered, moving, selected?.id, entered, offsetX, offsetY, framing, framedScroll, index]);
   const visibleKey = [...visible].join('\0');
   const wireGeometry = useMemo(() => ({ ports: new Map<string, { x: number; y: number }>(), measured: new Set<string>() }), [layoutKey, moving, view, zoom, phone, host.observations, entered, draft, sizes, offsetX, offsetY]);
   const measuredCards = useMemo(() => new WeakMap<HTMLElement, TidyMeasure>(), [layoutKey, zoom, view]);
+  const measuredPortPoints = useMemo(() => new WeakMap<HTMLElement, { x: number; y: number }>(), [layoutKey, zoom, view]);
   const readMeasurements = useCallback((cards: Iterable<HTMLElement> = board.current?.querySelectorAll<HTMLElement>('.w2-canvas-node') ?? [], cache?: WeakMap<HTMLElement, TidyMeasure>) => {
     const measured = new Map<string, TidyMeasure>();
     for (const card of cards) {
@@ -183,14 +192,19 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       const ports: Record<string, { direction: 'input' | 'output'; y: number }> = {};
       for (const port of card.querySelectorAll<HTMLElement>('[data-port-id]')) {
         const bounds = port.getBoundingClientRect(), direction = port.dataset.direction;
-        if (direction === 'input' || direction === 'output') ports[port.dataset.portId!] = { direction, y: (bounds.top + bounds.height / 2 - rect.top) / (view === 'graph' ? zoom : 1) };
+        if (direction === 'input' || direction === 'output') {
+          const scale = view === 'graph' ? zoom : 1;
+          const point = { x: ((direction === 'output' ? bounds.right : bounds.left) - rect.left) / scale, y: (bounds.top + bounds.height / 2 - rect.top) / scale };
+          ports[port.dataset.portId!] = { direction, y: point.y };
+          measuredPortPoints.set(port, point);
+        }
       }
       const measurement = { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1), ports };
       measured.set(card.dataset.nodeId!, measurement);
       cache?.set(card, measurement);
     }
     return measured;
-  }, [zoom, view]);
+  }, [zoom, view, measuredPortPoints]);
   useLayoutEffect(() => {
     if (view !== 'graph') return;
     const measured = readMeasurements(undefined, measuredCards);
@@ -208,7 +222,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       const changed = entries.flatMap(entry => {
         if (!(entry.target instanceof HTMLElement)) return [];
         const previous = measured.get(entry.target.dataset.nodeId!), size = entry.borderBoxSize[0];
-        if (previous && size && previous.width === size.inlineSize / zoom && previous.height === size.blockSize / zoom) return [];
+        if (previous && size && Math.abs(previous.width - size.inlineSize) < .01 && Math.abs(previous.height - size.blockSize) < .01) return [];
         return [entry.target];
       });
       if (!changed.length) return;
@@ -220,6 +234,32 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     board.current?.querySelectorAll('.w2-canvas-node').forEach(card => observer.observe(card));
     return () => observer.disconnect();
   }, [readMeasurements, measuredCards, view, layoutKey, entered, draft, visibleKey, zoom]);
+  useLayoutEffect(() => {
+    if (view !== 'graph' || graph.nodes.length === 0 || framed.current === framing || !viewport.current?.clientWidth || !viewport.current.clientHeight) return;
+    const frame = requestAnimationFrame(() => {
+      const area = viewport.current;
+      if (!area) return;
+      const cards = graph.nodes.map((node, i) => ({
+        id: node.id, x: positions[i].x + offsetX, y: positions[i].y + offsetY,
+        width: sizes.get(node.id)?.width ?? 190,
+        height: sizes.get(node.id)?.height ?? 140 + (node.inputs.length + node.outputs.length) * 44,
+      }));
+      const x = Math.min(...cards.map(card => card.x)), y = Math.min(...cards.map(card => card.y));
+      const bounds = { x, y, width: Math.max(...cards.map(card => card.x + card.width)) - x, height: Math.max(...cards.map(card => card.y + card.height)) - y };
+      const result = cards.find(card => card.id === graph.roots[0]?.nodeId);
+      const next = frameCanvas(bounds, { width: area.clientWidth, height: area.clientHeight }, result);
+      framed.current = framing;
+      pendingFramedScroll.current = next;
+      setZoom(next.zoom); setFramedScroll(next);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [view, framing, graph, sizes, offsetX, offsetY, width, height]);
+  useLayoutEffect(() => {
+    if (framedScroll) {
+      viewport.current?.scrollTo({ ...framedScroll, behavior: 'instant' });
+      pendingFramedScroll.current = undefined;
+    }
+  }, [framedScroll]);
   // Payload-only revisions retain both the block models and measured wire geometry.
   useLayoutEffect(() => {
     if (view !== 'graph' || !board.current) return;
@@ -230,6 +270,14 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
         const key = focusKey({ ...socket, direction }), cached = ports.get(key);
         const element = elementFor({ ...socket, direction });
         if (cached && (measured.has(key) || !element)) return cached;
+        // Card measurement already read these ports; reuse its normalized coordinates.
+        const local = element && measuredPortPoints.get(element), node = index.nodes.get(socket.nodeId)!;
+        if (local) {
+          const position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
+          const point = { x: position.x + offsetX + local.x, y: position.y + offsetY + local.y };
+          ports.set(key, point); measured.add(key);
+          return point;
+        }
         if (element && board.current) {
           bounds ??= board.current.getBoundingClientRect();
           const port = element.getBoundingClientRect();
@@ -238,7 +286,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           measured.add(key);
           return point;
         }
-        const node = index.nodes.get(socket.nodeId)!, model = models.get(node.id)!, position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
+        const model = models.get(node.id)!, position = node.id === moving?.nodeId ? moving : node.position ?? { x: 24, y: 24 };
         const row = model.ports.findIndex(port => port.port.id === socket.portId && port.direction === direction);
         const point = { x: position.x + offsetX + (direction === 'output' ? 190 : 0), y: position.y + offsetY + 48 + (model.detail ? 24 : 0) + (row + .5) * (phone ? 44 : 29) };
         ports.set(key, point);
@@ -434,6 +482,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
             const before = countCrossings(graph, measure), next = tidyCanvas(graph, measure), after = countCrossings(next, measure);
             if (next !== graph) send({ type: 'layout', graph: next });
             restore.current = false;
+            setFraming(value => value + 1);
             setMessage(next === graph ? 'Already tidy' : `Tidied: wire crossings ${before} → ${after}`);
             event.currentTarget.focus();
           }}><WandSparkles size={14}/><span className="w2-canvas-toolbar-label">Tidy Up</span></button>
