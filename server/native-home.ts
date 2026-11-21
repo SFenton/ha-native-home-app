@@ -9,7 +9,20 @@ import { HttpError } from './store';
 const maxConfigBytes = 256 * 1024;
 const maxSnapshotBytes = 1024 * 1024;
 const requiredSections = ['home', 'security', 'climate', 'customLights', 'food', 'chores', 'household', 'media', 'roomDevices', 'sprinklers', 'vacation', 'vacuums', 'bedroom', 'rooms'];
-const sensitiveKey = /token|secret|password|credential|pushurl|apikey|webhook|authorization|privatekey/;
+const sensitiveKey = /token|secret|password|passwd|credential|pushurl|apikey|webhook|auth|privatekey|bearer|session|cookie|signature|sig$/;
+const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '');
+const isSensitiveKey = (key: string) => sensitiveKey.test(normalizeKey(key));
+const isSensitiveQueryKey = (key: string) => normalizeKey(key) === 'key' || isSensitiveKey(key);
+const bearerCredential = /(?:^|[^a-z0-9])Bearer\s+\S+/i;
+
+function credentialBearingUrl(value: string): boolean {
+  if (/(?:https?:[/\\]*|[/\\]{2})[^/\\\s?#]*@/i.test(value)) return true;
+  for (const match of value.matchAll(/([a-z0-9_.%+-]+)\s*=/gi)) {
+    const key = new URLSearchParams(`${match[1]}=`).keys().next().value;
+    if (key && isSensitiveQueryKey(key)) return true;
+  }
+  return false;
+}
 const envelopeSchema = z.object({
   schema: z.literal(2),
   hash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -297,18 +310,19 @@ export async function readNativeHouseConfig(url: string, token: string, signal: 
 function inspectConfig(value: Json, references: Set<string>) {
   if (typeof value === 'string') {
     if (entityIdSchema.safeParse(value).success) references.add(value);
-    if (/\{\{|\{%|(?:javascript|vbscript|data|file):|(?:^|\s)Bearer\s+\S+/i.test(value)) throw new HttpError(502, 'Native house configuration contains unsafe executable or credential-bearing content');
+    if (/\{\{|\{%|(?:javascript|vbscript|data|file):/i.test(value) || bearerCredential.test(value)) throw new HttpError(502, 'Native house configuration contains unsafe executable or credential-bearing content');
+    if (credentialBearingUrl(value)) throw new HttpError(502, 'Native house configuration contains credential-bearing URLs');
     if (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(value)) {
       let url: URL;
       try { url = new URL(value, 'https://native-home.invalid'); }
       catch { throw new HttpError(502, 'Native house configuration contains an invalid URL'); }
-      if (url.username || url.password || [...url.searchParams.keys()].some((key) => sensitiveKey.test(key.replace(/[^a-z0-9]/gi, '').toLowerCase()))) {
+      if (url.username || url.password || [...url.searchParams.keys()].some(isSensitiveQueryKey)) {
         throw new HttpError(502, 'Native house configuration contains credential-bearing URLs');
       }
     }
   } else if (value !== null && typeof value === 'object') {
     for (const [key, nested] of Object.entries(value)) {
-      if (sensitiveKey.test(key.replace(/[^a-z0-9]/gi, '').toLowerCase())) throw new HttpError(502, 'Native house configuration contains credential-bearing fields');
+      if (isSensitiveKey(key)) throw new HttpError(502, 'Native house configuration contains credential-bearing fields');
       if (entityIdSchema.safeParse(key).success) references.add(key);
       inspectConfig(nested, references);
     }
@@ -413,9 +427,9 @@ export function projectNativeState(raw: unknown, wantedAttributes?: ReadonlySet<
   return extra ? { ...parsed.data, attributes: extra } : parsed.data;
 }
 
-const deniedAttribute = /token|password|passwd|secret|api_?key|credential|auth/i;
-const safeAttributeName = (name: string) => name.toLowerCase() !== 'entity_picture' && !deniedAttribute.test(name);
+const safeAttributeName = (name: string) => normalizeKey(name) !== 'entitypicture' && !isSensitiveKey(name);
 function hasDeniedAttribute(value: Json): boolean {
+  if (typeof value === 'string') return bearerCredential.test(value) || credentialBearingUrl(value);
   if (value === null || typeof value !== 'object') return false;
   if (Array.isArray(value)) return value.some(hasDeniedAttribute);
   return Object.entries(value).some(([name, nested]) => !safeAttributeName(name) || hasDeniedAttribute(nested));
