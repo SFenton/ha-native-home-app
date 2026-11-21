@@ -1,11 +1,14 @@
 /**
  * The cost of the first edit after a structural change, when the edit boundary has no dependency index for the revision
- * and builds one. Index building memoizes per-owner and per-root work by the identity of the committed objects it reads
- * (see `documentEdit.ts`), so a rebuild after a structural edit costs what the edit changed, not the whole document.
+ * and builds one. Index building memoizes per-owner, per-node and per-root work by the identity of the committed objects
+ * it reads (see `documentEdit.ts`), so a rebuild redoes that work only for what the edit rebuilt. It is not proportional
+ * to the edit: every rebuild still counts every object of the revision once and lists every binding and root, and an edit
+ * that reconciles a located binding indexes the candidate's object paths and authored nodes.
  *
  * The fixture is the binding invariant suite's per-edit overhead document (copied tiles, each with an automatic binding
  * and a canvas root; at 256, half are component parameters on a forked template). Medians print as
- * `Edit boundary cost: ...`; the 256-binding first edit after a single-tile insert is gated, everything else reports.
+ * `Edit boundary cost: ...`. Gated: a rename as the first edit after a single-tile insert at 256 bindings, and the field
+ * editor's first declared typing keystroke after one at 66; everything else reports.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { replaceAt, valueAt } from '../../../src/composition-editor';

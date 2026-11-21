@@ -112,6 +112,23 @@ function hiddenBindingDraft(param: string): Doc {
   if (!compiles(document)) throw new Error('The hidden-binding draft no longer compiles.');
   return document;
 }
+/**
+ * A raw draft whose component body is a `local-tabs` node holding the bound tile in its first tab. Both addresses of the
+ * tile's field compile; the reconciliation derives the tile's own (`inner-tile`), so a binding stored through the tabs
+ * node is re-addressed by every edit, while one stored at the tile is a fixed point. `node` lets two drafts share a body.
+ */
+function tabbedComponentDraft(through: 'tile' | 'tabs', node?: unknown): Doc {
+  const raw = componentDocument(), entry = raw.componentLibrary[0];
+  const choice = [{ id: 'first', label: 'First' }, { id: 'second', label: 'Second' }];
+  const body = node ?? { id: 'tab-container', title: 'Tabs', type: 'local-tabs', layout: { span: 1 }, props: { stateId: 'selected-tab', transition: 'canonical-swap@1' },
+    tabs: [{ ...choice[0], children: [entry.node] }, { ...choice[1], children: [] }] };
+  const binding = through === 'tile' ? { param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }
+    : { param: 'source', nodeId: 'tab-container', field: 'tabs/0/children/0/props/titleProviderId' };
+  const document = { ...raw, logicUseBindings: [], localState: [{ id: 'selected-tab', type: 'choice', initial: 'first', options: choice }],
+    componentLibrary: [{ ...entry, node: body, bindings: [binding] }] } as unknown as Doc;
+  if (!compiles(document)) throw new Error('The tabbed component draft no longer compiles.');
+  return document;
+}
 const fixtures: Record<string, () => Doc> = {
   'page tile with canvas': () => { const { document, slot } = meaningFixture('page tile'); return withMeaningCanvas(document, slot); },
   'component parameters with canvas': () => { const { document, slot } = meaningFixture('component parameters'); return withMeaningCanvas(document, slot); },
@@ -159,6 +176,7 @@ const fixtures: Record<string, () => Doc> = {
   'raw component draft': () => { const document = componentDocument() as unknown as Doc; if (!compiles(document)) throw new Error('The raw component draft no longer compiles.'); return document; },
   'raw draft, hidden binding with an unknown parameter': () => hiddenBindingDraft('missing'),
   'raw draft, hidden binding': () => hiddenBindingDraft('source'),
+  'raw draft, binding addressed through its tabs node': () => tabbedComponentDraft('tabs'),
   'shared frame': () => storedVariant('normal'),
   'shared frame, stale lifted ID': () => storedVariant('stale lifted ID'),
   'shared frame, missing origin': () => storedVariant('missing origin'),
@@ -812,6 +830,17 @@ describe('edit oracle regressions', () => {
     const before = untabbedUse(), own = untabbedUse();
     expect(oracleEdit(before, rename(before))).toBe(before);
     expect(documentEdit(own, rename(own))).toBe(own);
+  });
+
+  it('certifies a binding by its own address, not only by its target', () => {
+    // The same body object first under a binding at its fixed point, then under one through the tabs node at the same
+    // target: the certification remembered for the first must not answer for the second.
+    const settled = tabbedComponentDraft('tile'), body = settled.componentLibrary![0].node;
+    expect(documentEdit(settled, rename(settled)).componentLibrary![0].bindings).toEqual(settled.componentLibrary![0].bindings);
+    const before = tabbedComponentDraft('tabs', body), own = tabbedComponentDraft('tabs', body);
+    const oracle = oracleEdit(before, rename(before));
+    expect(oracle.componentLibrary![0].bindings).toEqual([{ param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }]);
+    expect(documentEdit(own, rename(own))).toEqual(oracle);
   });
 
   it('removes a binding naming an unknown parameter when its target is declared deleted', () => {
