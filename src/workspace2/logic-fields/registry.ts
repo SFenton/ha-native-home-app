@@ -41,16 +41,39 @@ export const pointerPath = (pointer: string): EditorPath => pointer === '' ? [] 
   ? pointer.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~')) : pointer.slice(1).split('/');
 const ownerKinds = { pages: 'page', modals: 'modal', componentLibrary: 'component', logicLibrary: 'logic', dataSources: 'flow' } as const;
 export type AuthoredNode = { node: CompositionNode; path: EditorPath; identity: string };
-export function authoredNodes(document: CompositionDocument): AuthoredNode[] {
-  const nodes: AuthoredNode[] = [];
+/** `authoredNodes`' walk of one owner, `document[key][index]`, appended to `nodes`. */
+function visitOwner(key: WalkedOwnerList, index: number, owner: unknown, nodes: AuthoredNode[]): void {
   const visit = (node: CompositionNode, path: EditorPath, scope: string) => {
     nodes.push({ node, path, identity: JSON.stringify([scope, node.id]) });
-    for (const list of childLists(node)) list.nodes.forEach((child, index) => visit(child, [...path, ...list.path, index], scope));
+    for (const list of childLists(node)) list.nodes.forEach((child, at) => visit(child, [...path, ...list.path, at], scope));
   };
-  for (const key of ['pages', 'modals'] as const) document[key].forEach((surface, index) => {
-    surface.components.forEach((node, at) => visit(node, [key, index, 'components', at], 'surface'));
-  });
-  document.componentLibrary?.forEach((entry, index) => visit(entry.node, ['componentLibrary', index, 'node'], `component:${entry.id}`));
+  if (key === 'componentLibrary') {
+    const entry = owner as NonNullable<CompositionDocument['componentLibrary']>[number];
+    visit(entry.node, ['componentLibrary', index, 'node'], `component:${entry.id}`);
+  } else (owner as CompositionDocument['pages'][number]).components.forEach((node, at) => visit(node, [key, index, 'components', at], 'surface'));
+}
+export function authoredNodes(document: CompositionDocument): AuthoredNode[] {
+  const nodes: AuthoredNode[] = [];
+  for (const key of ['pages', 'modals'] as const) document[key].forEach((surface, index) => visitOwner(key, index, surface, nodes));
+  document.componentLibrary?.forEach((entry, index) => visitOwner('componentLibrary', index, entry, nodes));
+  return nodes;
+}
+/**
+ * The nodes of `authoredNodes(document)` inside the owner `path` runs through (none for a path outside the walked owner
+ * lists): the only ones `fieldAnchor` can find for `path`. Like the walk, it throws on an owner it cannot walk. Memoized
+ * by the owner object and its index, for an immutable (committed) document only.
+ */
+const ownerNodeWalks = new WeakMap<object, { readonly index: number; readonly nodes: readonly AuthoredNode[] }>();
+export function ownerAuthoredNodes(document: CompositionDocument, path: EditorPath): readonly AuthoredNode[] {
+  const key = path[0], index = Number(path[1]);
+  if (!(walkedOwnerLists as readonly unknown[]).includes(key) || path.length < 2 || !Number.isInteger(index) || index < 0) return [];
+  const list: unknown = Reflect.get(document, key as string), owner: unknown = Array.isArray(list) ? list[index] : undefined;
+  if (owner === null || typeof owner !== 'object') return [];
+  const known = ownerNodeWalks.get(owner);
+  if (known?.index === index) return known.nodes;
+  const nodes: AuthoredNode[] = [];
+  visitOwner(key as WalkedOwnerList, index, owner, nodes);
+  ownerNodeWalks.set(owner, { index, nodes });
   return nodes;
 }
 /**

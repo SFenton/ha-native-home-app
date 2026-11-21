@@ -59,6 +59,9 @@ const pick = <T,>(rng: Rng, items: readonly T[]): T => items[Math.floor(rng() * 
 
 // MARK: - Fixtures
 
+/** Whether the compiler accepts `document` (as a reload would, before installing it as authored). */
+const compiles = (document: Doc) => { try { compileCompositionDocument(document); return true; } catch { return false; } };
+
 const slot = (at: number): EditorPath => ['pages', 0, 'components', at, 'props', 'subtitle'];
 const compiled = () => compileCompositionDocument(draftDocument()).document;
 const lifted = (document: Doc, path: EditorPath, kind: 'slot' | 'operand' = 'slot', y = 200) => {
@@ -94,6 +97,20 @@ function storedVariant(mode: string): Doc {
   }
   if (mode === 'reversed nodes') stored = { ...stored, canvases: [{ ...canvas, nodes: [...canvas.nodes].reverse() }] };
   return { ...document, studioCanvas: stored };
+}
+/**
+ * A raw draft whose component binding fills an argument of a use in the body that its logic never reads: expansion re-points
+ * such a binding to every place the argument lands, here none, so the compiler never sees it and accepts the draft with
+ * whatever `param` it names. Installed as is (as a reload installs authored content), never through this boundary.
+ */
+function hiddenBindingDraft(param: string): Doc {
+  const raw = componentDocument(), entry = raw.componentLibrary[0];
+  const constant = { id: 'constant', name: 'Constant', kind: 'operand', params: [{ name: 'source', kind: 'source-id' }], body: { type: 'literal', value: 'Fixed' } };
+  const node = { ...entry.node, props: { ...entry.node.props, subtitle: { type: 'expr', value: { type: 'logic-ref', logicId: 'constant', args: { source: 'source-a' } } } } };
+  const document = { ...raw, logicUseBindings: [], logicLibrary: [...raw.logicLibrary, constant],
+    componentLibrary: [{ ...entry, node, bindings: [...entry.bindings, { param, nodeId: 'inner-tile', field: 'props/subtitle/value/args/source' }] }] } as unknown as Doc;
+  if (!compiles(document)) throw new Error('The hidden-binding draft no longer compiles.');
+  return document;
 }
 const fixtures: Record<string, () => Doc> = {
   'page tile with canvas': () => { const { document, slot } = meaningFixture('page tile'); return withMeaningCanvas(document, slot); },
@@ -138,6 +155,10 @@ const fixtures: Record<string, () => Doc> = {
       pages: raw.pages.map(page => ({ ...page, components: page.components.map(node => ({ ...node, args: { entity: 'sensor.example' } })) })),
     } as unknown as Doc).document;
   },
+  // Compiler-accepted raw drafts, installed without passing the boundary.
+  'raw component draft': () => { const document = componentDocument() as unknown as Doc; if (!compiles(document)) throw new Error('The raw component draft no longer compiles.'); return document; },
+  'raw draft, hidden binding with an unknown parameter': () => hiddenBindingDraft('missing'),
+  'raw draft, hidden binding': () => hiddenBindingDraft('source'),
   'shared frame': () => storedVariant('normal'),
   'shared frame, stale lifted ID': () => storedVariant('stale lifted ID'),
   'shared frame, missing origin': () => storedVariant('missing origin'),
@@ -646,9 +667,10 @@ function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome):
   return `scoped ${describeOutcome(scoped, before, candidate)}, oracle ${describeOutcome(oracle, before, candidate)}`;
 }
 
+const adoptions = { compiled: 0, copied: 0 };
 interface Disagreement { readonly seed: number; readonly fixture: string; readonly step: number; readonly edit: string; readonly detail: string }
-function sequence(seed: number, steps: number): { disagreement?: Disagreement; accepted: number; refused: number } {
-  const rng = random(seed), names = Object.keys(fixtures), fixture = names[seed % names.length];
+function sequence(seed: number, steps: number, fixture = Object.keys(fixtures)[seed % Object.keys(fixtures).length]): { disagreement?: Disagreement; accepted: number; refused: number } {
+  const rng = random(seed);
   counter = 0;
   let before = fixtures[fixture]();
   links = fixture.startsWith('unlinked draft') ? fixtures['automatic with canvas']()
@@ -674,6 +696,12 @@ function sequence(seed: number, steps: number): { disagreement?: Disagreement; a
       }
       if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: ${label} -> ${describeOutcome(scoped, before, candidate)}\n`);
       if (scoped.kind === 'result' && scoped.document !== before) {
+        // Both accepted with the same JSON. Where each built its own result, the sequence carries on with the scoped one;
+        // the oracle records it as the descendant of its own result (an edit that changes nothing), so its history of
+        // validated revisions (which lets an edit back to a descendant through) matches the one the scoped boundary keeps.
+        if (oracle.kind === 'result' && oracle.document !== scoped.document && oracleEdit(oracle.document, scoped.document) !== scoped.document) {
+          throw new Error('The oracle did not take an identical revision as its own result.');
+        }
         accepted++; before = scoped.document; history.push(before); break;
       }
       refused++;
@@ -681,17 +709,25 @@ function sequence(seed: number, steps: number): { disagreement?: Disagreement; a
       if (rng() >= 0.35 || !retry(before, candidate, rng, history)) break;
       label = `${label} (refused, then mutated in place and resubmitted)`;
     }
-    // Sometimes the caller adopts accepted content as a revision that never passed this boundary (a reload, say): a copy of
-    // the current revision sharing its objects, sometimes with one owner list rebuilt around the same elements. Neither
-    // implementation has indexed the copy, while both have seen its objects. (Only accepted content: a refused candidate is
-    // not a revision the contract covers.)
+    // Sometimes the caller installs a revision that never passed this boundary. A reload compiles the stored authored draft
+    // and installs it as is, so any candidate the compiler accepts can become `before`, refused here or not. Otherwise it is
+    // a copy of the current revision sharing its objects, sometimes with one owner list rebuilt around the same elements.
+    // Neither implementation has indexed either, while both have seen their objects. (A `before` the compiler rejects is
+    // not covered by the contract.)
     if (rng() < 0.04) {
-      const copy: Record<string, unknown> = { ...before }, lists = ['pages', 'modals', 'componentLibrary', 'logicUseBindings', 'logicLibrary']
-        .filter(key => Array.isArray(copy[key]));
-      const rebuilt = lists.length && rng() < 0.5 ? pick(rng, lists) : undefined;
-      if (rebuilt) copy[rebuilt] = [...copy[rebuilt] as unknown[]];
-      if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: adopt a copy of the revision${rebuilt ? ` with ${rebuilt} rebuilt` : ''}\n`);
-      before = copy as unknown as CompositionDocument; history.push(before);
+      if (candidate !== before && compiles(candidate)) {
+        if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: install the candidate, which compiles\n`);
+        adoptions.compiled++;
+        before = candidate; history.push(before);
+      } else {
+        const copy: Record<string, unknown> = { ...before }, lists = ['pages', 'modals', 'componentLibrary', 'logicUseBindings', 'logicLibrary']
+          .filter(key => Array.isArray(copy[key]));
+        const rebuilt = lists.length && rng() < 0.5 ? pick(rng, lists) : undefined;
+        if (rebuilt) copy[rebuilt] = [...copy[rebuilt] as unknown[]];
+        if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: adopt a copy of the revision${rebuilt ? ` with ${rebuilt} rebuilt` : ''}\n`);
+        adoptions.copied++;
+        before = copy as unknown as CompositionDocument; history.push(before);
+      }
     }
   }
   return { accepted, refused };
@@ -716,11 +752,75 @@ describe('scoped documentEdit agrees with the whole-document oracle on seeded ra
       accepted += result.accepted; refused += result.refused;
       if (result.disagreement) disagreements.push(result.disagreement);
     }
-    process.stdout.write(`Edit oracle: ${seeds} seeds from ${from}, ${steps} steps; ${accepted} accepted and ${refused} refused submissions; ${disagreements.length} disagreeing seeds.\n`);
+    process.stdout.write(`Edit oracle: ${seeds} seeds from ${from}, ${steps} steps; ${accepted} accepted and ${refused} refused submissions; ${adoptions.compiled} compiled candidates and ${adoptions.copied} copies installed; ${disagreements.length} disagreeing seeds.\n`);
     if (process.env.EDIT_ORACLE_REPORT) {
       for (const found of disagreements) process.stdout.write(`Edit oracle disagreement: ${JSON.stringify(found)}\n`);
       for (const [error, count] of [...deviations].sort(([, left], [, right]) => right - left)) process.stdout.write(`Edit oracle deviation (oracle throws, scoped refuses) x${count}: ${error}\n`);
     }
     expect(disagreements).toEqual([]);
   }, Math.max(120_000, seeds * steps * 50));
+});
+
+/**
+ * A component body whose bound node sits in a `local-tabs` node's `children`: `resolveLogicAnchor` walks those, the authored
+ * walk (`fieldAnchor`) does not, so the whole-document reconciliation re-addresses the component binding to the tabs node
+ * on any edit. (The draft does not compile; a revision like it reached the boundary through a resubmitted candidate in seed
+ * 2000862.)
+ */
+function untabbedBindings(): Doc {
+  const document = compileCompositionDocument(componentDocument()).document;
+  return { ...document, logicUseBindings: [], componentLibrary: document.componentLibrary!.map(entry => ({ ...entry,
+    node: { id: 'tabs-1', type: 'local-tabs', tabs: [{ children: [] }], children: [entry.node] } as unknown as typeof entry.node })) };
+}
+/** The same for an automatic binding: its use's tile sits in a page's `local-tabs` node's `children`. */
+function untabbedUse(): Doc {
+  const document = compiled(), [first, second] = document.pages[0].components;
+  return replaceAt(document, ['pages', 0, 'components'], [{ id: 'tabs-1', type: 'local-tabs', tabs: [{ children: [] }], children: [first] }, second]);
+}
+const rename = (document: Doc): Doc => ({ ...document, name: `${document.name} again` });
+const retitle = (document: Doc): Doc => replaceAt(document, ['pages', 0, 'title'], 'Retitled');
+
+describe('edit oracle regressions', () => {
+  let toast: ReturnType<typeof vi.spyOn>;
+  beforeAll(() => { toast = vi.spyOn(toastManager, 'add').mockImplementation(() => ''); });
+  afterAll(() => toast.mockRestore());
+
+  // Found by long runs; pinned with their fixtures, since adding fixtures moves each seed to another one.
+  it.each([
+    // The scoped boundary carried its own rebuilt result forward; the oracle had never validated that object, so it did not
+    // let a later edit back through the redo shortcut that the scoped boundary (rightly) took.
+    ['already-aliased component parameter', 2000803, 40],
+    // A revision whose component binding the whole-document reconciliation re-addresses on every edit.
+    ['nested operand', 2000862, 40],
+  ] as const)('%s, seed %i, %i steps', (fixture, seed, steps) => {
+    expect(sequence(seed, steps, fixture).disagreement).toBeUndefined();
+  });
+
+  it('reconciles, on every edit, a binding whose stored address is not the one derived for its location', () => {
+    const before = untabbedBindings(), edit = rename(before);
+    // Each on its own copy, so neither sees what the other built.
+    const oracle = oracleEdit(before, edit), own = untabbedBindings(), scoped = documentEdit(own, rename(own));
+    expect(oracle).not.toBe(before);
+    expect(oracle.componentLibrary![0].bindings).toEqual([{ param: 'source', nodeId: 'tabs-1', field: 'children/0/props/titleProviderId' }]);
+    expect(scoped).toEqual(oracle);
+  });
+
+  it('reconciles, on every edit, a use whose stored address is not the one derived for its location', () => {
+    // Re-addressed to the tabs node, the use would run through `children`, which the resolution rejects: every edit refuses.
+    const before = untabbedUse(), own = untabbedUse();
+    expect(oracleEdit(before, rename(before))).toBe(before);
+    expect(documentEdit(own, rename(own))).toBe(own);
+  });
+
+  it('lets an edit back to a descendant through on each implementation\'s own history, across a rebuilt result', () => {
+    for (const edit of [documentEdit, oracleEdit]) {
+      const first = untabbedBindings(), proposed = rename(first), rebuilt = edit(first, proposed);
+      expect(rebuilt).not.toBe(proposed);
+      expect(rebuilt).not.toBe(first);
+      const later = retitle(rebuilt);
+      expect(edit(rebuilt, later)).toBe(later);
+      // Back to `first`, then forward again to `later` in one step: `later` descends from `first` through validated edits.
+      expect(edit(first, later)).toBe(later);
+    }
+  });
 });

@@ -5,7 +5,7 @@ import { atPointer, resolveLogicAnchor, type ResolvedLogicAnchor } from '../../s
 import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
 import { sameJson } from '../../sameJson';
 import { usesOf } from '../data/logic/logicModel';
-import { AnchorResolver, authoredNodes, fieldAnchor, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
+import { AnchorResolver, authoredNodes, fieldAnchor, ownerAuthoredNodes, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
 import { canvasWalk, rebaseCanvasLayout, uncertifiedCanvasRoots, walkedNodes } from '../logic-fields/layout';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { toastManager } from '../toasts';
@@ -433,6 +433,15 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       else { const steps = path.slice(0, found) as string[]; witnessAt(fieldPointer(steps), keys, witness, steps); }
     };
     const build: IndexBuild = { dependencies, before, resolver, scans: new Set(), bases: new Map() };
+    /**
+     * Keys the whole-document reconciliation would not give back unchanged even for an edit that touches nothing they read:
+     * a binding whose stored address is not the one `fieldAnchor` derives for its own location (a node `resolveLogicAnchor`
+     * finds but the authored walk does not, say), or that fails outright. Every edit reconciles these (see `always`).
+     * Whether one is certified depends only on the owner and its list, which its key reads anyway, so a carried index stays
+     * exact.
+     */
+    const always = new Set<string>();
+    const anchorOf = (path: EditorPath) => fieldAnchor(before, path, ownerAuthoredNodes(before, path), anchor => resolver.resolve(anchor));
     let stored: ReturnType<typeof studioCanvasMetadataSchema.safeParse> | undefined;
     const resolved = before.logicUseBindings?.length ? resolvedUses(before, resolver) : [];
     // Bindings array edits are scoped per element below; any of them invalidates this index's positions.
@@ -449,11 +458,35 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       // The canonical resolution already found this use's node: `usePointer` is that node's pointer followed by the field.
       if (authored.use.kind !== 'document') build.bases.set(baseKey(authored.use), binding.usePointer.slice(0, binding.usePointer.length - authored.use.field.length));
       watchAnchor(build, authored.use, [key, reanchor]);
+      // The reconciliation re-derives each located use's address; one that comes back different is rewritten.
+      let use: LogicAnchor | undefined;
+      try { use = anchorOf(pointerPath(binding.usePointer)); } catch { /* the reconciliation fails on it */ }
+      if (!use || !sameJson(use, authored.use)) { always.add(key); always.add(reanchor); }
       if (authored.use.kind === 'component') {
         const owner = anchorPointer(build, { kind: 'component', id: authored.use.id, field: '' })!;
         dependencies.add(`${owner}/params`, key); dependencies.add(`${owner}/bindings`, key);
       }
     });
+    /**
+     * Whether reconciling a node binding at its own target gives it back unchanged: the address derived there (through the
+     * holder for an absent optional value) names the same node and field. A target with no value that is not an optional
+     * value is refused by every reconciliation, so it is not certified either.
+     */
+    const fixedComponentBinding = (entry: ComponentEntry, binding: NonNullable<ComponentEntry['bindings']>[number], target: string): boolean => {
+      const steps = fieldSteps(binding.field), path = pointerPath(target), anchor = { kind: 'component' as const, id: entry.id, nodeId: binding.nodeId!, field: '' };
+      try {
+        let address: LogicAnchor;
+        if (valueAt(before, path) !== undefined) address = anchorOf(path);
+        else {
+          if (entry.params?.find(param => param.name === binding.param)?.kind !== 'value') return false;
+          const holder = path.slice(0, -1), node = resolver.resolve(anchor);
+          const base = node && node.pointer === fieldPointer(holder) ? anchor : anchorOf(holder);
+          address = { ...base, field: `${base.field}${fieldPointer(path.slice(-1))}` };
+        }
+        return address.kind === 'component' && address.id === entry.id && address.nodeId === binding.nodeId
+          && fieldSteps(address.field).join('/') === steps.join('/');
+      } catch { return false; }
+    };
     before.componentLibrary?.forEach((entry, at) => {
       for (const field of ['params', 'bindings', 'sources', 'flows']) {
         dependencies.add(fieldPointer(['componentLibrary', at, field]), `e:${entry.id}`);
@@ -465,6 +498,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
         // An already-broken binding stays in every edit's scope, so only an edit that repairs or removes it is accepted.
         if (target === undefined || !entry.params?.some(param => param.name === binding.param)) return dependencies.add('', key);
         targets.set(key, target); witnessed(target, key);
+        if (binding.nodeId && !fixedComponentBinding(entry, binding, target)) always.add(key);
         if (!binding.nodeId) {
           // A source binding is found by its source object's unique identity inside its entry (that object is its second
           // witness; the sources lists and IDs are read under `e:`), and by the entry's ID-order position.
@@ -490,7 +524,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
         watchAnchor(build, root.anchor, [key]);
       }
     }
-    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, counts, always: new Set(),
+    indexed = { dependencies, resolved, targets, entries: new Set(before.componentLibrary?.map(entry => entry.id)), evidence, holders, members, counts, always,
       uncertified: stored?.success ? uncertifiedCanvasRoots(before, stored.data) : new Set(), unshaped, ...(stored?.success ? { stored: stored.data } : {}) };
     revisions.set(before, indexed);
   }
