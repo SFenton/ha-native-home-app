@@ -173,6 +173,14 @@ describe('draft-scoped Home Assistant attribute reads', () => {
     expect(wanted()).not.toBe(first);
     expect(wanted().get(entityId)).toEqual(new Set(['mode']));
   });
+
+  it('only requests allowlisted plain-ASCII attribute names without normalizing HA keys', () => {
+    const names = ['line', 'author', 'auth', 'x_authorization', 'x_sig', 'Line', 'api-key', 'n'.repeat(65)];
+    const document = draft(...names.map((name, index) => text(`demo-name-${index}`, read(name))));
+    const requested = documentAttributeReads(document);
+    expect(requested.get(entityId)).toEqual(new Set(['line', 'author']));
+    expect(projectNativeState(raw({ Line: 'Wrong key', author: 'Demo Owner' }), requested.get(entityId)).attributes).toEqual({ author: 'Demo Owner' });
+  });
 });
 
 describe('safe custom attribute projection', () => {
@@ -180,8 +188,9 @@ describe('safe custom attribute projection', () => {
     'access_token', 'entity_picture', 'Entity_Picture', 'Entity.Picture', 'token_count', 'PASSWORD', 'passwd', 'session_secret',
     'api_key', 'apiKey', 'api-key', 'Api.Key', 'x_api_key', 'credential_bundle', 'Authorization',
     'bearer', 'BeArEr', 'session', 'Session.Id', 'cookie', 'Set-Cookie', 'signature', 'Signature', 'sig', 'X-Sig',
-    'private-key', 'push_url', 'webhook',
-  ])('drops the entire attribute for denied top-level, nested and array key %s', name => {
+    'private-key', 'push_url', 'webhook', 'auth', 'oauth', 'x_auth', 'authorization', 'x_authorization', 'x_sig',
+    'api%2Dkey', '%74oken', '\uff41\uff50\uff49\uff0d\uff4b\uff45\uff59', '', 'n'.repeat(65), 'line.name', 'line name', 'line\n', '\u00e9',
+  ])('drops attributes with refused names and structured values: %s', name => {
     const attributes = {
       [name]: 'demo-private', line: 'Off',
       nested: { label: 'Safe', details: { [name]: 'demo-private' } },
@@ -200,6 +209,10 @@ describe('safe custom attribute projection', () => {
     '/image?size=small&Api.Key=demo-private',
     '/image?x_api_key=demo-private',
     '/image?%74oken=demo-private',
+    '/image?api%2Dkey=demo-private',
+    '/image?\uff41\uff50\uff49\uff0d\uff4b\uff45\uff59=demo-private',
+    '/image?to!ken=demo-private',
+    '/image?token[]=demo-private',
     'token=demo-private',
     'access_token=demo-private',
     'authSig=demo-private',
@@ -215,43 +228,70 @@ describe('safe custom attribute projection', () => {
     '//demo-user:demo-password@demo.invalid/image',
     String.raw`https:\demo-user:demo-password@demo.invalid/image`,
     'Image URL: https://demo-user:demo-password@demo.invalid/image',
-  ])('drops the entire attribute for credential-bearing strings at any depth: %s', input => {
+    '{"access_token":"x"}',
+    '["demo-private"]',
+    `data:text/plain;base64,${Buffer.from('demo-private').toString('base64')}`,
+    'data:Off', 'DATA:Off', 'Bearer', 'A BEARER label',
+    'Public https://demo.invalid/image', 'plain://value',
+    'Question?', 'Percent 50%', 'A=B', 'demo@example.invalid', 'Object {', 'Array [', String.raw`Path \ demo`,
+    'Control \0', 'Control \t', 'Control \n', 'Control \u007f', 'Control \u0085',
+    'Format \u200b', 'Format \u202e', 'Format \u2066', 'Format \ufeff',
+    'Fullwidth \uff41', 'Fullwidth \uff11', 'Fullwidth \uff1f', 'Fullwidth \uffef',
+    'Symbol \u221e', 'Emoji \ud83d\ude00', 'Private \ue000', 'Surrogate \ud800', 'Combining e\u0301',
+    'a'.repeat(24), 'Prefix ' + 'a'.repeat(25), '+/_-'.repeat(6),
+  ])('drops the whole attribute for refused top-level or flat-array strings: %s', input => {
     const attributes = {
       line: 'Off', thumbnail: input,
-      nested: { label: 'Safe', details: { url: input } },
-      array: ['Safe', { url: input }],
-      deep_array: [['Safe'], [input]],
+      array: ['Safe', input],
     };
     expect(projectNativeState(raw(attributes), new Set(Object.keys(attributes))).attributes).toEqual({ line: 'Off' });
   });
 
-  it('keeps ordinary strings, public URLs and non-sensitive keys', () => {
+  it('keeps ordinary text and non-sensitive ASCII names, including common Unicode letters and punctuation', () => {
     const attributes = {
-      thumbnail: '/api/camera_proxy/camera.demo_front?width=120',
-      details: { signal: 'Strong', design: 'Compact', key: 'demo-row', note: 'Token count is 3', url: 'https://demo.invalid/image?size=small' },
+      signal: 'Strong', design: 'Compact', key: 'demo-row', author: 'Demo Owner', note: 'Token count is 3',
+      accented: 'Caf\u00e9', letters: '\u6570\u5024 12', punctuation: '\u201cOff\u201d \u2013 paused\u2026', space: 'Demo\u00a0Owner',
+      ordinary_word: 'Unbearable', near_run: 'a'.repeat(23),
+      n: 'One', ['n'.repeat(64)]: 'Sixty-four', _: 'Underscore',
     };
     expect(projectNativeState(raw(attributes), new Set(Object.keys(attributes))).attributes).toEqual(attributes);
   });
 
-  it('keeps JSON scalars, arrays and objects, but rejects non-JSON values and nested credential fields', () => {
+  it('keeps plain scalars and flat arrays, but rejects objects, nested arrays and non-JSON values', () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     const attributes = {
-      line: 'Off', zero: 0, no: false, nil: null, list: ['A', 0, false, null], details: { text: 'Off', values: [1, 2] },
-      undef: undefined, nan: NaN, infinity: Infinity, bigint: 1n, fn: () => 'Off', symbol: Symbol('Off'),
+      line: 'Off', level: 0, no: false, ends_at: null, list: ['A', 0, false, null], numbers: [0, 1, 2], empty: [],
+      details: { text: 'Off', values: [1, 2] }, nested: [[1, 2]], mixed: ['Safe', { label: 'Off' }],
+      undef: undefined, nan: NaN, infinity: Infinity, negative_infinity: -Infinity, bigint: 1n, fn: () => 'Off', symbol: Symbol('Off'),
       date: new Date(), map: new Map(), set: new Set(), cyclic,
-      bad_list: [undefined], bad_object: { value: undefined }, to_json: { toJSON: () => 'Off' },
+      bad_list: [undefined], bad_number_list: [1, Infinity], sparse_list: Array(1), bad_object: { value: undefined }, to_json: { toJSON: () => 'Off' },
       nested_private: { records: [{ password: 'private' }] }, nested_picture: { entity_picture: '/api/private' },
     };
     const state = projectNativeState(raw(attributes), new Set(Object.keys(attributes)));
-    expect(state.attributes).toEqual({ line: 'Off', zero: 0, no: false, nil: null, list: ['A', 0, false, null], details: { text: 'Off', values: [1, 2] } });
+    expect(state.attributes).toEqual({ line: 'Off', level: 0, no: false, ends_at: null, list: ['A', 0, false, null], numbers: [0, 1, 2], empty: [] });
   });
 
-  it('enforces the 4 KiB serialized byte boundary, including multi-byte strings', () => {
-    const attributes = { boundary: 'x'.repeat(4094), over: 'x'.repeat(4095), unicode_boundary: '\u00e9'.repeat(2047), unicode_over: '\u00e9'.repeat(2048), object_over: { text: 'x'.repeat(4090) } };
+  it('enforces 256-character strings and 32-item arrays, dropping a whole array when any item is refused', () => {
+    const boundary = 'x '.repeat(128), over = boundary + 'x';
+    const attributes = {
+      boundary, over, array_boundary: [boundary], array_over: ['Safe', over],
+      unicode_boundary: '\u00e9 '.repeat(128), unicode_over: '\u00e9 '.repeat(128) + '\u00e9',
+      items_boundary: Array(32).fill(0), items_over: Array(33).fill(0),
+      text_items_boundary: Array(32).fill(boundary),
+    };
     const state = projectNativeState(raw(attributes), new Set(Object.keys(attributes)));
-    expect(state.attributes).toEqual({ boundary: attributes.boundary, unicode_boundary: attributes.unicode_boundary });
-    expect(Buffer.byteLength(JSON.stringify(state.attributes?.boundary))).toBe(4096);
+    expect(state.attributes).toEqual({
+      boundary, array_boundary: [boundary], unicode_boundary: attributes.unicode_boundary,
+      items_boundary: attributes.items_boundary, text_items_boundary: attributes.text_items_boundary,
+    });
+  });
+
+  it('treats a requested __proto__ name as a plain own attribute rather than changing the result prototype', () => {
+    const attributes: Record<string, unknown> = JSON.parse('{"__proto__":["Off"]}');
+    const extra = projectNativeState(raw(attributes), new Set(['__proto__'])).attributes;
+    expect(JSON.stringify(extra)).toBe('{"__proto__":["Off"]}');
+    expect(Object.getPrototypeOf(extra)).toBe(Object.prototype);
   });
 
   it('keeps native fields and aliases authoritative even when custom names collide', () => {
@@ -350,16 +390,35 @@ describe('live draft revisions and session isolation', () => {
 
   it('still drops and removes a state if a safely named attribute contains a server credential', () => {
     const { hub, socket } = liveHub();
-    const credential = 'demo-server-private-credential';
+    const credential = 'demo-private';
     const messages: LiveMessage[] = [], document = draft(text('demo-line'));
     cleanup.push(openLiveSession(hub, () => new Set([entityId]), message => messages.push(message), { credentials: [credential], attributes: wantedAttributes(() => ({ revision: 1, document })) }));
     socket.connect({ line: 'Off' });
     vi.advanceTimersByTime(60);
     messages.length = 0;
-    socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: { nested: credential } } } } } } });
+    socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: `State ${credential}` } } } } } });
     vi.advanceTimersByTime(60);
     expect(messages).toEqual([{ type: 'update', states: [], removed: [entityId] }]);
     expect(JSON.stringify(messages)).not.toContain(credential);
+  });
+
+  it.each([
+    '{"access_token":"x"}',
+    `data:text/plain;base64,${Buffer.from('demo-private').toString('base64')}`,
+  ])('removes a previously plain attribute when its update contains a refused flat-array string: %s', input => {
+    const { hub, socket } = liveHub();
+    const messages: LiveMessage[] = [], document = draft(text('demo-line'));
+    cleanup.push(openLiveSession(hub, () => new Set([entityId]), message => messages.push(message), {
+      credentials: ['demo-private'], attributes: wantedAttributes(() => ({ revision: 1, document })),
+    }));
+    socket.connect({ line: 'Off' });
+    vi.advanceTimersByTime(60);
+    messages.length = 0;
+    socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: ['Safe', input] } } } } } });
+    vi.advanceTimersByTime(60);
+    expect(messages).toEqual([{ type: 'update', states: [projectNativeState(raw({}))], removed: [] }]);
+    expect(JSON.stringify(messages)).not.toContain(input);
+    expect(JSON.stringify(messages)).not.toContain('demo-private');
   });
 });
 

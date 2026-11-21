@@ -74,6 +74,17 @@ afterEach(() => {
 });
 
 describe('safe native control projections', () => {
+  it('preserves author metadata and structured public content in native-house configuration', () => {
+    const house = envelope(['sensor.demo_metadata']);
+    house.config.home = {
+      author: 'Demo Owner', entity: 'sensor.demo_metadata',
+      details: { links: ['https://demo.invalid/home?width=120'], description: 'x '.repeat(129) },
+    };
+    const snapshot = nativeHomeSnapshot(house, [rawState('sensor.demo_metadata')], credentials);
+    expect(snapshot.houseConfig).toEqual(house);
+    expect(snapshot.states).toEqual([{ entityId: 'sensor.demo_metadata', state: 'off', name: 'sensor.demo_metadata' }]);
+  });
+
   it('reads configured Chores lists and resident summary lists, not arbitrary todo entity counts', async () => {
     const house = envelope(['todo.unrelated']);
     house.config.chores = {
