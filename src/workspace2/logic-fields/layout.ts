@@ -1,9 +1,9 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
-import { lift, type ASTReplacement, type LogicAnchor } from '../../shared/composition/graph';
+import { lift, type ASTReplacement, type GraphNode, type LogicAnchor } from '../../shared/composition/graph';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
-import { encodeStudioCanvas, readStudioCanvas, type CanvasLayoutInput } from '../../shared/composition/studio-logic/layout';
+import { encodeStudioCanvas, normalizeAnnotation, readStudioCanvas, type CanvasLayoutInput } from '../../shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
 import type { CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, type AuthoredNode } from './registry';
@@ -30,9 +30,15 @@ type StoredCanvas = StoredStudioCanvasMetadata['canvases'][number];
 type StoredRoot = StoredCanvas['roots'][number];
 type StoredNode = StoredCanvas['nodes'][number];
 type LayoutNode = CanvasLayoutInput['roots'][number]['nodes'][number];
+type LayoutHandoff = Omit<CanvasLayoutHandoff, 'annotations'> & {
+  readonly annotations?: Readonly<Record<string, NonNullable<GraphNode['annotation']>>>;
+};
 interface Associated { readonly anchor: LogicAnchor; readonly nodes: LayoutNode[]; readonly associations: { old: string; node: string }[] }
 
-const asInput = (nodes: readonly StoredNode[]): LayoutNode[] => nodes.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y }));
+const presentation = ({ x, y, label, note }: StoredNode) => ({
+  x, y, ...(label ? { label } : {}), ...(note ? { note } : {}),
+});
+const asInput = (nodes: readonly StoredNode[]): LayoutNode[] => nodes.map(node => ({ id: node.nodeId, origins: node.origins, ...presentation(node) }));
 
 /** A canvas's nodes grouped by root, in stored order (one pass, however many roots share the canvas). */
 function nodesByRoot(nodes: readonly StoredNode[]): Map<string, StoredNode[]> {
@@ -72,8 +78,8 @@ function associate(semantic: CompositionDocument, pointer: string, path: EditorP
     if (!matches.length && !old.origins.every(origin => changes.deleted(`${pointer}${origin}`))) changes.refuse();
     for (const node of matches) {
       const previous = carried.get(node.id);
-      if (previous && (previous.x !== old.x || previous.y !== old.y)) changes.refuse();
-      carried.set(node.id, { id: node.id, origins: node.origins, x: old.x, y: old.y });
+      if (previous && (previous.x !== old.x || previous.y !== old.y || previous.label !== old.label || previous.note !== old.note)) changes.refuse();
+      carried.set(node.id, { id: node.id, origins: node.origins, ...presentation(old) });
       associations.push({ old: old.id, node: node.id });
     }
   }
@@ -230,7 +236,7 @@ function spliceCanvasLayout(after: CompositionDocument, stored: StoredStudioCanv
   return sameJson(stored, encoded) ? after : { ...after, studioCanvas: encoded };
 }
 
-export function saveCanvasLayout(document: CompositionDocument, replacements: readonly ASTReplacement[], handoff: CanvasLayoutHandoff,
+export function saveCanvasLayout(document: CompositionDocument, replacements: readonly ASTReplacement[], handoff: LayoutHandoff,
   previous: { document: CompositionDocument; paths: readonly EditorPath[] } = {
     document, paths: replacements.map(replacement => {
       const resolved = resolveLogicAnchor(document, replacement.anchor);
@@ -253,7 +259,9 @@ export function saveCanvasLayout(document: CompositionDocument, replacements: re
       const location = handoff.sourceMap.find(location => location.stage !== 'expanded' && location.portId === 'value'
         && location.pointer === node.origins[0] && canonicalOfBounded(location.anchor) === canonicalOfBounded(replacement.anchor));
       const position = location && handoff.positions[location.nodeId];
-      return position ? [{ id: node.id, origins: node.origins, ...position }] : [];
+      return position ? [{ id: node.id, origins: node.origins, ...position,
+        ...normalizeAnnotation(location && handoff.annotations?.[location.nodeId]),
+      }] : [];
     }) };
   });
   const current = readStudioCanvas(document);
@@ -266,8 +274,7 @@ export function saveCanvasLayout(document: CompositionDocument, replacements: re
       const key = canonicalOfBounded(root.anchor);
       const replacement = roots.find(candidate => canonicalOfBounded(candidate.anchor) === key);
       if (replacement) { placed.add(key); return replacement; }
-      return { anchor: root.anchor, nodes: canvas.nodes.filter(node => node.rootId === root.id)
-        .map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })) };
+      return { anchor: root.anchor, nodes: asInput(canvas.nodes.filter(node => node.rootId === root.id)) };
     }),
     ...(canvas.groups ? { groups: canvas.groups } : {}),
     ...(canvas.viewport ? { viewport: canvas.viewport } : {}),

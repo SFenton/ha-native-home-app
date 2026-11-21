@@ -16,19 +16,28 @@ published.
   It never infers a frame from prefixes or treats descendants as alternative
   roots. Reordering owners or moving the selected node through containers,
   tabs or blocks retains positions; removed/replaced owners cannot transfer
-  positions to another owner with identical fragment content. The graph's
+  positions or block annotations to another owner with identical fragment content. The graph's
   content-and-origin IDs still auto-layout unmatched nodes. Whole-document
   anchors exclude root layout from their fingerprint, as in `lift`. Layout
   reset must be an explicit authoring transaction.
 - `encodeStudioCanvas(document, canvases, bundles?)` returns canonical
   `StoredStudioCanvasMetadata`. Each `CanvasLayoutInput` has `id`,
-  `roots: [{anchor, nodes: [{id, origins, x, y}]}]`, optional `viewport`, and
+  `roots: [{anchor, nodes: [{id, origins, x, y, label?, note?}]}]`, optional `viewport`, and
   optional `groups`. Input node IDs are graph-local and origins must already
   be relative to the selected anchor. Groups reference the encoded canvas-wide
   IDs, never unqualified graph-local IDs. The writer resolves owners, qualifies
   IDs deterministically, validates the result and throws
   `CompositionValidationError` for unusable inputs. Apply its result through
   the host's normal immutable save/undo transaction; save is not publish.
+- Block labels and notes are optional Studio-only presentation metadata, carried
+  through the same node/origin associations as positions, including structural
+  rebase and Apply. `normalizeAnnotation` trims edits, removes empty fields and
+  returns `undefined` when both are empty. It refuses control/format characters
+  and labels over 60 or notes over 280 characters with
+  `CompositionValidationError`. Stored values must already be trimmed, nonempty
+  and within those limits; readers never repair invalid annotations. Layouts
+  without annotations remain usable. Preparation removes the entire root
+  layout, so annotations never enter lowering, simulation or publication.
 - `resolveLogicAnchor` resolves stable owner/node IDs at access time and refuses
   ambiguity. Document-only anchors require the exact canonical subtree
   fingerprint, matching the graph API. Fields use RFC 6901 pointers.
@@ -91,7 +100,7 @@ The only writer format is:
   canvases: [{
     id,
     roots: [{id, anchor, ownerId, originFrame: "anchor-relative"}],
-    nodes: [{id, rootId, nodeId, origins, x, y}],
+    nodes: [{id, rootId, nodeId, origins, x, y, label?, note?}],
     viewport?, groups?
   }],
   bundles?

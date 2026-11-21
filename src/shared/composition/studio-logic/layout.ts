@@ -1,7 +1,7 @@
-import type { GraphDiagnostic, LogicAnchor, StudioCanvasMetadata } from '../graph/types';
+import type { GraphDiagnostic, GraphNode, LogicAnchor, StudioCanvasMetadata } from '../graph/types';
 import { canonicalOfBounded, CompositionValidationError } from '../json';
 import { atPointer, record, resolveLogicAnchor, type ResolvedLogicAnchor } from './anchors';
-import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from './schemas';
+import { canvasAnnotationSchema, studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from './schemas';
 
 export type LayoutWarning = Pick<GraphDiagnostic, 'severity' | 'code' | 'message' | 'pointer'>;
 export interface DraftCanvasLayout {
@@ -12,9 +12,21 @@ export interface DraftCanvasLayout {
 }
 type GraphCanvas = StudioCanvasMetadata['canvases'][number];
 export interface CanvasLayoutInput extends Pick<GraphCanvas, 'id' | 'viewport' | 'groups'> {
-  readonly roots: readonly { readonly anchor: LogicAnchor; readonly nodes: GraphCanvas['nodes'] }[];
+  readonly roots: readonly { readonly anchor: LogicAnchor; readonly nodes: readonly (GraphCanvas['nodes'][number] & NonNullable<GraphNode['annotation']>)[] }[];
 }
 const warning: LayoutWarning = { severity: 'warning', code: 'invalid_layout', message: "Saved layout can't be used.", pointer: '/studioCanvas' };
+
+export function normalizeAnnotation(input: GraphNode['annotation']): GraphNode['annotation'] {
+  const invalid = () => new CompositionValidationError([{ code: 'invalid_value', pointer: '/studioCanvas' }]);
+  if (input === undefined) return undefined;
+  for (const value of [input.label, input.note]) {
+    if (value !== undefined && (typeof value !== 'string' || /[\p{Cc}\p{Cf}]/u.test(value))) throw invalid();
+  }
+  const label = input.label?.trim(), note = input.note?.trim();
+  const parsed = canvasAnnotationSchema.safeParse({ ...(label ? { label } : {}), ...(note ? { note } : {}) });
+  if (!parsed.success) throw invalid();
+  return parsed.data.label || parsed.data.note ? parsed.data : undefined;
+}
 
 function layoutRoot(document: Record<string, unknown>, anchor: LogicAnchor): ResolvedLogicAnchor | undefined {
   if (anchor.kind !== 'document' || anchor.field !== '') return resolveLogicAnchor(document, anchor);
@@ -56,7 +68,9 @@ function graphMetadata(document: Record<string, unknown>, stored: StoredStudioCa
       const own = canvas.nodes.filter(node => node.rootId === id);
       canvases.push({
         id: canonicalOfBounded([canvas.id, id]), roots: [root.anchor],
-        nodes: own.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y })),
+        nodes: own.map(node => ({ id: node.nodeId, origins: node.origins, x: node.x, y: node.y,
+          ...(node.label ? { label: node.label } : {}), ...(node.note ? { note: node.note } : {}),
+        })),
         ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
         ...(canvas.groups ? { groups: canvas.groups.flatMap(group => {
           const nodeIds = group.nodeIds.flatMap(nodeId => {
