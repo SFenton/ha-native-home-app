@@ -321,6 +321,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     },
     annotate: node => {
       setPeek(undefined); setPanel(null);
+      // Re-activating Rename keeps an unsubmitted draft for the same block instead of discarding it.
+      if (draftRef.current?.nodeId === node.id && draftRef.current.location === 'inline') {
+        requestAnimationFrame(() => elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
+        return;
+      }
       annotationOrigin.current = document.activeElement as HTMLElement;
       const current: AnnotationDraft = { nodeId: node.id, label: node.annotation?.label ?? '', note: node.annotation?.note ?? '', location: 'inline' };
       setDraft(current); draftRef.current = current;

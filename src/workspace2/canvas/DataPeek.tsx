@@ -59,7 +59,12 @@ function Comparison({ model, captured, theme, close, returnFocus }: { model: Blo
         {result?.kept && <p>{result.state !== 'known' && `${formatObservation({ state: result.state, source: result.source })} · `}Kept</p>}
         {items ? <><p>Host supplied {items.length} rows; total unavailable.</p>{!items.length ? <p>0 rows</p> : !matches?.length ? <p>No matching rows</p> : <div className="w2-canvas-table-scroll"><table>
           <thead><tr>{(columns.length ? columns : ['Value']).map(key => <th key={key} scope="col">{columnLabel(key)}</th>)}</tr></thead>
-          <tbody>{matches.map((item, i) => <tr key={i}>{columns.length ? columns.map(key => <td key={key}>{rowRecord(item)?.[key] === undefined ? 'Not observed' : formatValue(rowRecord(item)![key], { full: true })}</td>) : <td>{formatValue(item, { full: true })}</td>}</tr>)}</tbody>
+          <tbody>{matches.map((item, i) => {
+            const row = rowRecord(item);
+            // A non-record item in a mixed list keeps its own observed value across the row instead of per-column blanks.
+            return <tr key={i}>{columns.length && row ? columns.map(key => <td key={key}>{row[key] === undefined ? <span aria-label="No field">—</span> : formatValue(row[key], { full: true })}</td>)
+              : <td colSpan={Math.max(1, columns.length)}>{formatValue(item, { full: true })}</td>}</tr>;
+          })}</tbody>
         </table></div>}</> : <ValueView observation={result} full/>}
       </section></div>
     <details className="w2-canvas-raw" onToggle={event => setRaw(event.currentTarget.open)}><summary>Raw JSON · {raw ? 'On' : 'Off'}</summary>
@@ -77,7 +82,13 @@ export default function DataPeek({ model, observation, theme, phone, anchor, bou
   const id = useId(), popup = useRef<HTMLDivElement>(null), compareButton = useRef<HTMLButtonElement>(null), origin = useRef(anchor);
   const focused = useRef(false);
   const [captured, setCaptured] = useState<{ observation?: BlockObservation; node: GraphNode }>(), [position, setPosition] = useState<CSSProperties>({});
-  useEffect(() => { if (captured && (!observation || captured.node !== model.node)) setCaptured(undefined); }, [observation, captured, model.node]);
+  useEffect(() => {
+    if (!captured) return;
+    // A capture is closed when any reading it holds is withdrawn, not only when the whole block observation disappears.
+    const withdrawn = !observation || (['inputs', 'outputs'] as const).some(direction =>
+      Object.keys(captured.observation?.[direction] ?? {}).some(port => !observation[direction]?.[port]));
+    if (withdrawn || captured.node !== model.node) setCaptured(undefined);
+  }, [observation, captured, model.node]);
   useLayoutEffect(() => {
     if (phone || captured) return;
     const update = () => {
@@ -94,7 +105,12 @@ export default function DataPeek({ model, observation, theme, phone, anchor, bou
         maxHeight = Math.max(100, useBelow ? below : above);
         top = useBelow ? card.bottom + 10 : card.top - Math.min(height, maxHeight) - 10;
       }
-      setPosition({ left: Math.max(12, left - bounds.left), top: Math.max(12, Math.min(top - bounds.top, bounds.height - Math.min(height, maxHeight) - 12)), width, maxHeight: Math.max(100, maxHeight) });
+      // Clamp within the visible boundary, then convert to the popup's own containing block, which may be scrolled.
+      const x = bounds.left + Math.max(12, left - bounds.left), y = bounds.top + Math.max(12, Math.min(top - bounds.top, bounds.height - Math.min(height, maxHeight) - 12));
+      const container = popup.current?.offsetParent instanceof HTMLElement ? popup.current.offsetParent : boundary.current;
+      const frame = container?.getBoundingClientRect() ?? bounds;
+      const offsetX = (container?.scrollLeft ?? 0) - frame.left - (container?.clientLeft ?? 0), offsetY = (container?.scrollTop ?? 0) - frame.top - (container?.clientTop ?? 0);
+      setPosition({ left: x + offsetX, top: y + offsetY, width, maxHeight: Math.max(100, maxHeight) });
     };
     update();
     const observer = new ResizeObserver(update);

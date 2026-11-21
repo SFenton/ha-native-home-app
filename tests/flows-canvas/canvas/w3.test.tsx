@@ -231,3 +231,33 @@ it('passes zoom-normalized real card and port measurements to Tidy Up', () => {
   expect(measured.size).toBe(graph.nodes.length);
   expect(countCrossings(next, measure)).toBeLessThanOrEqual(countCrossings(graph, measure));
 });
+
+it('review: Compare closes when a captured reading is withdrawn from a still-present block', () => {
+  const { rerender, props } = mount();
+  const rows = props.graph.nodes.find(node => node.catalogKey === 'output.rows')!;
+  fireEvent.click(screen.getByRole('button', { name: /^Select Rows / }));
+  fireEvent.click(screen.getByRole('button', { name: 'Compare in full' }));
+  expect(screen.getByRole('dialog', { name: 'Compare Rows' })).toBeTruthy();
+  const withdrawn = { ...groceryObservations(props.graph), [rows.id]: { inputs: {}, outputs: {} } };
+  rerender(<FlowCanvas {...props} host={{ ...props.host, observations: withdrawn }}/>);
+  expect(screen.queryByRole('dialog', { name: 'Compare Rows' })).toBeNull();
+});
+it('review: Compare keeps every observed item of a mixed list instead of blanking non-record items', () => {
+  const { rerender, props } = mount();
+  const rows = props.graph.nodes.find(node => node.catalogKey === 'output.rows')!;
+  const mixed = { ...groceryObservations(props.graph), [rows.id]: { outputs: { value: { state: 'known' as const, source: 'live' as const, value: [{ title: 'Milk' }, false, 0, 'Eggs', null] } } } };
+  rerender(<FlowCanvas {...props} host={{ ...props.host, observations: mixed }}/>);
+  fireEvent.click(screen.getByRole('button', { name: /^Select Rows / }));
+  fireEvent.click(screen.getByRole('button', { name: 'Compare in full' }));
+  const full = screen.getByRole('dialog', { name: 'Compare Rows' });
+  const cells = within(full).getAllByRole('cell').map(cell => cell.textContent);
+  expect(cells).toEqual(['Milk', formatValue(false, { full: true }), formatValue(0, { full: true }), 'Eggs', formatValue(null, { full: true })]);
+});
+it('review: re-activating Rename keeps the unsubmitted annotation draft', () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: /^Select Rows / }));
+  fireEvent.click(screen.getByRole('button', { name: 'Rename or describe Rows' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Label' }), { target: { value: 'Shopping list' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Rename or describe Rows' }));
+  expect((screen.getByRole('textbox', { name: 'Label' }) as HTMLInputElement).value).toBe('Shopping list');
+});

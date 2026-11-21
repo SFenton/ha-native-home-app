@@ -111,3 +111,30 @@ test('B7 observed rows peek, captured comparison, overflow and real measured Tid
     expect(Math.max(...bounds.map(rect => rect.bottom))).toBeLessThan(viewport!.y + viewport!.height - 20);
   }
 });
+test('review: the data peek stays beside its block after the canvas is scrolled', async ({ page }) => {
+  test.skip(isPhone(page), 'Phones use the bottom-sheet peek, which is not anchored to the scrolled board.');
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.route(`**${harness}*`, async route => {
+    const response = await route.fetch(), html = await response.text();
+    await route.fulfill({ response, body: html.includes('src="/src/main.tsx"') ? html.replace('src="/src/main.tsx"', 'src="/tests/flows-canvas/canvas/harness.tsx"').replace('</head>', '<style>body{margin:0}</style></head>') : html });
+  });
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.goto(`${harness}?fixture=w3`);
+  await closePalette(page);
+  await page.locator('.w2-canvas-viewport').evaluate(viewport => viewport.scrollTo(240, 180));
+  const header = page.getByRole('button', { name: /^Select Rows / });
+  await header.scrollIntoViewIfNeeded();
+  await header.click();
+  const peek = page.locator('.w2-canvas-peek');
+  await expect(peek).toBeVisible();
+  const [card, popup, viewport] = await Promise.all([
+    page.locator('.w2-canvas-node[data-selected]').boundingBox(), peek.boundingBox(), page.locator('.w2-canvas-viewport').boundingBox(),
+  ]);
+  expect(card && popup && viewport).toBeTruthy();
+  expect(popup!.x).toBeGreaterThanOrEqual(viewport!.x);
+  expect(popup!.y).toBeGreaterThanOrEqual(viewport!.y);
+  expect(popup!.x + popup!.width).toBeLessThanOrEqual(viewport!.x + viewport!.width + 1);
+  const beside = popup!.x >= card!.x + card!.width || popup!.x + popup!.width <= card!.x;
+  const stacked = popup!.y >= card!.y + card!.height || popup!.y + popup!.height <= card!.y;
+  expect(beside || stacked).toBe(true);
+});
