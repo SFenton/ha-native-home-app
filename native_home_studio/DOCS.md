@@ -50,7 +50,7 @@ release pipeline creates `stable` with `repository.yaml` at the root and
 after both architecture images pass their production smoke checks and the
 versioned multi-architecture image is anonymously readable. Before the first
 successful release, `stable` does not exist. The repository and GHCR package
-must be public; see [release setup](https://github.com/SFenton/ha-native-home-app/blob/b95cb6c7e89b64160caa1fb1973e1549dcfe831d/docs/releasing.md).
+must be public; see [release setup](https://github.com/SFenton/ha-native-home-app/blob/63f67bf2cfcae15ed6d0dcbe08c3e526079fe2be/docs/releasing.md).
 
 ### Updates
 
@@ -162,7 +162,7 @@ credential-bearing layout data is rejected, not redacted. It does not modify
 
 ## Operations and limits
 
-The API and storage are documented in [configuration.md](https://github.com/SFenton/ha-native-home-app/blob/b95cb6c7e89b64160caa1fb1973e1549dcfe831d/docs/configuration.md).
+The API and storage are documented in [configuration.md](https://github.com/SFenton/ha-native-home-app/blob/63f67bf2cfcae15ed6d0dcbe08c3e526079fe2be/docs/configuration.md).
 `api/health` is authenticated in production; `haConnected` is a real probe result,
 not inferred from a configured credential. A published revision is separate
 from the mutable draft and starts absent. Keep backups of `/data/studio` before
