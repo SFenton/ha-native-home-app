@@ -98,6 +98,13 @@ title / summary / name. Port chips stay absent when the host supplies nothing.
 There is no configuration-value, evaluator, or connected-output fallback.
 Each observed input/result has its own Live / Pinned / Scenario badge.
 Rows inputs are one **Observed item**, not an invented execution history.
+Per-item readings identify the actual displayed iteration as **Item 1 of N**.
+An item-dependent block on an empty step has a **No items** chip; its peek,
+comparison and summary explain **Didn't run: no items reached \<step label\>**.
+The step's annotation wins over its generated name. Item-independent readings
+come from the host's frozen-context diagnostic observation, even for an empty
+list. A single output named Result shares the section heading rather than
+repeating it as a port heading.
 
 **Compare in full** captures a local copy of the currently supplied observations.
 It is a read-only Base UI dialog with Inputs left, Result right (stacked when

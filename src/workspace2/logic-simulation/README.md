@@ -197,7 +197,12 @@ unambiguous). Input ports match recorded child-port identities; unsupported
 or unrecorded ports say `not-observed`, never borrow an unrelated value.
 Each input's provenance comes from its own upstream connection, not the
 block's combined provenance; live and pinned inputs remain distinct.
-Repeated evaluations use the last actual callback and its matching inputs.
+Per-item evaluations use the first actual item callback and its matching inputs;
+other repeated evaluations use the last actual callback.
+Optional `item: {step, count, index?}` identifies the displayed iteration and the
+real count entering its step (including the rows output). Zero items on a
+dependent block explain why it did not run; missing responses, skipped prefixes
+and unrecorded evidence do not acquire an invented zero-item reason.
 `order` follows actual completions, including each native text-slot result.
 `kept` is defined only when the exact slot expression was observed and its
 actual native resolved result and separate seed prove the keep decision.
@@ -223,6 +228,18 @@ as such. Display cuts and the combined 2,000-record cap never change evaluation.
 Every bounded step, iteration value and count read propagates truncation to
 the report-wide warning; actual counts and results are still unchanged.
 Documents have node-visit observations, not an invented runtime budget cap.
+
+`per-item.ts` supplements successful flow observations with item-independent
+values, using the shared evaluator in flow mode, native parameter evaluation,
+the same prepared pin overlay, captured reads, viewer and frozen clock. It
+evaluates each independent expression once, including empty steps. These
+diagnostic values live in `OutputAnswer.perItem`, separate from the execution
+trace: they are not evidence that a per-item iteration or skipped branch ran.
+Only completed step input counts supply no-item context. Stream pins therefore
+do not fabricate observations for their skipped upstream prefix. Both reports
+share the existing 2,000-record observation allowance; diagnostic work never
+changes native flow answers, visits or branch execution. No shared types,
+pipeline evaluator or endpoint changes are required.
 
 Every event/copy is gated by observation; the unobserved hot paths allocate no
 new per-item or per-step diagnostic objects. The permanent corpus test runs all

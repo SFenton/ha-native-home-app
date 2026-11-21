@@ -160,6 +160,35 @@ it('B4 opens one peek, preserves selection on dismissal, and captures formatted 
   peek = screen.getByRole('dialog');
   expect(within(peek).getAllByText('Not observed').length).toBeGreaterThan(0);
 });
+it('shows Result once for a single Result output and preserves the no-items explanation in the full comparison', () => {
+  const { props, rerender } = mount();
+  const node = props.graph.nodes.find(node => node.origins[0] === '/output/row/title')!;
+  rerender(<FlowCanvas {...props} host={{ ...props.host, observations: {
+    [node.id]: { outputs: { value: { state: 'no-items', item: { step: 'Keep overdue tasks', count: 0 } } } },
+  } }}/>);
+  const port = screen.getByRole('button', { name: /^This Item, Result output.*Didn't run/ });
+  expect(port.textContent).toContain('No items');
+  fireEvent.click(port.closest('li')!.querySelector('.w2-canvas-eye')!);
+  const peek = screen.getByRole('dialog');
+  expect(within(peek).getAllByText('Result', { exact: true })).toHaveLength(1);
+  expect(within(peek).getByText("Didn't run: no items reached Keep overdue tasks")).toBeTruthy();
+  fireEvent.click(within(peek).getByRole('button', { name: 'Compare in full' }));
+  expect(within(screen.getByRole('dialog', { name: 'Compare This Item' })).getByText("Didn't run: no items reached Keep overdue tasks")).toBeTruthy();
+});
+it('identifies the first item in chips, data peek and captured comparison', () => {
+  const { props, rerender } = mount();
+  const node = props.graph.nodes.find(node => node.origins[0] === '/output/row/title')!;
+  rerender(<FlowCanvas {...props} host={{ ...props.host, observations: {
+    [node.id]: { outputs: { value: { state: 'known', value: 'Milk', source: 'live', item: { step: 'Rows', count: 4, index: 0 } } } },
+  } }}/>);
+  const port = screen.getByRole('button', { name: /^This Item, Result output.*Item 1 of 4$/ });
+  expect(within(port).getByText('Item 1 of 4')).toBeTruthy();
+  fireEvent.click(port.closest('li')!.querySelector('.w2-canvas-eye')!);
+  const peek = screen.getByRole('dialog');
+  expect(within(peek).getByText('Item 1 of 4')).toBeTruthy();
+  fireEvent.click(within(peek).getByRole('button', { name: 'Compare in full' }));
+  expect(within(screen.getByRole('dialog', { name: 'Compare This Item' })).getByText('Item 1 of 4')).toBeTruthy();
+});
 it('M4 port tooltips delay hover, open on focus, format observations, and dismiss with Escape', async () => {
   vi.useFakeTimers();
   mount();

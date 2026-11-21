@@ -7,9 +7,10 @@ import type { BlockObservation, PortObservation } from './observations';
 import { formatObservation, formatValue, primaryText, sourceText } from './value-format';
 import CanvasDialog from './CanvasDialog';
 import { record } from '../../shared/composition/graph/json';
+import { itemContextText } from '../logic-simulation/per-item';
 
 function Source({ observation }: { observation?: PortObservation }) {
-  return observation && <small className="w2-canvas-source" data-source={observation.source}>{sourceText(observation)}</small>;
+  return observation?.source && <small className="w2-canvas-source" data-source={observation.source}>{sourceText(observation)}</small>;
 }
 function ValueView({ observation, rows = false, full = false, output = true }: { observation?: PortObservation; rows?: boolean; full?: boolean; output?: boolean }) {
   if (!observation || observation.state !== 'known') return <p className="w2-canvas-value" data-state={observation?.state}>{formatObservation(observation, rows, full, output)}</p>;
@@ -28,12 +29,14 @@ function ValueView({ observation, rows = false, full = false, output = true }: {
 }
 function ObservedPorts({ model, observation, direction, full = false }: { model: BlockPresentation; observation?: BlockObservation; direction: 'input' | 'output'; full?: boolean }) {
   const ports = model.ports.filter(port => port.direction === direction);
+  const singleResult = direction === 'output' && ports.length === 1 && ports[0].label === 'Result';
   return <section><h3>{direction === 'input' ? 'Inputs' : 'Result'}</h3>
     {!ports.length && <p>No {direction} ports</p>}
     {ports.map(({ port, label }) => {
       const reading = observation?.[direction === 'input' ? 'inputs' : 'outputs']?.[port.id];
       return <div key={port.id} className="w2-canvas-observed-port" data-state={reading?.state}>
-        <div className="w2-canvas-value-heading"><strong>{label}</strong><Source observation={reading}/>{direction === 'output' && reading?.state === 'known' && reading.kept && <small>Kept</small>}</div>
+        <div className="w2-canvas-value-heading">{!singleResult && <strong>{label}</strong>}<Source observation={reading}/>{direction === 'output' && reading?.state === 'known' && reading.kept && <small>Kept</small>}</div>
+        {itemContextText(reading?.item) && <small>{itemContextText(reading?.item)}</small>}
         {direction === 'input' && model.node.catalogKey === 'output.rows' && <small>Observed item</small>}
         <ValueView observation={reading} rows={direction === 'output' && model.node.catalogKey === 'output.rows'} full={full} output={direction === 'output'}/>
       </div>;
@@ -56,6 +59,7 @@ function Comparison({ model, captured, theme, close, returnFocus }: { model: Blo
       <p role="status" aria-live="polite">{matches?.length} of {items.length} matching rows</p></div>}
     <div className="w2-canvas-compare-columns"><ObservedPorts model={model} observation={captured} direction="input" full/>
       <section><h3>Result <Source observation={result}/></h3>
+        {itemContextText(result?.item) && <p>{itemContextText(result?.item)}</p>}
         {result?.kept && <p>{result.state !== 'known' && `${formatObservation({ state: result.state, source: result.source })} · `}Kept</p>}
         {items ? <><p>Host supplied {items.length} rows; total unavailable.</p>{!items.length ? <p>0 rows</p> : !matches?.length ? <p>No matching rows</p> : <div className="w2-canvas-table-scroll"><table>
           <thead><tr>{(columns.length ? columns : ['Value']).map(key => <th key={key} scope="col">{columnLabel(key)}</th>)}</tr></thead>

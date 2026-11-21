@@ -12,6 +12,7 @@ import { createObservation, type ObservationReport } from '../../shared/composit
 import { trimSample } from '../data/samples';
 import { anchorKey, caseSchema, clockSchema, pinKey, readKey, sourceKey } from './contracts';
 import { blockSources, flowFingerprint, nodeFor, pinProblems, sourceCaptureForNode, walkJSON, type SimulationProgram, type SimulationRoot } from './program';
+import { observePerItem, type PerItemObservations } from './per-item';
 
 export interface HeldSnapshot {
   readonly base: SimulationCase['base'];
@@ -28,6 +29,7 @@ export interface OutputAnswer {
   readonly issues: readonly string[];
   readonly trace: ObservationReport;
   readonly flow?: RunResult;
+  readonly perItem?: PerItemObservations;
 }
 export interface SimulationRun {
   readonly mode: 'Live' | 'Simulated';
@@ -143,7 +145,7 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
   const clock = clockSchema.parse(options.liveClock ? held.base.clock : options.clock ?? scenario?.clock ?? base.clock);
   const simulated = Boolean(scenario || pins.length || options.clock);
   const outputs: OutputAnswer[] = [];
-  const flowAnswers = new Map<string, { result?: RunResult; trace: ObservationReport; issues: string[] }>(), pending = new Set<string>();
+  const flowAnswers = new Map<string, { result?: RunResult; trace: ObservationReport; issues: string[]; perItem?: PerItemObservations }>(), pending = new Set<string>();
   const gaps = new Set<string>();
   const environment = capturedEnvironment(base, pins, clock, gaps);
   if (scenario) for (const required of program.reads) {
@@ -153,7 +155,7 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
     }
   }
   const readBase = environment.read;
-  const runFlow = (sourceId: string): { result?: RunResult; trace: ObservationReport; issues: string[] } => {
+  const runFlow = (sourceId: string): { result?: RunResult; trace: ObservationReport; issues: string[]; perItem?: PerItemObservations } => {
     const existing = flowAnswers.get(sourceId);
     if (existing) return existing;
     const inputs = program.flows.get(sourceId);
@@ -183,15 +185,20 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
     const overridden = new Set(overlay?.overridden);
     if (overriddenStream) overridden.add('/request/value');
     const observation = root && options.observe !== false ? observationFor(root, actualInputs as Json, overridden, mapPointer) : undefined;
+    const context = {
+      clock, viewer: base.viewer,
+      read: (id: string, path: string[]) => { const result = overlay?.synthetic.get(id) ?? environment.read(id, path); return result.status === 'value' ? result.value : undefined; },
+    };
     const result = ownIssues.some(issue => issue.startsWith('Missing')) ? undefined : evaluatePipeline(actualInputs,
       actualInputs.request.type === 'entities' ? pinEntityRows(program, response?.response as Json ?? null, pins) : copy(response?.response ?? null), {
-        clock, viewer: base.viewer,
-        read: (id, path) => { const result = overlay?.synthetic.get(id) ?? environment.read(id, path); return result.status === 'value' ? result.value : undefined; },
+        ...context,
         ...(observation ? { observe: { evaluation: observation.evaluation, pipeline: observation.pipeline } } : {}),
       });
+    const perItem = root && observation && result?.status === 'ok' ? observePerItem(root, actualInputs, result, observation.report, context,
+      observationFor(root, actualInputs as Json, overridden, mapPointer, Math.max(0, 2000 - observation.report.events.length - observation.report.steps.length - observation.report.iterations.length)), mapPointer) : undefined;
     pending.delete(sourceId);
     if (result?.status === 'over-budget') ownIssues.push(`Flow ${sourceId} exceeded its runtime budget at ${result.stepId ?? 'output'}.`);
-    const answer = { result, trace: observation?.report ?? emptyReport(), issues: ownIssues };
+    const answer = { result, trace: observation?.report ?? emptyReport(), issues: ownIssues, ...(perItem ? { perItem } : {}) };
     flowAnswers.set(sourceId, answer);
     return answer;
   };
@@ -203,9 +210,9 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
     const field = program.flows.get(sourceId)?.output.kind === 'scalar' ? { value: flow.result.output } : flow.result.output;
     return value(valueAt(field, path));
   };
-  function observationFor(root: SimulationRoot, ast: Json, overridden: ReadonlySet<string>, originalPointer: (at: string) => string = at => at) {
+  function observationFor(root: SimulationRoot, ast: Json, overridden: ReadonlySet<string>, originalPointer: (at: string) => string = at => at, maxEvents?: number) {
     return createObservation({
-      runId: options.runId ?? 'studio-run', root: root.anchor, ast, clock, overridden,
+      runId: options.runId ?? 'studio-run', root: root.anchor, ast, clock, overridden, maxEvents,
       locate: at => ({ blockId: nodeFor(root, originalPointer(at))?.id ?? `unmapped:${at}`, portId: 'value', pointer: originalPointer(at) }),
       provenance: at => {
         if (overridden.has(at)) return 'pin';
@@ -220,10 +227,10 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
   }
   for (const root of program.roots) {
     const rootIssues = [...issues], overlay = prepared(root, pins);
-    let result: SimulationResult | undefined, trace = emptyReport(), flow: RunResult | undefined;
+    let result: SimulationResult | undefined, trace = emptyReport(), flow: RunResult | undefined, perItem: PerItemObservations | undefined;
     gaps.clear();
     if (root.body.kind === 'flow') {
-      const answer = runFlow(root.body.sourceId); flow = answer.result; trace = answer.trace; rootIssues.push(...answer.issues);
+      const answer = runFlow(root.body.sourceId); flow = answer.result; trace = answer.trace; perItem = answer.perItem; rootIssues.push(...answer.issues);
       if (flow?.status === 'ok') result = { kind: 'operand', answer: value(flow.output) };
     } else {
       const observation = options.observe === false ? undefined : observationFor(root, overlay.ast, overlay.overridden);
@@ -258,7 +265,7 @@ export function runSimulation(program: SimulationProgram, held: HeldSnapshot, op
     const sources = rootNode ? blockSources(program, rootNode, pins, Boolean(scenario), Boolean(!options.liveClock && (options.clock || scenario?.clock)), options.liveBlocks) : new Set(['live']);
     const source: OutputAnswer['source'] = sources.size > 1 ? 'Mixed' : sources.has('pin') ? 'Pinned' : sources.has('scenario') ? 'Scenario'
       : held.origin === 'sample' ? 'Sample' : held.stale ? 'Held/stale' : 'Live';
-    outputs.push({ output: root.anchor, result, source, at: scenario?.capturedAt ?? held.at, issues: [...new Set(rootIssues)], trace, ...(flow ? { flow } : {}) });
+    outputs.push({ output: root.anchor, result, source, at: scenario?.capturedAt ?? held.at, issues: [...new Set(rootIssues)], trace, ...(flow ? { flow } : {}), ...(perItem ? { perItem } : {}) });
   }
   return { mode: simulated ? 'Simulated' : 'Live', modified: Boolean(scenario && ((options.pins?.length ?? 0) > 0 || options.clock || options.liveClock)), outputs, issues };
 }
