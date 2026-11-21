@@ -821,3 +821,23 @@ describe('Scoped edits: the element at a scoped index of an id-less list is a re
     valid(doneCombined);
   });
 });
+
+describe('Scoped edits: a non-JSON array outside the scope', () => {
+  // The outside step is checked as the candidate holds it: a sparse or extra-key ancestor array is never rebuilt dense, so the
+  // boundary refuses it exactly as it refuses that outside edit on its own.
+  const typeEdit = (before: CompositionDocument) => fieldTypeEdit(before, ['pages', 0, 'components', 0],
+    fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text') as SchemaField, 'tile');
+  it.each([
+    ['a hole', (pages: unknown[]) => [pages[0], , ...pages.slice(1)]],
+    ['an extra key', (pages: unknown[]) => Object.assign([...pages], { alias: pages[0] })],
+  ] as const)('refuses an owner list with %s instead of repairing it', (_name, malformed) => {
+    vi.spyOn(toastManager, 'add').mockImplementation(() => '');
+    const before = meaningFixture('page tile').document, edit = typeEdit(before);
+    expect(before.pages.length).toBeGreaterThan(1);
+    expect(documentEdit(before, { ...before, pages: malformed(before.pages) as CompositionDocument['pages'] })).toBe(before);
+    const candidate = { ...edit.candidate, pages: malformed(edit.candidate.pages) as CompositionDocument['pages'] };
+    expect(editWithin(before, { ...edit, candidate })).toBe(before);
+    // The same operation without the malformed list still applies.
+    expect(editWithin(before, edit)).not.toBe(before);
+  });
+});

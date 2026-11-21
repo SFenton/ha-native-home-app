@@ -1,5 +1,5 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
-import { authoredNodes, fieldPointer } from '../logic-fields/registry';
+import { authoredNodes, fieldPointer, jsonList } from '../logic-fields/registry';
 import { documentEdit, LINKED_EDIT_REFUSAL, walkableDocument, type EditReferences } from './documentEdit';
 import { toastManager } from '../toasts';
 import { sameJson } from '../../sameJson';
@@ -116,6 +116,9 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
     const pointer = fieldPointer(path);
     if (scoped.includes(pointer)) return from;
     if (from === to || !scoped.some(base => base.startsWith(`${pointer}/`)) || !from || !to || typeof from !== 'object' || typeof to !== 'object' || Array.isArray(from) !== Array.isArray(to)) return to;
+    // A non-JSON array (a hole, or an extra key) is kept as the candidate holds it, never rebuilt dense: the boundary then
+    // refuses it, as it would the outside edit on its own.
+    if (Array.isArray(to) && !jsonList(to)) return to;
     const keys = Object.keys(to), held = from as Record<string, unknown>;
     const children = keys.map(key => restore(held[key], (to as Record<string, unknown>)[key], [...path, Array.isArray(to) ? Number(key) : key]));
     if (keys.length === Object.keys(held).length && keys.every((key, at) => Object.hasOwn(held, key) && children[at] === held[key])) return from;
