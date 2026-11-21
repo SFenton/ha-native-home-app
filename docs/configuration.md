@@ -58,7 +58,9 @@ credential at least 8 UTF-16 code units long, define
 Concatenate the candidate's string items and `String(number)` items in order
 (ignoring booleans and null), then apply `canon`. Refuse the entire attribute
 if that result contains any 12-character window of `canon(credential)`, or the
-whole canonical credential when it is shorter than 12 characters. If any array
+whole canonical credential when it is shorter than 12 characters. A credential
+whose canonical form has fewer than 6 characters (mostly punctuation) has no
+fragment check; the exact scrubber below still removes it verbatim. If any array
 item fails the type, size or string rules, the whole attribute is also dropped.
 The conservative fragment check can also refuse unrelated values sharing a
 window.

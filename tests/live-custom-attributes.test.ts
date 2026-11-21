@@ -580,3 +580,12 @@ it('wires the authenticated SSE endpoint to the persisted draft revision', async
   expect(JSON.stringify([snapshot, update])).not.toContain(authToken);
   expect(fake.serviceCalls).toEqual([]);
 }, 15000);
+
+it('ignores a configured credential with no letters or digits instead of dropping every attribute', async () => {
+  const { projectNativeAttributes } = await import('../server/native-home');
+  const wanted = new Set(['line', 'level', 'enabled', 'ends_at']);
+  const attributes = { line: 'Off', level: 0, enabled: true, ends_at: null };
+  expect(projectNativeAttributes(attributes, wanted, ['.'.repeat(24)])).toEqual(attributes);
+  expect(projectNativeAttributes(attributes, wanted, ['..a..b..c..'])).toEqual(attributes);
+  expect(projectNativeAttributes({ line: 'demo token 0123456789abcdef' }, new Set(['line']), ['0123456789abcdef'])).toBeUndefined();
+});

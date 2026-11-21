@@ -446,6 +446,9 @@ function canonicalCredentialText(value: string): string {
 export function projectNativeAttributes(attributes: Readonly<Record<string, unknown>>, wanted: ReadonlySet<string>, credentials: readonly string[] = []): Record<string, Json> | undefined {
   const credentialFragments = credentials.filter(credential => credential.length >= 8).flatMap(credential => {
     const canonical = canonicalCredentialText(credential);
+    // A credential with few or no letters and digits (all punctuation) has no meaningful fragments: matching an empty or tiny fragment
+    // would drop every attribute. Such a credential is still removed verbatim by the live session's exact scrubber.
+    if (canonical.length < 6) return [];
     const length = Math.min(12, canonical.length);
     return Array.from({ length: canonical.length - length + 1 }, (_, start) => canonical.slice(start, start + length));
   });
