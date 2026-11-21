@@ -4,6 +4,7 @@ import type { SimulationRun } from './engine';
 import { anchorKey } from './contracts';
 import { blockMode, blockSources, sourceCaptureForNode, type SimulationProgram } from './program';
 import { sourceKey } from './contracts';
+import { formatValue } from '../canvas/value-format';
 
 export interface ObservedValue {
   readonly observed: boolean;
@@ -27,11 +28,13 @@ export interface BlockObservation extends ObservedValue {
 }
 export interface CanvasObservations {
   readonly blocks: Readonly<Record<string, BlockObservation>>;
+  /** Completed root answers, including flow roots without an expression callback. */
+  readonly results?: Readonly<Record<string, ObservedValue>>;
   /** Actual callback completion order, followed by each root's native text-policy result. */
   readonly order: readonly string[];
   readonly truncated: boolean;
 }
-function answer(result: SimulationResult | undefined, computed = false) {
+function answer(result: SimulationResult | undefined, computed = false, literal = false) {
   if (!result) return { observed: false, state: 'not-observed' as const };
   if (result.kind === 'condition') return {
     observed: true, result, value: result.answer, state: result.answer === 'unknown' ? 'cant-tell' as const : 'known' as const,
@@ -39,7 +42,16 @@ function answer(result: SimulationResult | undefined, computed = false) {
   if (result.answer.status !== 'value') return { observed: true, result,
     state: computed && result.answer.status === 'unavailable' ? 'cant-tell' as const : result.answer.status };
   return { observed: true, result, value: result.answer.value as Json,
-    state: result.answer.value === 'unavailable' ? 'unavailable' as const : result.answer.value === 'unknown' ? 'cant-tell' as const : 'known' as const };
+    state: !literal && result.answer.value === 'unavailable' ? 'unavailable' as const : !literal && result.answer.value === 'unknown' ? 'cant-tell' as const : 'known' as const };
+}
+const isLiteral = (node: GraphNode | undefined) => node?.payload.kind === 'operand' && node.payload.value.type === 'literal';
+
+export function formatObservedValue(observation?: ObservedValue, rows = false): string {
+  if (!observation?.observed) return 'Not observed';
+  const value = observation.result?.kind === 'condition' ? observation.value === 'yes' : observation.value;
+  if (observation.state === 'known' && value !== undefined) return formatValue(value, { rows });
+  const state = observation.state === 'unavailable' ? 'Unavailable' : observation.state === 'loading' ? 'Loading' : "Can't tell";
+  return observation.kept && value !== undefined ? `${state}; Kept: ${formatValue(value, { rows })}` : state;
 }
 /** Pure projection of a completed run. No evaluator, environment, request or cost meter is invoked. */
 export function canvasObservations(program: SimulationProgram, run: SimulationRun, options: {
@@ -53,7 +65,7 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
   readonly liveBlocks?: ReadonlySet<string>;
   readonly previousText?: SimulationCase['base']['previousText'];
 } = {}): CanvasObservations {
-  const pins = options.pins ?? [], blocks: Record<string, BlockObservation> = {}, order: string[] = [];
+  const pins = options.pins ?? [], blocks: Record<string, BlockObservation> = {}, results: Record<string, ObservedValue> = {}, order: string[] = [];
   const liveSources = new Set(program.roots.flatMap(root => root.graph.nodes.filter(node => options.liveBlocks?.has(node.id))).flatMap(node => {
     const source = sourceCaptureForNode(node, program);
     return source ? [sourceKey(source)] : [];
@@ -92,20 +104,21 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
         ...node.outputs.map(port => {
           // A single output is unambiguous. Multi-output nodes require a real matching port callback.
           const result = node.outputs.length === 1 ? resolved : events.filter(event => event.portId === port.id).at(-1)?.output;
-          return { portId: port.id, direction: 'output' as const, ...common, ...answer(result, !sourceRead), ...(kept === undefined ? {} : { kept }) };
+          return { portId: port.id, direction: 'output' as const, ...common, ...answer(result, !sourceRead, isLiteral(node)), ...(kept === undefined ? {} : { kept }) };
         }),
         ...node.inputs.map(port => {
           const edge = root.graph.edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === port.id);
           const upstream = edge && root.graph.nodes.find(candidate => candidate.id === edge.from.nodeId);
           return { portId: port.id, direction: 'input' as const, ...(upstream ? provenance(upstream) : common),
             ...answer(event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result,
-              upstream ? !sourceCaptureForNode(upstream, program) : !sourceRead) };
+              upstream ? !sourceCaptureForNode(upstream, program) : !sourceRead, isLiteral(upstream)) };
         }),
       ];
-      blocks[node.id] = { blockId: node.id, ...common, ...answer(resolved, !sourceRead), ...(kept === undefined ? {} : { kept }), ports };
+      blocks[node.id] = { blockId: node.id, ...common, ...answer(resolved, !sourceRead, isLiteral(node)), ...(kept === undefined ? {} : { kept }), ports };
+      if (isRoot) results[node.id] = { ...common, ...answer(output?.result, !sourceRead, isLiteral(node)), ...(kept === undefined ? {} : { kept }) };
     }
     for (const event of output?.trace.events ?? []) if (event.output && !order.includes(event.blockId)) order.push(event.blockId);
     if (root.body.kind === 'slot' && output?.result) for (const rootNode of root.graph.roots) if (!order.includes(rootNode.nodeId)) order.push(rootNode.nodeId);
   }
-  return { blocks, order, truncated: run.outputs.some(output => output.trace.truncated) };
+  return { blocks, results, order, truncated: run.outputs.some(output => output.trace.truncated) };
 }

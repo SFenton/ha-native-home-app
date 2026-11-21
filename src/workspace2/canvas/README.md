@@ -8,6 +8,15 @@ element to restore focus to on close and friendly output names for the meter.
 Remount for a different anchor/snapshot.
 `arrangeCanvas` delegates to the shared canvas `tidyCanvas` engine without
 reordering node IDs. Already crossing-free positions retain their identity.
+Opening a session and **Tidy Up** fit the measured graph at a minimum 60% zoom.
+If the whole graph needs a smaller scale, 60% is retained and the **Result**
+block is brought into view without moving keyboard focus. Manual zoom and
+explicit Fit all remain available. Result headers carry a visible badge and
+include "result" in their accessible name.
+An exceptionally tall result starts at its header instead of hiding the badge
+by centering the middle of the card. Windowed graphs measure the result first,
+then the framed neighborhood; wires reuse the card's normalized port positions.
+ResizeObserver border-box sizes are already unscaled, even at 60% zoom.
 
 The host provides sources, target capabilities, an immutable revision snapshot,
 atomic Apply and separate Save. Apply uses the graph core's single lowering
@@ -56,6 +65,10 @@ Changing selection or closing with an unsent draft offers Apply / Discard / Stay
 Canvas Apply refuses unsent block details rather than silently ignoring them.
 
 A custom label is the title, with the generated block name on a secondary line.
+Template Setting blocks likewise use the setting's label as their title and
+retain Template Setting below it. Readers wired to a setting name that setting,
+not an unchosen entity; genuinely disconnected source placeholders keep their
+Choose an entity prompt.
 The description soft-wraps and clamps to two lines on the card. Full labels and
 generated names remain in accessible names, Outline, connection descriptions,
 and named problems. These details change presentation only, never native logic.

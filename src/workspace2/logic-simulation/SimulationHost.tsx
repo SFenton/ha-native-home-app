@@ -8,14 +8,14 @@ import { Field, TextField } from '../../ui';
 import { Overlay, Tag, useNarrow } from '../kit';
 import { captureScenario, mergePins, runAll, runSimulation, type ScenarioResult } from './engine';
 import { anchorKey, caseSchema, parseScenarios, pinSchema, readKey, sourceKey, STORE_COUNT } from './contracts';
-import { pinProblems, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
+import { pinProblems, simulationInputs, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
 import { loadScenarios, saveScenarios } from './storage';
 import { sharedFlowRequests, useSimulationSnapshot, type FlowState } from './live';
 import { SimulationFlowBridges } from './BridgeOwner';
 import { SimulationDrawers } from './Drawers';
 import { ClockInspector, SourceInspector, type PinChoice } from './Inspector';
 import { ScenariosDrawer } from './Scenarios';
-import { canvasObservations, type CanvasObservations } from './observations';
+import { canvasObservations, formatObservedValue, type CanvasObservations } from './observations';
 import { changedAgo, clockInstant, displayValue, type SimulationPresentation, type ValuePresentation } from './presentation';
 import './simulation.css';
 
@@ -93,12 +93,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     const source = sourceCaptureForNode(node, program);
     return node.payload.kind !== 'source-selection' && source && program.reads.some(read => sourceKey(read) === sourceKey(source));
   });
-  const inputMap = new Map<string, GraphNode>();
-  for (const node of inputNodes) {
-    const key = sourceKey(sourceCaptureForNode(node, program)!);
-    if (!inputMap.has(key)) inputMap.set(key, node);
-  }
-  const uniqueInputs = [...inputMap.values()];
+  const uniqueInputs = simulationInputs(program, nodes);
   const editingPin = nodes.find(node => node.id === (selectedBlockId ?? selection)) ?? inputNodes[0] ?? nodes[0];
   const blockLabel = (node: GraphNode): ValuePresentation => presentation?.blocks?.[node.id] ?? { name: blockNames[node.id] ?? 'Value' };
   const outputLabel = (index: number): ValuePresentation => presentation?.outputs?.[anchorKey(program.roots[index].anchor)]
@@ -202,7 +197,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
         const block = observation.blocks[id], node = nodes.find(node => node.id === id);
         if (!node || !block?.observed || presentation?.traceBlocks && !presentation.traceBlocks.includes(id)) return null;
         return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`}
-          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : block.state === 'cant-tell' ? "Can't tell" : displayValue(block.result, blockLabel(node))}</strong></button>;
+          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : node.payload.kind === 'operand' && node.payload.value.type === 'literal' ? formatObservedValue(block) : block.state === 'cant-tell' ? "Can't tell" : displayValue(block.result, blockLabel(node))}</strong></button>;
       })}</div>
       {observation.truncated && <p className="w2-caption">Trace truncated. Unrecorded values are not evidence.</p>}
       <div className="w2-sim-actions"><button type="button" onClick={() => { setInspecting(false); setDrawer('evidence'); }}>Each Run &amp; Items</button></div>
@@ -231,7 +226,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <h3 className="w2-group-title"><List size={15} aria-hidden />Just the Values</h3>
           <p className="w2-caption">The preview is a lens. These are the actual outputs, not device actions.{scenario ? ' Unpinned Live values are frozen at capture.' : ''}</p>
           <div className="w2-sim-values">{run.outputs.map((output, index) => <article className="kv2" key={anchorKey(output.output)} aria-label={`Output ${outputLabel(index).name}`}>
-            <span>{outputLabel(index).name}</span><output>{displayValue(output.result, outputLabel(index))}</output>
+            <span>{outputLabel(index).name}</span><output>{program.roots[index].body.kind === 'operand' && program.roots[index].body.value.type === 'literal' ? formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId]) : displayValue(output.result, outputLabel(index))}</output>
             <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source === 'Held/stale' ? 'Last value kept' : output.source === 'Sample' ? 'Demo' : output.source}</Tag>
             {output.issues.length > 0 && <p className="w2-caption">{output.issues.map(issueText).join(' ')}</p>}
           </article>)}</div>
