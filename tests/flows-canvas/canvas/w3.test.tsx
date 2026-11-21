@@ -205,7 +205,7 @@ it('B6 owner screenshot graph reaches zero crossings through real FlowCanvas Tid
   const next = onGraphChange.mock.calls.at(-1)![0] as LogicGraph;
   expect(next).not.toBe(graph);
   expect(countCrossings(next)).toBe(0);
-  expect(container.querySelector('.w2-canvas-footer [role=status]')?.textContent).toBe(`Tidied: ${before} crossings → 0`);
+  expect(container.querySelector('.w2-canvas-footer [role=status]')?.textContent).toBe(`Tidied: wire crossings ${before} → 0`);
   expect(document.activeElement).toBe(button);
   fireEvent.click(button);
   expect(container.querySelector('.w2-canvas-footer [role=status]')?.textContent).toBe('Already tidy');

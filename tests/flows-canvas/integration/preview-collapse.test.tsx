@@ -136,6 +136,8 @@ it('keeps invalid-layout warnings and their reset action visible while collapsed
 it('keeps conflict guidance and local canvas edits visible with Preview collapsed', async () => {
   const { draft } = setup(integrationDocument(), 1);
   fireEvent.click(screen.getAllByRole('button', { name: /^Select Number/ })[0]);
+  // A header click opens the data peek; the inspector opens from the block's Inspect action.
+  fireEvent.click(screen.getAllByRole('button', { name: /^Inspect Number/ })[0]);
   fireEvent.change(screen.getByRole('spinbutton', { name: 'Value' }), { target: { value: '9' } });
   fireEvent.click(screen.getByRole('button', { name: 'Update value' }));
   act(() => draft.set({ ...draft.get(), name: 'Concurrent local draft' }));

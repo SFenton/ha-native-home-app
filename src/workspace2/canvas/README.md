@@ -120,7 +120,7 @@ the host/Inspector/Preview layout; it does not rewrite positions.
 
 Tidy Up counts the current measured crossings, calls `tidyCanvas` with the same
 measurements, and sends one `layout` edit only when the graph changes. It keeps
-zoom, selection and button focus, announcing **Tidied: N crossings -> M** (the UI
+zoom, selection and button focus, announcing **Tidied: wire crossings N -> M** (the UI
 uses an arrow glyph) or **Already tidy**. The engine never accepts more
 crossings; Undo restores the previous layout in one step. Unmounted cards and
 zero-size jsdom rectangles use the engine's existing estimates.

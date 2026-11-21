@@ -98,7 +98,7 @@ test('B7 observed rows peek, captured comparison, overflow and real measured Tid
   await page.getByRole('button', { name: /^Close (data peek|Data peek:)/ }).click();
   const tidy = page.getByRole('button', { name: 'Tidy Up', exact: true });
   await tidy.click();
-  await expect(page.locator('.w2-canvas-footer [role=status]')).toHaveText(/Tidied: \d+ crossings → 0/);
+  await expect(page.locator('.w2-canvas-footer [role=status]')).toHaveText(/Tidied: wire crossings \d+ → 0/);
   await expect(tidy).toBeFocused();
   await page.getByRole('button', { name: 'More canvas controls', exact: true }).click();
   await page.getByRole('button', { name: 'Fit all', exact: true }).click();

@@ -412,7 +412,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
             const before = countCrossings(graph, measure), next = tidyCanvas(graph, measure), after = countCrossings(next, measure);
             if (next !== graph) send({ type: 'layout', graph: next });
             restore.current = false;
-            setMessage(next === graph ? 'Already tidy' : `Tidied: ${before} crossings → ${after}`);
+            setMessage(next === graph ? 'Already tidy' : `Tidied: wire crossings ${before} → ${after}`);
             event.currentTarget.focus();
           }}><WandSparkles size={14}/><span className="w2-canvas-toolbar-label">Tidy Up</span></button>
           <button type="button" className="w2-canvas-problems-pill" ref={problemsButton} onClick={() => setProblemsOpen(true)}>{problemCount ? <AlertTriangle size={14}/> : <CircleCheck size={14}/>} {problemCount ? `${problemCount} Problems` : 'No Problems'}</button>
