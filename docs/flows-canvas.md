@@ -524,7 +524,7 @@ result as the oracle's own, so both keep the same redo history. CI runs seeds
 1–256 with 14 steps, plus pinned regression seeds. For long local runs on
 unused ranges, set `EDIT_ORACLE_FROM`, `EDIT_ORACLE_SEEDS` and
 `EDIT_ORACLE_STEPS`, for example
-`EDIT_ORACLE_FROM=10001 EDIT_ORACLE_SEEDS=10000 npx vitest run tests/flows-canvas/integration/edit-oracle.test.ts`;
+`EDIT_ORACLE_FROM=10001 EDIT_ORACLE_SEEDS=10000 npx vitest run tests/flows-canvas/integration/edit-oracle.test.ts`.
 A scoped raw error is a disagreement even where the oracle throws the same
 one. `EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the
 documented deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
