@@ -30,8 +30,6 @@ Wake light
 Show state
 Words by state
 None
-By state
-2 states
 Colors by state
 None
 Tint by mode
@@ -46,7 +44,7 @@ Behavior
 When tapped
 Nothing
 Only show when
-Always
+binary_sensor.demo_entity_77 is On or Open
 Advanced
 
 [names]
@@ -55,7 +53,7 @@ Close
 Add Colors by state
 Add Tint by mode
 Add When tapped
-Only show when: Always.
+Only show when: binary_sensor.demo_entity_77 is On or Open.
 
 [advanced]
 Demo Window
@@ -90,8 +88,6 @@ Wake light
 Show state
 Words by state
 None
-By state
-2 states
 Colors by state
 None
 Tint by mode
@@ -106,7 +102,7 @@ Behavior
 When tapped
 Nothing
 Only show when
-Always
+binary_sensor.demo_entity_77 is On or Open
 Advanced
 ID
 Subtitle from
@@ -131,7 +127,7 @@ Close
 Add Colors by state
 Add Tint by mode
 Add When tapped
-Only show when: Always.
+Only show when: binary_sensor.demo_entity_77 is On or Open.
 hc-open-contact-0
 Copy ID
 Add Power

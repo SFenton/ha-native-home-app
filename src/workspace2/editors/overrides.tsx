@@ -11,6 +11,7 @@ import { valueWords } from '../labels';
 import type { BoundControlKind } from '../../shared/composition/bound-control';
 import { ActionRow } from './ActionEditor';
 import ConditionField from '../expr/ConditionField';
+import VisibilityField, { allowsStateVisibility } from '../expr/VisibilityField';
 import { words } from '../expr/words';
 import BadgeField from '../expr/BadgeField';
 import { FallbackTab, OpensOn } from '../expr/OpensOn';
@@ -42,7 +43,9 @@ export function useDeepRows(path: EditorPath): Record<string, RowOverride> {
   };
   return {
     action, onAction: action, offAction: action, quickLinksAction: action, profileAction: action,
-    visibleWhen: ({ path: at, label }) => <ConditionField label={label} path={at} place="show" policy="show" itemName={itemName}/>,
+    visibleWhen: ({ path: at, label }) => allowsStateVisibility(document, path)
+      ? <VisibilityField label={label} path={path} itemName={itemName}/>
+      : <ConditionField label={label} path={at} place="show" policy="show" itemName={itemName}/>,
     badge: ({ path: at, label }) => <BadgeField path={at} label={label} itemName={itemName}/>,
     enabledWhen: ({ path: at, label }) => <ConditionField label={label} path={[...at, 'condition']} place="enable" policy="enable" itemName={itemName}/>,
     activeWhen: ({ path: at, label }) => <ConditionField label={label} path={at} place="active" none={words.fromStyle} itemName={itemName}/>,

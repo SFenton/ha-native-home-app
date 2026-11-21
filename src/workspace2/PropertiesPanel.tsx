@@ -125,7 +125,7 @@ function NodeBody({ path, placePath, template }: { path: EditorPath; /** For the
   const dialRel = (at: EditorPath) => at.slice(path.length).join('.');
   const isDialControl = nodeType === 'dial-control', isThermostat = isThermostatDial(node as never);
   const dialDrawn = (at: EditorPath) => (isDialControl && /^(props|action|enabledWhen)(\.|$)/.test(dialRel(at))) || (isThermostat && /^props\.(dial|kind)(\.|$)/.test(dialRel(at)));
-  const hidden = (at: EditorPath) => notChildren(at) || drawn(at) || dialDrawn(at) || !boundControlShows(document, path, at) || (at.at(-1) === 'whenUnknown' && !('visibleWhen' in node && node.visibleWhen))
+  const hidden = (at: EditorPath) => notChildren(at) || drawn(at) || dialDrawn(at) || at.slice(path.length).join('.') === 'props.visibility' || !boundControlShows(document, path, at) || (at.at(-1) === 'whenUnknown' && !('visibleWhen' in node && node.visibleWhen))
     || (placePath !== undefined && at.length > path.length && at[path.length] === 'layout');
   // A row of a template that is set per place carries its line, and an entity or state row that is not carries "Set Per Place" (Edit); in Use the line is a caption.
   const perPlace = template ? (rel: EditorPath) => {
