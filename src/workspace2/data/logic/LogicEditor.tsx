@@ -12,14 +12,14 @@ import { RowsProvider, useRows } from '../../rowsContext';
 import type { Workspace2 } from '../../useWorkspace2';
 import { scalarText, evaluateOperand } from './logicEval';
 import LogicSettings from './LogicSettings';
-import { bodyWithSamples, entryOf, kindWord, nameFree, renameEntry, setBody, usesOf } from './logicModel';
+import { bodyWithSamples, entryOf, kindWord, nameFree, renameEntry, usesOf } from './logicModel';
 import { logicWords } from './logicWords';
 import { UseRow } from './LogicRow';
 import { useLiveDraft } from './useLiveDraft';
 import { useLogicActions } from './useLogicActions';
 import { AddressedField } from '../../logic-fields/AddressedField';
-import { operandBodyDraft, useFieldDraft, useLogicFields } from '../../logic-fields/LogicFields';
-import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
+import { bodyFromSlotView, operandBodyDraft, slotBodyView, useFieldDraft, useLogicFields } from '../../logic-fields/LogicFields';
+import { valueAt, type EditorPath } from '../../../composition-editor';
 import { LogicScopeProvider } from './logicScope';
 import EditorRow from '../../editors/EditorRow';
 import ConditionField from '../../expr/ConditionField';
@@ -75,7 +75,7 @@ function ValueBody({ document, entry, path, onApply }: { document: CompositionDo
     try { return { graph: liftField(document, path, 'operand').graph }; }
     catch (reason) { return { error: reason instanceof Error ? reason.message : String(reason) }; }
   }, [canvas, document, path.join('/')]);
-  const view = replaceAt(document, path, operandSlot(body));
+  const view = slotBodyView(document, path, body);
   const untouched = body.type === 'literal' && body.value === '';
   const rules = rulesOf(operandSlot(body), 'text') as RulesDraft<Operand | Json> | undefined;
   return <><EditorRow label={logicWords.bodyValue} title={logicWords.body} summary="" itemName={entry.name} document={view}
@@ -83,7 +83,7 @@ function ValueBody({ document, entry, path, onApply }: { document: CompositionDo
       const slot = valueAt(next, path) as { type: string };
       const edited = slotOperand(slot);
       if (!edited) throw new Error('The template body must have a value.');
-      onApply(setBody(next, entry.id, edited as unknown as Rec));
+      onApply(bodyFromSlotView(document, next, path));
     }}
     blocked={doc => { const held = rulesOf(valueAt(doc, path) as never, 'text'); return held ? rulesProblem(held as RulesDraft<Operand | Json>, 'text') : undefined; }}
     head={start => <div className="w2-expr-valuerow w2-logic-body" data-field-path={path.join('/')}>

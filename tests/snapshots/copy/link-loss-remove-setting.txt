@@ -1,0 +1,9 @@
+Remove “Source”?
+1 tile that fills it in will lose that value.
+Cancel
+Remove Setting
+
+Remove “Source”?
+3 tiles that fill it in will lose that value.
+Cancel
+Remove Setting

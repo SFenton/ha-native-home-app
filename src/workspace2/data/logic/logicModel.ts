@@ -1,4 +1,4 @@
-import { replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
+import { compilerIssuesOf, componentLocations, replaceAt, valueAt, type EditorPath } from '../../../composition-editor';
 import type { CompositionDocument } from '../../../shared/composition/schema';
 import type { Json } from '../../../shared/types';
 import type { Operand } from '../../../shared/composition/expression';
@@ -9,7 +9,7 @@ import { replacePointer, resolveLogicAnchor } from '../../../shared/composition/
 import { fieldSteps } from '../../../shared/composition/components';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../logic-fields/registry';
 import { operandSlot, slotOperand } from '../../expr/tokens';
-import { copySubtree, editSubtrees } from '../../editors/provenance';
+import { copySubtree, editSubtrees, editWithin, type ScopedEdit } from '../../editors/provenance';
 import {
   argFits, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
 } from '../../../shared/composition/logic-library';
@@ -186,28 +186,123 @@ export function updateSetting(document: CompositionDocument, id: string, name: s
     }),
   }));
 }
-const fillHoles = (value: unknown, name: string, replacement: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(item => fillHoles(item, name, replacement));
+/**
+ * The body with each hole for `name` filled with `replacement`. Only the holes and the objects above them are rebuilt, so every other part of the body keeps
+ * its identity; `holes` gets each filled hole's path, below `path`.
+ */
+const fillHoles = (value: unknown, name: string, replacement: unknown, path: EditorPath = [], holes: EditorPath[] = []): unknown => {
+  if (Array.isArray(value)) {
+    let changed = false;
+    const items = value.map((item, at) => { const filled = fillHoles(item, name, replacement, [...path, at], holes); if (filled !== item) changed = true; return filled; });
+    return changed ? items : value;
+  }
   if (!isRecord(value)) return value;
-  if (value.type === 'hole' && value.name === name) return copySubtree(replacement);
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillHoles(item, name, replacement)]));
+  if (value.type === 'hole' && value.name === name) { holes.push(path); return copySubtree(replacement); }
+  let out: Rec | undefined;
+  for (const [key, item] of Object.entries(value)) {
+    const filled = fillHoles(item, name, replacement, [...path, key], holes);
+    if (filled !== item) { out ??= { ...value }; out[key] = filled; }
+  }
+  return out ?? value;
 };
 /**
  * Removes a setting. Where the body used it, the setting's Try With value stands in; each use drops its value for it. The remaining uses keep drawing what they
  * drew only when they had given the Try With value, which is why Remove Setting is a change a person asks for by name.
+ *
+ * Only the uses' `args` change, and only along their paths, so every other object keeps its identity. Each dropped value is declared deleted: an automatic
+ * binding or a component parameter binding that filled it in is removed with it, and every other link stays exactly as it was.
  */
 export function removeSetting(document: CompositionDocument, id: string, name: string): CompositionDocument {
+  const edit = settingRemovalEdit(document, id, name);
+  return edit ? editWithin(document, edit) : document;
+}
+
+/**
+ * Remove Setting as a scoped edit: it changes, and speaks for, the template's entry and each use's `args` only. Undefined when the template or the
+ * setting is gone.
+ */
+export function settingRemovalEdit(document: CompositionDocument, id: string, name: string): ScopedEdit | undefined {
   const entry = entryOf(document, id);
   const param = entry?.params.find(item => item.name === name);
-  if (!entry || !param) return document;
-  const next = mapEntry(document, id, held => ({ ...held, params: held.params.filter(item => item.name !== name), body: fillHoles(held.body, name, param.sample ?? defaultSample(settingKindOf(param))) as Rec }));
-  const strip = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(strip);
+  if (!entry || !param) return undefined;
+  const at = document.logicLibrary!.findIndex(held => held.id === id), holes: EditorPath[] = [];
+  const next = mapEntry(document, id, held => ({ ...held, params: held.params.filter(item => item.name !== name),
+    body: fillHoles(held.body, name, param.sample ?? defaultSample(settingKindOf(param)), ['logicLibrary', at, 'body'], holes) as Rec }));
+  const deleted: EditorPath[] = [], uses: EditorPath[] = [];
+  const strip = (value: unknown, path: EditorPath): unknown => {
+    if (Array.isArray(value)) {
+      let changed = false;
+      const items = value.map((item, at) => { const stripped = strip(item, [...path, at]); if (stripped !== item) changed = true; return stripped; });
+      return changed ? items : value;
+    }
     if (!isRecord(value)) return value;
-    if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args)) { const { [name]: _gone, ...args } = value.args; return { ...value, args }; }
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'logicLibrary' ? item : strip(item)]));
+    let out: Rec | undefined;
+    if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args) && Object.hasOwn(value.args, name)) {
+      const { [name]: _gone, ...args } = value.args;
+      out = { ...value, args }; deleted.push([...path, 'args', name]); uses.push(path);
+    }
+    for (const [key, item] of Object.entries(out ?? value)) {
+      if (key === 'logicLibrary') continue;
+      const stripped = strip(item, [...path, key]);
+      if (stripped !== item) { out ??= { ...value }; out[key] = stripped; }
+    }
+    return out ?? value;
   };
-  return editSubtrees(document, strip(next) as CompositionDocument);
+  const candidate = strip(next, []) as CompositionDocument, self = (path: EditorPath) => [fieldPointer(path), [fieldPointer(path)]] as const;
+  // Each use stays the same use in place, without its value for the setting. Each filled hole is where its Try With value now stands: a saved canvas node of
+  // the hole is carried to the value's node there, or, when the value draws differently, only that node's place is dropped (the hole is also declared gone).
+  // The entry, its params and every object above a hole are rebuilt in place; the rest of the body keeps its identity.
+  const rebuilt = [['logicLibrary', at], ['logicLibrary', at, 'params'], ...holes.flatMap(hole => hole.slice(0, -1).map((_, depth) => hole.slice(0, depth + 1)).filter(path => path.length >= 3))];
+  return { candidate, scope: [['logicLibrary', at], ...uses], retained: true, references: {
+    deleted: [...deleted, ...holes],
+    relocated: new Map([...uses, ...holes].map(self)),
+    fields: new Map(rebuilt.map(self)),
+  } };
+}
+
+/**
+ * The tiles a link fills in, each counted once however many of its links are lost: a place on a page or sheet by its node; inside a tile template, the
+ * template's node at each of the template's placements. A placement is every component-ref that shows the template on a page or sheet, also through
+ * another template that holds it (one per placement of that one), so two linked tiles in a template shown twice are four tiles.
+ */
+function filledTiles(before: CompositionDocument, after: CompositionDocument): number {
+  const tiles = new Set<string>(), located = componentLocations(before, true), placements = new Map<string, string[]>();
+  const placementsOf = (componentId: string, visiting: ReadonlySet<string> = new Set()): string[] => {
+    const known = placements.get(componentId);
+    if (known) return known;
+    if (visiting.has(componentId)) return [];
+    const inside = new Set([...visiting, componentId]);
+    const found = located.filter(({ node }) => node.type === 'component-ref' && node.componentId === componentId).flatMap(({ node, path }) =>
+      path[0] === 'componentLibrary' ? placementsOf(before.componentLibrary![Number(path[1])].id, inside).map(outer => `${outer}/${node.id}`) : [`${path[0]}:${path[1]}/${node.id}`]);
+    placements.set(componentId, found);
+    return found;
+  };
+  const kept = new Set((after.logicUseBindings ?? []).map(binding => JSON.stringify(binding)));
+  for (const binding of before.logicUseBindings ?? []) {
+    if (kept.has(JSON.stringify(binding))) continue;
+    if (binding.use.kind === 'component') for (const place of placementsOf(binding.use.id)) tiles.add(`${place}:${binding.use.nodeId ?? ''}`);
+    else tiles.add(binding.use.kind === 'document' ? 'document' : `${binding.use.kind}:${binding.use.id}:${binding.use.nodeId ?? binding.use.field}`);
+  }
+  for (const entry of before.componentLibrary ?? []) {
+    const held = new Set((after.componentLibrary?.find(next => next.id === entry.id)?.bindings ?? []).map(binding => JSON.stringify(binding)));
+    for (const binding of entry.bindings ?? []) if (!held.has(JSON.stringify(binding)))
+      for (const place of placementsOf(entry.id)) tiles.add(`${place}:${binding.nodeId ?? ''}`);
+  }
+  return tiles.size;
+}
+
+/**
+ * Remove Setting as the editor asks it: the declared removal, and how many tiles that fill the setting in lose that value (0 when no link fills it in,
+ * so nothing needs asking). `document` comes back unchanged when the setting is gone or the removal cannot keep the other links.
+ */
+export function removeSettingPlan(document: CompositionDocument, id: string, name: string): { document: CompositionDocument; tiles: number } {
+  const next = removeSetting(document, id, name);
+  // The Try With value stands in for the setting; one the template cannot read leaves a document that does not compile, which is refused, never repaired.
+  if (next !== document && compilerIssuesOf(next).length && !compilerIssuesOf(document).length) {
+    const param = entryOf(document, id)?.params.find(item => item.name === name);
+    throw new Error(logicWords.removeNeedsSample(param?.label ?? name));
+  }
+  return { document: next, tiles: next === document ? 0 : filledTiles(document, next) };
 }
 
 // MARK: Uses

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import homeDomains from '../src/preview2/fixtures/home-domains.json';
-import { importCompositionText, compositionSourceText, moveCompositionNode, valueAt } from '../src/composition-editor';
+import { compositionSourceText, moveCompositionNode, valueAt } from '../src/composition-editor';
+import { importCompositionText } from '../src/workspace2/editors/importDocument';
 import { buildDocumentIndex } from '../src/preview2/model';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { normaliseFoldSides } from '../src/shared/composition/fold-sides-normalise';

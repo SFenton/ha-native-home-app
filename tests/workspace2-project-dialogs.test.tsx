@@ -256,7 +256,8 @@ describe('Import, About, Activity and Help', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Import' }));
     const confirm = await screen.findByRole('dialog');
     expect(within(confirm).getByText('Replace the Draft?')).toBeTruthy();
-    expect(within(confirm).getByText('Undo brings it back.')).toBeTruthy();
+    expect(within(confirm).getByText('The imported document replaces everything in this draft, including its linked values and saved canvas layouts. Undo brings it back.')).toBeTruthy();
+    expect(screen.getByTestId('import-replaces').textContent).toBe('Importing replaces this whole draft, including its linked values and saved canvas layouts.');
     fireEvent.click(within(confirm).getByRole('button', { name: 'Replace' }));
     expect(last.name).toBe('Imported house');
     expect(screen.getByText('Adds the rooms and chores pages this draft does not have yet.')).toBeTruthy();

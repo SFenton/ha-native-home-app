@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from './shared/composition/schema';
 import { compileCompositionDocument } from './shared/composition/compiler';
-import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON, type CompositionIssue } from './shared/composition/json';
+import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, type CompositionIssue } from './shared/composition/json';
 import { omitFoldSide } from './shared/composition/fold-sides';
 import { createId as uid } from './shared/ids';
 import type { Json } from './shared/types';
@@ -302,12 +302,6 @@ export function moveCompositionNode(document: CompositionDocument, id: string, p
   if (container?.type !== 'tile-grid') moved.layout.span = 1;
   children.push(moved);
   return next;
-}
-export function importCompositionText(text: string, documentId: string): CompositionDocument {
-  const parsed = parseCompositionJSON(new TextEncoder().encode(text));
-  const { document } = compileCompositionDocument(parsed);
-  // Import is explicitly content-only; publisher and document identity belong to this workspace.
-  return { ...document, id: documentId };
 }
 export function compositionSourceText(document: CompositionDocument, pretty = false): string {
   const formatted = pretty ? JSON.stringify(document, null, 2) : canonicalCompositionJSON(document);

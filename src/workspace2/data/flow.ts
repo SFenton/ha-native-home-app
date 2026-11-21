@@ -1,4 +1,6 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
+import { editWithin, type ScopedEdit } from '../editors/provenance';
+import { fieldPointer } from '../logic-fields/registry';
 import type { Operand, Predicate } from '../../shared/composition/expression';
 import {
   PIPELINE_LIMITS, checkPipelineSource, elementOf, forecastTypes, hasObject, isEntityKeyed, kindsOf, newFacts, requestShape, todoItemShape, typeOperand, typeSteps, withoutNull,
@@ -301,6 +303,32 @@ export function moveStep(steps: readonly PipelineStep[], from: number, by: -1 | 
   const next = [...steps];
   [next[from], next[to]] = [next[to], next[from]];
   return next;
+}
+
+/**
+ * Moves a flow's step up or down as a declared edit (see `flowStepMoveEdit`). Nothing is lost, so nothing is asked. Returns `document` when the move is out
+ * of range or refused.
+ */
+export function moveFlowStep(document: CompositionDocument, id: string, from: number, by: -1 | 1): CompositionDocument {
+  const edit = flowStepMoveEdit(document, id, from, by);
+  return edit ? editWithin(document, edit) : document;
+}
+
+/**
+ * The step move as a scoped edit: it changes, and speaks for, that flow only. The flow's inputs are rebuilt in place (each step keeps its object), and the
+ * two steps that trade places are declared relocated, old pointer to new, so saved canvas nodes and any link into a step follow it. Undefined out of range.
+ */
+export function flowStepMoveEdit(document: CompositionDocument, id: string, from: number, by: -1 | 1): ScopedEdit | undefined {
+  const at = document.dataSources.findIndex(source => source.kind === 'model' && source.model === 'pipeline@1' && source.id === id);
+  const source = document.dataSources[at] as PipelineSource | undefined, to = from + by;
+  if (!source || from < 0 || from >= source.inputs.steps.length || to < 0 || to >= source.inputs.steps.length) return undefined;
+  const candidate = updateFlow(document, id, inputs => ({ ...inputs, steps: moveStep(inputs.steps, from, by) }));
+  const step = (index: number) => fieldPointer(['dataSources', at, 'inputs', 'steps', index]);
+  const rebuilt = [fieldPointer(['dataSources']), fieldPointer(['dataSources', at]), fieldPointer(['dataSources', at, 'inputs']), fieldPointer(['dataSources', at, 'inputs', 'steps'])];
+  return { candidate, scope: [['dataSources', at]], retained: true, references: {
+    fields: new Map(rebuilt.map(pointer => [pointer, [pointer]])),
+    relocated: new Map([[step(from), [step(to)]], [step(to), [step(from)]]]),
+  } };
 }
 
 /** Whether the output's `rows` operands name a field the final shape no longer has: the reason in words, or undefined. */
