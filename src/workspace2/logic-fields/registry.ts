@@ -91,23 +91,37 @@ export function walkableNode(node: unknown, known?: WeakSet<object>, walked?: ob
   const lists: unknown[][] = [];
   if (holder.type === 'local-tabs') {
     for (const areas of [holder.tabs ?? [], holder.blocks ?? []]) {
-      // `every` and `forEach` skip holes, as the walk's `map` does.
-      const area = (value: unknown) => value === null || value === undefined ? undefined : (value as { children?: unknown }).children;
-      if (!Array.isArray(areas) || !areas.every(value => Array.isArray(area(value)))) return false;
-      areas.forEach(value => lists.push(area(value) as unknown[]));
+      if (!jsonList(areas)) return false;
+      for (let at = 0; at < areas.length; at++) {
+        const area = areas[at], children = area === null || area === undefined ? undefined : (area as { children?: unknown }).children;
+        if (!jsonList(children)) return false;
+        lists.push(children);
+      }
     }
   } else if (holder.children) {
-    if (!Array.isArray(holder.children)) return false;
+    if (!jsonList(holder.children)) return false;
     lists.push(holder.children);
   }
-  if (!lists.every(list => list.every(child => walkableNode(child, known, walked)))) return false;
+  for (const list of lists) for (let at = 0; at < list.length; at++) if (!walkableNode(list[at], known, walked)) return false;
   walked?.push(node);
+  return true;
+}
+/**
+ * Whether `value` is a JSON list: an array with every index from 0 to its length present and no other own enumerable key
+ * (`Object.keys` lists present indices in order, then any other key). A hole or an extra key is a value the schema forbids,
+ * and the shape checks below never pass one; they walk lists by index, since `every` and `some` skip holes.
+ */
+export function jsonList(value: unknown): value is unknown[] {
+  if (!Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== value.length) return false;
+  for (let at = 0; at < keys.length; at++) if (keys[at] !== String(at)) return false;
   return true;
 }
 /** The owner lists `authoredNodes` walks: `pages` and `modals` must be lists, `componentLibrary` absent or a list. */
 export const walkedOwnerLists = ['pages', 'modals', 'componentLibrary'] as const;
 export type WalkedOwnerList = typeof walkedOwnerLists[number];
-export const walkableList = (list: WalkedOwnerList, value: unknown) => Array.isArray(value) || list === 'componentLibrary' && (value === null || value === undefined);
+export const walkableList = (list: WalkedOwnerList, value: unknown) => jsonList(value) || list === 'componentLibrary' && (value === null || value === undefined);
 /**
  * Whether `authoredNodes` walks `owner`, an entry of `list`, without throwing: a page or modal must have a list of
  * `components` (`surface.components.forEach`), a component entry a `node` (`entry.node`), and each node must be walkable.
@@ -117,7 +131,9 @@ export function walkableOwner(list: WalkedOwnerList, owner: unknown, known?: Wea
   if (owner === null || owner === undefined) return false;
   if (list === 'componentLibrary') return walkableNode((owner as { node?: unknown }).node, known, walked);
   const components = (owner as { components?: unknown }).components;
-  return Array.isArray(components) && components.every(node => walkableNode(node, known, walked));
+  if (!jsonList(components)) return false;
+  for (let at = 0; at < components.length; at++) if (!walkableNode(components[at], known, walked)) return false;
+  return true;
 }
 /** Each walk's nodes by pointer, so `fieldAnchor` finds the deepest one on a path by its prefixes (a walk is never changed). */
 const nodesByPath = new WeakMap<readonly AuthoredNode[], Map<string, AuthoredNode>>();

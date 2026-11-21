@@ -5,7 +5,7 @@ import { atPointer, resolveLogicAnchor, type ResolvedLogicAnchor } from '../../s
 import { resolveLogicUseBindings } from '../../shared/composition/studio-logic/bindings';
 import { sameJson } from '../../sameJson';
 import { usesOf } from '../data/logic/logicModel';
-import { AnchorResolver, authoredNodes, fieldAnchor, ownerAuthoredNodes, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
+import { AnchorResolver, authoredNodes, fieldAnchor, jsonList, ownerAuthoredNodes, fieldPointer, pointerPath, walkableList, walkableOwner, walkedOwnerLists, type AuthoredNode, type WalkedOwnerList } from '../logic-fields/registry';
 import { canvasWalk, knownUsable, rebaseCanvasLayout, uncertifiedCanvasRoots, usableLayout, walkedNodes } from '../logic-fields/layout';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
 import { toastManager } from '../toasts';
@@ -127,7 +127,12 @@ function objectCounts(document: CompositionDocument): Map<object, number> {
  * `resolveLogicAnchor`, `usesOf` and a schema parse), never walked unguarded, so no shape of theirs throws.
  */
 const present = (value: unknown) => value !== null && value !== undefined;
-const listOf = (value: unknown, item: (value: unknown) => boolean) => !present(value) || Array.isArray(value) && value.every(item);
+const listOf = (value: unknown, item: (value: unknown) => boolean) => {
+  if (!present(value)) return true;
+  if (!jsonList(value)) return false;
+  for (let at = 0; at < value.length; at++) if (!item(value[at])) return false;
+  return true;
+};
 /** The component entry reads beyond the walk; a superset of the shapes they throw on (a binding without a text field, say). */
 const entryShaped = (entry: object) => {
   const { bindings, params, sources, flows } = entry as Record<string, unknown>;
@@ -151,7 +156,10 @@ function ownerShaped(list: WalkedOwnerList, owner: unknown, checked: Checked): b
 }
 function listShaped(document: CompositionDocument, list: WalkedOwnerList, checked: Checked): boolean {
   const owners: unknown = Reflect.get(document, list);
-  return walkableList(list, owners) && ((owners ?? []) as unknown[]).every(owner => ownerShaped(list, owner, checked));
+  if (!walkableList(list, owners)) return false;
+  const all = (owners ?? []) as unknown[];
+  for (let at = 0; at < all.length; at++) if (!ownerShaped(list, all[at], checked)) return false;
+  return true;
 }
 /** Whether `value` is a plain object (not an array): the only kind of value a document is. */
 const plainObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -430,7 +438,15 @@ function applyDocumentEdit(before: CompositionDocument, edit: CompositionDocumen
 }
 
 function reconcile(before: CompositionDocument, edit: CompositionDocument, references: EditReferences, shapes: { unshaped: boolean }): CompositionDocument {
-  if (before === edit || sameJson(before, edit) && !references.relocated?.size && !references.copied?.length) return edit;
+  /**
+   * An array the edit changed or placed that is not a JSON list (a hole, or an own key other than an index) is a value the
+   * schema forbids: refused wherever the edit reaches it. `changedPaths` hands over every such array, at a cost proportional
+   * to what the edit placed; this check runs on every path that accepts, including those below that skip reconciliation.
+   */
+  const unlisted = (value: object) => { if (Array.isArray(value) && !jsonList(value)) refuse(); };
+  const placedLists = () => { changedPaths(before, edit, () => {}, unlisted); return edit; };
+  if (before === edit) return edit;
+  if (sameJson(before, edit) && !references.relocated?.size && !references.copied?.length) return placedLists();
   /**
    * Whether `document` holds anything linked, read as the whole-document reconciliation reads it, in the same order and
    * stopping where it stops. Where that read throws (a component library that is not a list, or a missing entry before
@@ -445,7 +461,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
     }
     return Boolean(document.studioCanvas);
   };
-  if (!linked(before) && !linked(edit)) return edit;
+  if (!linked(before) && !linked(edit)) return placedLists();
   // Past this point the whole-document reconciliation reads `before`'s bindings through `forEach`, which throws on anything
   // but a list (a value without a length passes the checks of the edit that installs it). Where `before` holds bindings, it
   // reads the candidate's through `some` (likewise) and each binding it keeps through its `use` (which throws on a missing
@@ -667,6 +683,7 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
     reached.add(end < 0 ? list : below < 0 ? pointer : pointer.slice(0, below));
   };
   changedPaths(before, edit, pointer => { touch(pointer); reach(pointer); }, value => {
+    unlisted(value);
     placements.set(value, (placements.get(value) ?? 0) + 1);
     const keys = index.evidence.get(value);
     if (keys) { rewitnessed = true; for (const key of keys) scope.add(key); }

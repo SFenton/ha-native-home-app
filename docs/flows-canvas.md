@@ -515,16 +515,31 @@ keep `before`, never an acceptance with a different result:
   a value other than a list where the schema requires one (an owner list, the
   bindings list, a surface's components, a component entry's bindings, params,
   sources or flows, a node's children, a `local-tabs` node's tabs or blocks,
-  or their children). The oracle iterates a string there as an empty list;
-  the scoped boundary does not mirror that.
+  or their children), or, anywhere, an array that is not JSON: one with a
+  hole, or with an own enumerable key other than an index. The oracle iterates
+  a string there as an empty list and skips holes and extra keys; the scoped
+  boundary does not mirror that.
 
-It refuses those shapes by checking them before it reads them, not by turning
-errors into refusals: an error from anything else still propagates, so a raw
-error on some shape no check covers remains possible and is a bug. An `edit`
-that is not a plain object is refused before anything reads it, the redo walk
-included, and `editSubtrees` hands a document the authored walk cannot take to
-the boundary without walking it. Both boundaries pass an edit that descends
-from `before` through accepted edits (a redo) without reconciling it.
+These are checks, not errors turned into refusals: an error from anything
+else still propagates, so a raw error on some shape no check covers remains
+possible and is a bug. They do not all run before the candidate is read:
+
+- an `edit` that is not a plain object is refused before anything reads it,
+  the redo walk included;
+- the linked check and the bindings checks read the candidate first, exactly
+  as the oracle does (so they refuse where its reads would throw);
+- the revision's index is then built or reused (it reads only `before`), and
+  every array the edit changed or placed is checked as `changedPaths` hands
+  it over, before anything else of the candidate is read; the paths that
+  skip reconciliation (an unlinked revision, an edit equal to it as JSON) run
+  that scan too;
+- the owner, list and node shape checks walk lists by index, so a hole or an
+  extra key fails them, and `editSubtrees` hands a document they reject to the
+  boundary without walking it.
+
+Arrays the edit did not change are not checked again: they are `before`'s. Both
+boundaries pass an edit that descends from `before` through accepted edits (a
+redo) without reconciling it.
 
 Caches are keyed only by committed revisions: a `before` the caller holds, or a
 result the boundary accepted. **Committed revisions must not be mutated in
@@ -535,7 +550,7 @@ nothing it built is ever remembered beyond the call.
 `edit-oracle.test.ts` enforces the contract on seeded random edit sequences
 (alias, rebuild, move/copy provenance, ID and binding edits, canvas edits,
 malformed owners, bindings lists and list fields (strings, numbers and objects
-where a list belongs), owner-list reorders and repeated owner or node IDs, refused
+where a list belongs, sparse lists and lists with extra keys), owner-list reorders and repeated owner or node IDs, refused
 candidates mutated and resubmitted, candidates the compiler accepts installed
 as the next `before` refused or not, accepted content copied into a revision
 that never passed the boundary, and raw drafts with hidden bindings or a

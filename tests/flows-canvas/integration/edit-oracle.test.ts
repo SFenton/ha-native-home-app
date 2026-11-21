@@ -34,7 +34,7 @@ import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic
 import { encodeStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../../src/shared/composition/studio-logic/schemas';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
-import { documentEdit, type EditReferences } from '../../../src/workspace2/editors/documentEdit';
+import { documentEdit, walkableDocument, type EditReferences } from '../../../src/workspace2/editors/documentEdit';
 import { editSubtrees } from '../../../src/workspace2/editors/provenance';
 import { fieldPointer, liftField, pointerPath } from '../../../src/workspace2/logic-fields/registry';
 import { toastManager } from '../../../src/workspace2/toasts';
@@ -208,7 +208,7 @@ function survey(document: Doc) {
     if (value === null || typeof value !== 'object') return;
     counts.set(value, (counts.get(value) ?? 0) + 1);
     if (path.length) all.push({ path, value });
-    for (const [key, child] of Object.entries(value)) visit(child, [...path, Array.isArray(value) ? Number(key) : key]);
+    for (const [key, child] of Object.entries(value)) visit(child, [...path, Array.isArray(value) && /^\d+$/.test(key) ? Number(key) : key]);
   };
   visit(document, []);
   const semantic = all.filter(({ path }) => path[0] !== 'studioCanvas' && path[0] !== 'logicUseBindings');
@@ -586,7 +586,19 @@ type OwnerList = keyof typeof brokenOwners;
 function malformed(document: Doc, rng: Rng): Step | undefined {
   const list = pick(rng, Object.keys(brokenOwners) as OwnerList[]), owners = (document as unknown as Record<string, unknown>)[list];
   const items = Array.isArray(owners) ? owners as unknown[] : [];
-  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list', 'bindings', 'field', 'field'] as const);
+  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list', 'bindings', 'field', 'field', 'array', 'array'] as const);
+  // A list that is not JSON: one with a hole (inside or at its end), or with an extra own key holding an object of the
+  // document or a scalar.
+  if (mode === 'array') {
+    const lists = survey(document).all.filter(({ value }) => Array.isArray(value));
+    if (!lists.length) return undefined;
+    const { path, value } = pick(rng, lists), copy = [...value as unknown[]] as unknown[] & Record<string, unknown>;
+    const kind = pick(rng, ['a hole at the end', 'a hole inside', 'an extra object key', 'an extra scalar key'] as const);
+    if (kind === 'a hole at the end') copy.length += 1;
+    else if (kind === 'a hole inside') { if (copy.length) delete copy[Math.floor(rng() * copy.length)]; else copy.length = 1; }
+    else copy.alias = kind === 'an extra object key' ? pick(rng, survey(document).all).value : 'alias';
+    return { document: replaceAt(document, path, copy), references: {}, label: `malformed ${fieldPointer(path)}: ${kind}` };
+  }
   // A list field of an owner or node (a surface's components, an entry's bindings, params, sources or flows, any node list)
   // given a string, a number or an object.
   if (mode === 'field') {
@@ -680,15 +692,36 @@ const describeOutcome = (outcome: Outcome, before: Doc, candidate: Doc) => outco
   : outcome.document === before ? 'refuses' : outcome.document === candidate ? 'accepts as proposed' : 'accepts with reconciled metadata';
 /** Each time the oracle threw and the scoped implementation refused instead (the documented deviation), by oracle message and site. */
 const deviations = new Map<string, number>();
+/** Where `document` holds an array that is not JSON (a hole, or an own enumerable key other than an index), as a pattern. */
+function nonJsonArray(document: unknown): string | undefined {
+  const seen = new Set<object>();
+  const visit = (value: unknown, at: string): string | undefined => {
+    if (value === null || typeof value !== 'object' || seen.has(value)) return undefined;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index++) if (!Object.hasOwn(value, index)) return `${at || '(root)'}: a list with a hole`;
+      if (Object.keys(value).length !== value.length) return `${at || '(root)'}: a list with an own non-index key`;
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const found = visit(child, `${at}/${Array.isArray(value) ? '*' : key}`);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  return visit(document, '');
+}
 /**
  * Where `document` holds a value of a type its schema forbids at a place the boundaries read (as a pattern, `*` for each
  * index), or undefined: a root that is not a plain object, or a value other than a list where the schema requires one (the
  * owner lists and the bindings list, a surface's components, a component entry's bindings, params, sources and flows, a
- * node's children, a `local-tabs` node's tabs and blocks, and each tab's or block's children). Absent is allowed.
+ * node's children, a `local-tabs` node's tabs and blocks, and each tab's or block's children). Absent is allowed. And,
+ * anywhere in the document, an array that is not JSON: one with a hole, or with an own enumerable key other than an index.
  */
 function schemaInvalid(document: unknown): string | undefined {
   const plain = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
   if (!plain(document) || ![Object.prototype, null].includes(Object.getPrototypeOf(document))) return '(root)';
+  const array = nonJsonArray(document);
+  if (array) return array;
   const list = (holder: Record<string, unknown>, key: string, at: string) => holder[key] !== undefined && !Array.isArray(holder[key]) ? `${at}/${key}` : undefined;
   const node = (value: unknown, at: string): string | undefined => {
     if (!plain(value)) return undefined;
@@ -739,6 +772,8 @@ function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome):
     }
   } else if (scoped.kind === 'result') {
     const refused = scoped.document === before, oracleRefused = oracle.document === before;
+    // Whatever the oracle does, the scoped boundary never accepts a non-JSON array the revision did not already hold.
+    if (!refused && nonJsonArray(scoped.document) && !nonJsonArray(before)) return `scoped accepts a non-JSON array (${nonJsonArray(scoped.document)})`;
     if (refused === oracleRefused && sameJson(scoped.document, oracle.document)) return undefined;
     // The narrowed contract: the scoped boundary may also refuse a candidate or revision holding a schema-invalid type.
     const invalid = refused && !oracleRefused ? schemaInvalid(candidate) ?? schemaInvalid(before) : undefined;
@@ -941,6 +976,40 @@ describe('edit oracle regressions', () => {
   it('refuses a candidate whose bindings list cannot be read where the revision holds bindings', () => {
     const before = compiled();
     for (const logicUseBindings of [{}, 'list', 5, [...before.logicUseBindings!, null]]) unreadable(before, { ...before, logicUseBindings } as unknown as Doc);
+  });
+
+  // Arrays that are not JSON (a hole, or an own non-index key) are schema-forbidden: refused wherever the edit reaches them.
+  it('refuses a rebuilt list with an extra own key, which the placement scan would otherwise not see', () => {
+    // `changedPaths` scans a resized list's elements, the candidate's object index also sees `alias`: the shortcut that
+    // locates retained objects without that index over-accepted here.
+    const before = compiled(), components = Object.assign([...before.pages[0].components, tile('extra', 'source-a')], { alias: before.pages[0].components[0] });
+    const candidate = replaceAt(before, ['pages', 0, 'components'], components);
+    const references = { discardLayouts: [['pages', 0, 'components', 0, 'props', 'subtitle', 'value']] };
+    expect(oracleEdit(before, candidate, references)).toBe(before);
+    expect(documentEdit(before, candidate, references)).toBe(before);
+    expect(schemaInvalid(candidate)).toBe('/pages/*/components: a list with an own non-index key');
+  });
+
+  it('refuses sparse tabs, blocks and component libraries through documentEdit and editSubtrees, never throwing', () => {
+    const before = compiled(), tabs = (fields: object) => replaceAt(before, ['pages', 0, 'components', 0], { ...before.pages[0].components[0], type: 'local-tabs', ...fields });
+    const candidates = [tabs({ tabs: Array(2) }), tabs({ tabs: [], blocks: Array(1) }), { ...before, componentLibrary: Array(1) },
+      tabs({ tabs: [{ id: 'a', label: 'A', children: Array(1) }] })];
+    for (const candidate of candidates) {
+      expect(walkableDocument(candidate)).toBe(false);
+      expect(documentEdit(before, candidate)).toBe(before);
+      expect(editSubtrees(before, candidate)).toBe(before);
+    }
+  });
+
+  it('refuses a non-JSON list on the paths that skip reconciliation too', () => {
+    // An unlinked revision (nothing to reconcile) and an edit equal to the revision as JSON (an extra key is not JSON).
+    const unlinked = { ...compiled(), logicUseBindings: [] }, linked = compiled();
+    const keyed = { ...linked, pages: Object.assign([...linked.pages], { alias: 'alias' }) };
+    expect(sameJson(keyed, linked)).toBe(true);
+    for (const [from, edit] of [[unlinked, { ...unlinked, pages: Object.assign(new Array(unlinked.pages.length + 1), unlinked.pages) }], [linked, keyed]] as const) {
+      expect(oracleEdit(from, edit)).toBe(edit);
+      expect(documentEdit(from, edit)).toBe(from);
+    }
   });
 
   it('refuses an edit that is not a plain object, before reading it', () => {
