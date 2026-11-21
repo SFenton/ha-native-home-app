@@ -110,7 +110,7 @@
     .condition-wire { --wire: var(--chart-3); }
     .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px; border-top: 1px solid var(--border); }
     .actions button { padding: 4px; min-width: 0; min-height: 32px; }
-    .actions button.active { background: var(--accent); border-color: var(--primary); }
+    .actions .active { background: var(--accent); border-color: var(--primary); }
     .m1-layout { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(250px, 1fr) 292px minmax(200px, .8fr); gap: 24px; padding: 28px; align-items: start; }
     .m1-layout .block { width: 220px; margin-top: 22px; }
     .inline-form { display: grid; gap: 10px; border-top: 1px solid var(--border); padding: 10px; }
@@ -444,13 +444,13 @@
           <div class="eyebrow">A / Scalar</div>
           <article class="block selected">
             <header class="block-head"><button class="block-title" data-open-peek="peek-scalar" aria-label="Select Grocery target, Text and show data peek"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg></span><span><strong>Grocery target</strong><small>Text</small></span></button><button class="icon-button quiet" data-open-peek="peek-scalar" aria-expanded="true" aria-controls="peek-scalar" aria-label="Show data peek for Grocery target"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header>
-            <div class="port output entity-wire"><span class="port-name">Result</span><span class="port-value">todo.groceries</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span></div>
+            <div class="port output entity-wire"><span class="port-name">Result</span><span class="port-value">todo.demo_groceries</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span></div>
           </article>
           <div class="peek" id="peek-scalar" role="dialog" aria-modal="false" aria-labelledby="peek-scalar-title">
             <header class="panel-head"><div><h3 id="peek-scalar-title">Grocery target <span class="muted">/ Peek</span></h3><small>Text</small></div><button class="icon-button quiet" data-close-peek="peek-scalar" aria-label="Dismiss data peek for Grocery target"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
             <div class="panel-body">
               <div class="peek-group"><div class="peek-label"><strong>Inputs</strong></div><p class="muted">No input ports.</p></div>
-              <div class="peek-group"><div class="peek-label"><strong>Result</strong><span class="pill live"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Live</span></div><div class="scalar">todo.groceries</div><small>A complete text value, not quoted JSON.</small></div>
+              <div class="peek-group"><div class="peek-label"><strong>Result</strong><span class="pill live"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Live</span></div><div class="scalar">todo.demo_groceries</div><small>A complete text value, not quoted JSON.</small></div>
             </div>
             <div class="peek-foot"><small>Read-only observation</small><a class="button" href="#m3">Compare in full<svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></a></div>
           </div>
@@ -460,13 +460,13 @@
           <div class="eyebrow">B / Record</div>
           <article class="block selected">
             <header class="block-head"><button class="block-title" data-open-peek="peek-record" aria-label="Select Choose Entry and show data peek"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span><strong>Choose Entry</strong></span></button><button class="icon-button quiet" data-open-peek="peek-record" aria-expanded="true" aria-controls="peek-record" aria-label="Show data peek for Choose Entry"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header>
-            <div class="port input entity-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span class="port-name">Key</span><span class="port-value">todo.groceries</span></div>
+            <div class="port input entity-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span class="port-name">Key</span><span class="port-value">todo.demo_groceries</span></div>
             <div class="port output record-wire"><span class="port-name">Result</span><span class="port-value">Items: 7 items</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div>
           </article>
           <div class="peek" id="peek-record" role="dialog" aria-modal="false" aria-labelledby="peek-record-title">
             <header class="panel-head"><div><h3 id="peek-record-title">Choose Entry <span class="muted">/ Peek</span></h3><small>From Service Response</small></div><button class="icon-button quiet" data-close-peek="peek-record" aria-label="Dismiss data peek for Choose Entry"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
             <div class="panel-body">
-              <div class="peek-group"><div class="peek-label"><strong>Inputs</strong><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div><dl class="kv"><dt>Key</dt><dd>todo.groceries</dd></dl></div>
+              <div class="peek-group"><div class="peek-label"><strong>Inputs</strong><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div><dl class="kv"><dt>Key</dt><dd>todo.demo_groceries</dd></dl></div>
               <div class="peek-group"><div class="peek-label"><strong>Result</strong><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div><div class="value-record"><div class="row between"><strong>Items</strong><span>7 items</span></div><small>Milk, Eggs, Bread</small><small>+4 more items</small></div><small>Named fields, with a compact nested-list summary.</small></div>
             </div>
             <div class="peek-foot"><small>1 field</small><a class="button" href="#m3">Compare in full<svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></a></div>
@@ -548,7 +548,7 @@
             <output class="compare-count" id="row-count" aria-live="polite">7 of 7 rows</output>
           </div>
           <div class="compare-columns">
-            <section class="compare-inputs" aria-labelledby="compare-input-title"><div class="row between"><h3 id="compare-input-title">Inputs</h3><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><p class="caption">Observed item</p><dl class="kv"><dt>Row Id</dt><dd>grocery-milk</dd><dt>Row Title</dt><dd>Milk</dd><dt>Subtitle</dt><dd>Dairy - 2 litres</dd></dl><div class="note"><small>One observed item, not an invented input history for all seven rows.</small></div><p class="caption">Flow context<br><strong>Service Response</strong> / todo.groceries<br><strong>Choose Entry</strong> / Key: todo.groceries</p></section>
+            <section class="compare-inputs" aria-labelledby="compare-input-title"><div class="row between"><h3 id="compare-input-title">Inputs</h3><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><p class="caption">Observed item</p><dl class="kv"><dt>Row Id</dt><dd>grocery-milk</dd><dt>Row Title</dt><dd>Milk</dd><dt>Subtitle</dt><dd>Dairy - 2 litres</dd></dl><div class="note"><small>One observed item, not an invented input history for all seven rows.</small></div><p class="caption">Flow context<br><strong>Service Response</strong> / todo.demo_groceries<br><strong>Choose Entry</strong> / Key: todo.demo_groceries</p></section>
             <section class="compare-result" aria-labelledby="compare-result-title"><div class="row between"><h3 id="compare-result-title">Result <span class="muted">/ 7 rows</span></h3><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div>
               <div class="table-scroll"><table><caption class="sr">Shopping list result. Seven observed rows with identifiers, titles, and subtitles.</caption><thead><tr><th scope="col">Row Id</th><th scope="col">Row Title</th><th scope="col">Subtitle</th></tr></thead><tbody id="result-rows">
                 <tr><td>grocery-milk</td><td>Milk</td><td>Dairy - 2 litres</td></tr>
@@ -584,7 +584,7 @@
       <header class="section-heading"><span class="section-id">M4</span><div><h2 id="m4-title">Port hover explains the value, not its serialization</h2><p>The same formatter supplies port text, tooltip content, peek content, and accessible names. Socket type still comes from the graph descriptor, not this sample.</p></div></header>
       <div class="m4-grid">
         <div class="surface canvas tooltip-stage">
-          <article class="block"><header class="block-head no-peek"><div class="block-title"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span><strong>Choose Entry</strong></span></div></header><div class="port input entity-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span class="port-name">Key</span><span class="port-value">todo.groceries</span></div><div class="port output record-wire" tabindex="0" aria-label="Choose Entry, Result output, record, pinned, Items: 7 items, Milk, Eggs, Bread, plus 4 more" aria-describedby="port-tooltip"><span class="port-name">Result</span><span class="port-value">Items: 7 items</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div></article>
+          <article class="block"><header class="block-head no-peek"><div class="block-title"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span><strong>Choose Entry</strong></span></div></header><div class="port input entity-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span class="port-name">Key</span><span class="port-value">todo.demo_groceries</span></div><div class="port output record-wire" tabindex="0" aria-label="Choose Entry, Result output, record, pinned, Items: 7 items, Milk, Eggs, Bread, plus 4 more" aria-describedby="port-tooltip"><span class="port-name">Result</span><span class="port-value">Items: 7 items</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div></article>
           <div class="tooltip" role="tooltip" id="port-tooltip"><div class="row between"><strong>Choose Entry / Result</strong><span class="badge">Record</span></div><p><strong>Items:</strong> 7 items</p><p class="muted">Milk, Eggs, Bread<br>+4 more items</p><div class="source-line"><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div></div>
         </div>
         <div class="m4-aside">
@@ -631,20 +631,20 @@
       const use = document.createElementNS(svg.namespaceURI, "use");
       use.setAttribute("href", `#i-${id}`); svg.append(use); return svg;
     };
-    document.querySelectorAll("[data-close-peek]").forEach(button => button.addEventListener("click", () => {
-      const id = button.dataset.closePeek;
+    document.querySelectorAll("[data-close-peek]").forEach(btn => btn.addEventListener("click", () => {
+      const id = btn.dataset.closePeek;
       document.getElementById(id).hidden = true;
       const trigger = document.querySelector(`[aria-controls="${id}"]`);
       trigger.setAttribute("aria-expanded", "false"); trigger.focus();
     }));
-    document.querySelectorAll("[data-open-peek]").forEach(button => button.addEventListener("click", () => {
-      const id = button.dataset.openPeek;
+    document.querySelectorAll("[data-open-peek]").forEach(btn => btn.addEventListener("click", () => {
+      const id = btn.dataset.openPeek;
       const peek = document.getElementById(id); peek.hidden = false;
       document.querySelector(`[aria-controls="${id}"]`).setAttribute("aria-expanded", "true");
       peek.querySelector("[data-close-peek]").focus();
     }));
-    document.querySelectorAll(".peek").forEach(peek => peek.addEventListener("keydown", event => {
-      if (event.key === "Escape") { event.preventDefault(); peek.querySelector("[data-close-peek]").click(); }
+    document.querySelectorAll(".peek").forEach(peek => peek.addEventListener("keydown", ev => {
+      if (ev.key === "Escape") { ev.preventDefault(); peek.querySelector("[data-close-peek]").click(); }
     }));
     const search = document.getElementById("row-search"), filter = document.getElementById("row-filter");
     const rows = [...document.querySelectorAll("#result-rows tr")];
@@ -669,9 +669,9 @@
       return element;
     }
     const nodes = [
-      { id: "target", title: "Text", icon: "type", ports: [["Result", "output", "entity", "todo.groceries"]] },
+      { id: "target", title: "Text", icon: "type", ports: [["Result", "output", "entity", "todo.demo_groceries"]] },
       { id: "service", title: "Service Response", icon: "download", ports: [["Target Entity_id", "input", "entity"], ["Result", "output", "record"]] },
-      { id: "key", title: "Text", icon: "type", ports: [["Result", "output", "entity", "todo.groceries"]] },
+      { id: "key", title: "Text", icon: "type", ports: [["Result", "output", "entity", "todo.demo_groceries"]] },
       { id: "choose", title: "Choose Entry", icon: "tag", ports: [["Key", "input", "entity"], ["Result", "output", "record"]] },
       { id: "into", title: "Go Into", icon: "into", ports: [["Result", "output", "record"]] },
       { id: "id", title: "This Item", icon: "blocks", detail: "Row Id / uid", ports: [["Result", "output", "text"]] },

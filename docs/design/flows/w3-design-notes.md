@@ -23,7 +23,7 @@ paths over it. No third-party artwork or new dependency is bundled.
 
 All grocery values are **illustrative host-observation fixtures**, not recovered
 household data or evidence of a service call. The recognizable graph vocabulary
-is `todo.groceries`, Text, Service Response, Choose Entry, Go Into, This Item,
+is `todo.demo_groceries`, Text, Service Response, Choose Entry, Go Into, This Item,
 Rows, and Flow. The seven illustrative rows are Milk, Eggs, Bread, Apples, Rice,
 Coffee, and Dish soap. Their subtitle and identifier fields stay consistent
 between the peek, full comparison, and Raw disclosure. Office PC is the
