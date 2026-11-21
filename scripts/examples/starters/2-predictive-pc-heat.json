@@ -1,0 +1,52 @@
+{
+  "id": "predictive-pc-heat",
+  "title": "PC heat in Predictive Comfort",
+  "purpose": "Explains when the predictive comfort model is including heat from the Office PC.",
+  "where": "Climate page, Predictive Comfort details, PC heat explanation visibility",
+  "construct": "operand",
+  "entities": [
+    { "id": "sensor.demo_living_room_contact_1", "provenance": "synthetic-demo", "replaceWith": "The predictive comfort sensor exposing active_activity_entities, regardless of its entity name" },
+    { "id": "binary_sensor.demo_office_pc_power", "provenance": "synthetic-demo", "replaceWith": "The PC activity entity actually named in that predictive sensor's active_activity_entities attribute, not an assumed alias of the PC tile power helper" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.assets.publisher@1", "sh.backdrop@1", "sh.bindings@1",
+    "sh.chrome@1", "sh.composition@1", "sh.conditions@1", "sh.grid@1", "sh.list-read@1",
+    "sh.operands@1", "sh.page@1", "sh.power-toggle@1", "sh.sheet@1", "sh.shell@1",
+    "sh.symbols@1", "sh.text@1", "sh.tile-ink-default@1", "sh.tiles@1", "sh.visible-when@1"
+  ],
+  "changes": [
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "predictive", "kind": "ha-entity", "entityId": { "type": "literal", "value": "sensor.demo_living_room_contact_1" } } },
+    {
+      "op": "add", "pointer": "/pages/2/components/-",
+      "value": {
+        "id": "pc-heat-explanation", "title": "PC heat contribution", "type": "text", "layout": {},
+        "visibleWhen": {
+          "type": "compare", "op": "eq",
+          "left": {
+            "type": "list-includes", "from": { "type": "source", "sourceId": "predictive", "path": ["attributes", "active_activity_entities"] },
+            "value": { "type": "literal", "value": "binary_sensor.demo_office_pc_power" }
+          },
+          "right": { "type": "literal", "value": true }
+        },
+        "whenUnknown": "hide",
+        "props": {
+          "value": { "type": "literal", "value": "The predictive model includes Office PC heat." },
+          "style": "body", "unavailableText": "Predictive activity unavailable"
+        }
+      }
+    }
+  ],
+  "simulation": [
+    { "name": "Model includes PC heat", "inputs": { "entities": { "sensor.demo_living_room_contact_1": { "state": "ready", "attributes": { "active_activity_entities": ["binary_sensor.demo_office_pc_power"] } } } }, "expect": { "answer": "yes", "visible": true } },
+    { "name": "Empty activity list", "inputs": { "entities": { "sensor.demo_living_room_contact_1": { "state": "ready", "attributes": { "active_activity_entities": [] } } } }, "expect": { "answer": "no", "visible": false } },
+    { "name": "PC is not in the model list", "inputs": { "entities": { "sensor.demo_living_room_contact_1": { "state": "ready", "attributes": { "active_activity_entities": ["light.demo_office_light_item_1"] } } } }, "expect": { "answer": "no", "visible": false } },
+    { "name": "Missing attribute is Can't Tell", "inputs": { "entities": { "sensor.demo_living_room_contact_1": { "state": "ready" } } }, "expect": { "answer": "unknown", "visible": false } },
+    { "name": "Unavailable model without activity data", "inputs": { "entities": { "sensor.demo_living_room_contact_1": { "state": "unavailable" } } }, "expect": { "answer": "unknown", "visible": false } },
+    { "name": "Missing model is Can't Tell", "inputs": { "entities": {} }, "expect": { "answer": "unknown", "visible": false } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/composition-first-slice.json; the existing detail page is labelled Predictive Comfort in the test copy.",
+    "No grammar correction. Visibility describes the model's declared activity list, not an inference from power and not a measurement of PC heat.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest."
+  ]
+}

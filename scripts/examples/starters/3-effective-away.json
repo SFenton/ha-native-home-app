@@ -1,0 +1,73 @@
+{
+  "id": "effective-away",
+  "title": "Effective Away notice",
+  "purpose": "Shows a climate notice when the household is effectively Away or its mode cannot yet be determined.",
+  "where": "Climate page, Whole Home details, Home/Away notice visibility; reusable by the Office Windows caption",
+  "construct": "template",
+  "entities": [
+    { "id": "sensor.demo_away_1", "provenance": "synthetic-demo", "replaceWith": "The effective Home/Away sensor reporting Home, Away, unknown or unavailable" },
+    { "id": "binary_sensor.demo_contact_1", "provenance": "synthetic-demo", "replaceWith": "The fallback Away flag, whose on state means Away" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.assets.publisher@1", "sh.backdrop@1", "sh.bindings@1",
+    "sh.chrome@1", "sh.composition@1", "sh.conditions@1", "sh.grid@1", "sh.operands@1",
+    "sh.page@1", "sh.power-toggle@1", "sh.raw-state@1", "sh.sheet@1", "sh.shell@1",
+    "sh.symbols@1", "sh.text@1", "sh.tile-ink-default@1", "sh.tiles@1", "sh.visible-when@1"
+  ],
+  "changes": [
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "home-mode", "kind": "ha-entity", "entityId": { "type": "literal", "value": "sensor.demo_away_1" } } },
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "away-fallback", "kind": "ha-entity", "entityId": { "type": "literal", "value": "binary_sensor.demo_contact_1" } } },
+    {
+      "op": "add", "pointer": "/logicLibrary",
+      "value": [{
+        "id": "effective-away", "name": "Effective Away", "kind": "condition",
+        "params": [
+          { "name": "mode", "kind": "source-id", "label": "Effective mode", "sample": "home-mode" },
+          { "name": "fallback", "kind": "source-id", "label": "Away fallback", "sample": "away-fallback" }
+        ],
+        "body": {
+          "type": "any", "of": [
+            { "type": "compare", "op": "eq", "left": { "type": "raw-state", "sourceId": { "type": "hole", "name": "mode" } }, "right": { "type": "literal", "value": "Away" } },
+            {
+              "type": "all", "of": [
+                { "type": "in", "value": { "type": "raw-state", "sourceId": { "type": "hole", "name": "mode" } }, "in": [{ "type": "literal", "value": "unknown" }, { "type": "literal", "value": "unavailable" }] },
+                { "type": "state", "sourceId": { "type": "hole", "name": "fallback" }, "path": ["state"], "in": ["on"] }
+              ]
+            }
+          ]
+        }
+      }]
+    },
+    {
+      "op": "add", "pointer": "/pages/2/components/-",
+      "value": {
+        "id": "effective-away-notice", "title": "Home/Away notice", "type": "text", "layout": {},
+        "visibleWhen": { "type": "logic-ref", "logicId": "effective-away", "args": { "mode": "home-mode", "fallback": "away-fallback" } },
+        "whenUnknown": "show",
+        "props": {
+          "value": { "type": "literal", "value": "Check the effective Home/Away mode before changing targets." },
+          "style": "body", "unavailableText": "Home/Away status unavailable"
+        }
+      }
+    }
+  ],
+  "simulation": [
+    { "name": "Home overrides fallback On", "inputs": { "entities": { "sensor.demo_away_1": { "state": "Home" }, "binary_sensor.demo_contact_1": { "state": "on" } } }, "expect": { "answer": "no", "visible": false } },
+    { "name": "Away overrides fallback Off", "inputs": { "entities": { "sensor.demo_away_1": { "state": "Away" }, "binary_sensor.demo_contact_1": { "state": "off" } } }, "expect": { "answer": "yes", "visible": true } },
+    { "name": "Unknown uses fallback On", "inputs": { "entities": { "sensor.demo_away_1": { "state": "unknown" }, "binary_sensor.demo_contact_1": { "state": "on" } } }, "expect": { "answer": "yes", "visible": true } },
+    { "name": "Unknown uses fallback Off", "inputs": { "entities": { "sensor.demo_away_1": { "state": "unknown" }, "binary_sensor.demo_contact_1": { "state": "off" } } }, "expect": { "answer": "no", "visible": false } },
+    { "name": "Unavailable uses fallback On", "inputs": { "entities": { "sensor.demo_away_1": { "state": "unavailable" }, "binary_sensor.demo_contact_1": { "state": "on" } } }, "expect": { "answer": "yes", "visible": true } },
+    { "name": "Unavailable uses fallback Off", "inputs": { "entities": { "sensor.demo_away_1": { "state": "unavailable" }, "binary_sensor.demo_contact_1": { "state": "off" } } }, "expect": { "answer": "no", "visible": false } },
+    { "name": "Missing mode does not imply Home", "inputs": { "entities": { "binary_sensor.demo_contact_1": { "state": "on" } } }, "expect": { "answer": "unknown", "visible": true } },
+    { "name": "Both reads missing", "inputs": { "entities": {} }, "expect": { "answer": "unknown", "visible": true } },
+    { "name": "Unavailable mode and missing fallback", "inputs": { "entities": { "sensor.demo_away_1": { "state": "unavailable" } } }, "expect": { "answer": "unknown", "visible": true } },
+    { "name": "Home needs no fallback answer", "inputs": { "entities": { "sensor.demo_away_1": { "state": "Home" } } }, "expect": { "answer": "no", "visible": false } },
+    { "name": "Away needs no fallback answer", "inputs": { "entities": { "sensor.demo_away_1": { "state": "Away" } } }, "expect": { "answer": "yes", "visible": true } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/composition-first-slice.json; the detail page is labelled Whole Home in the test copy.",
+    "No grammar correction. Missing mode is Can't Tell, distinct from the explicit unknown/unavailable strings that select the fallback.",
+    "The standalone fixture has no logicLibrary. On a real draft append or reuse this entry, never replace an existing library. Starter 4 carries the identical entry so it can also compile independently.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest; template expansion adds no native template capability."
+  ]
+}
