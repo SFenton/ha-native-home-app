@@ -55,6 +55,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const [entered, setEntered] = useState<string>(), [connection, setConnection] = useState<ConnectionRequest>();
   const [deleting, setDeleting] = useState<GraphNode>(), [leaving, setLeaving] = useState(false);
   const [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [peek, setPeek] = useState<{ nodeId: string; keyboard: boolean }>();
   const [draft, setDraft] = useState<AnnotationDraft>(), draftRef = useRef(draft);
   draftRef.current = draft;
@@ -137,23 +138,25 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     if (command.type === 'add' || command.type === 'combine') setPanel(null);
   }, []);
   const cancelDraft = (restoreFocus = true) => {
-    const location = draftRef.current?.location;
+    const held = draftRef.current, origin = annotationOrigin.current;
     setDraft(undefined); draftRef.current = undefined;
     if (restoreFocus) requestAnimationFrame(() => {
-      if (location === 'inspector') document.querySelector<HTMLInputElement>('.w2-canvas-inspector .w2-canvas-annotation input')?.focus();
-      else annotationOrigin.current?.focus();
+      if (draftRef.current || held && lastSelection.current !== held.nodeId) return;
+      if (held?.location === 'inspector') document.querySelector<HTMLInputElement>('.w2-canvas-inspector .w2-canvas-annotation input')?.focus();
+      else if (origin?.isConnected) origin.focus();
     });
   };
   const applyDraft = (restoreFocus = true) => {
     const held = draftRef.current;
-    if (!held) { setMessage('Block details updated.'); return true; }
+    if (!held) { cancelDraft(restoreFocus); setMessage('No unsubmitted block details.'); return true; }
+    if (!index.nodes.has(held.nodeId)) { cancelDraft(restoreFocus); setMessage('The block no longer exists. Block details were not applied.'); return false; }
     const error = held.error ?? annotationError(held.label, held.note);
     if (error) { setDraft({ ...held, error }); return false; }
     send({ type: 'annotate', nodeId: held.nodeId, label: held.label, note: held.note });
     cancelDraft(restoreFocus);
     return true;
   };
-  const annotationEditor = (node: GraphNode, location: AnnotationDraft['location']) => <AnnotationEditor node={node} draft={draft?.nodeId === node.id ? draft : undefined}
+  const annotationEditor = (node: GraphNode, location: AnnotationDraft['location']) => <AnnotationEditor key={`${node.id}:${location}`} node={node} draft={draft?.nodeId === node.id ? draft : undefined}
     change={(label, note) => {
       const current = { nodeId: node.id, label, note, location, error: annotationError(label, note), dirty: label !== (node.annotation?.label ?? '') || note !== (node.annotation?.note ?? '') };
       setDraft(current); draftRef.current = current;
@@ -305,9 +308,15 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     measure();
   }, [wireGeometry, windowed, canvasWindow, visibleKey]);
   const close = () => { onClose(); returnFocus?.focus(); };
+  const applyProblem = detached.length
+    ? `Apply refused: ${detached.map(node => `${nameOf(node)} (block ${index.ordinals.get(node.id)})`).join(', ')} ${detached.length === 1 ? 'is' : 'are'} not connected to an output. Connect or delete these blocks.`
+    : !result.ok ? `Apply refused: ${result.errors.length ? result.errors.map(issue => `${issue.nodeId ? `${names.get(issue.nodeId) ?? 'Block'}: ` : ''}${issue.message} ${issue.pointer || 'Output'}`).join('; ') : 'The canvas has no output. Choose a block to use as its output.'}` : '';
   const apply = async () => {
-    if (!result.ok || detached.length || busy) return;
+    if (busyRef.current) { setMessage('An Apply or Save is already in progress. Wait for it to finish before applying again.'); return; }
+    if (!result.ok || detached.length) { setMessage(applyProblem); setProblemsOpen(true); return; }
     if (draftRef.current?.dirty) { setMessage('Apply or cancel the block details before applying the canvas to the draft.'); return; }
+    if (moving) { setMessage('Finish or cancel the block move before applying the canvas to the draft.'); return; }
+    busyRef.current = true;
     setBusy(true);
     try {
       const transaction = { revision: snapshot.current.revision, label: `Edit ${title}`, replacements: result.replacements, generatedSources: result.generatedSources, generatedLibrary: result.generatedLibrary };
@@ -320,9 +329,11 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       } else if (written.status === 'invalid') setMessage(`Apply refused: ${written.diagnostics.map(issue => `${issue.message} ${issue.pointer}`).join('; ')}`);
       else { snapshot.current = written.snapshot; baseline.current = graph; setMessage('Edits applied to the draft. Not published.'); setLeaving(false); }
     } catch (reason) { setMessage(`Apply failed. Canvas edits are preserved: ${reason instanceof Error ? reason.message : String(reason)}`); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   };
   const save = async () => {
+    if (busyRef.current) { setMessage('An Apply or Save is already in progress. Wait for it to finish before saving again.'); return; }
+    busyRef.current = true;
     setBusy(true);
     try {
       const written = await host.save(snapshot.current.revision);
@@ -330,7 +341,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       else if (written.status === 'invalid') setMessage(`Save refused: ${written.diagnostics.map(issue => issue.message).join('; ')}`);
       else { snapshot.current = written.snapshot; setMessage('Draft saved. Not published.'); }
     } catch (reason) { setMessage(`Save failed: ${reason instanceof Error ? reason.message : String(reason)}`); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   };
   const beginMove = useCallback((node: GraphNode) => {
     setMoving({ nodeId: node.id, x: node.position?.x ?? 0, y: node.position?.y ?? 0 });
@@ -385,16 +396,22 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       setPeek({ nodeId: node.id, keyboard });
     },
     annotate: node => {
+      if (!focus({ nodeId: node.id })) return;
+      setEntered(node.id);
       setPeek(undefined); setPanel(null);
       // Re-activating Rename keeps an unsubmitted draft for the same block instead of discarding it.
       if (draftRef.current?.nodeId === node.id && draftRef.current.location === 'inline') {
-        requestAnimationFrame(() => elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
+        requestAnimationFrame(() => {
+          if (draftRef.current?.nodeId === node.id) elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus();
+        });
         return;
       }
       annotationOrigin.current = document.activeElement as HTMLElement;
       const current: AnnotationDraft = { nodeId: node.id, label: node.annotation?.label ?? '', note: node.annotation?.note ?? '', location: 'inline' };
       setDraft(current); draftRef.current = current;
-      requestAnimationFrame(() => elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
+      requestAnimationFrame(() => {
+        if (draftRef.current === current) elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus();
+      });
     },
     headerKeys, nodeKeys, move: beginMove,
     connect: request => { connectionReturn.current = { ...request.socket, direction: request.direction }; setConnection(request); },
@@ -414,7 +431,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     if (selection && selected) { setZoom(1); requestAnimationFrame(() => elementFor({ nodeId: selected.id })?.scrollIntoView({ block: 'center', inline: 'center' })); }
     else { setZoom(Math.min(1, (viewport.current?.clientWidth || width) / width, (viewport.current?.clientHeight || height) / height)); viewport.current?.scrollTo(0, 0); }
   };
-  const problemCount = (result.ok ? 0 : result.errors.length) + detached.length;
+  const problemCount = (result.ok ? 0 : Math.max(1, result.errors.length)) + detached.length;
   const closePanel = () => { setPanel(null); if (panel === 'palette') addButton.current?.focus(); else if (selected) focus({ nodeId: selected.id }); };
   const palette = <Palette graph={graph} index={index} locate={locate} scope={graph.scopes.find(scope => scope.id === selected?.scopeId)?.kind ?? graph.scopes[0].kind} capabilities={host.targetCapabilities} sourceId={host.data.sources[0]?.id} onAdd={add} close={closePanel}/>;
   const inspector = selected && <Inspector key={`${selected.id}:${state.past.length}`} graph={graph} index={index} node={selected} host={host} send={send} locate={locate} close={closePanel} move={() => beginMove(selected)} remove={() => { setPanel(null); setDeleting(selected); }} budgets={result.budgets} onLocate={locatePointer} outputNames={outputNames} annotationEditor={annotationEditor(selected, 'inspector')}/>;
@@ -491,14 +508,15 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       </main>
       {!phone && panel === 'inspector' && inspector}
     </div>
-    <footer className="w2-canvas-footer" data-message={Boolean(message || state.message) || undefined}><div role="status" aria-live="polite" aria-atomic="true">{message || state.message || (result.ok && !detached.length ? <><Check size={14} aria-hidden/> Compiler accepted</> : 'Complete the required connections before Apply.')}</div>
-      <button type="button" disabled={busy || dirty} onClick={save}>Save draft</button><button type="button" className="w2-canvas-primary" disabled={busy || !result.ok || !!detached.length} onClick={apply}>Apply to draft</button></footer>
+    <footer className="w2-canvas-footer" data-message={Boolean(message || state.message || applyProblem) || undefined}><div role="status" aria-live="polite" aria-atomic="true">{message || state.message || applyProblem || <><Check size={14} aria-hidden/> Compiler accepted</>}</div>
+      <button type="button" disabled={busy || dirty} onClick={save}>Save draft</button><button type="button" className="w2-canvas-primary" aria-disabled={busy || !result.ok || !!detached.length} onClick={apply}>Apply to draft</button></footer>
     {phone && panel && <Modal title={panel === 'palette' ? 'Blocks' : 'Block inspector'} sheet theme={theme} close={closePanel}>{panel === 'palette' ? palette : inspector}</Modal>}
     {help && <Modal title="Keyboard help" theme={theme} close={() => { setHelp(false); moreButton.current?.focus(); }}><p>Arrows select blocks or traverse their controls. Enter enters ports and actions. Escape returns to the header. Tab leaves the graph.</p><p>Move: arrows 8 pixels, Shift and arrows 32. Enter commits. Escape cancels. Position also accepts numeric coordinates in the inspector.</p><p>Delete removes a block after confirmation. Control or Command Z undoes; add Shift to redo. All editing is available in Outline.</p></Modal>}
     {problemsOpen && <Modal title="Canvas problems" theme={theme} close={() => { setProblemsOpen(false); problemsButton.current?.focus(); }}>
       {!problemCount && <p>No Problems. Compiler accepted the current connections.</p>}
       {!result.ok && <ul>{result.errors.map((error, i) => <li key={i}><button type="button" onClick={() => { setProblemsOpen(false); if (error.nodeId) locate(error.nodeId); else locatePointer(error.pointer); }}>{error.nodeId && names.get(error.nodeId)} {error.message} {error.pointer || 'Output'}</button></li>)}</ul>}
-      {!!detached.length && <p>{detached.length} blocks are not connected to an output. Connect or delete them before Apply; nothing is silently dropped.</p>}
+      {!result.ok && !result.errors.length && <p>{applyProblem}</p>}
+      {!!detached.length && <p>{applyProblem}</p>}
       {result.ok && result.diagnostics.filter(issue => issue.hint).map((issue, i) => <p key={i}>Wiring hint: {issue.message}</p>)}
     </Modal>}
     {connection && <Modal title={`Connect ${nameOf(index.nodes.get(connection.socket.nodeId)!)}.${portLabel(connection.socket.portId)}`} theme={theme} close={restoreConnection}>
@@ -507,7 +525,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
     {deleting && <Modal title="Delete block" theme={theme} close={() => { setDeleting(undefined); locate(deleting.id); }}><p>Delete {nameOf(deleting)} and {(index.incoming.get(deleting.id)?.length ?? 0) + (index.outgoing.get(deleting.id)?.length ?? 0)} connected wires? Required inputs will need reconnecting. Undo restores this edit.</p>
       <button type="button" onClick={() => { send({ type: 'delete', nodeId: deleting.id }); setDeleting(undefined); }}>Confirm delete</button></Modal>}
     {leaving && <Modal title="Unsaved canvas edits" theme={theme} close={() => { setLeaving(false); if (selected) locate(selected.id); }}><p>Keep this canvas open, apply valid edits to the draft, or discard canvas edits. Apply is not Publish.</p>
-      <button type="button" onClick={() => { setLeaving(false); if (selected) locate(selected.id); }}>Stay</button><button type="button" disabled={!result.ok || !!detached.length || busy} onClick={apply}>Apply valid edits</button><button type="button" onClick={close}>Discard canvas edits</button>
+      <button type="button" onClick={() => { setLeaving(false); if (selected) locate(selected.id); }}>Stay</button><button type="button" aria-disabled={!result.ok || !!detached.length || busy} onClick={apply}>Apply valid edits</button><button type="button" onClick={close}>Discard canvas edits</button>
       {message && <p role="status">{message}</p>}</Modal>}
     {(pendingSelection || pendingClose) && <Modal title="Unsubmitted block details" theme={theme} close={() => {
       setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
