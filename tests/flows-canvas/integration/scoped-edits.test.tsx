@@ -2,18 +2,22 @@
 /**
  * Scoped edits (`editWithin`, docs/flows-canvas.md "Declared operations"): an operation's declarations speak for its own
  * scope only, its scope must still name the same owners, and an operation made together with an outside edit is exactly
- * the outside edit followed by the operation, or refused. The first describe is the independent review of ffcabcbe, kept.
+ * the outside edit followed by the operation, or refused. The describes named for ffcabcbe and a8d4c83d are the independent
+ * reviews' probes, kept as they were written (their logging removed, their types made explicit).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fieldVariants, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
+import { compositionEditorSchema, fieldVariants, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath, type SchemaField } from '../../../src/composition-editor';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
 import type { Operand } from '../../../src/shared/composition/expression';
 import { encodeStudioCanvas, readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
 import { operandSlot } from '../../../src/workspace2/expr/tokens';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
-import { editWithin, fieldTypeEdit } from '../../../src/workspace2/editors/provenance';
-import { fieldPointer, liftField } from '../../../src/workspace2/logic-fields/registry';
+import { editWithin, fieldTypeEdit, retargetLogicLayout } from '../../../src/workspace2/editors/provenance';
+import { fieldAnchor, fieldPointer, liftField } from '../../../src/workspace2/logic-fields/registry';
+import { canonicalOfBounded } from '../../../src/shared/composition/json';
+import { deleteSurface } from '../../../src/workspace2/navigation/edit';
+import { flowStepMoveEdit, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import { bodyFromSlotView, canonicalBody, combinedSourceMap, slotApplyEdit, slotBodyView } from '../../../src/workspace2/logic-fields/LogicFields';
 import { projectGraph } from '../../../src/shared/composition/graph';
 import { removeSettingPlan, settingRemovalEdit } from '../../../src/workspace2/data/logic/logicModel';
@@ -43,6 +47,19 @@ function addCanvas(document: CompositionDocument, path: EditorPath, id: string):
     nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 80, y: 200 })) }] }]);
   const stored = studioCanvasMetadataSchema.safeParse(document.studioCanvas);
   return { ...document, studioCanvas: { version: 2, canvases: [...(stored.success ? stored.data.canvases : []), ...extra.canvases] } };
+}
+/** The schema of a literal text operand, for a field type change to it. */
+function literalSchema(): SchemaField {
+  const schemas: SchemaField[] = [];
+  const collect = (value: unknown) => {
+    if (!value || typeof value !== 'object') return;
+    const properties = (value as { properties?: Record<string, { const?: unknown; type?: unknown }> }).properties;
+    if (properties?.type?.const === 'literal' && properties.value?.type === 'string') schemas.push(value as SchemaField);
+    Object.values(value).forEach(collect);
+  };
+  collect(compositionEditorSchema);
+  expect(schemas[0]).toBeDefined();
+  return schemas[0];
 }
 const ids = (document: CompositionDocument) => studioCanvasMetadataSchema.parse(document.studioCanvas).canvases.map(canvas => canvas.id);
 
@@ -350,5 +367,357 @@ describe('Scoped edits: combined equals sequential, or both are refused', () => 
     expect(old.nodes.length - next.nodes.length).toBe(1);
     expect(readStudioCanvas(after).warnings).toEqual([]);
     valid(after);
+  });
+});
+
+describe('Scoped edits: review of a8d4c83d', () => {
+  const slot: EditorPath = ['pages', 0, 'components', 0, 'props', 'subtitle', 'value'];
+  it('Remove Setting handles two uses in the same id-less case array', () => {
+    const base = meaningFixture('page tile').document;
+    const use = (value: string) => ({ type: 'logic-ref', logicId: 'remove-me', args: { value: text(value) } });
+    const before = replaceAt({
+      ...base,
+      logicUseBindings: base.logicUseBindings!.slice(1),
+      logicLibrary: [...base.logicLibrary!, { id: 'remove-me', name: 'Remove Me', kind: 'operand', params: [
+        { name: 'value', kind: 'operand', sample: text('Sample') },
+      ], body: { type: 'hole', name: 'value' } }],
+    } as CompositionDocument, slot, { type: 'choose', cases: [{ when: check, then: use('First') }, { when: check, then: use('Second') }], otherwise: text('Fallback') });
+    valid(before);
+    const edit = settingRemovalEdit(before, 'remove-me', 'value')!;
+    const after = editWithin(before, edit);
+    expect(after).not.toBe(before);
+    expect(after).toEqual(removeSettingPlan(before, 'remove-me', 'value').document);
+    expect(after.logicLibrary!.find(entry => entry.id === 'remove-me')!.params).toEqual([]);
+    expect(valueAt(after, [...slot, 'cases', 0, 'then', 'args'])).toEqual({});
+    expect(valueAt(after, [...slot, 'cases', 1, 'then', 'args'])).toEqual({});
+    expect(valueAt(after, [...slot, 'cases', 0, 'then', 'logicId'])).toBe('remove-me');
+    expect(valueAt(after, [...slot, 'cases', 1, 'then', 'logicId'])).toBe('remove-me');
+    expect(after.logicUseBindings).toEqual(before.logicUseBindings);
+    valid(after);
+  });
+
+  it('relocations may not move an inside binding to an outside use', () => {
+    const base = meaningFixture('page tile').document;
+    const before = { ...base, logicUseBindings: [base.logicUseBindings![0]] };
+    const a = '/pages/0/components/0/props/subtitle/value';
+    const b = '/pages/0/components/1/props/subtitle/value';
+    valid(before);
+    const after = editWithin(before, { candidate: replaceAt(before, slot, text('Replaced')), scope: [slot], retained: true,
+      references: { relocated: new Map([[a, [b]]]) } });
+    valid(after);
+    expect(after === before || JSON.stringify(after.logicUseBindings) === JSON.stringify(before.logicUseBindings)).toBe(true);
+  });
+
+  it.each(['root', 'canvas'])('the full boundary rejects a retargeted %s collision with an unmoved canvas', collision => {
+    const body: EditorPath = ['logicLibrary', 1, 'body'];
+    const base = replaceAt(meaningFixture('page tile').document, body, text('Body'));
+    const moving = fieldAnchor(base, [...body, 'value']);
+    const destination = fieldAnchor(base, body);
+    const stationary = collision === 'root' ? destination : fieldAnchor(base, ['logicLibrary', 0, 'body']);
+    const before = { ...base, studioCanvas: encodeStudioCanvas(base, [
+      { id: canonicalOfBounded([moving]), roots: [{ anchor: moving, nodes: [] }] },
+      { id: collision === 'root' ? 'stationary' : canonicalOfBounded([destination]), roots: [{ anchor: stationary, nodes: [] }] },
+    ], [{ id: 'bundle', name: 'Bundle', outputs: [{ name: 'value', logicId: 'other-label' }] }]) };
+    expect(readStudioCanvas(before).warnings).toEqual([]);
+    const next = retargetLogicLayout(before, 'other-label', '/body/value', '/body');
+    expect(readStudioCanvas(next).warnings).toHaveLength(1);
+    expect(documentEdit(before, next, { layout: [body] })).toBe(before);
+  });
+
+  it('a new leaf key uses the ordinary fallback, while a missing middle is refused', () => {
+    const before = meaningFixture('page tile').document;
+    const parent: EditorPath = ['pages', 0, 'components', 0];
+    const leaf = [...parent, 'visibleWhen'];
+    const candidate = replaceAt(before, leaf, check);
+    valid(candidate);
+    const ordinary = documentEdit(before, candidate);
+    expect(ordinary).not.toBe(before);
+    const next = editWithin(before, { candidate, scope: [leaf], references: {}, retained: true });
+    expect(next).toEqual(ordinary);
+    expect(editWithin(before, { candidate, scope: [[...leaf, 'isAdmin']], references: {}, retained: true })).toBe(before);
+  });
+
+  it('Done plus a bound-tile move keeps the rebased canvas and binding', () => {
+    const made = meaningFixture('page tile');
+    const before = withMeaningCanvas(made.document, made.slot);
+    const body: EditorPath = ['logicLibrary', 1, 'body'];
+    const move = (document: CompositionDocument): CompositionDocument => {
+      const [first, second] = document.pages, moved = first.components[1];
+      return { ...document, pages: [{ ...first, components: first.components.filter(node => node !== moved) },
+        { ...second, components: [...second.components, moved] }, ...document.pages.slice(2)] };
+    };
+    const done = (document: CompositionDocument, outside = (view: CompositionDocument) => view) =>
+      bodyFromSlotView(document, outside(replaceAt(slotBodyView(document, body, valueAt(document, body) as Operand), body, operandSlot(text('Changed')))), body);
+    const first = documentEdit(before, move(before));
+    const sequential = done(first), combined = done(before, move);
+    expect(first).not.toBe(before);
+    expect(sequential).not.toBe(first);
+    expect(combined).not.toBe(before);
+    expect(combined).toEqual(sequential);
+    valid(combined);
+  });
+
+  it('a field type change with saved layouts accepts and discards only its own root', () => {
+    const made = meaningFixture('page tile');
+    const before = withMeaningCanvas(made.document, made.slot);
+    const schema = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
+    const after = editWithin(before, fieldTypeEdit(before, ['pages', 0, 'components', 0], schema, 'tile'));
+    expect(after).not.toBe(before);
+    expect(studioCanvasMetadataSchema.parse(after.studioCanvas).canvases.map(canvas => canvas.id)).toEqual(['meaning-1']);
+    expect(readStudioCanvas(after).warnings).toEqual([]);
+    valid(after);
+  });
+
+  it('Apply can introduce the new value wrapper key in a literal template body', () => {
+    const body: EditorPath = ['logicLibrary', 1, 'body'];
+    const real = replaceAt(meaningFixture('page tile').document, body, text('Before'));
+    const view = slotBodyView(real, body, valueAt(real, body) as Operand);
+    const working = replaceAt(real, body, { type: 'choose', cases: [{ when: check, then: text('Owner') }], otherwise: text('Guest') });
+    const previous = liftField(real, body, 'operand'), next = liftField(working, body, 'operand'), projected = projectGraph(next.graph);
+    const edit = slotApplyEdit(view, body, 'operand', [{ path: body, ast: projected.ast }],
+      { generatedSources: [], generatedLibrary: [] }, previous, { graph: next.graph, sourceMap: projected.sourceMap });
+    expect(edit.scope).toEqual([body]);
+    const after = editWithin(view, edit);
+    expect(after).not.toBe(view);
+    expect(valueAt(after, [...body, 'type'])).toBe('expr');
+    expect(valueAt(canonicalBody(after, body), body)).toEqual(valueAt(working, body));
+    valid(canonicalBody(after, body));
+  });
+
+  it('a page deletion with a saved canvas is refused by the ordinary outside boundary, not the merge', () => {
+    const body: EditorPath = ['logicLibrary', 1, 'body'];
+    const base = meaningFixture('page tile').document, anchor = fieldAnchor(base, ['pages', 1, 'components', 0]);
+    const before: CompositionDocument = { ...base, studioCanvas: encodeStudioCanvas(base, [{ id: 'deleted-page', roots: [{ anchor, nodes: [] }] }]) };
+    const outside = deleteSurface(before, { kind: 'page', id: before.pages[1].id }).document;
+    expect(documentEdit(before, outside)).toBe(before);
+    const view = replaceAt(slotBodyView(before, body, valueAt(before, body) as Operand), body, operandSlot(text('Changed')));
+    const changed = deleteSurface(view, { kind: 'page', id: before.pages[1].id }).document;
+    expect(bodyFromSlotView(before, changed, body)).toBe(before);
+  });
+
+  it.each(['components', 'children', 'tabs', 'blocks', 'componentLibrary'])('a shifted %s owner is refused', branch => {
+    let before = meaningFixture(branch === 'componentLibrary' ? 'component tile' : 'page tile').document;
+    let list: EditorPath = ['pages', 0, 'components'], path: EditorPath = [...list, 0];
+    if (branch === 'componentLibrary') {
+      list = ['componentLibrary'];
+      path = ['componentLibrary', 0, 'node'];
+    } else if (branch !== 'components') {
+      const children = before.pages[0].components;
+      const container = branch === 'children'
+        ? { id: 'container', title: 'Container', type: 'stack', layout: { span: 1 }, props: { axis: 'vertical', spacing: { type: 'token', name: 'm' } }, children }
+        : { id: 'container', title: 'Container', type: 'local-tabs', layout: { span: 1 }, props: { stateId: 'selected-tab', transition: 'canonical-swap@1' },
+          tabs: [{ id: 'first', label: 'First', children: branch === 'tabs' ? children : [] }, { id: 'second', label: 'Second', children: [] }],
+          ...(branch === 'blocks' ? { blocks: [{ id: 'common', tabs: 'all', children }] } : {}) };
+      before = replaceAt(before, list, [container]);
+      if (branch !== 'children') before = { ...before, localState: [...before.localState ?? [], { id: 'selected-tab', type: 'choice', initial: 'first',
+        options: [{ id: 'first', label: 'First' }, { id: 'second', label: 'Second' }] }] };
+      list = [...list, 0, ...(branch === 'children' ? ['children'] : [branch, 0, 'children'])];
+      path = [...list, 0];
+    }
+    valid(before);
+    const schema = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!, edit = fieldTypeEdit(before, path, schema, 'tile');
+    const items = valueAt(edit.candidate, list) as readonly Record<string, unknown>[];
+    const candidate = replaceAt(edit.candidate, list, [{ ...structuredClone(items[0]), id: 'inserted-owner' }, ...items]);
+    expect(editWithin(before, { ...edit, candidate })).toBe(before);
+  });
+
+  it('a duplicate ID cannot fool the boundary after passing the owner check', () => {
+    const before = meaningFixture('page tile').document;
+    const list: EditorPath = ['pages', 0, 'components'];
+    const schema = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!, edit = fieldTypeEdit(before, [...list, 0], schema, 'tile');
+    const items = valueAt(edit.candidate, list) as readonly unknown[];
+    const candidate = replaceAt(edit.candidate, list, [structuredClone(before.pages[0].components[0]), ...items]);
+    expect(editWithin(before, { ...edit, candidate })).toBe(before);
+  });
+
+  it('a shifted flow owner is refused while an unshifted step move accepts', () => {
+    const made = newFlow(meaningFixture('page tile').document, 'group');
+    const before = updateFlow(made.document, made.id, inputs => ({ ...inputs, steps: [
+      { id: 'one', op: 'limit', count: 10 }, { id: 'two', op: 'limit', count: 20 },
+    ] }));
+    valid(before);
+    const edit = flowStepMoveEdit(before, made.id, 0, 1)!;
+    expect(editWithin(before, edit)).not.toBe(before);
+    const candidate = { ...edit.candidate, dataSources: [
+      { ...before.dataSources[0], id: 'inserted-source' }, ...edit.candidate.dataSources,
+    ] };
+    expect(editWithin(before, { ...edit, candidate })).toBe(before);
+  });
+
+  it('recreating the page with identical JSON under its old ID preserves the intended result', () => {
+    const before = meaningFixture('page tile').document;
+    const schema = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
+    const edit = fieldTypeEdit(before, ['pages', 0, 'components', 0], schema, 'tile');
+    const candidate = replaceAt(edit.candidate, ['pages', 0], structuredClone(edit.candidate.pages[0]));
+    const after = editWithin(before, { ...edit, candidate });
+    expect(after).not.toBe(before);
+    expect(after).toEqual(editWithin(before, edit));
+    const shallow = replaceAt(edit.candidate, ['pages', 0], { ...edit.candidate.pages[0] });
+    expect(editWithin(before, { ...edit, candidate: shallow })).not.toBe(before);
+  });
+
+  it('an equal-JSON outside swap has the same result combined and sequential', () => {
+    const base = meaningFixture('page tile').document, use = valueAt(base, slot);
+    const before = replaceAt({ ...base, logicUseBindings: base.logicUseBindings!.map((binding, at) => at ? binding : {
+      ...binding, use: { ...binding.use, field: `${binding.use.field}/cases/1/then` },
+    }) }, slot, { type: 'choose', cases: [{ when: check, then: text('Target') },
+      { when: check, then: structuredClone(use) }, { when: check, then: structuredClone(use) }], otherwise: text('Fallback') });
+    valid(before);
+    const scope = [...slot, 'cases', 0, 'then'];
+    const swap = (document: CompositionDocument) => {
+      const cases = valueAt(document, [...slot, 'cases']) as readonly unknown[];
+      return replaceAt(document, [...slot, 'cases'], [cases[0], cases[2], cases[1]]);
+    };
+    const operation = (document: CompositionDocument) => ({
+      candidate: replaceAt(document, scope, text('Changed')), scope: [scope], retained: true,
+      references: { fields: new Map([[fieldPointer(scope), [fieldPointer(scope)]]]) },
+    });
+    const first = documentEdit(before, swap(before)), sequential = editWithin(first, operation(first)), edit = operation(before);
+    const combined = editWithin(before, { ...edit, candidate: swap(edit.candidate) });
+    expect(first).not.toBe(before);
+    expect(first.logicUseBindings![0].use.field).toContain('/cases/1/then');
+    expect(sequential).not.toBe(first);
+    expect(combined).not.toBe(before);
+    expect(combined).toEqual(sequential);
+    valid(combined);
+  });
+
+  it('an id-less swap masked by a field type change must not leave the outside canvas on the wrong case', () => {
+    const base = meaningFixture('page tile').document;
+    const casesPath = [...slot, 'cases'], scope = [...casesPath, 0, 'then'], second = [...casesPath, 1, 'then'];
+    const semantic = replaceAt({ ...base, logicUseBindings: base.logicUseBindings!.slice(1) }, slot, {
+      type: 'choose', cases: [{ when: check, then: { type: 'format', pattern: 'First', args: {} } }, { when: check, then: text('') }], otherwise: text('Fallback'),
+    });
+    const graph = liftField(semantic, second, 'operand').graph;
+    const before: CompositionDocument = { ...semantic, studioCanvas: encodeStudioCanvas(semantic, [{ id: 'case-b', roots: [{ anchor: graph.roots[0].anchor,
+      nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 42, y: 80 })) }] }]) };
+    valid(before);
+    const swap = (document: CompositionDocument) => {
+      const cases = valueAt(document, casesPath) as readonly unknown[];
+      return replaceAt(document, casesPath, [cases[1], cases[0]]);
+    };
+    const literal = literalSchema();
+    const operation = (document: CompositionDocument, path: EditorPath) => fieldTypeEdit(document, path, literal, 'then');
+    const first = documentEdit(before, swap(before)), sequential = editWithin(first, operation(first, second));
+    const edit = operation(before, scope), combined = editWithin(before, { ...edit, candidate: swap(edit.candidate) });
+    const anchor = (document: CompositionDocument) => studioCanvasMetadataSchema.parse(document.studioCanvas).canvases[0].roots[0].anchor;
+    expect(first).not.toBe(before);
+    expect(sequential).not.toBe(first);
+    valid(sequential);
+    valid(combined);
+    expect(combined === before || JSON.stringify(combined) === JSON.stringify(sequential)).toBe(true);
+    // In turn, the outside canvas follows its case to index 0; together, the moved case is no object of before's, so it is refused.
+    expect('field' in anchor(sequential) && anchor(sequential).field).toBe(fieldPointer(scope).replace(/^\/pages\/0\/components\/0/, ''));
+    expect(combined).toBe(before);
+  });
+});
+
+describe('Scoped edits: declarations and id-less owners, fixes for a8d4c83d', () => {
+  const a: EditorPath = ['pages', 0, 'components', 0, 'props', 'subtitle', 'value'], b: EditorPath = ['pages', 0, 'components', 1, 'props', 'subtitle', 'value'];
+  const subtitle = a.slice(0, -1), pa = fieldPointer(a), pb = fieldPointer(b);
+  const tiles = (document: CompositionDocument) => (document.logicUseBindings ?? []).map(binding => 'nodeId' in binding.use ? binding.use.nodeId : binding.use.id);
+  /** Only tile-a's (and the unrelated tile's) bindings, or only tile-b's. */
+  const onlyA = () => { const base = meaningFixture('page tile').document; return { ...base, logicUseBindings: [base.logicUseBindings![0], base.logicUseBindings![2]] }; };
+  const onlyB = () => { const base = meaningFixture('page tile').document; return { ...base, logicUseBindings: base.logicUseBindings!.slice(1) }; };
+  /** A change inside tile-a's subtitle that keeps its use. */
+  const touch = (document: CompositionDocument) => replaceAt(document, [...subtitle, 'fallback'], 'Changed');
+  const scoped = (before: CompositionDocument, candidate: CompositionDocument, references: Parameters<typeof documentEdit>[2] = {}) =>
+    editWithin(before, { candidate, scope: [subtitle], retained: true, references });
+
+  it('a forwarded relocation with any destination outside the scope is ignored, not half-kept', () => {
+    const before = onlyA();
+    valid(before);
+    // Ordinarily these relocations would move tile-a's binding to tile-b, or copy it there.
+    expect(tiles(documentEdit(before, touch(before), { relocated: new Map([[pa, [pb]]]) }))).toEqual(['tile-b', 'unrelated-bound']);
+    expect(tiles(documentEdit(before, touch(before), { relocated: new Map([[pa, [pa, pb]]]) }))).toEqual(['tile-a', 'tile-b', 'unrelated-bound']);
+    for (const to of [[pb], [pa, pb]]) {
+      const after = scoped(before, touch(before), { relocated: new Map([[pa, to]]) });
+      expect(after, to.join()).not.toBe(before);
+      expect(after.logicUseBindings, to.join()).toEqual(before.logicUseBindings);
+      expect(valueAt(after, [...subtitle, 'fallback'])).toBe('Changed');
+      valid(after);
+    }
+  });
+
+  it('a forwarded copy from inside to outside the scope is ignored', () => {
+    const before = onlyA();
+    expect(tiles(documentEdit(before, touch(before), { copied: [{ from: a, to: b }] }))).toEqual(['tile-a', 'tile-b', 'unrelated-bound']);
+    const after = scoped(before, touch(before), { copied: [{ from: a, to: b }] });
+    expect(after).not.toBe(before);
+    expect(after.logicUseBindings).toEqual(before.logicUseBindings);
+    valid(after);
+  });
+
+  it('a forwarded copy from outside into the scope is ignored', () => {
+    const before = onlyB(), candidate = touch(replaceAt(before, a, structuredClone(valueAt(before, b))));
+    expect(tiles(documentEdit(before, candidate, { copied: [{ from: b, to: a }] }))).toEqual(['tile-b', 'tile-a', 'unrelated-bound']);
+    const after = scoped(before, candidate, { copied: [{ from: b, to: a }] });
+    expect(after).not.toBe(before);
+    expect(after.logicUseBindings).toEqual(before.logicUseBindings);
+    valid(after);
+  });
+
+  it('a retained object also placed outside the scope declares nothing there', () => {
+    const before = onlyA(), candidate = touch(replaceAt(before, b, valueAt(before, a)));
+    const after = scoped(before, candidate);
+    expect(after).not.toBe(before);
+    expect(valueAt(after, b)).toEqual(valueAt(before, a));
+    expect(after.logicUseBindings).toEqual(before.logicUseBindings);
+    valid(after);
+  });
+
+  it('an object the operation drops from its scope, placed outside, is followed by the boundary alone, as in turn', () => {
+    // Not the operation's declaration: step 2 declares tile-a's subtitle only; the binding follows its use by the boundary's
+    // own identity rule, exactly as when the outside edit is made first.
+    const before = onlyA(), outside = (document: CompositionDocument) => replaceAt(document, b, valueAt(document, a));
+    const operation = (document: CompositionDocument) => replaceAt(document, a, text('Replaced'));
+    const first = documentEdit(before, outside(before));
+    expect(tiles(first)).toEqual(['tile-a', 'unrelated-bound']);
+    const sequential = scoped(first, operation(first)), combined = scoped(before, operation(outside(before)));
+    expect(sequential).not.toBe(first);
+    expect(tiles(combined)).toEqual(['tile-b', 'unrelated-bound']);
+    expect(combined).toEqual(sequential);
+    valid(combined);
+  });
+
+  describe('an id-less list on the scope path', () => {
+    const cases = [...a, 'cases'], scope = [...cases, 0, 'then'];
+    const choose = (): CompositionDocument => {
+      const base = meaningFixture('page tile').document;
+      return replaceAt({ ...base, logicUseBindings: base.logicUseBindings!.slice(1) }, a, { type: 'choose',
+        cases: [{ when: check, then: text('Target') }, { when: check, then: text('One') }, { when: check, then: text('Two') }], otherwise: text('Fallback') });
+    };
+    const operation = (document: CompositionDocument) => ({ candidate: replaceAt(document, scope, text('Changed')), scope: [scope], retained: true,
+      references: { fields: new Map([[fieldPointer(scope), [fieldPointer(scope)]]]) } });
+    const list = (document: CompositionDocument) => valueAt(document, cases) as readonly unknown[];
+
+    it('two other elements trading places is accepted, and is the trade followed by the operation', () => {
+      const before = choose(), trade = (document: CompositionDocument) => { const [target, one, two] = list(document); return replaceAt(document, cases, [target, two, one]); };
+      valid(before);
+      const first = documentEdit(before, trade(before)), sequential = editWithin(first, operation(first)), edit = operation(before);
+      const combined = editWithin(before, { ...edit, candidate: trade(edit.candidate) });
+      expect(first).not.toBe(before);
+      expect(sequential).not.toBe(first);
+      expect(combined).not.toBe(before);
+      expect(combined).toEqual(sequential);
+      expect(valueAt(combined, [...cases, 1, 'then'])).toEqual(text('Two'));
+      valid(combined);
+    });
+
+    it('a structurally equal clone at another index is refused', () => {
+      const before = choose(), edit = operation(before);
+      const candidate = replaceAt(edit.candidate, [...cases, 1], structuredClone(list(before)[1]));
+      expect(JSON.stringify(list(candidate)[1])).toBe(JSON.stringify(list(before)[1]));
+      expect(editWithin(before, edit)).not.toBe(before);
+      expect(editWithin(before, { ...edit, candidate })).toBe(before);
+    });
+
+    it('a changed length is refused, and so is an element replaced by another of before\'s', () => {
+      const before = choose(), edit = operation(before), [target, one, two] = list(edit.candidate);
+      expect(editWithin(before, { ...edit, candidate: replaceAt(edit.candidate, cases, [target, one, two, one]) })).toBe(before);
+      expect(editWithin(before, { ...edit, candidate: replaceAt(edit.candidate, cases, [target, one]) })).toBe(before);
+      expect(editWithin(before, { ...edit, candidate: replaceAt(edit.candidate, cases, [target, one, one]) })).toBe(before);
+      expect(two).toBe(list(before)[2]);
+    });
   });
 });

@@ -106,7 +106,7 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
   const scoped = scope.map(path => fieldPointer(path));
   const within = (pointer: string) => scoped.some(base => pointer === base || pointer.startsWith(`${base}/`));
   // The operation was made at these paths of `before`; in the candidate they must still name the same owners.
-  if (!scope.every(path => sameOwners(path, before, candidate))) return refused(before);
+  if (!scope.every(path => sameOwners(path, scope, before, candidate))) return refused(before);
   // A scope the candidate or `before` does not hold cannot be put back: the whole candidate is then an ordinary edit.
   if (scope.some(path => valueAt(before, path) === undefined || valueAt(candidate, path) === undefined)) return documentEdit(before, candidate);
   /** The candidate with each scoped subtree put back as `before` holds it; wherever nothing else changed, `before`'s own object. */
@@ -132,7 +132,7 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
     from = documentEdit(before, outside);
     if (from === before) return before;
     // Step 1 keeps every scoped subtree where it was; if one moved, the operation no longer says where it applies.
-    if (scope.some(path => valueAt(from, path) !== valueAt(before, path) || !sameOwners(path, before, from))) return refused(before);
+    if (scope.some(path => valueAt(from, path) !== valueAt(before, path) || !sameOwners(path, scope, before, from))) return refused(before);
   }
   let target = from;
   for (const path of [...scope].sort((left, right) => left.length - right.length)) target = replaceAt(target, path, valueAt(candidate, path));
@@ -168,7 +168,8 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
   }
   // The operation's own fields speak for its scope only: a mapping from, or to, anywhere else is not its to declare.
   for (const [pointer, to] of references.fields ?? []) if (within(pointer) && to.every(within)) fields.set(pointer, to);
-  for (const [pointer, to] of references.relocated ?? []) if (within(pointer)) relocated.set(pointer, to);
+  // Likewise a relocation: from inside the scope to inside it, or it is not the operation's to declare.
+  for (const [pointer, to] of references.relocated ?? []) if (within(pointer) && to.every(within)) relocated.set(pointer, to);
   const inside = (paths: readonly EditorPath[] | undefined) => paths?.filter(path => within(fieldPointer(path)));
   const deleted = inside(references.deleted), discardLayouts = inside(references.discardLayouts), layoutPaths = inside(references.layout);
   const copied = references.copied?.filter(copy => within(fieldPointer(copy.from)) && within(fieldPointer(copy.to)));
@@ -181,21 +182,35 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
 }
 
 /**
- * Whether `path` names the same place in `document` as in `before`: every list it goes through holds, at its position, the
- * same owner. An element with an ID (a template, a saved component, a page, a node, a source, a step) must have the same
- * ID; in a list without IDs, the list must keep its length and every other element as it was, so no position shifted.
- * Keys of an object name themselves. Positions alone are not identity: a template prepended before the scope's own would
- * otherwise make the scope another template's.
+ * Whether `path`, one of an edit's `scope`, names the same place in `document` as in `before`: every list it goes through
+ * holds, at its position, the same owner. An element with an ID (a template, a saved component, a page, a node, a source,
+ * a step) must have the same ID. A list without IDs must keep its length, and every element at another index must be one
+ * of `before`'s own objects from another index, each once (identity: equal JSON is not evidence, two equal cases swap
+ * unseen), or hold another of the edit's scopes, which is checked on its own path. Those elements may trade places with
+ * each other (the boundary follows each by identity), but the scope's own position can then only hold what came from
+ * `before`'s element there. Keys of an object name themselves. Positions alone are not identity: a template
+ * prepended before the scope's own would otherwise make the scope another template's.
  */
-function sameOwners(path: EditorPath, before: CompositionDocument, document: CompositionDocument): boolean {
+function sameOwners(path: EditorPath, scope: readonly EditorPath[], before: CompositionDocument, document: CompositionDocument): boolean {
+  const others = scope.filter(other => other !== path).map(other => fieldPointer(other));
   let was: unknown = before, now: unknown = document;
-  for (const key of path) {
+  for (const [depth, key] of path.entries()) {
     if (Array.isArray(was) !== Array.isArray(now)) return false;
     if (Array.isArray(was) && Array.isArray(now)) {
       const list: readonly unknown[] = now, at = Number(key), id = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? (value as { id?: unknown }).id : undefined;
-      const owner = id(was[at]);
+      const owner = id(was[at]), base = fieldPointer(path.slice(0, depth));
+      const scoped = (index: number) => others.some(other => other === `${base}/${index}` || other.startsWith(`${base}/${index}/`));
       if (typeof owner === 'string' || typeof id(list[at]) === 'string') { if (owner !== id(list[at])) return false; }
-      else if (was.length !== list.length || was.some((item, index) => index !== at && item !== list[index] && !sameJson(item, list[index]))) return false;
+      else {
+        if (was.length !== list.length) return false;
+        // Every element at another index is one of `before`'s own elements from another index (each once, by identity),
+        // unless it holds another scope. So the scope's position can only hold what came from `before`'s element there.
+        const held = new Set(was.filter((_, index) => index !== at && !scoped(index)));
+        for (const [index, item] of list.entries()) {
+          if (index === at || scoped(index)) continue;
+          if (!held.delete(item)) return false;
+        }
+      }
     }
     if (!was || typeof was !== 'object' || !now || typeof now !== 'object') return false;
     was = Reflect.get(was, key); now = Reflect.get(now, key);
