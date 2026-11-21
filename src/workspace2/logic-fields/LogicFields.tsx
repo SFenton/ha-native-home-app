@@ -26,7 +26,7 @@ import { useWorkspaceData } from '../pickers/WorkspaceData';
 import type { Workspace2 } from '../useWorkspace2';
 import type { DerivedTheme } from '../theme';
 import { fieldAdapters, fieldAnchor, fieldPointer, pointerPath, type LogicFieldKind } from './registry';
-import { saveCanvasLayout } from './layout';
+import { rebaseCanvasLayout, saveCanvasLayout } from './layout';
 import { canvasPortObservations } from './observations';
 import { RetireWorkspaceFlows } from './live';
 import { previewGraph, templateUses } from './lenses';
@@ -69,16 +69,38 @@ function moveLayout(document: CompositionDocument, path: EditorPath, from: Edito
   const id = logicIdAt(document, path);
   try { return id === undefined ? document : retargetLogicLayout(document, id, ownerField(from), ownerField(to)); } catch { return document; }
 }
+/**
+ * The saved roots over a value holding the body (a document root at the whole document, or at an ancestor of the body: its
+ * fingerprint reads the body) rebased from `original` to `moved`, as the boundary rebases them for any other edit: each
+ * node stays at its origins, re-anchored. A whole-document lift sees a slot view's wrapper as one value, so the body's
+ * own nodes inside it have no place there and are left out of the view's copy; the template's document keeps them, since
+ * Done is rebased from that document (`editWithin`). Every other root is kept as `moved` holds it. A layout that cannot be
+ * rebased stays as stored; the canvas then reports it can't be used.
+ */
+function rebaseCovering(original: CompositionDocument, moved: CompositionDocument, path: EditorPath): CompositionDocument {
+  const stored = studioCanvasMetadataSchema.safeParse(moved.studioCanvas), body = fieldPointer(path);
+  if (!stored.success) return moved;
+  const affected = new Set(stored.data.canvases.flatMap(canvas => canvas.roots.filter(root => root.anchor.kind === 'document'
+    && (body === root.anchor.field || body.startsWith(`${root.anchor.field}/`))).map(root => root.id)));
+  if (!affected.size) return moved;
+  const locate = (pointer: string): EditorPath[] => { const at = pointerPath(pointer); return valueAt(moved, at) === undefined ? [] : [at]; };
+  const refuse = (): never => { throw new Error('The saved layout does not fit the slot view.'); };
+  try {
+    return rebaseCanvasLayout({ ...original, studioCanvas: moved.studioCanvas }, moved, locate,
+      { affected, stored: stored.data, usable: true, deleted: pointer => pointer.startsWith(`${body}/`), refuse });
+  } catch { return moved; }
+}
 /** The slot view a pushed value editor edits a template body in, with the body's saved canvas layout anchored where the operand now sits. */
 export function slotBodyView(document: CompositionDocument, path: EditorPath, body: Operand): CompositionDocument {
-  const view = replaceAt(document, path, operandSlot(body));
-  return moveLayout(view, path, path, slotBase(view, path));
+  const view = replaceAt(document, path, operandSlot(body)), base = slotBase(view, path);
+  return rebaseCovering(document, moveLayout(view, path, path, base), path);
 }
 /** The canonical document behind a slot view: the template body in its own place, its saved canvas layout anchored there. */
 export function canonicalBody(view: CompositionDocument, path: EditorPath): CompositionDocument {
   const body = slotOperand(valueAt(view, path) as { type: string });
   if (!body) throw new Error('The template body must have a value.');
-  return moveLayout(replaceAt(view, path, body), path, slotBase(view, path), path);
+  const base = slotBase(view, path);
+  return rebaseCovering(view, moveLayout(replaceAt(view, path, body), path, base, path), path);
 }
 
 /**
@@ -98,6 +120,18 @@ export function bodyFromSlotView(document: CompositionDocument, view: Compositio
     if (!saved?.roots.some(next => next.id === root.id)) { deleted.push(pointerPath(target)); continue; }
     for (const node of canvas.nodes) if (node.rootId === root.id && !saved.nodes.some(next => next.id === node.id))
       for (const origin of node.origins) deleted.push([...pointerPath(target), ...pointerPath(origin)]);
+  }
+  // A document root over the body (the whole document, say) is no editor's: the boundary rebases it, following each node by
+  // identity. Its nodes inside the body that the edit no longer holds by identity have nowhere to go, so their places inside
+  // the body are declared gone, as for the body's own canvases; never one that holds or is held by a linked use.
+  const uses = (document.logicUseBindings ?? []).flatMap(binding => resolveLogicAnchor(document, binding.use)?.pointer ?? []);
+  const linked = (pointer: string) => uses.some(use => use === pointer || use.startsWith(`${pointer}/`) || pointer.startsWith(`${use}/`));
+  if (previous.success) for (const canvas of previous.data.canvases) for (const root of canvas.roots) {
+    if (root.anchor.kind !== 'document' || body !== root.anchor.field && !body.startsWith(`${root.anchor.field}/`)) continue;
+    for (const node of canvas.nodes) if (node.rootId === root.id) for (const origin of node.origins) {
+      const pointer = `${root.anchor.field}${origin}`;
+      if (pointer.startsWith(`${body}/`) && !linked(pointer)) deleted.push(pointerPath(pointer));
+    }
   }
   return editWithin(document, { candidate, scope: [path], retained: true, references: { fields: new Map([[body, [body]]]), layout: [path], ...(deleted.length ? { deleted } : {}) } });
 }

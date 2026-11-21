@@ -1,12 +1,14 @@
 import { z } from 'zod/v4';
 import { compositionDocumentSchema, type CompositionDocument, type CompositionNode } from './shared/composition/schema';
 import { compileCompositionDocument } from './shared/composition/compiler';
-import { canonicalCompositionJSON, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON, type CompositionIssue } from './shared/composition/json';
+import { canonicalCompositionJSON, canonicalOfBounded, CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES, parseCompositionJSON, type CompositionIssue } from './shared/composition/json';
 import { omitFoldSide } from './shared/composition/fold-sides';
 import { createId as uid } from './shared/ids';
 import type { Json } from './shared/types';
 import { formatCompositionIssue } from './shared/composition/workspace';
-import { readStudioCanvas } from './shared/composition/studio-logic/layout';
+import { encodeStudioCanvas, readStudioCanvas } from './shared/composition/studio-logic/layout';
+import { studioCanvasMetadataSchema } from './shared/composition/studio-logic/schemas';
+import { atPointer } from './shared/composition/studio-logic/anchors';
 
 export type SchemaField = {
   $ref?: string; type?: string | string[]; const?: Json; enum?: Json[];
@@ -305,17 +307,56 @@ export function moveCompositionNode(document: CompositionDocument, id: string, p
   return next;
 }
 /**
+ * A saved layout whose document roots name `document`'s identity, re-anchored to `id`: each document-kind root of
+ * `document` (by its ID) names `id` instead, with the fingerprint it has under that ID, and its root and node IDs, groups
+ * included, follow. Owner-based roots and portable `document` roots are unchanged. Undefined when the layout has no such
+ * root, or cannot be read (left for the caller's check).
+ */
+function reanchoredLayout(document: CompositionDocument, id: string): unknown {
+  const stored = studioCanvasMetadataSchema.safeParse(document.studioCanvas);
+  if (!stored.success) return undefined;
+  const moved = (anchor: (typeof stored.data.canvases)[number]['roots'][number]['anchor']) => anchor.kind === 'document' && anchor.id === document.id;
+  if (!stored.data.canvases.some(canvas => canvas.roots.some(root => moved(root.anchor)))) return undefined;
+  const { studioCanvas: _layout, ...semantic } = { ...document, id };
+  const anchors = stored.data.canvases.map(canvas => canvas.roots.map(root => {
+    if (!moved(root.anchor)) return root.anchor;
+    const value = root.anchor.field === '' ? semantic : atPointer(semantic, root.anchor.field);
+    return value === undefined ? root.anchor : { ...root.anchor, id, fingerprint: canonicalOfBounded(value) };
+  }));
+  try {
+    // Encoded without groups first: their node IDs are canvas-wide, so they follow each node's re-encoded ID.
+    const encoded = encodeStudioCanvas(semantic, stored.data.canvases.map((canvas, at) => ({ id: canvas.id, ...(canvas.viewport ? { viewport: canvas.viewport } : {}),
+      roots: canvas.roots.map((root, index) => ({ anchor: anchors[at][index], nodes: canvas.nodes.filter(node => node.rootId === root.id)
+        .map(({ id: _id, rootId: _root, nodeId, ...node }) => ({ ...node, id: nodeId })) })) })), stored.data.bundles);
+    return { ...encoded, canvases: encoded.canvases.map((canvas, at) => {
+      const old = stored.data.canvases[at], ids = new Map<string, string>();
+      for (const [index, root] of old.roots.entries()) for (const node of old.nodes.filter(node => node.rootId === root.id))
+        ids.set(node.id, canvas.nodes.find(next => next.rootId === canvas.roots[index].id && next.nodeId === node.nodeId)!.id);
+      return old.groups ? { ...canvas, groups: old.groups.map(group => ({ ...group, nodeIds: group.nodeIds.map(nodeId => ids.get(nodeId) ?? nodeId) })) } : canvas;
+    }) };
+  } catch (error) {
+    if (error instanceof CompositionValidationError) return undefined;
+    throw error;
+  }
+}
+/**
  * Parses and checks a whole document for Import and Edit as JSON. Its links are taken as authored: they must pass the compiler
- * (which resolves every automatic binding and component parameter) and its saved canvas layout must fit its content. A
- * document that does not is rejected with its issues, never repaired. Applying it replaces the current document
+ * (which resolves every automatic binding and component parameter) and its saved canvas layout must fit its content. The
+ * document takes this workspace's identity (`documentId`); a layout root that names the exported document itself is
+ * re-anchored to that identity first, so a valid export from another workspace keeps its layout. A document whose layout
+ * still does not fit is rejected with its issues, never repaired. Applying it replaces the current document
  * (`replaceDocument` in `workspace2/editors/provenance`).
  */
 export function importCompositionText(text: string, documentId: string): CompositionDocument {
   const parsed = parseCompositionJSON(new TextEncoder().encode(text));
   const { document } = compileCompositionDocument(parsed);
-  if (readStudioCanvas(document).warnings.length) throw new CompositionValidationError([{ code: 'invalid_value', pointer: '/document/studioCanvas' }]);
+  const rejected = () => new CompositionValidationError([{ code: 'invalid_value', pointer: '/document/studioCanvas' }]);
+  if (readStudioCanvas(document).warnings.length) throw rejected();
   // Import is explicitly content-only; publisher and document identity belong to this workspace.
-  return { ...document, id: documentId };
+  const layout = document.id === documentId ? undefined : reanchoredLayout(document, documentId);
+  const imported = { ...document, id: documentId, ...(layout === undefined ? {} : { studioCanvas: layout as CompositionDocument['studioCanvas'] }) };
+  if (readStudioCanvas(imported).warnings.length) throw rejected();
+  return imported;
 }
 export function compositionSourceText(document: CompositionDocument, pretty = false): string {
   const formatted = pretty ? JSON.stringify(document, null, 2) : canonicalCompositionJSON(document);

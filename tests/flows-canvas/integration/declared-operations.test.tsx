@@ -6,7 +6,7 @@
  */
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { compositionSourceText, fieldVariants, importCompositionText, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
+import { compilerIssuesOf, compositionEditorSchema, compositionSourceText, fieldVariants, resolveField, importCompositionText, nodeDefinition, replaceAt, valueAt, variantName, type EditorPath } from '../../../src/composition-editor';
 import CompositionFields from '../../../src/CompositionFields';
 import { CompositionValidationError } from '../../../src/shared/composition/json';
 import { encodeStudioCanvas, readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
@@ -14,15 +14,18 @@ import { studioCanvasMetadataSchema } from '../../../src/shared/composition/stud
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
 import type { Operand } from '../../../src/shared/composition/expression';
 import type { Json } from '../../../src/shared/types';
-import { createDraft } from '../../../src/workspace2/editors/draft';
+import { createDraft, useDraftDocument } from '../../../src/workspace2/editors/draft';
+import { DialogBody } from '../../../src/workspace2/projectDialogs';
+import StepList from '../../../src/workspace2/data/StepList';
+import { RowsProvider } from '../../../src/workspace2/rowsContext';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
 import { operandSlot } from '../../../src/workspace2/expr/tokens';
-import { changeFieldType, editWithin, fieldTypeEdit, replaceDocument } from '../../../src/workspace2/editors/provenance';
+import { changeFieldType, compiledBeyond, editWithin, fieldTypeEdit, replaceDocument } from '../../../src/workspace2/editors/provenance';
 import { flowStepMoveEdit, moveFlowStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import LogicSettings from '../../../src/workspace2/data/logic/LogicSettings';
 import { removeSettingPlan } from '../../../src/workspace2/data/logic/logicModel';
 import { LogicFieldsProvider, bodyFromSlotView, canonicalBody, combinedSourceMap, operandBodyDraft, slotApplyEdit, slotBodyView, useLogicFields } from '../../../src/workspace2/logic-fields/LogicFields';
-import { liftField } from '../../../src/workspace2/logic-fields/registry';
+import { fieldAnchor, fieldPointer, liftField } from '../../../src/workspace2/logic-fields/registry';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { toastManager } from '../../../src/workspace2/toasts';
 import { houseFrom } from '../../../src/preview2/projections';
@@ -559,5 +562,369 @@ describe('Remove Setting keeps the template body\'s saved layout', () => {
     expect(now).not.toBe(was);
     expect(now.from.path).toBe(was.from.path);
     expect(after.logicLibrary![1]).toBe(before.logicLibrary![1]);
+  });
+});
+
+/**
+ * The final whole-branch review's probes, kept (their logging removed, their types made explicit), with the cases around
+ * each of its three findings: a field type change that keeps a binding the new type cannot hold, a whole-document layout
+ * that blocked a slot-view Apply, and a document-level layout in an export from another workspace.
+ */
+describe('Final review: real handlers and edge layouts', () => {
+  afterEach(() => { resetLiveRuns(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+  const base = () => meaningFixture('page tile').document;
+  const body: EditorPath = ['logicLibrary', 1, 'body'];
+  const slot: EditorPath = ['pages', 0, 'components', 0, 'props', 'subtitle', 'value'];
+  const withCanvas = (document: CompositionDocument, path: EditorPath, kind: Parameters<typeof liftField>[2] = 'operand', id = 'review-canvas'): CompositionDocument => {
+    const graph = liftField(document, path, kind).graph;
+    const extra = encodeStudioCanvas(document, [{ id, roots: [{ anchor: graph.roots[0].anchor,
+      nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 80 + 20, y: 120 })) }] }]);
+    const old = studioCanvasMetadataSchema.safeParse(document.studioCanvas);
+    return { ...document, studioCanvas: { ...extra, canvases: [...(old.success ? old.data.canvases : []), ...extra.canvases] } };
+  };
+  const history = (draft: ReturnType<typeof createDraft>, before: CompositionDocument, after: CompositionDocument) => {
+    act(() => draft.undo()); expect(draft.get()).toBe(before); expect(draft.canUndo()).toBe(false);
+    act(() => draft.redo()); expect(draft.get()).toBe(after); expect(draft.canRedo()).toBe(false);
+  };
+  const canvases = (document: CompositionDocument) => studioCanvasMetadataSchema.parse(document.studioCanvas).canvases;
+
+  describe('Import', () => {
+    function ImportUI({ before, seen }: { before: CompositionDocument; seen: (document: CompositionDocument) => void }) {
+      return <Project.Live document={before} seen={seen}>{ws => <DialogBody dialog="import" ws={ws} close={() => {}} onError={error => { throw new Error(error); }}/>}</Project.Live>;
+    }
+    async function importThroughUI(before: CompositionDocument, exported: CompositionDocument) {
+      const seen = vi.fn();
+      render(<ImportUI before={before} seen={seen}/>);
+      fireEvent.change(screen.getByLabelText('Paste JSON'), { target: { value: compositionSourceText(exported) } });
+      fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+      const question = await screen.findByRole('dialog', { name: 'Replace the Draft?' });
+      fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+      expect(seen).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Replace the Draft?' })).getByRole('button', { name: 'Replace' }));
+      return seen;
+    }
+    const foreign = () => ({ ...base(), id: 'foreign-project', name: 'Foreign project' });
+
+    it('imports an exported draft with owner-based saved layouts', async () => {
+      const before = base(), source = withCanvas(foreign(), body);
+      valid(source);
+      const seen = await importThroughUI(before, source);
+      expect(seen).toHaveBeenCalledOnce();
+      const after = seen.mock.calls[0][0] as CompositionDocument;
+      expect(after.id).toBe(before.id); expect(after.name).toBe('Foreign project');
+      expect(readStudioCanvas(after).warnings).toEqual([]);
+      expect(after.studioCanvas).toEqual(source.studioCanvas);
+      const draft = createDraft(before); draft.set(after); history(draft, before, after);
+    });
+
+    it.each([{ path: ['name'] }, { path: [] }])('imports a valid exported draft with a document-based layout rooted at $path', async ({ path }) => {
+      const before = base(), source = withCanvas(foreign(), path, path.length ? 'operand' : 'document');
+      valid(source); expect(readStudioCanvas(source).warnings).toEqual([]);
+      const seen = await importThroughUI(before, source);
+      expect(seen, 'a valid export replaces the draft after confirmation').toHaveBeenCalledOnce();
+      const after = seen.mock.calls[0][0] as CompositionDocument;
+      expect(after.id).toBe(before.id);
+      expect(readStudioCanvas(after).warnings).toEqual([]);
+      // Re-anchored to this workspace's identity, each node kept where it was saved.
+      const [canvas] = canvases(after), [old] = canvases(source);
+      expect(canvas.roots.map(root => [root.anchor.kind, root.anchor.id, root.anchor.field, root.ownerId])).toEqual([['document', before.id, fieldPointer(path), before.id]]);
+      expect(canvas.nodes.map(node => [node.nodeId, node.origins, node.x, node.y])).toEqual(old.nodes.map(node => [node.nodeId, node.origins, node.x, node.y]));
+    });
+
+    it('imports a same-workspace exported draft with a whole-document layout unchanged', async () => {
+      const before = base(), source = withCanvas({ ...base(), name: 'Same workspace export' }, [], 'document');
+      valid(source); expect(readStudioCanvas(source).warnings).toEqual([]);
+      const seen = await importThroughUI(before, source);
+      expect(seen).toHaveBeenCalledOnce();
+      expect(readStudioCanvas(seen.mock.calls[0][0]).warnings).toEqual([]);
+      expect((seen.mock.calls[0][0] as CompositionDocument).studioCanvas).toEqual(source.studioCanvas);
+    });
+
+    it('carries each group of a re-anchored canvas to its nodes\' new IDs', () => {
+      const plain = foreign(), graph = liftField(plain, [], 'document').graph;
+      const source = { ...plain, studioCanvas: encodeStudioCanvas(plain, [{ id: 'grouped', roots: [{ anchor: graph.roots[0].anchor,
+        nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at, y: 0 })) }] }]) };
+      const [stored] = canvases(source), grouped = { ...source, studioCanvas: { ...source.studioCanvas, canvases: [{ ...stored,
+        groups: [{ id: 'pair', label: 'Pair', nodeIds: stored.nodes.slice(0, 2).map(node => node.id) }] }] } };
+      expect(readStudioCanvas(grouped).warnings).toEqual([]);
+      const imported = importCompositionText(compositionSourceText(grouped), 'draft-fixture');
+      expect(readStudioCanvas(imported).warnings).toEqual([]);
+      const [canvas] = canvases(imported);
+      expect(canvas.groups![0].nodeIds).toEqual(canvas.nodes.slice(0, 2).map(node => node.id));
+      expect(canvas.groups![0].nodeIds).not.toEqual(stored.groups?.[0]?.nodeIds ?? grouped.studioCanvas.canvases[0].groups[0].nodeIds);
+    });
+
+    it('rejects, before asking, an export whose layout still does not fit once re-anchored', async () => {
+      const plain = foreign(), graph = liftField(plain, ['name'], 'operand').graph;
+      // Saved over the name as it was, then renamed: stale in the export itself, so no identity makes it fit.
+      const source = { ...plain, name: 'Renamed later', studioCanvas: encodeStudioCanvas(plain, [{ id: 'stale', roots: [{ anchor: graph.roots[0].anchor, nodes: [] }] }]) };
+      expect(readStudioCanvas(source).warnings).toHaveLength(1);
+      expect(() => importCompositionText(compositionSourceText(source), 'draft-fixture')).toThrow(CompositionValidationError);
+      const seen = vi.fn();
+      render(<ImportUI before={base()} seen={seen}/>);
+      fireEvent.change(screen.getByLabelText('Paste JSON'), { target: { value: compositionSourceText(source) } });
+      fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+      await act(async () => {});
+      expect(screen.queryByRole('dialog', { name: 'Replace the Draft?' })).toBeNull();
+      expect(seen).not.toHaveBeenCalled();
+    });
+  });
+
+  it('Remove Setting handles multiple nested uses and a saved body layout through LogicSettings', () => {
+    const raw = base(), use = () => ({ type: 'logic-ref', logicId: 'remove-many', args: { source: 'source-a' } });
+    const read = () => ({ type: 'read', from: { type: 'source', sourceId: { type: 'hole', name: 'source' }, path: ['state'] }, as: 'string', missing: 'unavailable' });
+    const fields = ['/cases/0/then', '/cases/1/then', '/otherwise'];
+    let before = replaceAt({ ...raw, logicUseBindings: [...raw.logicUseBindings!.slice(1), ...fields.map(field => ({
+      ...raw.logicUseBindings![0], logicId: 'remove-many', use: { ...raw.logicUseBindings![0].use, field: `/props/subtitle/value${field}` },
+    }))], logicLibrary: [...raw.logicLibrary!, {
+      id: 'remove-many', name: 'Remove many', kind: 'operand', params: [{ name: 'source', kind: 'source-id', sample: 'source-b' }],
+      body: { type: 'choose', cases: [{ when: check, then: read() }], otherwise: read() },
+    }] } as CompositionDocument, slot, { type: 'choose', cases: [{ when: check, then: use() }, { when: check, then: use() }], otherwise: use() });
+    before = withCanvas(before, ['logicLibrary', before.logicLibrary!.length - 1, 'body']);
+    valid(before); const draft = createDraft(before);
+    function Settings() {
+      const document = useDraftDocument(draft);
+      return <WorkspaceDataProvider document={document} house={new LiveHouse().house}>
+        <LogicSettings document={document} draft={draft} id="remove-many" apply={next => draft.set(next)} onError={error => { throw new Error(error); }}/>
+      </WorkspaceDataProvider>;
+    }
+    render(<Settings/>);
+    fireEvent.click(screen.getByRole('button', { name: /^source, Entity/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Setting' }));
+    let question = screen.getByTestId('link-loss-question');
+    expect(question.textContent).toContain('1 tile that fills it in will lose that value.');
+    fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    expect(draft.get()).toBe(before); expect(draft.canUndo()).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: /^source, Entity/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Setting' }));
+    question = screen.getByTestId('link-loss-question');
+    fireEvent.click(within(question).getByRole('button', { name: 'Remove Setting' }));
+    const after = draft.get();
+    expect(after).not.toBe(before); valid(after);
+    for (const path of [[...slot, 'cases', 0, 'then'], [...slot, 'cases', 1, 'then'], [...slot, 'otherwise']])
+      expect(valueAt(after, [...path, 'args'])).toEqual({});
+    expect(before.logicUseBindings!.length - after.logicUseBindings!.length).toBe(3);
+    expect(readStudioCanvas(after).warnings).toEqual([]);
+    history(draft, before, after);
+  });
+
+  it('StepList Move Down applies with a saved canvas, as a single undo step', async () => {
+    vi.useFakeTimers(); resetLiveRuns();
+    const made = newFlow(base(), 'group');
+    let before = updateFlow(made.document, made.id, inputs => ({ ...inputs, steps: [
+      { id: 'one', op: 'limit', count: 10 }, { id: 'two', op: 'limit', count: 20 },
+    ] }));
+    const at = before.dataSources.findIndex(source => source.id === made.id);
+    before = withCanvas(before, ['dataSources', at], 'flow');
+    const draft = createDraft(before);
+    function Steps() {
+      const document = useDraftDocument(draft), inputs = (document.dataSources[at] as { inputs: Parameters<typeof StepList>[0]['inputs'] }).inputs;
+      return <WorkspaceDataProvider document={document} house={new LiveHouse().house}>
+        <RowsProvider value={{ document, onChange: next => draft.set(next), onError(error) { throw new Error(error); } }}><StepList flowId={made.id} inputs={inputs}/></RowsProvider>
+      </WorkspaceDataProvider>;
+    }
+    render(<Steps/>);
+    fireEvent.click(screen.getByRole('button', { name: 'More for step 1, Limit' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move Down' }));
+    const after = draft.get();
+    expect((valueAt(after, ['dataSources', at, 'inputs', 'steps']) as { id: string }[]).map(step => step.id)).toEqual(['two', 'one']);
+    expect(readStudioCanvas(after).warnings).toEqual([]); valid(after);
+    history(draft, before, after);
+  });
+
+  describe('a field type change keeps only the bindings the new type can hold', () => {
+    const dataSourceItem = () => { const items = resolveField(compositionEditorSchema.properties!.dataSources).items; if (!items || Array.isArray(items)) throw new Error('Expected source items'); return items; };
+    const textChoice = () => fieldVariants(nodeDefinition()).findIndex(type => variantName(type) === 'text');
+
+    it.each([false, true])('drops a value binding to a field the new type does not have, and asks first; saved layout=%s', saved => {
+      const made = meaningFixture('page tile');
+      const path: EditorPath = ['componentLibrary', made.optionalIndex, 'node', 'children', 0];
+      const before = saved ? withCanvas(made.document, path, 'fragment') : made.document, notice = refusals();
+      const variants = fieldVariants(nodeDefinition()), choice = textChoice();
+      const change = changeFieldType(before, path, variants[choice], 'tile');
+      expect(change.bindings).toBe(1); expect(change.layouts).toBe(saved ? 1 : 0);
+      expect(compilerIssuesOf(change.document)).toEqual([]);
+      const draft = createDraft(before);
+      function Fields() {
+        const document = useDraftDocument(draft);
+        return <CompositionFields document={document} value={valueAt(document, path) as Json} path={path} schema={nodeDefinition()} label="Optional tile"
+          onChange={next => draft.set(next)} onError={error => { throw new Error(error); }}/>;
+      }
+      render(<Fields/>);
+      const pick = () => fireEvent.change(screen.getByLabelText('Optional tile type'), { target: { value: String(choice) } });
+      pick();
+      const question = screen.getByTestId('link-loss-question');
+      expect(question.textContent).toContain(saved ? "1 linked value and 1 saved canvas layout can't carry over to text" : "1 linked value can't carry over to text");
+      fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+      expect(draft.get()).toBe(before); expect(draft.canUndo()).toBe(false);
+      pick();
+      fireEvent.click(within(screen.getByTestId('link-loss-question')).getByRole('button', { name: 'Change Type' }));
+      const after = draft.get();
+      expect(refused(notice)).toBe(0);
+      expect(valueAt(after, [...path, 'type'])).toBe('text');
+      expect(after.componentLibrary![made.optionalIndex].bindings).toEqual([]);
+      expect(compilerIssuesOf(after)).toEqual([]);
+      valid(after);
+      history(draft, before, after);
+    });
+
+    it('keeps a binding to a key the new type copies (the title) while dropping the optional one, and counts only the dropped', () => {
+      const made = meaningFixture('page tile'), at = made.optionalIndex, entry = made.document.componentLibrary![at];
+      const path: EditorPath = ['componentLibrary', at, 'node', 'children', 0];
+      let before = replaceAt(made.document, ['componentLibrary', at], { ...entry, params: [...entry.params!, { name: 'heading', kind: 'text' }],
+        bindings: [...entry.bindings!, { param: 'heading', nodeId: 'demo-lamp', field: 'title' }] });
+      for (const [page, index] of [[0, 3], [1, 0]]) before = replaceAt(before, ['pages', page, 'components', index, 'args'], { heading: `Heading ${page}` });
+      valid(before);
+      const change = changeFieldType(before, path, fieldVariants(nodeDefinition())[textChoice()], 'tile');
+      expect(change.document).not.toBe(before);
+      expect(change.bindings).toBe(1);
+      expect(change.document.componentLibrary![at].bindings).toEqual([{ param: 'heading', nodeId: 'demo-lamp', field: 'title' }]);
+      valid(change.document);
+    });
+
+    it('removes the binding in its own edit and declares it deleted; left in place, the boundary would re-place it where nothing compiles', () => {
+      const made = meaningFixture('page tile'), at = made.optionalIndex, path: EditorPath = ['componentLibrary', at, 'node', 'children', 0];
+      const edit = fieldTypeEdit(made.document, path, fieldVariants(nodeDefinition())[textChoice()], 'tile');
+      expect(edit.scope).toEqual([path, ['componentLibrary', at, 'bindings']]);
+      expect(edit.references.deleted).toContainEqual(['componentLibrary', at, 'bindings', 0]);
+      expect(edit.candidate.componentLibrary![at].bindings).toEqual([]);
+      const after = editWithin(made.document, edit);
+      expect(after.componentLibrary![at].bindings).toEqual([]);
+      expect(compilerIssuesOf(after)).toEqual([]);
+      // The edit as it was before this fix: only the field, the binding left for the boundary's optional-field fallback.
+      const kept = editWithin(made.document, { ...edit, scope: [path], candidate: replaceAt(edit.candidate, ['componentLibrary', at, 'bindings'], made.document.componentLibrary![at].bindings) });
+      expect(kept.componentLibrary![at].bindings).toEqual(made.document.componentLibrary![at].bindings);
+      expect(compilerIssuesOf(kept).map(issue => issue.code)).toEqual(['unknown_field', 'unknown_field']);
+    });
+
+    it('still drops an automatic binding whose use the new type does not hold, and counts it', () => {
+      const before = base(), change = changeFieldType(before, ['pages', 0, 'components', 0], fieldVariants(nodeDefinition())[textChoice()], 'tile');
+      expect(change.bindings).toBe(1);
+      expect(change.document.logicUseBindings).toEqual(before.logicUseBindings!.slice(1));
+      valid(change.document);
+    });
+
+    it('refuses, and never applies, a type change whose result breaks what it does not own', () => {
+      const made = meaningFixture('page tile'), at = made.optionalIndex, path: EditorPath = ['componentLibrary', at, 'node', 'children', 0], notice = refusals();
+      const edit = fieldTypeEdit(made.document, path, fieldVariants(nodeDefinition())[textChoice()], 'tile');
+      // The result this change had before the fix: both placements fail at `values/tint`, outside the changed field.
+      const kept = editWithin(made.document, { ...edit, scope: [path], candidate: replaceAt(edit.candidate, ['componentLibrary', at, 'bindings'], made.document.componentLibrary![at].bindings) });
+      expect(compilerIssuesOf(kept).map(issue => issue.pointer)).toEqual(['/document/pages/0/components/3/values/tint', '/document/pages/1/components/0/values/tint']);
+      const before = refused(notice);
+      expect(compiledBeyond(made.document, kept, path)).toBe(made.document);
+      expect(refused(notice)).toBe(before + 1);
+      expect(compiledBeyond(made.document, editWithin(made.document, edit), path)).not.toBe(made.document);
+    });
+
+    it('lets a type change leave its own new value for the author to fill in, and a draft unfinished elsewhere still change', () => {
+      const made = meaningFixture('page tile'), notice = refusals();
+      const source = { id: 'demo-source', kind: 'model', model: 'alarm-mode@1', inputs: { entityId: { type: 'literal', value: 'alarm_control_panel.demo_unit' } } };
+      const document = { ...made.document, dataSources: [...made.document.dataSources, source] } as CompositionDocument, at = document.dataSources.length - 1;
+      valid(document);
+      const variants = fieldVariants(nodeDefinition()), sources = fieldVariants(dataSourceItem()), summary = sources.find(type => JSON.stringify(type).includes('inventory-summary@1'))!;
+      const unfinished = changeFieldType(document, ['dataSources', at], summary, 'dataSources').document;
+      expect(unfinished).not.toBe(document);
+      expect(compilerIssuesOf(unfinished).every(issue => issue.pointer.startsWith(`/document/dataSources/${at}/`))).toBe(true);
+      expect(compilerIssuesOf(unfinished).length).toBeGreaterThan(0);
+      // Its issues were there before: a tile's type change elsewhere still applies.
+      const tile = changeFieldType(unfinished, ['pages', 0, 'components', 1], variants[textChoice()], 'tile').document;
+      expect(tile).not.toBe(unfinished);
+      expect(refused(notice)).toBe(0);
+    });
+  });
+
+  describe('a slot-view Apply and Done keep a whole-document layout as the boundary rebases it', () => {
+    beforeEach(() => {
+      vi.useFakeTimers(); resetLiveRuns();
+      vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+      HTMLElement.prototype.scrollIntoView = vi.fn();
+    });
+    const rule = () => replaceAt(base(), body, { type: 'choose', cases: [{ when: check, then: text('Owner') }], otherwise: text('Guest') });
+    /** A whole-document canvas saved over `document` with its layout set aside (the root's fingerprint never reads it), beside that layout. */
+    const withWhole = (document: CompositionDocument) => {
+      const { studioCanvas: kept, ...semantic } = document, whole = withCanvas(semantic as CompositionDocument, [], 'document', 'whole');
+      const old = studioCanvasMetadataSchema.safeParse(kept);
+      return { ...document, studioCanvas: { ...studioCanvasMetadataSchema.parse(whole.studioCanvas), canvases: [...(old.success ? old.data.canvases : []), ...canvases(whole)] } } as CompositionDocument;
+    };
+    const outsideBody = (document: CompositionDocument, id: string) => canvases(document).find(canvas => canvas.id === id)!.nodes
+      .filter(node => !node.origins.some(origin => origin.startsWith(fieldPointer(body))))
+      .map(node => [node.origins, node.x, node.y]);
+
+    async function applyAnd(real: CompositionDocument) {
+      const view = slotBodyView(real, body, valueAt(real, body) as Operand), pushed = createDraft(view);
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => Response.json(prepareDraft(JSON.parse(String(init?.body)).document)));
+      function Controls() {
+        const canvas = useLogicFields()!;
+        return <button type="button" onClick={() => canvas.open({ draft: operandBodyDraft(pushed, body), path: [...body, 'cases', 0, 'when'], kind: 'condition', label: 'Review', combine: 'all' })}>Open review</button>;
+      }
+      render(<WorkspaceDataProvider document={real} house={new LiveHouse().house}>
+        <LogicFieldsProvider ws={Project.workspace(real)} theme={deriveTheme({}, false)}><Controls/></LogicFieldsProvider>
+      </WorkspaceDataProvider>);
+      fireEvent.click(screen.getByRole('button', { name: 'Open review' }));
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' })));
+      return { view, pushed };
+    }
+
+    it.each([false, true, 'whole-document'] as const)('slot Apply and Done, layout=%s', async saved => {
+      let real = rule();
+      if (saved) real = withCanvas(real, saved === 'whole-document' ? [] : body, saved === 'whole-document' ? 'document' : 'operand');
+      valid(real); expect(readStudioCanvas(real).warnings).toEqual([]);
+      const { pushed } = await applyAnd(real);
+      expect(screen.queryAllByText('Edits applied to the draft. Not published.').length).toBeGreaterThan(0);
+      expect(valueAt(operandBodyDraft(pushed, body).get(), [...body, 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
+      const applied = pushed.get();
+      expect(readStudioCanvas(applied).warnings).toEqual([]);
+      const target = createDraft(real);
+      target.set(bodyFromSlotView(real, applied, body));
+      expect(target.get()).not.toBe(real);
+      valid(target.get()); expect(readStudioCanvas(target.get()).warnings).toEqual([]);
+      history(target, real, target.get());
+    });
+
+    it('the slot view rebases the whole-document root, and Done keeps every node outside the body where it was saved', async () => {
+      const real = withCanvas(rule(), [], 'document', 'whole');
+      const view = slotBodyView(real, body, valueAt(real, body) as Operand);
+      expect(readStudioCanvas(view).warnings).toEqual([]);
+      expect(outsideBody(view, 'whole')).toEqual(outsideBody(real, 'whole'));
+      expect(canonicalBody(view, body)).not.toBe(view);
+      const { pushed } = await applyAnd(real);
+      const after = bodyFromSlotView(real, pushed.get(), body);
+      expect(after).not.toBe(real);
+      expect(readStudioCanvas(after).warnings).toEqual([]);
+      const [root] = canvases(after).find(canvas => canvas.id === 'whole')!.roots;
+      const { studioCanvas: _layout, ...semantic } = after;
+      expect(root.anchor).toEqual(fieldAnchor(semantic as CompositionDocument, []));
+      expect(outsideBody(after, 'whole')).toEqual(outsideBody(real, 'whole'));
+      valid(after);
+    });
+
+    it('Done with both a body canvas and a whole-document canvas writes the body\'s and rebases the other', async () => {
+      const real = withWhole(withCanvas(rule(), body, 'operand', 'body-canvas'));
+      valid(real); expect(readStudioCanvas(real).warnings).toEqual([]);
+      const { pushed } = await applyAnd(real);
+      expect(screen.queryAllByText('Edits applied to the draft. Not published.').length).toBeGreaterThan(0);
+      const after = bodyFromSlotView(real, pushed.get(), body);
+      expect(after).not.toBe(real);
+      expect(readStudioCanvas(after).warnings).toEqual([]);
+      // The body's canvases are the editor's (its own, and the one Apply saved); the whole-document one is rebased.
+      const ids = canvases(after).map(canvas => canvas.id), written = canvases(canonicalBody(pushed.get(), body));
+      expect(ids.slice(0, 2)).toEqual(['body-canvas', 'whole']);
+      for (const id of ids.filter(id => id !== 'whole')) expect(canvases(after).find(canvas => canvas.id === id)).toEqual(written.find(canvas => canvas.id === id));
+      expect(outsideBody(after, 'whole')).toEqual(outsideBody(real, 'whole'));
+      valid(after);
+    });
+
+    it('Done of a body replaced outright drops only the whole-document nodes inside it', () => {
+      const real = withCanvas(rule(), [], 'document', 'whole');
+      const view = slotBodyView(real, body, valueAt(real, body) as Operand);
+      const after = bodyFromSlotView(real, replaceAt(view, body, operandSlot(text('Changed'))), body);
+      expect(after).not.toBe(real);
+      expect(readStudioCanvas(after).warnings).toEqual([]);
+      expect(outsideBody(after, 'whole')).toEqual(outsideBody(real, 'whole'));
+      expect(canvases(after)[0].nodes.length).toBeLessThan(canvases(real)[0].nodes.length);
+      valid(after);
+    });
   });
 });

@@ -615,10 +615,16 @@ cleanly.
 - **Import and Edit as JSON** replace the whole draft as one undo step
   (`replaceDocument`). The current document's links are declared deleted
   (`deleted: [[]]`), and the imported links are then checked exactly as
-  authored. Nothing from the old draft is carried over. An import that fails to
-  resolve or compile, or whose saved canvas layout has warnings, is rejected
-  with its issues and never repaired. The dialog says: "Importing replaces this
-  whole draft, including its linked values and saved canvas layouts."
+  authored. Nothing from the old draft is carried over. The imported document
+  takes this draft's ID. A layout root anchored to the exported document itself
+  (a document root at the whole document or at a field such as `/name`) is
+  re-anchored to that ID first, with its fingerprint, root and node IDs and
+  groups, so a valid export from another workspace keeps its layout. Owner-based
+  roots need no change. An import that fails to resolve or compile, or whose
+  saved canvas layout still has warnings after that, is rejected with its issues
+  before the question is asked, and never repaired. The dialog says: "Importing
+  replaces this whole draft, including its linked values and saved canvas
+  layouts."
 - **Remove Setting** asks first when tiles fill the setting in: "Remove
   “Source”? 3 tiles that fill it in will lose that value." Tiles are counted per
   placement, including templates nested in other templates. Confirming fills
@@ -632,7 +638,15 @@ cleanly.
   be removed."). It declares the field deleted and its layouts discarded. A
   binding is kept only when it targets a key the new type copies unchanged
   (`id`, `title`, `label`, `icon`, `layout`), because only then does the same
-  value stay in the same place.
+  value stay in the same place. That holds for automatic bindings and component
+  parameter bindings alike. A component parameter binding into the field is
+  removed by the operation itself and declared deleted, including a value
+  parameter's binding to an optional field the new type doesn't have, which the
+  boundary would otherwise keep for the absent field. The question counts every
+  binding removed. A result with a compile issue outside the changed field,
+  which the draft didn't already have, is refused and never applied: the change
+  broke something it doesn't own. Issues inside the field, such as a new source
+  type's empty inputs, are the author's to fill in.
 - **Reordering flow steps** rebuilds the flow in place and declares the moved
   steps relocated, so saved canvas positions follow their steps. It asks no
   question.
@@ -642,7 +656,16 @@ cleanly.
   under an `expr` wrapper), with provenance and the saved layout for that place,
   and reports applied only when the draft took the edit. The saved layout is
   re-anchored between `/body` and `/body/value` when the editor opens and again
-  at Done. Done is a declared edit of the body.
+  at Done. A document root over the body (at the whole document, or at an
+  ancestor of the body) is rebased into the view and back, as the boundary
+  rebases it for any other edit: each node keeps its origins and position.
+  A whole-document lift sees the view's wrapper as one value, so the root's
+  nodes inside the body are left out of the view's copy only. Done is a
+  declared edit of the body. It never writes such a root itself; the boundary
+  rebases it from the template's document. Nodes it can still follow by
+  identity keep their positions. The places inside the body of those it can't
+  follow are declared gone, as for the body's own canvases, unless they hold
+  or sit inside a linked use.
 
 A declaration speaks only for its operation's scope (`editWithin` in
 `provenance.ts`). A candidate that also changes something else is applied in
@@ -679,7 +702,11 @@ else is ignored, never half applied.
 A saved layout the operation changes is merged canvas by canvas, in the
 operation's canvas order. If the outside edit and the operation both change the
 same canvas, the bundles or the canvas order, the edit is refused rather than
-one side being kept.
+one side being kept. A document root over the scope is never the operation's:
+its fingerprint reads the scope. When the operation writes a layout beside such
+a root, the change is made in two steps. First the change goes through with the
+earlier layout, so the boundary rebases that root as for any other edit. Then
+only the operation's own canvases are written.
 
 The binding resolver is authoritative, not the cached authored argument.
 Save as Logic Template, duplication, Unlink and Delete Template read its resolved
