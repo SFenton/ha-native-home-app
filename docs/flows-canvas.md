@@ -503,14 +503,28 @@ ever passed the boundary: reload compiles the stored authored draft and
 installs it as is, and expansion can hide a broken component binding from the
 compiler (one that fills an argument the logic never reads). A `before` the
 compiler rejects that the boundary never accepted (a repeated component ID,
-say) is outside the contract. The one deliberate exception: where the oracle
-throws a raw error (a field without an unambiguous owner, an owner it cannot
-walk, a component library or bindings value that is not a list), the scoped
-boundary refuses and keeps `before`; it never throws one itself. It checks
-those shapes before anything reads them, refusing only where the oracle's own
-read would throw; other errors still propagate. Both pass an edit that
-descends from `before` through accepted edits (a redo) without reconciling
-it.
+say) is outside the contract. Two deviations are allowed, both refusals that
+keep `before`, never an acceptance with a different result:
+
+- where the oracle throws a raw error (a field without an unambiguous owner,
+  an owner it cannot walk, a component library or bindings value it cannot
+  read), the scoped boundary refuses;
+- the scoped boundary may also refuse a candidate, or an installed `before`,
+  that holds a value of a type the schema forbids where either boundary reads
+  it, even where the oracle accepts: an `edit` that is not a plain object, or
+  a value other than a list where the schema requires one (an owner list, the
+  bindings list, a surface's components, a component entry's bindings, params,
+  sources or flows, a node's children, a `local-tabs` node's tabs or blocks,
+  or their children). The oracle iterates a string there as an empty list;
+  the scoped boundary does not mirror that.
+
+It refuses those shapes by checking them before it reads them, not by turning
+errors into refusals: an error from anything else still propagates, so a raw
+error on some shape no check covers remains possible and is a bug. An `edit`
+that is not a plain object is refused before anything reads it, the redo walk
+included, and `editSubtrees` hands a document the authored walk cannot take to
+the boundary without walking it. Both boundaries pass an edit that descends
+from `before` through accepted edits (a redo) without reconciling it.
 
 Caches are keyed only by committed revisions: a `before` the caller holds, or a
 result the boundary accepted. **Committed revisions must not be mutated in
@@ -520,7 +534,8 @@ nothing it built is ever remembered beyond the call.
 
 `edit-oracle.test.ts` enforces the contract on seeded random edit sequences
 (alias, rebuild, move/copy provenance, ID and binding edits, canvas edits,
-malformed owners and bindings lists, owner-list reorders and repeated owner or node IDs, refused
+malformed owners, bindings lists and list fields (strings, numbers and objects
+where a list belongs), owner-list reorders and repeated owner or node IDs, refused
 candidates mutated and resubmitted, candidates the compiler accepts installed
 as the next `before` refused or not, accepted content copied into a revision
 that never passed the boundary, and raw drafts with hidden bindings or a
@@ -532,7 +547,9 @@ unused ranges, set `EDIT_ORACLE_FROM`, `EDIT_ORACLE_SEEDS` and
 `EDIT_ORACLE_STEPS`, for example
 `EDIT_ORACLE_FROM=10001 EDIT_ORACLE_SEEDS=10000 npx vitest run tests/flows-canvas/integration/edit-oracle.test.ts`.
 A scoped raw error is a disagreement even where the oracle throws the same
-one. `EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the
+one, and a scoped refusal where the oracle accepts is one unless the candidate
+or `before` fails the harness's schema type check (`schemaInvalid`), which is
+tallied as its own deviation. `EDIT_ORACLE_REPORT=1` lists every disagreeing seed and tallies the
 documented deviation, and `EDIT_ORACLE_DUMP=<dir>` writes each disagreeing step's
 documents (as JSON, which drops the aliasing many disagreements depend on:
 replay the seed to reproduce one). `edit-boundary-cost.test.ts` reports the

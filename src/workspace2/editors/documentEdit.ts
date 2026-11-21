@@ -153,6 +153,18 @@ function listShaped(document: CompositionDocument, list: WalkedOwnerList, checke
   const owners: unknown = Reflect.get(document, list);
   return walkableList(list, owners) && ((owners ?? []) as unknown[]).every(owner => ownerShaped(list, owner, checked));
 }
+/** Whether `value` is a plain object (not an array): the only kind of value a document is. */
+const plainObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+/**
+ * Whether the authored walk (`authoredNodes`) and this boundary's owner reads can take `document`: a plain object whose
+ * owner lists, owners and nodes pass the boundary's own shape check. Nothing is remembered: `document` may be a candidate.
+ */
+export function walkableDocument(document: unknown): boolean {
+  if (!plainObject(document)) return false;
+  const checked = checking();
+  return walkedOwnerLists.every(list => listShaped(document as unknown as CompositionDocument, list, checked));
+}
 function commitShapes(checked: Checked): void {
   for (const node of checked.nodes) shapedNodes.add(node);
   for (const surface of checked.surfaces) shapedSurfaces.add(surface);
@@ -384,6 +396,11 @@ function resolvedUses(document: CompositionDocument, resolver: AnchorResolver): 
  * History records only edits whose linked references survive or have an explicit relocation/deletion.
  */
 export function documentEdit(before: CompositionDocument, edit: CompositionDocument, references: EditReferences = {}): CompositionDocument {
+  // Only a plain object can be a document: anything else is refused before any read of it, the redo walk included.
+  if (!plainObject(edit)) {
+    toastManager.add({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    return before;
+  }
   const visited = new Set<CompositionDocument>();
   for (let parent = edit; validated.has(parent) && !visited.has(parent);) {
     visited.add(parent);

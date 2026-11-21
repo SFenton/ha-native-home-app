@@ -1,6 +1,6 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { authoredNodes, fieldPointer } from '../logic-fields/registry';
-import { documentEdit, type EditReferences } from './documentEdit';
+import { documentEdit, walkableDocument, type EditReferences } from './documentEdit';
 import type { EditorPath } from '../../composition-editor';
 import type { GraphSourceMap, LogicGraph } from '../../shared/composition/graph';
 import { canonicalOfBounded } from '../../shared/composition/json';
@@ -104,6 +104,9 @@ export function canvasReferences(paths: readonly EditorPath[], before: CanvasPro
 /** Structural operations declare their copies/rebuilds; retained composition IDs supply the other relocations. */
 export function editSubtrees(before: CompositionDocument, after: CompositionDocument, references: EditReferences = {}): CompositionDocument {
   if (before === after) return after;
+  // A document the authored walk cannot take is the boundary's to decide (it refuses where its own reads cannot take the
+  // shape), without the references the walk would derive.
+  if (!walkableDocument(before) || !walkableDocument(after)) return documentEdit(before, after, references);
   if (!before.logicUseBindings?.length && !before.componentLibrary?.some(entry => entry.bindings?.length) && !before.studioCanvas) return documentEdit(before, after, references);
   const following = new Map(authoredNodes(after).map(location => [location.identity, location.path]));
   const relocated: Map<string, readonly string[]> = new Map(authoredNodes(before).flatMap(location => {
