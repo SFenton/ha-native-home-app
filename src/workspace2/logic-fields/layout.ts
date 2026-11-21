@@ -150,9 +150,25 @@ function rootKey(root: StoredRoot, own: readonly StoredNode[]): string {
 }
 /**
  * Certification results by the committed object a root's check reads (see `uncertifiedCanvasRoots`), then by the root's
- * own content. Only filled from committed documents, so identity keeps each answer.
+ * own content. Only filled from committed documents, so identity keeps each answer. The content is the root's stored
+ * layout, which every layout edit changes while the object stays, so each object keeps only its most recently used
+ * {@link CERTIFIED_PER_HOLDER} answers (a root moved again and again does not pile up keys while its node lives).
  */
 const certified = new WeakMap<object, Map<string, boolean>>();
+export const CERTIFIED_PER_HOLDER = 4;
+function certifiedAnswer(memo: Map<string, boolean>, key: string): boolean | undefined {
+  const known = memo.get(key);
+  if (known !== undefined) { memo.delete(key); memo.set(key, known); }
+  return known;
+}
+function certify(holder: object, memo: Map<string, boolean>, key: string, ok: boolean): void {
+  memo.delete(key);
+  memo.set(key, ok);
+  for (const oldest of memo.keys()) { if (memo.size <= CERTIFIED_PER_HOLDER) break; memo.delete(oldest); }
+  certified.set(holder, memo);
+}
+/** How many certification answers are kept for `holder` (for tests). */
+export const certifiedAnswers = (holder: object): number => certified.get(holder)?.size ?? 0;
 
 /**
  * Roots that a full rebase of this unedited document would not give back exactly as stored: an association it cannot
@@ -189,7 +205,7 @@ export function uncertifiedCanvasRoots(document: CompositionDocument, stored: St
       if (!whole && !resolved) { failed.add(root.id); continue; }
       const holder = resolved && (root.anchor.kind === 'document' ? resolved.value : (resolved.node ?? resolved.owner).value);
       const memo = holder !== null && typeof holder === 'object' ? certified.get(holder) ?? new Map<string, boolean>() : undefined;
-      const key = memo && rootKey(root, own), known = key === undefined ? undefined : memo!.get(key);
+      const key = memo && rootKey(root, own), known = key === undefined ? undefined : certifiedAnswer(memo!, key);
       if (known !== undefined) { if (!known) failed.add(root.id); continue; }
       let ok = true, pure = true;
       try {
@@ -201,7 +217,7 @@ export function uncertifiedCanvasRoots(document: CompositionDocument, stored: St
         ok = false; pure = error === failed || error instanceof CompositionValidationError;
       }
       if (!ok) failed.add(root.id);
-      if (memo && pure) { memo.set(key!, ok); certified.set(holder as object, memo); }
+      if (memo && pure) certify(holder as object, memo, key!, ok);
     }
   }
   return failed;

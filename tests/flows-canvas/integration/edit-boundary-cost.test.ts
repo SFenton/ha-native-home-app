@@ -16,6 +16,9 @@ import { MAX_LOGIC_USE_BINDINGS, studioCanvasMetadataSchema } from '../../../src
 import { documentEdit } from '../../../src/workspace2/editors/documentEdit';
 import { copySubtree, editSubtrees } from '../../../src/workspace2/editors/provenance';
 import { fieldPointer, liftField } from '../../../src/workspace2/logic-fields/registry';
+import { certifiedAnswers, CERTIFIED_PER_HOLDER } from '../../../src/workspace2/logic-fields/layout';
+import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic/anchors';
+import type { StoredStudioCanvasMetadata } from '../../../src/shared/composition/studio-logic/schemas';
 import { forkPlace } from '../../../src/workspace2/linked';
 import { toastManager } from '../../../src/workspace2/toasts';
 import { sameJson } from '../../../src/sameJson';
@@ -171,6 +174,30 @@ describe('edit boundary cost after structural edits', () => {
     expect(sameJson(result, oracleEdit(before, proposed, { fields: new Map([[pointer, [pointer]]]) }))).toBe(true);
     return calls;
   }
+
+  it('keeps a bounded number of certification answers for a root moved again and again', () => {
+    const fixture = meaningFixture('page tile');
+    let before: Doc = withMeaningCanvas(fixture.document, fixture.slot), oracleBefore = before;
+    const stored = before.studioCanvas as StoredStudioCanvasMetadata, root = stored.canvases[0].roots[0];
+    const holder = resolveLogicAnchor(before, root.anchor)!.node!.value;
+    for (let move = 1; move <= 200; move++) {
+      // Each move drags the root's first node; the next one indexes (and certifies) the revision this one made.
+      const layout = before.studioCanvas as StoredStudioCanvasMetadata;
+      const proposed = { ...before, studioCanvas: { ...layout, canvases: layout.canvases.map((canvas, at) => at ? canvas
+        : { ...canvas, nodes: canvas.nodes.map(node => node.rootId === root.id && node.id === canvas.nodes[0].id ? { ...node, x: node.x + 1 } : node) }) } };
+      const references = { layout: [fixture.slot] };
+      const scoped = documentEdit(before, proposed, references);
+      expect(scoped).toBe(proposed);
+      if (move % 50 === 0) expect(sameJson(scoped, oracleEdit(oracleBefore, proposed, references))).toBe(true);
+      before = scoped; oracleBefore = scoped;
+    }
+    // The tile itself was never rebuilt: every move's certification was memoized against it.
+    expect(resolveLogicAnchor(before, root.anchor)!.node!.value).toBe(holder);
+    const kept = certifiedAnswers(holder);
+    process.stdout.write(`Edit boundary cost: 200 layout moves of one root; ${kept} certification answers kept for its node.\n`);
+    expect(kept).toBeGreaterThan(0);
+    expect(kept).toBeLessThanOrEqual(CERTIFIED_PER_HOLDER);
+  });
 
   it('matches the stored nodes of a large canvas root by origin, linearly in the root\'s own graph', () => {
     const small = rootOriginChecks(10), large = rootOriginChecks(20);
