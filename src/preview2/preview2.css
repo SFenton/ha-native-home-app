@@ -331,12 +331,35 @@
     box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow); backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); transform: translateX(-102%); transition: transform .3s var(--ease-sheet); }
   .sh-flyout-heading { margin: 0; padding: 8px 16px 4px; font: 700 22px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
   .sh-flyout-layer[data-open] .sh-flyout { transform: none; }
-  /* Beside a tab bar (the iPhone) the flyout is mounted only while open, so it slides in by keyframes and out by the transition. */
-  .sh-flyout-layer[data-beside][data-open] .sh-flyout { animation: sh-flyout-in .3s var(--ease-sheet); }
-  .sh-flyout-layer[data-beside][data-open] .sh-flyout-scrim { animation: sh-scrim-in .25s ease-out; }
+  /* The flyout is mounted only while open, so it slides in by keyframes and out by the transition. */
+  .sh-flyout-layer[data-open] .sh-flyout { animation: sh-flyout-in .3s var(--ease-sheet); }
+  .sh-flyout-layer[data-open] .sh-flyout-scrim { animation: sh-scrim-in .25s ease-out; }
   .sh-flyout .sh-tab { flex: none; flex-direction: row; justify-content: flex-start; gap: 12px; height: 48px; padding: 0 16px; font-size: 17px; }
   .sh-screen[data-short-bar] .sh-status { padding: 0 30px 3px; font-size: 13px; align-items: center; }
-  .sh-screen[data-flyout] .sh-page { --bottom-pad: 32px; }
+  .sh-screen[data-tabs-top] .sh-page, .sh-screen[data-tabs-hidden] .sh-page { --bottom-pad: 32px; }
+  /* The tabs at the top (the iPad, `tabsAtTop`): the system draws them in the navigation bar's row, centred, labels only, and the app draws no menu button. The inline title leads, where the tabs hold the centre. */
+  .sh-screen[data-tabs-top] .sh-tabbar { top: calc(var(--sh-safe-top) + 2px); bottom: auto; left: 50%; right: auto; width: auto; height: 44px; transform: translateX(-50%); padding: 3px; border-radius: 22px; z-index: 6; }
+  .sh-screen[data-tabs-top] .sh-tab { flex: none; width: 84px; flex-direction: row; font-size: 15px; font-weight: 500; border-radius: 19px; }
+  .sh-screen[data-tabs-top] .sh-tab-glyph svg { display: none; } .sh-screen[data-tabs-top] .sh-tab-glyph { display: contents; }
+  .sh-screen[data-tabs-top] .sh-tab-glyph .sh-badge { position: absolute; top: 2px; right: 10px; }
+  .sh-screen[data-tabs-top] .sh-inline-title { flex: 0 1 200px; text-align: left; order: 1; margin-left: 8px; }
+  /* The folded Duo's sheet: Back and Close in the rail's column, the title alone in the bar, clear of the camera and the status items. */
+  .sh-sheet-rail { position: absolute; z-index: 2; transform: translateX(-50%); display: flex; flex-direction: column; gap: 12px; }
+  .sh-sheet[data-rail-side=trailing] .sh-sheet-bar { padding-right: 97px; } .sh-sheet[data-rail-side=leading] .sh-sheet-bar { padding-left: 97px; }
+  .sh-sheet[data-rail-side] .sh-scroll { padding-inline-end: 97px; } .sh-sheet[data-rail-side=leading] .sh-scroll { padding-inline-end: 0; padding-inline-start: 97px; }
+  /* The rail's circles are glass over the sheet's own ground: dark ink on a light sheet. */
+  .sh-sheet-rail .sh-circle { color: #000; background: rgba(255, 255, 255, .85); border-color: rgba(0, 0, 0, .12); }
+  .sh-sheet-rail[data-appearance=dark] .sh-circle { color: #fff; background: var(--glass-bg); border-color: var(--glass-border); }
+  @media (prefers-color-scheme: dark) { .sh-sheet-rail:not([data-appearance=light]) .sh-circle { color: #fff; background: var(--glass-bg); border-color: var(--glass-border); } }
+  /* The row that opened the trailing column stays selected in the leading one. */
+  /* A ring on the tile's own edge, drawn above its fill: an inside outline is painted over by the fill and cannot be seen. White hairline outside, accent ring inside, so it reads on the wallpaper and on a lit tile. */
+  [data-opened]:not([data-selected])::after { content: ''; position: absolute; inset: -4px; border: 3px solid var(--action); border-radius: var(--ring-r, 24px); box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .9); pointer-events: none; z-index: 6; }
+  /* A bar the page on top hides leaves with the push or the pop and comes back with it, the system's own move: toward its edge, fading. Reduce Motion never sets the phase, so nothing slides. */
+  .sh-tabbar { --bar-dx: 0px; --bar-dy: 110px; }
+  .sh-screen[data-tabs-top] .sh-tabbar { --bar-dy: -90px; }
+  .sh-screen[data-rail] .sh-tabbar { --bar-dy: 0px; --bar-dx: 90px; } .sh-screen[data-rail][data-rail-side=leading] .sh-tabbar { --bar-dx: -90px; }
+  .sh-tabbar[data-phase=hiding] { animation: sh-bar-out .3s var(--ease-sheet) both; pointer-events: none; }
+  .sh-tabbar[data-phase=showing] { animation: sh-bar-in .3s var(--ease-sheet) both; }
   @media (prefers-reduced-motion: reduce) { .sh-flyout, .sh-flyout-scrim { transition: none; animation: none !important; } }
 
   /* Panels, security, rooms, cameras and records (nodes/panels). Tokens only; sheets re-map --module, --ink and --tile-bg. */
@@ -397,7 +420,7 @@
   .sh-form { display: flex; flex-direction: column; gap: 16px; } .sh-form-row { justify-content: space-between; } .sh-form-row .sh-field-box, .sh-form-row .sh-segments { flex: 1; max-width: 55%; }
   /* The pinned action bar: over the page's bottom edge, above the floating tab bar (22 + 62 + 6 = 90 pt up), else on the bottom safe area. */
   .sh-screen { --sh-dock-bottom: max(12px, calc(var(--sh-safe-bottom) - 8px)); }
-  .sh-screen:not([data-rail]):not([data-flyout]) { --sh-dock-bottom: 90px; }
+  .sh-screen:not([data-rail]):not([data-tabs-top]):not([data-tabs-hidden]) { --sh-dock-bottom: 90px; }
   .sh-sheet { --sh-dock-bottom: 12px; }
   /* The bottom tab bar's slot: on the safe edge (above the app's tab bar on a page, the sheet's own bottom safe inset in a sheet), outside the scroller. */
   .sh-screen { --sh-tabs-bottom: var(--sh-dock-bottom); }
@@ -423,6 +446,7 @@
 @keyframes sh-in-push { from { transform: translateX(100%); } to { transform: none; } } @keyframes sh-out-push { from { transform: none; } to { transform: translateX(-100%); } }
 @keyframes sh-in-pop { from { transform: translateX(-100%); } to { transform: none; } } @keyframes sh-out-pop { from { transform: none; } to { transform: translateX(100%); } }
 @keyframes sh-sheet-in { from { transform: translateY(100%); } to { transform: none; } } @keyframes sh-fade { from { opacity: 0; } to { opacity: 1; } } @keyframes sh-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sh-bar-out { from { translate: 0 0; opacity: 1; } to { translate: var(--bar-dx) var(--bar-dy); opacity: 0; } } @keyframes sh-bar-in { from { translate: var(--bar-dx) var(--bar-dy); opacity: 0; } to { translate: 0 0; opacity: 1; } }
 @keyframes sh-flyout-in { from { transform: translateX(-120%); } }
 @keyframes sh-scrim-in { from { opacity: 0; } }
 

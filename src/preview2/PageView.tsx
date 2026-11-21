@@ -9,7 +9,8 @@ import { points, useSourceText } from './nodes/shared';
 import { useRender } from './render-context';
 import { TabDockContext } from './tab-dock';
 
-type Surface = CompositionDocument['pages'][number] | CompositionDocument['modals'][number];
+type Level = NonNullable<CompositionDocument['levels']>[number];
+type Surface = CompositionDocument['pages'][number] | CompositionDocument['modals'][number] | Level;
 
 /** Scroll distance over which the large title collapses into the inline one. */
 const COLLAPSE = 44;
@@ -37,7 +38,7 @@ export function PageBody({ surface, largeTitle, scrollToTop = 0, sides = false }
   const { mode, fold, largeText } = useRender();
   const library = useContext(ComponentLibraryContext);
   // Whether the page is laid out in sides is the document's word and never the window's: the drawing keeps one DOM in every pose, so a fold moves frames and re-creates nothing.
-  const page = 'presentation' in surface ? undefined : surface;
+  const page = 'navigation' in surface ? surface : undefined;
   const plan = useMemo(() => page ? planFoldSides(page, library) : undefined, [page, library]);
   const grouped = sides && plan?.active ? plan : undefined;
   const geometry = grouped ? fold?.sides : undefined;
@@ -110,6 +111,14 @@ export interface PageViewProps {
   document: CompositionDocument;
   page: CompositionDocument['pages'][number];
   root: boolean;
+  /** How many pages sit below the page whose chrome the header shows: 0 is a root page. App items that show on the first page only go from a pushed page. */
+  depth: number;
+  /** The page whose chrome decides, when it is not this one: in columns there is one bar and the page opened last decides what it shows. */
+  chrome?: CompositionDocument['pages'][number];
+  /** The leading button is Close rather than Back (the first page of a column set). */
+  close?: boolean;
+  /** In columns the one bar is split over the panes: the leading pane draws the leading half, the trailing pane the trailing half. */
+  column?: 'leading' | 'trailing';
   onBack?: () => void;
   scrollToTop?: number;
   /** Classes for the push and pop motion (`sh-in-push`, `sh-out-pop`, ...). */
@@ -122,15 +131,15 @@ export interface PageViewProps {
 }
 /**
  * One page of the stack: its header over its scroller. The selection key of the page itself rides on this element. Memoised, so
- * the page a push leaves, and the page a window resize or a flyout toggle does not touch, is not drawn again.
+ * the page a push leaves, and the page a window resize or a menu toggle does not touch, is not drawn again.
  */
-export const PageView = memo(function PageView({ document, page, root, onBack, scrollToTop, motion = '', current, detail, sides }: PageViewProps) {
-  const groups: CompositionGroups = headerGroups(document, page);
+export const PageView = memo(function PageView({ document, page, root, depth, chrome, close, column, onBack, scrollToTop, motion = '', current, detail, sides }: PageViewProps) {
+  const groups: CompositionGroups = headerGroups(document, chrome ?? page, depth);
   const { verticalBar } = useRender();
   const title = useSourceText(page.titleSourceId, page.title);
   return <div className={`sh-page ${motion}`.trim()} data-sel={`page:${page.id}`} data-page={page.id} data-current={current ? '' : undefined}
     aria-hidden={current ? undefined : true} inert={!current || undefined}>
     <PageBody surface={page} largeTitle={!verticalBar} scrollToTop={root ? scrollToTop : 0} sides={sides}/>
-    <HeaderBar groups={groups} root={root} onBack={onBack} detail={detail} title={title.state === 'ready' && title.text ? title.text : page.title}/>
+    <HeaderBar groups={groups} root={root} onBack={onBack} detail={detail} close={close} column={column} title={title.state === 'ready' && title.text ? title.text : page.title}/>
   </div>;
 });

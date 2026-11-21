@@ -1,6 +1,8 @@
-import { ChevronLeft, Menu, X } from 'lucide-react';
+import { ChevronLeft, X } from 'lucide-react';
 import { useRef, type CSSProperties, type ReactNode } from 'react';
 import type { CompositionActionSlot, CompositionDocument, CompositionGroups } from '../shared/composition/schema';
+import { chromeGroups } from './chrome-hide';
+import { useBarPresence, type BarPhase } from './bar-presence';
 import { isShown, type VisibilityRule } from './evaluate';
 import type { SelectionKey } from './model';
 import { RAIL } from './rail-constants';
@@ -46,9 +48,9 @@ export function ProfileCircle({ item, rail }: { item: Extract<Item, { type: 'she
 /** The two buttons of the app's `shell-header` item: Quick Links, then Profile. */
 function ItemView({ item, root, rail = false }: { item: Item; root: boolean; /** In the vertical bar Profile is the person symbol (`person.crop.circle`). */ rail?: boolean }) {
   const ctx = useRender();
-  // The iPad draws its own menu button; elsewhere this one opens the same flyout, over the tab bar. The vertical bar has no menu at all.
-  if (item.type === 'shell-menu') return root && !ctx.flyout && !ctx.verticalBar ? <Circle selKey={`chrome-item:${item.id}`} label={item.label} icon={item.icon.name} onPress={ctx.menu?.toggle} expanded={ctx.menu?.open}/> : null;
-  if (item.visibility === 'root-only' && !root) return null;
+  // The menu opens the flyout over the tab bar. Where the tabs sit at the top (the iPad) there is no menu, and the vertical bar has none either.
+  if (item.type === 'shell-menu') return root && !ctx.topTabs && !ctx.verticalBar ? <Circle selKey={`chrome-item:${item.id}`} label={item.label} icon={item.icon.name} onPress={ctx.menu?.toggle} expanded={ctx.menu?.open}/> : null;
+  // What the app or the page hides is already out of the groups (`chromeGroups`).
   if (item.type === 'button') return <ButtonItem item={item}/>;
   return <>
     <Circle selKey={`chrome-item:${item.id}`} label="Quick Links" icon="square.grid.2x2" action={item.quickLinksAction}/>
@@ -56,9 +58,11 @@ function ItemView({ item, root, rail = false }: { item: Item; root: boolean; /**
   </>;
 }
 
-/** The chrome groups a page shows: its own when it replaces the toolbar, else the document's. */
-export const headerGroups = (document: CompositionDocument, page: CompositionDocument['pages'][number]): CompositionGroups =>
-  page.toolbar.type === 'replace' ? page.toolbar.groups : document.navigation.chrome.groups;
+/**
+ * The chrome groups a page shows at `depth` pages below it: its own when it replaces the toolbar, else the document's, less what the app or the page
+ * hides (`chromeGroups`). Back and Close are drawn by the bar itself and are never in a group.
+ */
+export const headerGroups = (document: CompositionDocument, page: CompositionDocument['pages'][number], depth: number): CompositionGroups => chromeGroups(document, page, depth);
 
 /** Props of {@link HeaderBar}. */
 export interface HeaderBarProps {
@@ -71,12 +75,16 @@ export interface HeaderBarProps {
   title: string;
   /** The detail pane of a split: no back button, no flyout button. */
   detail?: boolean;
+  /** The leading button is Close (an X) rather than Back: the first page of a column set, which Close returns to full width. It goes where Back goes and is never hidden. */
+  close?: boolean;
+  /** In columns the bar is one across both panes: a pane draws its own half only. */
+  column?: 'leading' | 'trailing';
 }
 /**
  * The page header: transparent over the wallpaper, leading and trailing glass buttons from the chrome groups, a back button
  * on a pushed page, and the inline title that replaces the large one once the page scrolls (`--sh-progress`).
  */
-export function HeaderBar({ groups, root, onBack, title, detail }: HeaderBarProps) {
+export function HeaderBar({ groups, root, onBack, title, detail, close, column }: HeaderBarProps) {
   const ctx = useRender();
   const vertical = ctx.verticalBar === true;
   // In the vertical bar the eligible items are in the rail; only a `horizontal-only` button stays here.
@@ -84,10 +92,12 @@ export function HeaderBar({ groups, root, onBack, title, detail }: HeaderBarProp
     <div key={group.id} className={`sh-group ${group.horizontal === 'shared@1' ? 'sh-shared' : 'sh-separate'}`}>{items.map(item => <ItemView key={item.id} item={item} root={root}/>)}</div>);
   return <header className="sh-header" data-vertical={vertical ? '' : undefined}>
     <div className="sh-bar-side">
-      {root && !detail && ctx.flyout && <button type="button" className="sh-circle" aria-label="Menu" title="Menu" data-passthrough="" aria-expanded={ctx.flyout.open} onClick={ctx.flyout.toggle}><Menu size={20}/></button>}
-      {!root && !detail && <button type="button" className="sh-circle" aria-label="Back" title="Back" onClick={() => { if (ctx.mode === 'use') onBack?.(); }}><ChevronLeft size={22}/></button>}{render('leading')}</div>
+      {!root && !detail && !vertical && (close
+        ? <button type="button" className="sh-circle sh-close" aria-label="Close" title="Close" data-leading="close" onClick={() => { if (ctx.mode === 'use') onBack?.(); }}><X size={18}/></button>
+        // Back is the chevron alone, with no title (`backButtonDisplayMode = .minimal`), and never hidden.
+        : <button type="button" className="sh-circle" aria-label="Back" title="Back" data-leading="back" onClick={() => { if (ctx.mode === 'use') onBack?.(); }}><ChevronLeft size={22}/></button>)}{column !== 'trailing' && render('leading')}</div>
     <h2 className="sh-inline-title" aria-hidden="true">{title}</h2>
-    <div className="sh-bar-side sh-trailing">{render('trailing')}</div>
+    <div className="sh-bar-side sh-trailing">{column !== 'leading' && render('trailing')}</div>
   </header>;
 }
 
@@ -118,18 +128,27 @@ export function useShownTabCount(document: CompositionDocument): number {
  * Duo's vertical bar the pill widens and every icon gains its label, and on every bar a lens sits on the tab under the pointer and follows it along
  * the bar; a tab is selected when the press is released over it, never before (`tab-hold.ts`). `vertical` is the Duo's rail; `style` carries its layout.
  */
-export function TabBar({ document, tabId, vertical = false, style }: { document: CompositionDocument; tabId?: string; vertical?: boolean; style?: CSSProperties }) {
+export function TabBar({ document, tabId, vertical = false, style, phase = 'rest' }: { document: CompositionDocument; tabId?: string; vertical?: boolean; style?: CSSProperties; /** `hiding` or `showing` while the bar moves with a push or a pop; `rest` otherwise. */ phase?: BarPhase }) {
   const ctx = useRender();
   const tabs = document.navigation.tabs, count = useShownTabCount(document);
   const bar = useRef<HTMLElement>(null);
   // A held release picks a tab the way a click does: the click runs the tab's action in Use and selects it in Edit.
   const hold = useTabHold(bar, vertical ? 'y' : 'x', index => bar.current?.querySelectorAll<HTMLElement>('.sh-tab')[index]?.click());
   if (!tabs.length) return null;
-  return <nav ref={bar} className="sh-tabbar" aria-label="Tabs" data-no-pan="" data-hold={hold.held ? '' : undefined} onPointerDown={hold.bind.onPointerDown} onContextMenu={hold.bind.onContextMenu}
+  return <nav ref={bar} className="sh-tabbar" aria-label="Tabs" data-no-pan="" data-hold={hold.held ? '' : undefined} data-phase={phase === 'rest' ? undefined : phase} onPointerDown={hold.bind.onPointerDown} onContextMenu={hold.bind.onContextMenu}
     style={{ ...tabBarVars(), ...style, '--hold-p': hold.position, '--tab-n': count } as CSSProperties}>
     {tabs.map(tab => <TabButton key={tab.id} tab={tab} selected={tab.id === tabId} ctx={ctx}/>)}
     <span className="sh-tab-lens" aria-hidden="true"/>
   </nav>;
+}
+/**
+ * The tab navigator as the page on top wants it: drawn, or not drawn while the page hides it (`hidden`; `sh.page-chrome-hide@1`, `sh.tabs-visibility@1`). It moves out and back
+ * with the push or the pop that causes it, and not at all under Reduce Motion or in Edit, where it appears and disappears at once. Hidden at rest it is not in the tree.
+ */
+export function TabBarSlot({ document, tabId, vertical = false, hidden }: { document: CompositionDocument; tabId?: string; vertical?: boolean; hidden: boolean }) {
+  const ctx = useRender();
+  const presence = useBarPresence(hidden, ctx.mode === 'use');
+  return presence.mounted ? <TabBar document={document} tabId={tabId} vertical={vertical} phase={presence.phase}/> : null;
 }
 /**
  * The navigation flyout: the tabs as a full-height glass drawer flush to the leading edge (300 pt, at most 80% of the window)
@@ -137,14 +156,14 @@ export function TabBar({ document, tabId, vertical = false, style }: { document:
  * strip. At regular width with no hinge (the iPad) it replaces the tab bar; in the iPhone window the `shell-menu` button opens it
  * over the tab bar. Its rows are the same tabs, so Edit still selects them.
  */
-export function Flyout({ document, tabId, open, onClose, replacesTabBar = true }: { document: CompositionDocument; tabId?: string; open: boolean; onClose: () => void; /** False beside the tab bar, so the two landmarks differ. */ replacesTabBar?: boolean }) {
+export function Flyout({ document, tabId, open, onClose }: { document: CompositionDocument; tabId?: string; open: boolean; onClose: () => void }) {
   const ctx = useRender();
   const tabs = document.navigation.tabs;
-  return <div className="sh-flyout-layer" data-open={open ? '' : undefined} data-beside={replacesTabBar ? undefined : ''} inert={!open || undefined}>
+  return <div className="sh-flyout-layer" data-open={open ? '' : undefined} data-beside="" inert={!open || undefined}>
     <div className="sh-flyout-scrim" data-passthrough="" onClick={onClose}/>
-    <nav className="sh-flyout" aria-label={replacesTabBar ? 'Tabs' : 'Navigation menu'}>
+    <nav className="sh-flyout" aria-label="Navigation menu">
       <h2 className="sh-flyout-heading">Navigation</h2>
-      {tabs.map(tab => <TabButton key={tab.id} tab={tab} selected={tab.id === tabId} ctx={ctx} onPicked={onClose} selectable={replacesTabBar}/>)}
+      {tabs.map(tab => <TabButton key={tab.id} tab={tab} selected={tab.id === tabId} ctx={ctx} onPicked={onClose} selectable={false}/>)}
     </nav>
   </div>;
 }

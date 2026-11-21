@@ -1,7 +1,7 @@
-import { Ellipsis } from 'lucide-react';
+import { ChevronLeft, Ellipsis, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { CompositionActionSlot, CompositionDocument, CompositionGroups } from '../shared/composition/schema';
-import { ButtonItem, Circle, ProfileCircle, railItems, TabBar, useShownTabCount } from './Chrome';
+import { ButtonItem, Circle, ProfileCircle, railItems, TabBarSlot, useShownTabCount } from './Chrome';
 import { FOLD_POSE } from './fold-motion';
 import { GlyphByName } from './nodes/shared';
 import { BADGE, RAIL } from './rail-constants';
@@ -16,8 +16,9 @@ type Item = CompositionGroups[number]['items'][number];
 interface Entry {
   key: string;
   priority: RailPriority;
-  item: Item;
-  part: 'links' | 'profile' | 'button';
+  /** Absent for the leading Back or Close, which is not an item of the app's chrome. */
+  item?: Item;
+  part: 'links' | 'profile' | 'button' | 'nav';
   /** The menu row's words, glyph and action when it is folded. */
   label: string;
   glyph: string;
@@ -34,8 +35,15 @@ function entriesOf(item: Item): Entry[] {
   return [];
 }
 
-function EntryView({ entry }: { entry: Entry }) {
+function EntryView({ entry, leading, onLeading }: { entry: Entry; leading: 'back' | 'close'; onLeading?: () => void }) {
+  const ctx = useRender();
   const item = entry.item;
+  if (entry.part === 'nav') {
+    // Back and Close are the first item of the rail, above Quick Links and Profile, and are never folded into More.
+    return <button type="button" className="sh-circle" aria-label={leading === 'close' ? 'Close' : 'Back'} title={leading === 'close' ? 'Close' : 'Back'} data-leading={leading}
+      onClick={() => { if (ctx.mode === 'use') onLeading?.(); }}>{leading === 'close' ? <X size={RAIL.glyph.more}/> : <ChevronLeft size={RAIL.glyph.more + 2}/>}</button>;
+  }
+  if (!item) return null;
   if (entry.part === 'links' && item.type === 'shell-header') return <Circle selKey={`chrome-item:${item.id}`} label="Quick Links" icon="square.grid.2x2" action={item.quickLinksAction} glyph={RAIL.glyph.quickLinks}/>;
   if (entry.part === 'profile' && item.type === 'shell-header') return <ProfileCircle item={item} rail/>;
   return item.type === 'button' ? <ButtonItem item={item}/> : null;
@@ -47,11 +55,17 @@ function EntryView({ entry }: { entry: Entry }) {
  * When they do not all fit, items fold into a More circle, lowest priority first, and More opens a menu of them. The camera is at one end of
  * the rail, and the order never flips. No menu button. The title is in the header row.
  */
-export function RailBar({ document, tabId, groups, root, window: win }: { document: CompositionDocument; tabId?: string; groups: CompositionGroups; root: boolean; window: PreviewWindow }) {
+export function RailBar({ document, tabId, groups, root, window: win, tabsHidden = false, leading = 'none', onLeading }: { document: CompositionDocument; tabId?: string; groups: CompositionGroups; root: boolean; window: PreviewWindow; /** What leads the rail: Back, Close, or nothing on a root page. */ leading?: 'none' | 'back' | 'close'; onLeading?: () => void; /** The page on top hides the tab navigator: its pill leaves the rail. */ tabsHidden?: boolean }) {
   const ctx = useRender();
   const side = railSideOf(win);
-  const ordered = useMemo(() => ['leading', 'trailing'].flatMap(placement => groups.filter(group => group.placement === placement))
-    .map(group => ({ group, entries: railItems(group, root).flatMap(entriesOf) })).filter(entry => entry.entries.length), [groups, root]);
+  const ordered = useMemo(() => {
+    const rows = ['leading', 'trailing'].flatMap(placement => groups.filter(group => group.placement === placement))
+      .map(group => ({ group, entries: railItems(group, root).flatMap(entriesOf) })).filter(entry => entry.entries.length);
+    // Back or Close is the rail's first item, its own circle above the groups; `required`, so it never folds.
+    if (leading === 'none') return rows;
+    const nav = { group: { id: '__leading', placement: 'leading', horizontal: 'separate-circles@1', vertical: 'separate@1', items: [] } as unknown as CompositionGroups[number], entries: [{ key: '__leading', priority: 'required' as const, part: 'nav' as const, label: leading, glyph: '', action: undefined }] };
+    return [nav, ...rows];
+  }, [groups, root, leading]);
   const tabCount = useShownTabCount(document);
   const layout = useMemo(() => railLayout({
     width: win.width, length: win.height, side, tabs: tabCount,
@@ -76,11 +90,11 @@ export function RailBar({ document, tabId, groups, root, window: win }: { docume
   return <div className="sh-rail-bar" data-rail-bar="" data-compressed={layout.compressed ? '' : undefined} style={style}>
     {layout.header && <div className="sh-rail-header" style={{ top: layout.header.top }}>
       {layout.groups.map(group => <div key={group.id} className={group.shared ? 'sh-group sh-shared sh-rail-group' : 'sh-group sh-rail-circles'}>
-        {entries.filter(entry => group.keys.includes(entry.key)).map(entry => <EntryView key={entry.key} entry={entry}/>)}</div>)}
+        {entries.filter(entry => group.keys.includes(entry.key)).map(entry => <EntryView key={entry.key} entry={entry} leading={leading === 'close' ? 'close' : 'back'} onLeading={onLeading}/>)}</div>)}
     </div>}
     {layout.more && <button ref={button} type="button" className="sh-circle sh-rail-more" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={open} data-passthrough="" style={{ top: layout.more.top }}
       onClick={() => { if (open) close(); else { setLeaving(false); setOpen(true); } }}><Ellipsis size={RAIL.glyph.more}/></button>}
-    <TabBar document={document} tabId={tabId} vertical/>
+    <TabBarSlot document={document} tabId={tabId} vertical hidden={tabsHidden}/>
     {(open || leaving) && box && <>
       <div className="sh-more-catch" data-passthrough="" aria-hidden="true" onClick={() => close()} onContextMenu={event => { event.preventDefault(); close(); }}/>
       <MoreMenu rows={rows} box={box} side={side} closing={!open} onClose={refocus => close(refocus)} mode={ctx.mode} run={ctx.run}/>
@@ -115,7 +129,7 @@ function MoreMenu({ rows, box, side, closing, onClose, mode, run }: {
     style={{ left: box.left, top: box.top, width: box.width, height: box.height, ...moreMenuVars() } as CSSProperties}
     onKeyDown={keys} onPointerDownCapture={() => { pressing.current = true; }}
     onBlur={event => { if (!pressing.current && !event.currentTarget.contains(event.relatedTarget as Node | null)) onClose(false); }}>
-    {rows.map(entry => <button key={entry.key} type="button" role="menuitem" className="sh-more-row" data-sel={`chrome-item:${entry.item.id}`}
+    {rows.map(entry => <button key={entry.key} type="button" role="menuitem" className="sh-more-row" data-sel={`chrome-item:${entry.item?.id}`}
       // Choosing a row closes the menu, then runs the item's action (Use). In Edit the selection layer takes the click, so the release closes it.
       onClick={() => { onClose(true); if (mode === 'use' && entry.action) run(entry.action); }}
       onPointerUp={() => { if (mode === 'edit') setTimeout(() => onClose(true), 0); }}>
