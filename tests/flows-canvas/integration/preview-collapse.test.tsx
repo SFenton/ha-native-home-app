@@ -130,6 +130,78 @@ it('observes each named source setting before deduplicating readers of the same 
     .toEqual([['First mode', 'Home'], ['Second mode', 'Away']]);
 });
 
+it.each([false, true])('shows operand settings as their own values with a source setting present: %s', withSourceSetting => {
+  const body = { type: 'numeric', sourceId: withSourceSetting ? { type: 'hole', name: 'temperature' } : 'demo_temperature',
+    path: ['state'], above: { type: 'hole', name: 'threshold' } };
+  const base = effectiveAwayDocument();
+  const document = compileCompositionDocument({ ...base,
+    dataSources: [...base.dataSources, { id: 'demo_temperature', kind: 'ha-entity',
+      entityId: { type: 'literal', value: 'sensor.demo_temperature' } }],
+    logicLibrary: [...base.logicLibrary ?? [], { id: 'demo_threshold', name: 'Above threshold', kind: 'condition',
+      params: [
+        ...(withSourceSetting ? [{ name: 'temperature', label: 'Temperature', kind: 'source-id', sample: 'demo_temperature' }] : []),
+        { name: 'threshold', label: 'Threshold', kind: 'operand', sample: { type: 'literal', value: 20 } },
+      ], body }],
+  }).document;
+  const index = document.logicLibrary!.length - 1, path = ['logicLibrary', index, 'body'];
+  const graph = lift(body, { kind: 'condition', anchor: { kind: 'logic', id: 'demo_threshold', field: '/body' },
+    context: { document, pointer: `/logicLibrary/${index}/body` } }).graph;
+  const program = createSimulationProgram([previewGraph(document, graph, path, { kind: 'values' })], {
+    sourceEntities: { demo_temperature: 'sensor.demo_temperature' },
+  });
+  const fixture = simulationFixture().held;
+  const held = { ...fixture, base: { ...fixture.base,
+    reads: [{ sourceId: 'demo_temperature', path: ['state'], answer: { status: 'value' as const, value: '23.6' } }] } };
+  const observations = canvasObservations(program, runSimulation(program, held));
+  const threshold = graph.nodes.find(node => node.payload.kind === 'hole' && node.payload.value.name === 'threshold')!;
+  expect(observations.blocks[threshold.id]).toMatchObject({ state: 'known', value: 20 });
+  render(<ResultSummary graph={graph} program={program} observations={observations}
+    blockNames={{ [graph.roots[0].nodeId]: 'Temperature check' }}/>);
+  const summary = screen.getByRole('region', { name: 'Result summary' });
+  expect(within(summary).getByLabelText('Result value').textContent).toBe('Yes');
+  expect([...summary.querySelectorAll('dl > div')].map(row => [row.querySelector('dt')?.textContent, row.querySelector('dd')?.textContent]))
+    .toEqual(withSourceSetting ? [['Threshold', '20'], ['Temperature', 'Yes']] : [['Threshold', '20'], ['Temperature check', 'Yes']]);
+});
+
+it.each(['unknown', 'unavailable'])('keeps computed %s literal in the Preview panel output and trace', async text => {
+  const base = integrationDocument();
+  const document = compileCompositionDocument({ ...base, logicLibrary: [...base.logicLibrary!, {
+    id: 'demo_format', name: 'Formatted text', kind: 'operand', params: [],
+    body: { type: 'format', pattern: '{value}', args: { value: { type: 'literal', value: text } } },
+  }] }).document;
+  setup(document, document.logicLibrary!.length - 1);
+  await waitFor(() => expect(screen.getByLabelText('Result value').textContent).toBe(text));
+  fireEvent.click(screen.getByText('Simulation · Studio only', { exact: true }));
+  expect(screen.getByRole('region', { name: 'Just the Values' }).querySelector('output')?.textContent).toBe(text);
+  const trace = screen.getByRole('region', { name: 'Evaluation trace' });
+  expect([...trace.querySelectorAll('strong')].map(element => element.textContent)).toEqual([text, text]);
+});
+
+it.each(['unknown', 'unavailable'])('keeps real HA %s readings unavailable in the Preview panel', async text => {
+  const base = effectiveAwayDocument();
+  const document = compileCompositionDocument({ ...base, logicLibrary: [...base.logicLibrary!, {
+    id: 'demo_raw_mode', name: 'Raw mode', kind: 'operand', params: [],
+    body: { type: 'raw-state', sourceId: 'demo_mode' },
+  }] }).document;
+  const { live } = setup(document, document.logicLibrary!.length - 1, 'operand', effectiveAwaySnapshot);
+  act(() => live.applyStream([{ entityId: 'input_select.demo_mode', name: 'Demo mode', state: text }]));
+  const expected = text === 'unknown' ? "Can't tell" : 'Unavailable';
+  await waitFor(() => expect(screen.getByLabelText('Result value').textContent).toBe(expected));
+  fireEvent.click(screen.getByText('Simulation · Studio only', { exact: true }));
+  expect(screen.getByRole('region', { name: 'Just the Values' }).querySelector('output')?.textContent).toBe(expected);
+});
+
+it.each([[true, 'Yes'], ['', 'Empty text']] as const)('preserves existing Preview formatting for literal %s', async (value, expected) => {
+  const base = integrationDocument();
+  const document = compileCompositionDocument({ ...base, logicLibrary: [...base.logicLibrary!, {
+    id: 'demo_literal', name: 'Literal value', kind: 'operand', params: [], body: { type: 'literal', value },
+  }] }).document;
+  setup(document, document.logicLibrary!.length - 1);
+  await waitFor(() => expect(screen.getByLabelText('Result value').textContent).toBe(expected));
+  fireEvent.click(screen.getByText('Simulation · Studio only', { exact: true }));
+  expect(screen.getByRole('region', { name: 'Just the Values' }).querySelector('output')?.textContent).toBe(expected);
+});
+
 it('shows the result, provenance and named live inputs above the controls with Simulation still collapsed', async () => {
   const { live, draft, session } = setup(effectiveAwayDocument(), 2, 'condition', effectiveAwaySnapshot);
   const before = draft.get();

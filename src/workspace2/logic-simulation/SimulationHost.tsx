@@ -197,7 +197,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
         const block = observation.blocks[id], node = nodes.find(node => node.id === id);
         if (!node || !block?.observed || presentation?.traceBlocks && !presentation.traceBlocks.includes(id)) return null;
         return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`}
-          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : node.payload.kind === 'operand' && node.payload.value.type === 'literal' ? formatObservedValue(block) : block.state === 'cant-tell' ? "Can't tell" : displayValue(block.result, blockLabel(node))}</strong></button>;
+          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : node.payload.kind === 'operand' && node.payload.value.type === 'literal' ? formatObservedValue(block) : displayValue(block.result, blockLabel(node), block)}</strong></button>;
       })}</div>
       {observation.truncated && <p className="w2-caption">Trace truncated. Unrecorded values are not evidence.</p>}
       <div className="w2-sim-actions"><button type="button" onClick={() => { setInspecting(false); setDrawer('evidence'); }}>Each Run &amp; Items</button></div>
@@ -226,7 +226,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <h3 className="w2-group-title"><List size={15} aria-hidden />Just the Values</h3>
           <p className="w2-caption">The preview is a lens. These are the actual outputs, not device actions.{scenario ? ' Unpinned Live values are frozen at capture.' : ''}</p>
           <div className="w2-sim-values">{run.outputs.map((output, index) => <article className="kv2" key={anchorKey(output.output)} aria-label={`Output ${outputLabel(index).name}`}>
-            <span>{outputLabel(index).name}</span><output>{program.roots[index].body.kind === 'operand' && program.roots[index].body.value.type === 'literal' ? formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId]) : displayValue(output.result, outputLabel(index))}</output>
+            <span>{outputLabel(index).name}</span><output>{program.roots[index].body.kind === 'operand' && program.roots[index].body.value.type === 'literal' ? formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId]) : displayValue(output.result, outputLabel(index), observation.results?.[program.roots[index].graph.roots[0].nodeId])}</output>
             <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source === 'Held/stale' ? 'Last value kept' : output.source === 'Sample' ? 'Demo' : output.source}</Tag>
             {output.issues.length > 0 && <p className="w2-caption">{output.issues.map(issueText).join(' ')}</p>}
           </article>)}</div>
@@ -236,7 +236,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <div className="w2-sim-values">{uniqueInputs.map(node => {
             const block = observation.blocks[node.id];
             return <div key={node.id} className="kv2"><button type="button" className="w2-link-button" aria-label={`Inspect ${blockLabel(node).name}`} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>
-              <span>{displayValue(block?.result, blockLabel(node))}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Last value kept' : block?.freshness === 'sample' ? 'Demo' : 'Live'}</Tag></div>;
+              <span>{displayValue(block?.result, blockLabel(node), block)}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Last value kept' : block?.freshness === 'sample' ? 'Demo' : 'Live'}</Tag></div>;
           })}</div>
           <details className="w2-sim-details"><summary>Other blocks</summary><div className="w2-sim-block-list">{nodes.filter(node => !sourceCaptureForNode(node, program)).map(node => <button type="button" key={node.id} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>)}</div></details>
           <p className="w2-caption">Select a value to inspect its source, pin it, or try a scenario.</p>

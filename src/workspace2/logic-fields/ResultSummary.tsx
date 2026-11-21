@@ -33,7 +33,10 @@ export default function ResultSummary({ graph, program, observations, blockNames
       if (node.payload.kind !== 'hole') continue;
       const consumers = graph.edges.filter(edge => edge.from.nodeId === node.id).flatMap(edge => {
         const candidate = byId.get(edge.to.nodeId);
-        return candidate && candidate.payload.kind !== 'source-selection' && sourceCaptureForNode(candidate, program) ? [candidate] : [];
+        const sourceSetting = node.outputs.find(port => port.id === edge.from.portId)?.type.representation === 'source-selection';
+        const sourcePort = candidate?.inputs.find(port => port.id === edge.to.portId)?.type.representation === 'source-selection';
+        return sourceSetting && sourcePort && candidate && candidate.payload.kind !== 'source-selection'
+          && sourceCaptureForNode(candidate, program) ? [candidate] : [];
       });
       consumers.forEach(consumer => representedReaders.add(consumer.id));
       const consumer = consumers.find(candidate => observations?.blocks[candidate.id]?.observed) ?? consumers[0];
