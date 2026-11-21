@@ -15,7 +15,8 @@ import type { CompositionDocument } from '../../../src/shared/composition/schema
 import type { Operand } from '../../../src/shared/composition/expression';
 import type { Json } from '../../../src/shared/types';
 import { createDraft } from '../../../src/workspace2/editors/draft';
-import { LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
+import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
+import { operandSlot } from '../../../src/workspace2/expr/tokens';
 import { changeFieldType, editWithin, fieldTypeEdit, replaceDocument } from '../../../src/workspace2/editors/provenance';
 import { flowStepMoveEdit, moveFlowStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import LogicSettings from '../../../src/workspace2/data/logic/LogicSettings';
@@ -34,6 +35,7 @@ import { resetLiveRuns } from '../../../src/workspace2/data/liveRun';
 import { Project } from '../../support/workspace2-surfaces';
 import { prepareDraft } from '../../../server/studio-logic/prepare';
 import { integrationSnapshot } from './fixture';
+import { sameJson } from '../../../src/sameJson';
 import { check, fixture, meaningFixture, text, valid, withMeaningCanvas } from './meaning-fixtures';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -344,9 +346,12 @@ describe('Canvas Apply over a template body slot view in a linked document', () 
     expect(roots(done).filter(anchor => anchor.kind === 'logic')).toEqual([{ kind: 'logic', id: 'other-label', field: '/body' }]);
     valid(done);
 
-    // The same edit written into the slot view without the slot mapping (its layout anchored canonically): refused whole.
+    // The control: the applied slot view's own content in its own frame (its body and saved layout, offered afresh so no
+    // accepted revision vouches for it), differing from the Apply only in having no declaration, is refused whole.
+    const fresh = { ...replaceAt(opened, path, valueAt(applied, path)), studioCanvas: applied.studioCanvas } as CompositionDocument;
+    expect(sameJson(fresh, applied)).toBe(true);
     const naive = createDraft(opened);
-    naive.set(replaceAt(canonicalBody(applied, path), path, valueAt(applied, path)));
+    naive.set(fresh);
     expect(naive.get()).toBe(opened); expect(naive.canUndo()).toBe(false); expect(refused(notice)).toBe(1);
   });
 
@@ -428,11 +433,131 @@ describe('Canvas Apply over a template body slot view in a linked document', () 
     const edit = slotApplyEdit(view, path, 'operand', [{ path, ast: projected.ast }], { generatedSources: [], generatedLibrary: [] },
       { graph: lifted.graph, sourceMap: combinedSourceMap(lifted.sourceMap, '/cases/0/when') }, { graph: lifted.graph, sourceMap: projected.sourceMap });
     expect(edit.placed).toEqual([[...path, 'value']]);
-    expect(editWithin(view, { ...edit, candidate: { ...edit.candidate, logicUseBindings: edit.candidate.logicUseBindings!.slice(1) } })).toBe(view);
+    // The same declared Apply, its candidate differing only in one binding removed (same body, same layout and frame).
+    const dropped = { ...edit.candidate, logicUseBindings: edit.candidate.logicUseBindings!.slice(1) };
+    expect(Object.keys(dropped).filter(key => Reflect.get(dropped, key) !== Reflect.get(edit.candidate, key))).toEqual(['logicUseBindings']);
+    expect(editWithin(view, { ...edit, candidate: dropped })).toBe(view);
     expect(refused(notice)).toBe(1);
     const applied = editWithin(view, edit);
     expect(applied).not.toBe(view); expect(refused(notice)).toBe(1);
     expect(valueAt(applied, [...path, 'value', 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
     expect(applied.logicUseBindings).toBe(view.logicUseBindings);
+  });
+});
+
+/**
+ * A declared operation made together with an outside edit (one the boundary takes on its own, rewriting a link as it does)
+ * is exactly the outside edit followed by the operation: the operation's declarations never replay the stale candidate.
+ */
+describe('A declared operation with an outside edit equals the two made one after the other', () => {
+  const body: EditorPath = ['logicLibrary', 1, 'body'], tileA: EditorPath = ['pages', 0, 'components', 0];
+  const textType = () => fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
+  /** The reviewer's fixture: two tiles using the first template, one the second, all bound; with their saved layouts when asked. */
+  const start = (policy: 'fallback' | 'keep', layouts = false) => { const made = meaningFixture('page tile', policy); return layouts ? withMeaningCanvas(made.document, made.slot) : made.document; };
+  /** tile-b's use moves out of its subtitle into its visibility rule: alone, the boundary retargets its binding there. */
+  const intoRule = (document: CompositionDocument) => {
+    const at = ['pages', 0, 'components', 1], node = valueAt(document, at) as { props: { subtitle: { value: unknown } } };
+    return replaceAt(document, at, { ...node, props: { ...node.props, subtitle: { type: 'expr', value: text('Moved') } },
+      visibleWhen: { type: 'compare', op: 'eq', left: node.props.subtitle.value, right: text('sensor.demo_1') }, whenUnknown: 'keep' });
+  };
+  /** tile-b, still bound, moves to the second page. */
+  const toSecondPage = (document: CompositionDocument) => {
+    const [home, second] = document.pages, moved = home.components[1];
+    return { ...document, pages: [{ ...home, components: home.components.filter(node => node !== moved) }, { ...second, components: [...second.components, moved] }, ...document.pages.slice(2)] } as CompositionDocument;
+  };
+  /** Done of a body set to a text through its slot view, `outside` made in the same view. */
+  const done = (document: CompositionDocument, outside: (document: CompositionDocument) => CompositionDocument = value => value) => {
+    const view = slotBodyView(document, body, valueAt(document, body) as Operand);
+    return bodyFromSlotView(document, outside(replaceAt(view, body, operandSlot(text('Changed') as Operand, valueAt(view, body)))), body);
+  };
+  const sequential = (before: CompositionDocument, outside: (document: CompositionDocument) => CompositionDocument, operation: (document: CompositionDocument) => CompositionDocument) => {
+    const first = documentEdit(before, outside(before));
+    expect(first).not.toBe(before);
+    const second = operation(first);
+    expect(second).not.toBe(first);
+    return second;
+  };
+
+  for (const policy of ['fallback', 'keep'] as const) {
+    it(`${policy}: Done with a use moved into a rule`, () => {
+      const before = start(policy), notice = refusals();
+      expect(documentEdit(before, intoRule(before)).logicUseBindings![1].use).toEqual({ kind: 'page', id: 'page-home', nodeId: 'tile-b', field: '/visibleWhen/left' });
+      const expected = sequential(before, intoRule, document => done(document));
+      const combined = done(before, intoRule);
+      expect(refused(notice)).toBe(0);
+      expect(combined.logicUseBindings).toEqual(expected.logicUseBindings);
+      expect(combined).toEqual(expected);
+      expect(valueAt(combined, body)).toEqual(text('Changed'));
+      valid(combined);
+    });
+
+    it(`${policy}: a type change with a use moved into a rule`, () => {
+      const before = start(policy), notice = refusals();
+      const expected = sequential(before, intoRule, document => editWithin(document, fieldTypeEdit(document, tileA, textType(), 'tile')));
+      const edit = fieldTypeEdit(before, tileA, textType(), 'tile');
+      const combined = editWithin(before, { ...edit, candidate: intoRule(edit.candidate) });
+      expect(refused(notice)).toBe(0);
+      expect(combined.logicUseBindings).toEqual(expected.logicUseBindings);
+      expect(combined).toEqual(expected);
+      valid(combined);
+    });
+
+    it.each([false, true])(`${policy}: Done with a bound tile moved to another page; saved layouts=%s`, layouts => {
+      const before = start(policy, layouts), notice = refusals();
+      expect(documentEdit(before, toSecondPage(before)).logicUseBindings![1].use).toEqual({ kind: 'page', id: before.pages[1].id, nodeId: 'tile-b', field: '/props/subtitle/value' });
+      const expected = sequential(before, toSecondPage, document => done(document));
+      const combined = done(before, toSecondPage);
+      expect(refused(notice)).toBe(0);
+      expect(combined).toEqual(expected);
+      valid(combined);
+    });
+  }
+});
+
+describe('Remove Setting keeps the template body\'s saved layout', () => {
+  /** The first template's body (a read of its hole) with a saved canvas layout, every node at 10, 20. */
+  function withBodyLayout() {
+    let document = replaceAt(linked(), ['logicLibrary', 0, 'params', 0, 'sample'], 'source-b');
+    const graph = liftField(document, ['logicLibrary', 0, 'body'], 'operand').graph, stored = studioCanvasMetadataSchema.parse(document.studioCanvas);
+    const extra = encodeStudioCanvas(document, [{ id: 'template-body', roots: [{ anchor: graph.roots[0].anchor, nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 10, y: 20 })) }] }]);
+    document = { ...document, studioCanvas: { ...stored, canvases: [...stored.canvases, ...extra.canvases] } };
+    valid(document);
+    return document;
+  }
+  const canvas = (document: CompositionDocument) => studioCanvasMetadataSchema.parse(document.studioCanvas).canvases.find(canvas => canvas.id === 'template-body');
+
+  it('fills the hole, keeps each node where it was saved, and is one undo step', () => {
+    const before = withBodyLayout(), notice = refusals(), draft = createDraft(before);
+    const plan = removeSettingPlan(before, 'tile-label', 'source');
+    expect(plan.document).not.toBe(before); expect(refused(notice)).toBe(0);
+    expect(plan.tiles).toBe(2);
+    const after = plan.document;
+    expect(valueAt(after, ['logicLibrary', 0, 'body', 'from', 'sourceId'])).toBe('source-b');
+    expect(after.logicLibrary![0].params).toEqual([]);
+    expect(after.logicUseBindings).toEqual(before.logicUseBindings!.filter(binding => binding.logicId !== 'tile-label'));
+    const saved = canvas(after)!, old = canvas(before)!;
+    expect(saved.roots.map(root => root.anchor)).toEqual(old.roots.map(root => root.anchor));
+    expect(saved.nodes.map(node => [node.origins, node.x, node.y])).toEqual(old.nodes.map(node => [node.origins, 10, 20]));
+    // The tiles' own saved canvases keep their roots, and each node they still draw keeps its place; only the lost value's nodes go.
+    const others = (document: CompositionDocument) => studioCanvasMetadataSchema.parse(document.studioCanvas).canvases.filter(canvas => canvas.id !== 'template-body');
+    expect(others(after).map(canvas => [canvas.id, canvas.roots.map(root => root.anchor)])).toEqual(others(before).map(canvas => [canvas.id, canvas.roots.map(root => root.anchor)]));
+    others(before).forEach((canvas, at) => {
+      const places = others(after)[at].nodes.map(node => JSON.stringify([node.origins, node.x, node.y]));
+      for (const node of canvas.nodes.filter(node => !node.origins.some(origin => origin.includes('/args/source')))) expect(places, node.origins.join(',')).toContain(JSON.stringify([node.origins, node.x, node.y]));
+    });
+    expect(readStudioCanvas(after).warnings).toEqual([]);
+    valid(after);
+    draft.set(after);
+    expect(draft.get()).toBe(after);
+    act(() => draft.undo()); expect(draft.get()).toBe(before);
+    act(() => draft.redo()); expect(draft.get()).toBe(after);
+  });
+
+  it('keeps the rest of the body by identity: only the hole and the objects above it are new', () => {
+    const before = withBodyLayout(), after = removeSettingPlan(before, 'tile-label', 'source').document;
+    const was = before.logicLibrary![0].body as unknown as { from: { path: unknown } }, now = after.logicLibrary![0].body as unknown as { from: { path: unknown } };
+    expect(now).not.toBe(was);
+    expect(now.from.path).toBe(was.from.path);
+    expect(after.logicLibrary![1]).toBe(before.logicLibrary![1]);
   });
 });

@@ -1,6 +1,8 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
 import { authoredNodes, fieldPointer } from '../logic-fields/registry';
-import { documentEdit, walkableDocument, type EditReferences } from './documentEdit';
+import { documentEdit, LINKED_EDIT_REFUSAL, walkableDocument, type EditReferences } from './documentEdit';
+import { toastManager } from '../toasts';
+import { sameJson } from '../../sameJson';
 import type { EditorPath } from '../../composition-editor';
 import type { GraphSourceMap, LogicGraph } from '../../shared/composition/graph';
 import { canonicalOfBounded } from '../../shared/composition/json';
@@ -85,16 +87,24 @@ export interface ScopedEdit {
 }
 
 /**
- * Applies a `ScopedEdit`. Its declarations speak only for its scope: whatever else the candidate changes is taken first
- * as an ordinary, undeclared edit (the candidate with every scoped subtree, and a declared layout, put back as they
- * were), which the boundary keeps or refuses on its own. Only then is the operation's own change made, as declared, from
- * that result, so a declaration can never stand in for a link change outside its scope. Returns `before` when either step
- * is refused.
+ * Applies a `ScopedEdit` in two steps, so its declarations speak for its scope only.
+ *
+ * 1. Whatever else the candidate changes is an ordinary, undeclared edit: the candidate with every scoped subtree (and a
+ *    declared layout) put back as `before` holds it. The boundary keeps or refuses that on its own, and may rewrite links
+ *    as it does (a binding that follows its use, say).
+ * 2. The operation's own change is then made on that accepted result, not on the stale candidate: each scoped subtree is
+ *    taken from the candidate and grafted onto step 1's document, whose bindings and component bindings it keeps. A
+ *    declared layout is merged canvas by canvas (step 1's canvases, with the ones the operation changed). The change is
+ *    declared with the operation's references inside its scope only, and with the identities it retains there.
+ *
+ * So the combined edit is exactly the outside edit followed by the operation. Returns `before` when either step, or a
+ * layout both changed differently, is refused.
  */
 export function editWithin(before: CompositionDocument, edit: ScopedEdit): CompositionDocument {
   const { candidate, scope, references, retained } = edit;
   if (before === candidate) return candidate;
   const scoped = scope.map(path => fieldPointer(path));
+  const within = (pointer: string) => scoped.some(base => pointer === base || pointer.startsWith(`${base}/`));
   // A scope the candidate or `before` does not hold cannot be put back: the whole candidate is then an ordinary edit.
   if (scope.some(path => valueAt(before, path) === undefined || valueAt(candidate, path) === undefined)) return documentEdit(before, candidate);
   /** The candidate with each scoped subtree put back as `before` holds it; wherever nothing else changed, `before`'s own object. */
@@ -108,8 +118,9 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
     if (Array.isArray(to)) return children;
     return Object.fromEntries(keys.map((key, at) => [key, children[at]]));
   };
+  const layout = Boolean(references.layout?.length);
   let outside = restore(before, candidate, []) as CompositionDocument;
-  if (references.layout?.length && outside.studioCanvas !== before.studioCanvas) {
+  if (layout && outside.studioCanvas !== before.studioCanvas) {
     const { studioCanvas: _layout, ...rest } = outside;
     const back = (before.studioCanvas === undefined ? rest : { ...rest, studioCanvas: before.studioCanvas }) as CompositionDocument;
     outside = Object.keys(back).length === Object.keys(before).length && Object.keys(back).every(key => Reflect.get(back, key) === Reflect.get(before, key)) ? before : back;
@@ -118,9 +129,90 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
   if (outside !== before) {
     from = documentEdit(before, outside);
     if (from === before) return before;
+    // Step 1 keeps every scoped subtree where it was; if one moved, the operation no longer says where it applies.
+    if (scope.some(path => valueAt(from, path) !== valueAt(before, path))) return refused(before);
   }
-  const next = retained ? editSubtrees(from, candidate, references) : documentEdit(from, candidate, references);
+  let target = from;
+  for (const path of [...scope].sort((left, right) => left.length - right.length)) target = replaceAt(target, path, valueAt(candidate, path));
+  if (layout) {
+    const merged = mergedLayout(before.studioCanvas, from.studioCanvas, candidate.studioCanvas);
+    if (merged === conflict) return refused(before);
+    if (merged !== target.studioCanvas) {
+      const { studioCanvas: _layout, ...rest } = target;
+      target = (merged === undefined ? rest : { ...rest, studioCanvas: merged }) as CompositionDocument;
+    }
+  }
+  const relocated = new Map<string, readonly string[]>(), fields = new Map<string, readonly string[]>();
+  if (retained) {
+    // The identities the operation retains inside its scope: composition nodes by ID, and objects it kept.
+    const following = new Map(authoredNodes(target).map(location => [location.identity, fieldPointer(location.path)]));
+    for (const location of authoredNodes(from)) {
+      const pointer = fieldPointer(location.path), next = following.get(location.identity);
+      if (next !== undefined && within(pointer) && within(next)) relocated.set(pointer, [next]);
+    }
+    for (const path of scope) for (const [pointer, to] of retainedObjects(valueAt(from, path), valueAt(target, path), path, fields)) relocated.set(pointer, to);
+  }
+  // The graft rebuilt each scope's ancestors in place. They, and the plain values they hold beside the scope (which identity
+  // cannot place under a rebuilt object), are where they were: nothing outside the scope changes in this step, and a plain
+  // value has nothing under it to declare.
+  for (const path of scope) for (let depth = 0; depth < path.length; depth++) {
+    const ancestor = path.slice(0, depth), pointer = fieldPointer(ancestor), held = valueAt(from, ancestor);
+    fields.set(pointer, [pointer]);
+    if (!held || typeof held !== 'object') continue;
+    for (const [key, value] of Object.entries(held)) {
+      const sibling = fieldPointer([...ancestor, key]);
+      if (key !== String(path[depth]) && (value === null || typeof value !== 'object') && !within(sibling)) relocated.set(sibling, [sibling]);
+    }
+  }
+  for (const [pointer, to] of references.fields ?? []) fields.set(pointer, to);
+  for (const [pointer, to] of references.relocated ?? []) if (within(pointer)) relocated.set(pointer, to);
+  const inside = (paths: readonly EditorPath[] | undefined) => paths?.filter(path => within(fieldPointer(path)));
+  const deleted = inside(references.deleted), discardLayouts = inside(references.discardLayouts), layoutPaths = inside(references.layout);
+  const copied = references.copied?.filter(copy => within(fieldPointer(copy.from)) && within(fieldPointer(copy.to)));
+  const next = documentEdit(from, target, {
+    relocated, fields,
+    ...(deleted?.length ? { deleted } : {}), ...(discardLayouts?.length ? { discardLayouts } : {}),
+    ...(layoutPaths?.length ? { layout: layoutPaths } : {}), ...(copied?.length ? { copied } : {}),
+  });
   return next === from ? before : next;
+}
+
+const conflict = Symbol('conflict');
+/** Refuses as the boundary does: its notice, and `before`. */
+function refused(before: CompositionDocument): CompositionDocument {
+  toastManager.add({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+  return before;
+}
+/**
+ * The saved layout after an outside edit (`from`, which the boundary may have rebased) and the operation's own layout
+ * change (`to`), both made from `base`: canvas by canvas, each side's change where only that side changed it. A canvas (or
+ * the bundles) both sides changed differently is a conflict, which refuses rather than picks one.
+ */
+function mergedLayout(base: unknown, from: unknown, to: unknown): unknown {
+  if (sameJson(from, base)) return to;
+  if (sameJson(to, base) || sameJson(to, from)) return from;
+  const parse = (value: unknown) => value === undefined ? { success: true as const, data: undefined } : studioCanvasMetadataSchema.safeParse(value);
+  const [b, f, t] = [parse(base), parse(from), parse(to)];
+  if (!b.success || !f.success || !t.success || !f.data || !t.data) return conflict;
+  const raw = (value: unknown) => (value as { canvases: unknown[] }).canvases;
+  const byId = (data: typeof t.data | undefined, value: unknown) => new Map((data?.canvases ?? []).map((canvas, at) => [canvas.id, raw(value)[at]]));
+  const was = byId(b.data, base), ours = byId(f.data, from), theirs = byId(t.data, to);
+  const canvases: unknown[] = [];
+  for (const [id, mine] of ours) {
+    const old = was.get(id), next = theirs.get(id);
+    if (next === undefined) { if (old === undefined) canvases.push(mine); else if (!sameJson(mine, old)) return conflict; continue; }
+    if (old === undefined || sameJson(next, old) || sameJson(mine, next)) { if (old === undefined && !sameJson(mine, next)) return conflict; canvases.push(mine); continue; }
+    if (!sameJson(mine, old)) return conflict;
+    canvases.push(next);
+  }
+  for (const [id, next] of theirs) {
+    if (ours.has(id)) continue;
+    const old = was.get(id);
+    if (old === undefined) canvases.push(next); else if (!sameJson(next, old)) return conflict;
+  }
+  const bundles = sameJson(f.data.bundles, b.data?.bundles) ? (to as { bundles?: unknown }).bundles : sameJson(t.data.bundles, b.data?.bundles) ? (from as { bundles?: unknown }).bundles : conflict;
+  if (bundles === conflict) return conflict;
+  return { ...(from as object), canvases, ...(bundles === undefined ? {} : { bundles }) };
 }
 
 /** What `changeFieldVariant` copies from the old value into the new one, unchanged and at the same key. */

@@ -186,11 +186,24 @@ export function updateSetting(document: CompositionDocument, id: string, name: s
     }),
   }));
 }
-const fillHoles = (value: unknown, name: string, replacement: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(item => fillHoles(item, name, replacement));
+/**
+ * The body with each hole for `name` filled with `replacement`. Only the holes and the objects above them are rebuilt, so every other part of the body keeps
+ * its identity; `holes` gets each filled hole's path, below `path`.
+ */
+const fillHoles = (value: unknown, name: string, replacement: unknown, path: EditorPath = [], holes: EditorPath[] = []): unknown => {
+  if (Array.isArray(value)) {
+    let changed = false;
+    const items = value.map((item, at) => { const filled = fillHoles(item, name, replacement, [...path, at], holes); if (filled !== item) changed = true; return filled; });
+    return changed ? items : value;
+  }
   if (!isRecord(value)) return value;
-  if (value.type === 'hole' && value.name === name) return copySubtree(replacement);
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillHoles(item, name, replacement)]));
+  if (value.type === 'hole' && value.name === name) { holes.push(path); return copySubtree(replacement); }
+  let out: Rec | undefined;
+  for (const [key, item] of Object.entries(value)) {
+    const filled = fillHoles(item, name, replacement, [...path, key], holes);
+    if (filled !== item) { out ??= { ...value }; out[key] = filled; }
+  }
+  return out ?? value;
 };
 /**
  * Removes a setting. Where the body used it, the setting's Try With value stands in; each use drops its value for it. The remaining uses keep drawing what they
@@ -212,8 +225,10 @@ export function settingRemovalEdit(document: CompositionDocument, id: string, na
   const entry = entryOf(document, id);
   const param = entry?.params.find(item => item.name === name);
   if (!entry || !param) return undefined;
-  const next = mapEntry(document, id, held => ({ ...held, params: held.params.filter(item => item.name !== name), body: fillHoles(held.body, name, param.sample ?? defaultSample(settingKindOf(param))) as Rec }));
-  const deleted: EditorPath[] = [];
+  const at = document.logicLibrary!.findIndex(held => held.id === id), holes: EditorPath[] = [];
+  const next = mapEntry(document, id, held => ({ ...held, params: held.params.filter(item => item.name !== name),
+    body: fillHoles(held.body, name, param.sample ?? defaultSample(settingKindOf(param)), ['logicLibrary', at, 'body'], holes) as Rec }));
+  const deleted: EditorPath[] = [], uses: EditorPath[] = [];
   const strip = (value: unknown, path: EditorPath): unknown => {
     if (Array.isArray(value)) {
       let changed = false;
@@ -224,7 +239,7 @@ export function settingRemovalEdit(document: CompositionDocument, id: string, na
     let out: Rec | undefined;
     if (value.type === 'logic-ref' && value.logicId === id && isRecord(value.args) && Object.hasOwn(value.args, name)) {
       const { [name]: _gone, ...args } = value.args;
-      out = { ...value, args }; deleted.push([...path, 'args', name]);
+      out = { ...value, args }; deleted.push([...path, 'args', name]); uses.push(path);
     }
     for (const [key, item] of Object.entries(out ?? value)) {
       if (key === 'logicLibrary') continue;
@@ -233,8 +248,16 @@ export function settingRemovalEdit(document: CompositionDocument, id: string, na
     }
     return out ?? value;
   };
-  const at = document.logicLibrary!.findIndex(held => held.id === id);
-  return { candidate: strip(next, []) as CompositionDocument, scope: [['logicLibrary', at], ...deleted.map(path => path.slice(0, -1))], references: { deleted }, retained: true };
+  const candidate = strip(next, []) as CompositionDocument, self = (path: EditorPath) => [fieldPointer(path), [fieldPointer(path)]] as const;
+  // Each use stays the same use in place, without its value for the setting. Each filled hole is where its Try With value now stands: a saved canvas node of
+  // the hole is carried to the value's node there, or, when the value draws differently, only that node's place is dropped (the hole is also declared gone).
+  // The entry, its params and every object above a hole are rebuilt in place; the rest of the body keeps its identity.
+  const rebuilt = [['logicLibrary', at], ['logicLibrary', at, 'params'], ...holes.flatMap(hole => hole.slice(0, -1).map((_, depth) => hole.slice(0, depth + 1)).filter(path => path.length >= 3))];
+  return { candidate, scope: [['logicLibrary', at], ...uses], retained: true, references: {
+    deleted: [...deleted, ...holes],
+    relocated: new Map([...uses, ...holes].map(self)),
+    fields: new Map(rebuilt.map(self)),
+  } };
 }
 
 /**
