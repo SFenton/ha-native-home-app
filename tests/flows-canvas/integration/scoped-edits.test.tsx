@@ -721,3 +721,103 @@ describe('Scoped edits: declarations and id-less owners, fixes for a8d4c83d', ()
     });
   });
 });
+
+describe('Scoped edits: the element at a scoped index of an id-less list is a rebuild of before\'s there', () => {
+  const slot: EditorPath = ['pages', 0, 'components', 0, 'props', 'subtitle', 'value'], cases = [...slot, 'cases'];
+  const guest = { type: 'viewer' as const, isAdmin: false };
+  /** Two uses of "Remove Me" in one choose, under different `when`s; only the first use's `source` is filled in from the tile. */
+  const twoUses = (): CompositionDocument => {
+    const base = meaningFixture('page tile').document;
+    const use = (value: string) => ({ type: 'logic-ref', logicId: 'remove-me', args: { value: text(value), source: 'source-a' } });
+    return replaceAt({
+      ...base,
+      logicUseBindings: [...base.logicUseBindings!.slice(1), { use: { kind: 'page', id: 'page-home', nodeId: 'tile-a', field: '/props/subtitle/value/cases/0/then' },
+        logicId: 'remove-me', argument: 'source', from: { kind: 'use-tile', field: '/props/titleProviderId' } }],
+      logicLibrary: [...base.logicLibrary!, { id: 'remove-me', name: 'Remove Me', kind: 'operand', params: [
+        { name: 'value', kind: 'operand', sample: text('Sample') }, { name: 'source', kind: 'source-id', sample: 'source-b' },
+      ], body: { type: 'hole', name: 'value' } }],
+    } as CompositionDocument, slot, { type: 'choose', cases: [{ when: check, then: use('First') }, { when: guest, then: use('Second') }], otherwise: text('Fallback') });
+  };
+  const swap = (document: CompositionDocument) => { const [first, second] = valueAt(document, cases) as readonly unknown[]; return replaceAt(document, cases, [second, first]); };
+  const removal = (document: CompositionDocument) => settingRemovalEdit(document, 'remove-me', 'value')!;
+  const bound = (document: CompositionDocument) => document.logicUseBindings!.filter(binding => binding.logicId === 'remove-me').map(binding => binding.use.field);
+  const otherTitle = (document: CompositionDocument) => replaceAt(document, ['pages', 0, 'components', 1, 'title'], 'Elsewhere');
+
+  it('(a) Remove Setting with its two uses\' cases swapped is refused; in turn the binding follows its use', () => {
+    const before = twoUses();
+    valid(before);
+    expect(removal(before).scope.filter(path => path.length > 2)).toEqual([[...cases, 0, 'then'], [...cases, 1, 'then']]);
+    const first = documentEdit(before, swap(before)), sequential = editWithin(first, removal(first));
+    expect(bound(sequential)).toEqual(['/props/subtitle/value/cases/1/then']);
+    // The uses' self-relocations would hold the binding at cases/0, now the guest case's use: refused instead.
+    const edit = removal(before);
+    expect(editWithin(before, { ...edit, candidate: swap(edit.candidate) })).toBe(before);
+    // Likewise the plan made on the swapped document, offered against the unswapped one.
+    expect(editWithin(before, removal(swap(before)))).toBe(before);
+  });
+
+  it('(c) the same Remove Setting, unswapped, applies to both uses and keeps the binding on its use', () => {
+    const before = twoUses(), after = editWithin(before, removal(before));
+    expect(after).not.toBe(before);
+    expect(after).toEqual(removeSettingPlan(before, 'remove-me', 'value').document);
+    expect(after.logicLibrary!.find(entry => entry.id === 'remove-me')!.params.map(param => param.name)).toEqual(['source']);
+    expect(valueAt(after, [...cases, 0, 'then', 'args'])).toEqual({ source: 'source-a' });
+    expect(valueAt(after, [...cases, 1, 'then', 'args'])).toEqual({ source: 'source-a' });
+    expect(valueAt(after, [...cases, 1, 'when'])).toBe(valueAt(before, [...cases, 1, 'when']));
+    expect(bound(after)).toEqual(['/props/subtitle/value/cases/0/then']);
+    valid(after);
+  });
+
+  it('(d) an outside change to a scoped case\'s own `when` is refused together, though it applies in turn', () => {
+    const before = twoUses(), outside = (document: CompositionDocument) => replaceAt(document, [...cases, 0, 'when'], { ...check });
+    const flip = (document: CompositionDocument) => replaceAt(document, [...cases, 0, 'when'], guest);
+    for (const change of [outside, flip]) {
+      const first = documentEdit(before, change(before));
+      expect(first).not.toBe(before);
+      expect(editWithin(first, removal(first))).not.toBe(first);
+      const edit = removal(before);
+      expect(editWithin(before, { ...edit, candidate: change(edit.candidate) })).toBe(before);
+    }
+  });
+
+  it('(b) a field type change is refused when an outside edit swaps, or rewrites the `when` of, its case', () => {
+    const base = meaningFixture('page tile').document, scope = [...cases, 0, 'then'];
+    const before = replaceAt({ ...base, logicUseBindings: base.logicUseBindings!.slice(1) }, slot, { type: 'choose',
+      cases: [{ when: check, then: { type: 'format', pattern: 'First', args: {} } }, { when: guest, then: text('') }], otherwise: text('Fallback') });
+    valid(before);
+    const edit = fieldTypeEdit(before, scope, literalSchema(), 'then');
+    expect(editWithin(before, edit)).not.toBe(before);
+    expect(editWithin(before, { ...edit, candidate: swap(edit.candidate) })).toBe(before);
+    const rewritten = replaceAt(edit.candidate, [...cases, 0, 'when'], guest);
+    expect(documentEdit(before, replaceAt(before, [...cases, 0, 'when'], guest))).not.toBe(before);
+    expect(editWithin(before, { ...edit, candidate: rewritten })).toBe(before);
+  });
+
+  it('(e) Remove Setting, a field type change and Done with unrelated outside edits still equal their results in turn', () => {
+    const elsewhere = (document: CompositionDocument) => replaceAt(otherTitle(document), [...slot, 'otherwise'], text('Other fallback'));
+    const before = twoUses(), first = documentEdit(before, elsewhere(before));
+    expect(first).not.toBe(before);
+    const removed = removal(before), sequential = editWithin(first, removal(first)), combined = editWithin(before, { ...removed, candidate: elsewhere(removed.candidate) });
+    expect(sequential).not.toBe(first);
+    expect(combined).not.toBe(before);
+    expect(combined).toEqual(sequential);
+    valid(combined);
+
+    const typed = replaceAt(before, [...cases, 1, 'then'], { type: 'format', pattern: 'Second', args: {} }), path = [...cases, 1, 'then'];
+    valid(typed);
+    const typedFirst = documentEdit(typed, elsewhere(typed)), change = fieldTypeEdit(typed, path, literalSchema(), 'then');
+    const typedSequential = editWithin(typedFirst, fieldTypeEdit(typedFirst, path, literalSchema(), 'then'));
+    const typedCombined = editWithin(typed, { ...change, candidate: elsewhere(change.candidate) });
+    expect(typedSequential).not.toBe(typedFirst);
+    expect(typedCombined).not.toBe(typed);
+    expect(typedCombined).toEqual(typedSequential);
+    valid(typedCombined);
+
+    const layouts = start(true), doneFirst = documentEdit(layouts, otherTitle(layouts));
+    const doneSequential = done(doneFirst), doneCombined = done(layouts, otherTitle);
+    expect(doneSequential).not.toBe(doneFirst);
+    expect(doneCombined).not.toBe(layouts);
+    expect(doneCombined).toEqual(doneSequential);
+    valid(doneCombined);
+  });
+});

@@ -184,15 +184,28 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
 /**
  * Whether `path`, one of an edit's `scope`, names the same place in `document` as in `before`: every list it goes through
  * holds, at its position, the same owner. An element with an ID (a template, a saved component, a page, a node, a source,
- * a step) must have the same ID. A list without IDs must keep its length, and every element at another index must be one
- * of `before`'s own objects from another index, each once (identity: equal JSON is not evidence, two equal cases swap
- * unseen), or hold another of the edit's scopes, which is checked on its own path. Those elements may trade places with
- * each other (the boundary follows each by identity), but the scope's own position can then only hold what came from
- * `before`'s element there. Keys of an object name themselves. Positions alone are not identity: a template
- * prepended before the scope's own would otherwise make the scope another template's.
+ * a step) must have the same ID. A list without IDs must keep its length. Its element at each scoped index (the path's own,
+ * and each other scope's through this list) must be a rebuild of `before`'s element at that index: every key that leads to
+ * none of the edit's scopes holds `before`'s own value (`===`), and a key that leads to one is checked the same way a level
+ * down, until the scope itself, which the operation may write. Every element at another index must be one of `before`'s
+ * own objects from another index, each once; those may trade places with each other (the boundary follows each by
+ * identity). Equal JSON is never evidence: two equal cases swap unseen. Keys of an object name themselves. Positions alone
+ * are not identity: a template prepended before the scope's own would otherwise make the scope another template's.
  */
 function sameOwners(path: EditorPath, scope: readonly EditorPath[], before: CompositionDocument, document: CompositionDocument): boolean {
-  const others = scope.filter(other => other !== path).map(other => fieldPointer(other));
+  const pointers = scope.map(other => fieldPointer(other)), others = scope.filter(other => other !== path).map(other => fieldPointer(other));
+  const leads = (at: EditorPath) => { const pointer = fieldPointer(at); return pointers.some(other => other === pointer || other.startsWith(`${pointer}/`)); };
+  /** `now` at `at` is `was` rebuilt: the same object, a scope the operation writes, or every key held as it was except those leading to a scope. */
+  const rebuilt = (was: unknown, now: unknown, at: EditorPath): boolean => {
+    if (was === now || pointers.includes(fieldPointer(at))) return true;
+    if (!was || !now || typeof was !== 'object' || typeof now !== 'object' || Array.isArray(was) !== Array.isArray(now)) return false;
+    for (const key of new Set([...Object.keys(was), ...Object.keys(now)])) {
+      const child = [...at, Array.isArray(was) ? Number(key) : key];
+      if (leads(child)) { if (!rebuilt(Reflect.get(was, key), Reflect.get(now, key), child)) return false; }
+      else if (!Object.hasOwn(was, key) || !Object.hasOwn(now, key) || Reflect.get(was, key) !== Reflect.get(now, key)) return false;
+    }
+    return true;
+  };
   let was: unknown = before, now: unknown = document;
   for (const [depth, key] of path.entries()) {
     if (Array.isArray(was) !== Array.isArray(now)) return false;
@@ -203,11 +216,11 @@ function sameOwners(path: EditorPath, scope: readonly EditorPath[], before: Comp
       if (typeof owner === 'string' || typeof id(list[at]) === 'string') { if (owner !== id(list[at])) return false; }
       else {
         if (was.length !== list.length) return false;
-        // Every element at another index is one of `before`'s own elements from another index (each once, by identity),
-        // unless it holds another scope. So the scope's position can only hold what came from `before`'s element there.
+        // Each scoped index holds a rebuild of `before`'s element there, so no outside change moved an owner into it.
+        // Every other element is one of `before`'s own elements from another index (each once, by identity).
         const held = new Set(was.filter((_, index) => index !== at && !scoped(index)));
         for (const [index, item] of list.entries()) {
-          if (index === at || scoped(index)) continue;
+          if (index === at || scoped(index)) { if (!rebuilt(was[index], item, [...path.slice(0, depth), index])) return false; continue; }
           if (!held.delete(item)) return false;
         }
       }
