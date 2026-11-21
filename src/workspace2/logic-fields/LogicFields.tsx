@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ApiError, request } from '../../api';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
@@ -142,7 +143,34 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
     {opened && <CanvasSession key={canonicalOfBounded(opened.graph.roots[0].anchor)} field={opened} ws={ws} theme={theme} onClose={() => { setRetiring(true); setOpened(undefined); }}/>}
   </Fields.Provider>;
 }
+let previewCollapsedInMemory = false;
+let previewPreferenceUnsaved = false;
 function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Workspace2; theme: DerivedTheme; onClose: () => void }) {
+  const previewStorageKey = 'sh-studio.canvas.preview-collapsed';
+  const [preview, setPreview] = useState(() => {
+    try {
+      const stored = localStorage.getItem(previewStorageKey) === 'true';
+      return { collapsed: previewPreferenceUnsaved ? previewCollapsedInMemory : stored, storageUnavailable: previewPreferenceUnsaved };
+    }
+    catch { return { collapsed: previewCollapsedInMemory, storageUnavailable: true }; }
+  });
+  const previewId = useId(), collapseToggle = useRef<HTMLButtonElement>(null), expandToggle = useRef<HTMLButtonElement>(null);
+  const focusPreviewToggle = useRef(false);
+  useEffect(() => {
+    previewCollapsedInMemory = preview.collapsed;
+    if (focusPreviewToggle.current) {
+      (preview.collapsed ? expandToggle : collapseToggle).current?.focus();
+      focusPreviewToggle.current = false;
+    }
+  }, [preview.collapsed]);
+  const togglePreview = (collapsed: boolean) => {
+    let storageUnavailable = false;
+    try { localStorage.setItem(previewStorageKey, String(collapsed)); }
+    catch { storageUnavailable = true; }
+    previewPreferenceUnsaved = storageUnavailable;
+    focusPreviewToggle.current = true;
+    setPreview({ collapsed, storageUnavailable });
+  };
   const document = useDraftDocument(field.draft), data = useWorkspaceData();
   const names = useNameContext(document);
   const entry = field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined;
@@ -238,11 +266,25 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
   return <Dialog.Root open modal onOpenChange={() => {}}>
     <Dialog.Portal><Dialog.Backdrop className="w2-logic-backdrop" style={theme.variables}/><Dialog.Popup className="w2-scope w2-logic-overlay" style={theme.variables} aria-label={`${field.label} canvas`} finalFocus={() => field.returnFocus}>
       <Dialog.Title className="w2-logic-sr">{field.label}</Dialog.Title>
-      <div className="w2-logic-work">
+      <div className="w2-logic-work" data-preview-collapsed={preview.collapsed}>
+        <div className="w2-logic-session-status">
+          {conflict && <p role="alert">The saved revision changed. Local canvas edits are retained; close the canvas to compare revisions in the workspace.</p>}
+          {warnings.map(warning => <p role="alert" key={warning.pointer}>{warning.message}</p>)}
+          {warnings.length > 0 && <button type="button" onClick={() => {
+            const before = field.draft.get(), { studioCanvas: _removed, ...rest } = before;
+            field.draft.set(documentEdit(before, rest as CompositionDocument, { deleted: [['studioCanvas']] }));
+          }}>Reset saved layout</button>}
+          {preview.storageUnavailable && <p role="status">Browser storage is unavailable. The Preview choice will only be remembered until this page closes.</p>}
+        </div>
         <FlowCanvas host={{ ...host, observations }} graph={field.graph} title={field.label} theme={theme} onClose={close} returnFocus={field.returnFocus}
           selectedNodeId={selected} onSelectionChange={setSelected} onGraphChange={setWorking}
           onApply={(transaction, layout) => apply(transaction, layout)}/>
-        <aside className="w2-logic-simulation" aria-label="Canvas preview">
+        <aside className="w2-logic-simulation" aria-label="Canvas preview" id={previewId} hidden={preview.collapsed} inert={preview.collapsed}>
+          <header className="w2-logic-preview-header"><strong>Preview</strong>
+            <button type="button" ref={collapseToggle} aria-label="Collapse Preview" aria-expanded={!preview.collapsed} aria-controls={previewId} onClick={() => togglePreview(true)}>
+              <PanelRightClose size={18} aria-hidden />
+            </button>
+          </header>
           <LensChooser document={document} entry={field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined}
             lens={lens} onLens={setLens} onArguments={setTryWith}/>
           {lens.kind !== 'values' && <article className="w2-logic-field-preview" aria-label={lens.kind === 'stand-in' ? 'Stand-in field preview' : 'Use field preview'}>
@@ -256,12 +298,11 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
             freshness={{ stale: !data.live || !ws.houseStates.streaming }}/>
             : <p className="w2-caption" role="status">{simulation.error}</p>}
           </details>
-          {conflict && <p role="alert">The saved revision changed. Local canvas edits are retained; close the canvas to compare revisions in the workspace.</p>}
-          {warnings.map(warning => <p role="alert" key={warning.pointer}>{warning.message}</p>)}
-          {warnings.length > 0 && <button type="button" onClick={() => {
-            const before = field.draft.get(), { studioCanvas: _removed, ...rest } = before;
-            field.draft.set(documentEdit(before, rest as CompositionDocument, { deleted: [['studioCanvas']] }));
-          }}>Reset saved layout</button>}
+        </aside>
+        <aside className="w2-logic-preview-rail" aria-label="Collapsed canvas preview" hidden={!preview.collapsed}>
+          <button type="button" ref={expandToggle} aria-label="Expand Preview" aria-expanded={!preview.collapsed} aria-controls={previewId} onClick={() => togglePreview(false)}>
+            <PanelRightOpen size={18} aria-hidden /><span>Preview</span>
+          </button>
         </aside>
       </div>
     </Dialog.Popup></Dialog.Portal>
