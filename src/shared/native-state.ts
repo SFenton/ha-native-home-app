@@ -37,6 +37,8 @@ export type NativeState = {
   /** When the state last changed, `YYYY-MM-DDTHH:MM:SS.sssZ` (`last-changed`, `sh.entity-time@1`); absent when Home Assistant did not say. */
   lastChanged?: string;
   name: string;
+  /** Safe Home Assistant attributes explicitly read by the current Studio draft; live preview only. */
+  attributes?: Record<string, Json>;
   unit?: string;
   icon?: string;
   deviceClass?: string;

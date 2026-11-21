@@ -348,9 +348,9 @@ export function houseConfigReferences(houseConfig: Pick<NativeHouseConfig, 'conf
 
 /**
  * Projects one Home Assistant state object (`{ entity_id, state, attributes }`, as REST or the entity stream gives it) to the
- * fields the app reads. Throws a 502 `HttpError` for a malformed or out-of-bounds state.
+ * fields the app reads, plus explicitly wanted attributes for the Studio's live preview. Throws a 502 `HttpError` for a malformed or out-of-bounds state.
  */
-export function projectNativeState(raw: unknown): NativeEntityState {
+export function projectNativeState(raw: unknown, wantedAttributes?: ReadonlySet<string>): NativeEntityState {
   if (!isRecord(raw) || typeof raw.entity_id !== 'string') throw new HttpError(502, 'Invalid Home Assistant state record');
   if (!isRecord(raw.attributes)) throw new HttpError(502, 'Invalid Home Assistant state attributes');
   const attributes = raw.attributes;
@@ -409,7 +409,34 @@ export function projectNativeState(raw: unknown): NativeEntityState {
   if (domain === 'weather' && projected.unit === undefined) projectFields(projected, attributes, { temperature_unit: 'unit' });
   const parsed = stateSchema.safeParse(projected);
   if (!parsed.success) throw new HttpError(502, 'Invalid projected Home Assistant state');
-  return parsed.data;
+  const extra = wantedAttributes && projectNativeAttributes(attributes, wantedAttributes);
+  return extra ? { ...parsed.data, attributes: extra } : parsed.data;
+}
+
+const deniedAttribute = /token|password|passwd|secret|api_?key|credential|auth/i;
+const safeAttributeName = (name: string) => name.toLowerCase() !== 'entity_picture' && !deniedAttribute.test(name);
+function hasDeniedAttribute(value: Json): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(hasDeniedAttribute);
+  return Object.entries(value).some(([name, nested]) => !safeAttributeName(name) || hasDeniedAttribute(nested));
+}
+
+/** Extra attributes never become native fields; unsafe, non-JSON or oversized values remain unavailable. */
+export function projectNativeAttributes(attributes: Readonly<Record<string, unknown>>, wanted: ReadonlySet<string>): Record<string, Json> | undefined {
+  const extra: Record<string, Json> = {};
+  for (const name of wanted) {
+    if (!safeAttributeName(name) || !Object.hasOwn(attributes, name)) continue;
+    const raw = attributes[name];
+    try { assertJsonBounds({ [name]: raw }); }
+    catch (error) {
+      if (!(error instanceof DocumentValidationError)) throw error;
+      continue;
+    }
+    const parsed = jsonSchema.safeParse(raw);
+    if (!parsed.success || hasDeniedAttribute(parsed.data) || Buffer.byteLength(JSON.stringify(parsed.data)) > 4 * 1024) continue;
+    extra[name] = parsed.data;
+  }
+  return Object.keys(extra).length ? extra : undefined;
 }
 
 /**
