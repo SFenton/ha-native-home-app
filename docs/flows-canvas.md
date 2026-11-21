@@ -605,6 +605,82 @@ The `oracle/` copy is the specification. Never "fix" it to make a test pass: a
 disagreement is a bug in the scoped boundary unless the specification itself is
 being changed deliberately, which is a reviewed change of its own.
 
+#### Declared operations
+
+Some edits remove or move linked values on purpose. Each one declares that
+intent through `EditReferences`, so the boundary checks the declared change
+instead of refusing it. Without its declaration, each would still be refused
+cleanly.
+
+- **Import and Edit as JSON** replace the whole draft as one undo step
+  (`replaceDocument`). The current document's links are declared deleted
+  (`deleted: [[]]`), and the imported links are then checked exactly as
+  authored. Nothing from the old draft is carried over. An import that fails to
+  resolve or compile, or whose saved canvas layout has warnings, is rejected
+  with its issues and never repaired. The dialog says: "Importing replaces this
+  whole draft, including its linked values and saved canvas layouts."
+- **Remove Setting** asks first when tiles fill the setting in: "Remove
+  “Source”? 3 tiles that fill it in will lose that value." Tiles are counted per
+  placement, including templates nested in other templates. Confirming fills
+  each hole for the setting with its Try With value and declares each use's
+  `args/<name>` deleted. Every other link stays as it was. A saved layout of the
+  template body is kept: each filled hole's canvas node moves to the Try With
+  value's node, and a node that can't be carried loses only its own position.
+  Cancel changes nothing.
+- **Changing a field's type** asks first when linked values or saved canvas
+  layouts would be lost ("1 linked value can't carry over to Text, so it will
+  be removed."). It declares the field deleted and its layouts discarded. A
+  binding is kept only when it targets a key the new type copies unchanged
+  (`id`, `title`, `label`, `icon`, `layout`), because only then does the same
+  value stay in the same place.
+- **Reordering flow steps** rebuilds the flow in place and declares the moved
+  steps relocated, so saved canvas positions follow their steps. It asks no
+  question.
+- **Template body slot view.** A value editor edits a template body through its
+  `operandSlot` view, while the canvas reads the canonical body. Apply writes
+  where the slot view holds the operand (`logicLibrary/<i>/body`, or its `value`
+  under an `expr` wrapper), with provenance and the saved layout for that place,
+  and reports applied only when the draft took the edit. The saved layout is
+  re-anchored between `/body` and `/body/value` when the editor opens and again
+  at Done. Done is a declared edit of the body.
+
+A declaration speaks only for its operation's scope (`editWithin` in
+`provenance.ts`). A candidate that also changes something else is applied in
+two steps:
+
+1. Everything outside the scope goes through the ordinary boundary, undeclared.
+2. The operation's own change is then made on that result. Its scoped subtrees
+   are grafted onto it, keeping any links the first step rewrote.
+
+So a combined edit equals the outside edit followed by the operation, or it is
+refused.
+
+A scoped operation must also still name the same owners. A list with IDs must
+keep the ID at each position the scope passes through. A list without IDs must
+keep its length, and:
+
+- At each position that holds one of the operation's scopes, the element must
+  be the earlier revision's element rebuilt. Every key that leads to none of the
+  scopes keeps its earlier value, as the same object. A key that leads to a
+  scope is checked the same way one level down, until the scope itself, which
+  the operation may write.
+- Every other element must be one of the earlier revision's own objects, each
+  used once. These may trade places with each other.
+
+Equal JSON never counts as the same element, so a copy, a clone or a shifted
+position is refused. So is an outside change to a scoped element's other keys,
+such as a case's condition, even though making that change first and the
+operation second would apply. No current editor combines those.
+
+The operation's `fields`, `relocated` and `copied` references, and the
+identities it retains, count only when both ends are inside its scope. Anything
+else is ignored, never half applied.
+
+A saved layout the operation changes is merged canvas by canvas, in the
+operation's canvas order. If the outside edit and the operation both change the
+same canvas, the bundles or the canvas order, the edit is refused rather than
+one side being kept.
+
 The binding resolver is authoritative, not the cached authored argument.
 Save as Logic Template, duplication, Unlink and Delete Template read its resolved
 projection, as do inspector evaluation, setting displays and sentences.
