@@ -105,6 +105,8 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
   if (before === candidate) return candidate;
   const scoped = scope.map(path => fieldPointer(path));
   const within = (pointer: string) => scoped.some(base => pointer === base || pointer.startsWith(`${base}/`));
+  // The operation was made at these paths of `before`; in the candidate they must still name the same owners.
+  if (!scope.every(path => sameOwners(path, before, candidate))) return refused(before);
   // A scope the candidate or `before` does not hold cannot be put back: the whole candidate is then an ordinary edit.
   if (scope.some(path => valueAt(before, path) === undefined || valueAt(candidate, path) === undefined)) return documentEdit(before, candidate);
   /** The candidate with each scoped subtree put back as `before` holds it; wherever nothing else changed, `before`'s own object. */
@@ -130,7 +132,7 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
     from = documentEdit(before, outside);
     if (from === before) return before;
     // Step 1 keeps every scoped subtree where it was; if one moved, the operation no longer says where it applies.
-    if (scope.some(path => valueAt(from, path) !== valueAt(before, path))) return refused(before);
+    if (scope.some(path => valueAt(from, path) !== valueAt(before, path) || !sameOwners(path, before, from))) return refused(before);
   }
   let target = from;
   for (const path of [...scope].sort((left, right) => left.length - right.length)) target = replaceAt(target, path, valueAt(candidate, path));
@@ -164,7 +166,8 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
       if (key !== String(path[depth]) && (value === null || typeof value !== 'object') && !within(sibling)) relocated.set(sibling, [sibling]);
     }
   }
-  for (const [pointer, to] of references.fields ?? []) fields.set(pointer, to);
+  // The operation's own fields speak for its scope only: a mapping from, or to, anywhere else is not its to declare.
+  for (const [pointer, to] of references.fields ?? []) if (within(pointer) && to.every(within)) fields.set(pointer, to);
   for (const [pointer, to] of references.relocated ?? []) if (within(pointer)) relocated.set(pointer, to);
   const inside = (paths: readonly EditorPath[] | undefined) => paths?.filter(path => within(fieldPointer(path)));
   const deleted = inside(references.deleted), discardLayouts = inside(references.discardLayouts), layoutPaths = inside(references.layout);
@@ -177,6 +180,29 @@ export function editWithin(before: CompositionDocument, edit: ScopedEdit): Compo
   return next === from ? before : next;
 }
 
+/**
+ * Whether `path` names the same place in `document` as in `before`: every list it goes through holds, at its position, the
+ * same owner. An element with an ID (a template, a saved component, a page, a node, a source, a step) must have the same
+ * ID; in a list without IDs, the list must keep its length and every other element as it was, so no position shifted.
+ * Keys of an object name themselves. Positions alone are not identity: a template prepended before the scope's own would
+ * otherwise make the scope another template's.
+ */
+function sameOwners(path: EditorPath, before: CompositionDocument, document: CompositionDocument): boolean {
+  let was: unknown = before, now: unknown = document;
+  for (const key of path) {
+    if (Array.isArray(was) !== Array.isArray(now)) return false;
+    if (Array.isArray(was) && Array.isArray(now)) {
+      const list: readonly unknown[] = now, at = Number(key), id = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? (value as { id?: unknown }).id : undefined;
+      const owner = id(was[at]);
+      if (typeof owner === 'string' || typeof id(list[at]) === 'string') { if (owner !== id(list[at])) return false; }
+      else if (was.length !== list.length || was.some((item, index) => index !== at && item !== list[index] && !sameJson(item, list[index]))) return false;
+    }
+    if (!was || typeof was !== 'object' || !now || typeof now !== 'object') return false;
+    was = Reflect.get(was, key); now = Reflect.get(now, key);
+  }
+  return true;
+}
+
 const conflict = Symbol('conflict');
 /** Refuses as the boundary does: its notice, and `before`. */
 function refused(before: CompositionDocument): CompositionDocument {
@@ -185,8 +211,10 @@ function refused(before: CompositionDocument): CompositionDocument {
 }
 /**
  * The saved layout after an outside edit (`from`, which the boundary may have rebased) and the operation's own layout
- * change (`to`), both made from `base`: canvas by canvas, each side's change where only that side changed it. A canvas (or
- * the bundles) both sides changed differently is a conflict, which refuses rather than picks one.
+ * change (`to`), both made from `base`: what the operation makes when it runs on `from`. Canvas by canvas, each side's
+ * change is taken where only that side made it, in the operation's order (the outside edit never reorders or adds
+ * canvases; the boundary only rebases or drops them). A canvas, the canvas order or the bundles both sides changed
+ * differently is a conflict, which refuses rather than picks one; a key the operation removed stays removed.
  */
 function mergedLayout(base: unknown, from: unknown, to: unknown): unknown {
   if (sameJson(from, base)) return to;
@@ -197,22 +225,25 @@ function mergedLayout(base: unknown, from: unknown, to: unknown): unknown {
   const raw = (value: unknown) => (value as { canvases: unknown[] }).canvases;
   const byId = (data: typeof t.data | undefined, value: unknown) => new Map((data?.canvases ?? []).map((canvas, at) => [canvas.id, raw(value)[at]]));
   const was = byId(b.data, base), ours = byId(f.data, from), theirs = byId(t.data, to);
+  // The outside edit keeps `base`'s canvases in their order, some rebased or dropped; anything else it did, the operation cannot be placed after.
+  const kept = [...was.keys()].filter(id => ours.has(id));
+  if ([...ours.keys()].some(id => !was.has(id)) || !sameJson([...ours.keys()], kept)) return conflict;
   const canvases: unknown[] = [];
-  for (const [id, mine] of ours) {
-    const old = was.get(id), next = theirs.get(id);
-    if (next === undefined) { if (old === undefined) canvases.push(mine); else if (!sameJson(mine, old)) return conflict; continue; }
-    if (old === undefined || sameJson(next, old) || sameJson(mine, next)) { if (old === undefined && !sameJson(mine, next)) return conflict; canvases.push(mine); continue; }
+  for (const [id, next] of theirs) {
+    const old = was.get(id), mine = ours.get(id);
+    if (old === undefined) { canvases.push(next); continue; }
+    // A canvas the outside edit dropped: the operation, run after it, would not have it.
+    if (mine === undefined) { if (!sameJson(next, old)) return conflict; continue; }
+    if (sameJson(next, old) || sameJson(mine, next)) { canvases.push(mine); continue; }
     if (!sameJson(mine, old)) return conflict;
     canvases.push(next);
   }
-  for (const [id, next] of theirs) {
-    if (ours.has(id)) continue;
-    const old = was.get(id);
-    if (old === undefined) canvases.push(next); else if (!sameJson(next, old)) return conflict;
-  }
+  // A canvas the operation removed is gone, unless the outside edit changed it too.
+  for (const [id, mine] of ours) if (!theirs.has(id) && !sameJson(mine, was.get(id))) return conflict;
   const bundles = sameJson(f.data.bundles, b.data?.bundles) ? (to as { bundles?: unknown }).bundles : sameJson(t.data.bundles, b.data?.bundles) ? (from as { bundles?: unknown }).bundles : conflict;
   if (bundles === conflict) return conflict;
-  return { ...(from as object), canvases, ...(bundles === undefined ? {} : { bundles }) };
+  const { bundles: _bundles, ...rest } = from as { bundles?: unknown };
+  return { ...rest, canvases, ...(bundles === undefined ? {} : { bundles }) };
 }
 
 /** What `changeFieldVariant` copies from the old value into the new one, unchanged and at the same key. */
@@ -355,6 +386,7 @@ export function retargetLogicLayout(document: CompositionDocument, logicId: stri
     return [canvas, { ...encoded.canvases[index], ...(groups ? { groups } : {}) }] as const;
   }));
   const next = { ...document, studioCanvas: { ...stored, canvases: stored.canvases.map(canvas => canvases.get(canvas) ?? canvas) } };
-  if (readStudioCanvas(next).warnings.length) throw new CompositionValidationError([{ code: 'invalid_value', pointer: '/studioCanvas' }]);
+  // Only the moved canvases are this move's to check: another canvas may be stale until the boundary rebases it.
+  if (readStudioCanvas({ ...document, studioCanvas: { ...stored, canvases: [...canvases.values()] } }).warnings.length) throw new CompositionValidationError([{ code: 'invalid_value', pointer: '/studioCanvas' }]);
   return next;
 }
