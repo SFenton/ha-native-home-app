@@ -1,10 +1,8 @@
 import { performance } from 'node:perf_hooks';
 import { describe, expect, it } from 'vitest';
-import { lift, portType, type GraphEdge, type GraphNode, type LogicGraph } from '../../../src/shared/composition/graph';
-import { pipelineSourceSchema } from '../../../src/shared/composition/pipeline/schema';
+import { portType, type GraphEdge, type GraphNode, type LogicGraph } from '../../../src/shared/composition/graph';
 import { countCrossings, tidyCanvas, type TidyMeasure } from '../../../src/workspace2/canvas/tidy';
-import { corpusDocument } from '../graph/fixtures/native';
-import { record } from '../../../src/shared/composition/graph/json';
+import { groceryGraph } from './grocery-fixture';
 
 const type = portType({ kind: 'string' });
 const port = (id: string) => ({ id, label: id, type, required: true });
@@ -28,51 +26,6 @@ function graphFor(positions: readonly { x: number; y: number }[], connections: r
     frames: [{ id: 'frame', scopeId: 'outer', nodeIds: nodes.filter(node => node.scopeId !== 'document').map(node => node.id) }],
     original: {},
   };
-}
-
-function groceryGraph(): LogicGraph {
-  const document = corpusDocument('accept/pipeline-todo-get-items-service.json');
-  if (!record(document) || !Array.isArray(document.dataSources)) throw new Error('Expected grocery pipeline corpus fixture.');
-  const source = pipelineSourceSchema.parse(document.dataSources.find(source => record(source) && source.model === 'pipeline@1'));
-  if (source.inputs.request.type !== 'service-response') throw new Error('Expected a service response request.');
-  const response = source.inputs.request.responseShape;
-  if (response.kind !== 'object' || !response.fields['todo.demo_chores']) throw new Error('Expected grocery response fields.');
-  const groceryId = 'todo.demo_groceries';
-  const { refresh: _refresh, ...baseInputs } = source.inputs;
-  const { data: _data, ...baseRequest } = source.inputs.request;
-  const inputs = {
-    ...baseInputs, parameters: [],
-    request: {
-      ...baseRequest,
-      target: { entity_id: { type: 'literal', value: groceryId } },
-      responseShape: { kind: 'object', fields: { [groceryId]: response.fields['todo.demo_chores'] } },
-    },
-    steps: [
-      { id: 'entry', op: 'select-key', key: { type: 'literal', value: groceryId } },
-      { id: 'items', op: 'get', path: ['items'] },
-    ],
-    output: {
-      kind: 'rows', max: 20,
-      row: {
-        id: { type: 'item', path: ['uid'] }, title: { type: 'item', path: ['summary'] }, subtitle: { type: 'item', path: ['description'] },
-      },
-    },
-  };
-  const pipeline = pipelineSourceSchema.parse({ ...source, inputs });
-  const graph = lift(pipeline.inputs, { kind: 'flow-inputs', sourceId: source.id }).graph;
-  // Canvas-space positions read from feedback-w3-canvas.png (the screenshot is at 160%).
-  const positions: Readonly<Record<string, { x: number; y: number }>> = {
-    '': { x: 600, y: 24 },
-    '/request': { x: 312, y: 24 }, '/request/target/entity_id': { x: 24, y: 24 },
-    '/steps/0': { x: 312, y: 212 }, '/steps/0/key': { x: 24, y: 168 },
-    '/steps/1': { x: 24, y: 312 }, '/output': { x: 312, y: 400 },
-    '/output/row/id': { x: 24, y: 456 }, '/output/row/title': { x: 24, y: 600 }, '/output/row/subtitle': { x: 24, y: 744 },
-  };
-  return { ...graph, nodes: graph.nodes.map(node => {
-    const position = positions[node.origins[0]];
-    if (!position) throw new Error(`Unexpected grocery block: ${node.origins[0]}`);
-    return { ...node, position };
-  }) };
 }
 
 function assertSeparated(graph: LogicGraph, measurements = new Map<string, TidyMeasure>()): void {

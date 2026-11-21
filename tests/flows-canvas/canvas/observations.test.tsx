@@ -63,14 +63,14 @@ it("updates can't-tell wires without recompiling, changing the draft, or evaluat
   expect(container.querySelectorAll('.w2-canvas-wire[data-observation-state=cant-tell]')).toHaveLength(0);
   expect(container.querySelectorAll('.w2-canvas-port-value')).toHaveLength(0);
 });
-it.each([[false, 'No'], [null, 'null'], ['', 'Empty text']] as const)('renders known %j without treating it as absent or unknown', (value, text) => {
+it.each([[false, 'No'], [null, 'Null'], ['', 'Empty text']] as const)('renders known %j without treating it as absent or unknown', (value, text) => {
   render(<PortReading observation={{ state: 'known', source: 'live', value }} output/>);
   expect(screen.getByText(text)).toBeTruthy();
 });
 it('marks only outputs kept, and displays a retained value only when explicitly supplied', () => {
   const observation: PortObservation = { state: 'cant-tell', source: 'live', kept: true, value: 'Previous answer' };
   const { rerender } = render(<PortReading observation={observation} output/>);
-  expect(screen.getByText('Previous answer')).toBeTruthy(); expect(screen.getByText('kept')).toBeTruthy();
+  expect(screen.getByText("Can't tell; Kept: Previous answer")).toBeTruthy(); expect(screen.getByText('kept')).toBeTruthy();
   rerender(<PortReading observation={observation} output={false}/>);
   expect(screen.queryByText('kept')).toBeNull();
   rerender(<PortReading observation={{ state: 'cant-tell', source: 'live' }} output/>);

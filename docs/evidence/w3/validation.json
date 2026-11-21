@@ -1,0 +1,54 @@
+{
+  "task": "w3-b1-canvas",
+  "branch": "t3/flows-block-names-data-peek",
+  "checks": [
+    {
+      "command": "npm ci",
+      "status": "passed"
+    },
+    {
+      "command": "npx vitest run tests/flows-canvas/canvas tests/flows-canvas/integration/canvas-seam.test.tsx",
+      "status": "passed",
+      "result": "212 tests across 9 files"
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "notes": "Existing Rollup annotation and large-chunk warnings remain."
+    },
+    {
+      "command": "npx playwright test tests/e2e/workspace2-flows-w3.spec.ts",
+      "status": "passed",
+      "result": "4 tests: desktop and phone, server-backed annotation save/reload/reopen, observed-value peek/comparison, keyboard focus, 190px actions, and measured Tidy Up"
+    },
+    {
+      "command": "npm test -- --maxWorkers=2",
+      "status": "failed",
+      "result": "15128 passed, 1 failed, 1 skipped; 295 files passed and 1 failed",
+      "failure": "The existing house-data scan reports 14 entity findings in untouched docs/design/flows/w3-design-notes.md and docs/design/flows/w3-mockups.html. Those files are outside this task's ownership."
+    }
+  ],
+  "resolvedInfrastructureFailures": [
+    "An initial fully concurrent full-suite run encountered port 4821 contention and a compiler performance timing failure. Both passed in isolation and in the final full-suite run with two workers."
+  ],
+  "geometryEvidence": {
+    "browser": "The production FlowCanvas render reports Tidied: 1 crossings -> 0 using DOM card sizes and port centers.",
+    "jsdom": "The real FlowCanvas render reaches zero crossings through the estimate path because jsdom rectangles are zero. A separate test supplies card/port rectangles at zoom 2 and verifies normalized measurements never increase crossings."
+  },
+  "screenshots": [
+    "desktop-dark-annotated-block.png",
+    "desktop-dark-peek.png",
+    "desktop-dark-compare-in-full.png",
+    "desktop-dark-tidied-graph.png",
+    "phone-dark-annotated-block.png",
+    "phone-dark-peek.png",
+    "phone-dark-compare-in-full.png",
+    "phone-dark-tidied-graph.png"
+  ],
+  "boundaries": [
+    "The persistence test uses the real Studio server and isolated test-results/studio-data.",
+    "Grocery observations are scripted host display fixtures, not a Home Assistant service call.",
+    "No development data, Home Assistant deployment, native app, credentials, or device services were changed.",
+    "Browser geometry is not native hardware, ActivityKit, APNs, or iOS SDUI validation."
+  ]
+}

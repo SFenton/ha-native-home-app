@@ -79,6 +79,8 @@ it('restores the affected port, not the previously selected Number, after outlin
 it('does not remeasure wire or port geometry for a valid literal-only edit', async () => {
   const host = mount(), geometry = vi.spyOn(Element.prototype, 'getBoundingClientRect');
   fireEvent.click(screen.getByRole('button', { name: 'Select Number 2' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Close data peek' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect Number' }));
   fireEvent.change(screen.getByRole('spinbutton', { name: 'Value' }), { target: { value: '25' } });
   geometry.mockClear();
   fireEvent.click(screen.getByRole('button', { name: 'Update value' }));
@@ -93,6 +95,8 @@ it('does not steal editing keys, preserves local edits on conflict, and keeps sa
   fireEvent.click(screen.getByRole('button', { name: 'Close block palette' }));
   const header = screen.getByRole('button', { name: 'Select Number 2' });
   fireEvent.click(header);
+  fireEvent.click(screen.getByRole('button', { name: 'Close data peek' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect Number' }));
   const field = screen.getByRole('spinbutton', { name: 'Value' });
   fireEvent.change(field, { target: { value: '25' } });
   fireEvent.keyDown(field, { key: 'Delete' });

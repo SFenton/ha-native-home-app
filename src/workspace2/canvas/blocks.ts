@@ -43,7 +43,11 @@ export function fixedAverage(graph: LogicGraph, node: GraphNode, index?: CanvasG
   return sum?.catalogKey === 'operand.math.add' && sum.inputs.length >= 2 && sum.inputs.length <= 8
     && value !== undefined && value.type === 'literal' && value.value === sum.inputs.length;
 }
-export function nodeName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string { return graph && fixedAverage(graph, node, index) ? 'Average' : blockName(node.catalogKey); }
+export function generatedName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string { return graph && fixedAverage(graph, node, index) ? 'Average' : blockName(node.catalogKey); }
+export function nodeName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string {
+  const generated = generatedName(node, graph, index);
+  return node.annotation?.label ? `${node.annotation.label}, ${generated}` : generated;
+}
 export function portLabel(binding: string, node?: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string {
   if (node) {
     if (binding === 'value') return 'Result';
