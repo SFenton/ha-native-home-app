@@ -808,6 +808,12 @@ function reconcile(before: CompositionDocument, edit: CompositionDocument, refer
       if (!result.length && !deleted(resolved[index].usePointer)) refuse();
       return result;
     }).filter(binding => {
+        // The whole-document check reads each binding's `use`, `argument` and `logicId`, and a duplicate's `from.field`, which
+        // throws on an entry without `from` (a scalar entry, say). No such entry is valid; refuse it before anything reads it.
+        const entry: unknown = binding;
+        if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) refuse();
+        const from: unknown = binding.from;
+        if (from === null || typeof from !== 'object') refuse();
         const key = canonicalOfBounded([binding.use, binding.argument]);
         const previous = seen.get(key);
         if (previous && (previous.logicId !== binding.logicId || previous.from.field !== binding.from.field)) refuse();

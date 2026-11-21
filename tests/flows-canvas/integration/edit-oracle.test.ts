@@ -16,10 +16,13 @@
  * library rebuilt): the index build memoizes per owner, node and root by identity, and these are the reads such a memo
  * must still check.
  *
- * Documented deviation: where the oracle throws (a field with no unambiguous owner, such as duplicate IDs; or an owner it
- * cannot walk or read, such as a page without `components`), the scoped implementation refuses (and keeps `before`)
- * instead. That pair counts as agreement; `EDIT_ORACLE_REPORT=1` tallies each such oracle error by message and site. Any
- * other error must be the same error from both, and the scoped implementation must never accept where the oracle throws.
+ * Documented deviations (see the contract in docs/flows-canvas.md): where the oracle throws (a field with no unambiguous
+ * owner, such as duplicate IDs; or an owner it cannot walk or read, such as a page without `components`), the scoped
+ * implementation refuses (and keeps `before`) instead; and it may refuse a schema-forbidden shape the oracle accepts (see
+ * `schemaInvalid`). Each counts as agreement and is tallied apart; `EDIT_ORACLE_REPORT=1` prints the tallies by site. Any
+ * other error must be the same error from both, the scoped implementation must never accept where the oracle throws, and
+ * it must never accept a non-JSON array the revision did not hold. Every document generated is a JSON value apart from
+ * such arrays: no method-shadowing, symbol, non-enumerable or accessor properties, which the contract leaves out.
  *
  * CI runs seeds 1-256 (14 steps each, a few seconds). Each bug class reviews 5 and 6 found is caught within that range
  * when its fix is reverted. For a longer local run: `EDIT_ORACLE_SEEDS=2000 npx vitest run <this file>` (optionally
@@ -36,7 +39,7 @@ import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
 import { documentEdit, walkableDocument, type EditReferences } from '../../../src/workspace2/editors/documentEdit';
 import { editSubtrees } from '../../../src/workspace2/editors/provenance';
-import { fieldPointer, liftField, pointerPath } from '../../../src/workspace2/logic-fields/registry';
+import { fieldPointer, jsonList, liftField, pointerPath } from '../../../src/workspace2/logic-fields/registry';
 import { toastManager } from '../../../src/workspace2/toasts';
 import { sameJson } from '../../../src/sameJson';
 import { componentDocument, draftDocument, tile } from '../draft/fixtures';
@@ -608,10 +611,18 @@ function malformed(document: Doc, rng: Rng): Step | undefined {
     const path = pick(rng, fields), value = pick(rng, ['', 'list', 0, 5, {}, { 0: null }] as const);
     return { document: replaceAt(document, path, value), references: {}, label: `malformed ${fieldPointer(path)}: ${JSON.stringify(value)} for the list` };
   }
+  // The bindings list given something that is not a list, or a malformed entry appended: a missing one, scalars (one, or two,
+  // which the duplicate check compares with each other), or a copy of a binding without `from` (which it compares with the
+  // original). The second draw happens only for an appended entry, so it leaves every other seed's sequence as it was.
   if (mode === 'bindings') {
     const value = pick(rng, [{}, 'list', 5, '', null, 'a missing entry'] as const);
-    const bindings = value === 'a missing entry' ? [...document.logicUseBindings ?? [], null] : value;
-    return { document: { ...document, logicUseBindings: bindings } as unknown as Doc, references: {}, label: `malformed logicUseBindings: ${JSON.stringify(value)}` };
+    const held = Array.isArray(document.logicUseBindings) ? document.logicUseBindings : [];
+    if (value !== 'a missing entry') return { document: { ...document, logicUseBindings: value } as unknown as Doc, references: {}, label: `malformed logicUseBindings: ${JSON.stringify(value)}` };
+    const kind = pick(rng, ['a missing entry', 'a scalar entry', 'two scalar entries', 'a duplicate without from'] as const);
+    const { from: _, ...unsourced } = held[0] ?? {};
+    const added = kind === 'a missing entry' ? [null] : kind === 'a scalar entry' ? [pick(rng, ['l', 5, true] as const)]
+      : kind === 'two scalar entries' ? ['l', 'i'] : [held.length ? unsourced : 'l'];
+    return { document: { ...document, logicUseBindings: [...held, ...added] } as unknown as Doc, references: {}, label: `malformed logicUseBindings: ${kind} appended` };
   }
   if (mode === 'list') {
     const value = pick(rng, [undefined, {}, 'list', '', 5] as const);
@@ -711,6 +722,42 @@ function nonJsonArray(document: unknown): string | undefined {
   return visit(document, '');
 }
 /**
+ * How `value` fails to be a JSON list (its length, missing indices and own enumerable non-index keys), or undefined for a
+ * JSON list or anything else. The same two defects as `nonJsonArray` (and `jsonList`), and no others.
+ */
+function listDefect(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const holes: number[] = [];
+  for (let index = 0; index < value.length; index++) if (!Object.hasOwn(value, index)) holes.push(index);
+  const extra = Object.keys(value).filter(key => !(/^(0|[1-9]\d*)$/.test(key) && Number(key) < value.length));
+  return holes.length || extra.length ? JSON.stringify({ length: value.length, holes, extra: extra.sort() }) : undefined;
+}
+/**
+ * The first non-JSON array in `after` that `before` did not already hold, or undefined. An array is held when `before`
+ * holds that same object anywhere, or holds at the same path an array with the same defects.
+ */
+function newNonJsonArray(before: unknown, after: unknown): string | undefined {
+  const held = new Set<object>(), seen = new Set<object>();
+  const collect = (value: unknown) => {
+    if (value === null || typeof value !== 'object' || held.has(value)) return;
+    held.add(value);
+    for (const child of Object.values(value)) collect(child);
+  };
+  collect(before);
+  const visit = (value: unknown, path: EditorPath): string | undefined => {
+    if (value === null || typeof value !== 'object' || seen.has(value)) return undefined;
+    seen.add(value);
+    const defect = listDefect(value);
+    if (defect && !held.has(value) && listDefect(valueAt(before, path)) !== defect) return `${fieldPointer(path) || '(root)'}: ${defect}`;
+    for (const [key, child] of Object.entries(value)) {
+      const found = visit(child, [...path, Array.isArray(value) && /^(0|[1-9]\d*)$/.test(key) ? Number(key) : key]);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  return visit(after, []);
+}
+/**
  * Where `document` holds a value of a type its schema forbids at a place the boundaries read (as a pattern, `*` for each
  * index), or undefined: a root that is not a plain object, or a value other than a list where the schema requires one (the
  * owner lists and the bindings list, a surface's components, a component entry's bindings, params, sources and flows, a
@@ -772,8 +819,10 @@ function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome):
     }
   } else if (scoped.kind === 'result') {
     const refused = scoped.document === before, oracleRefused = oracle.document === before;
-    // Whatever the oracle does, the scoped boundary never accepts a non-JSON array the revision did not already hold.
-    if (!refused && nonJsonArray(scoped.document) && !nonJsonArray(before)) return `scoped accepts a non-JSON array (${nonJsonArray(scoped.document)})`;
+    // Whatever the oracle does, the scoped boundary never accepts a non-JSON array the revision did not already hold (each
+    // array on its own: a different non-JSON array elsewhere in the revision exempts nothing).
+    const fresh = refused ? undefined : newNonJsonArray(before, scoped.document);
+    if (fresh) return `scoped accepts a non-JSON array (${fresh})`;
     if (refused === oracleRefused && sameJson(scoped.document, oracle.document)) return undefined;
     // The narrowed contract: the scoped boundary may also refuse a candidate or revision holding a schema-invalid type.
     const invalid = refused && !oracleRefused ? schemaInvalid(candidate) ?? schemaInvalid(before) : undefined;
@@ -919,6 +968,9 @@ describe('edit oracle regressions', () => {
     ['nested operand', 2000862, 40],
     // A compiler-accepted draft whose hidden binding names an unknown parameter: declaring its target deleted removes it.
     ['raw draft, hidden binding with an unknown parameter', 277, 14],
+    // Bindings set to a string, then a binding reversed: the candidate spreads the string into scalar entries, which the
+    // duplicate check compared through `from.field` (both boundaries threw; the scoped one must refuse).
+    ['already-aliased use', 10902105, 14],
   ] as const)('%s, seed %i, %i steps', (fixture, seed, steps) => {
     expect(sequence(seed, steps, fixture).disagreement).toBeUndefined();
   });
@@ -1041,6 +1093,57 @@ describe('edit oracle regressions', () => {
     // The same divergence over schema-valid documents stays a disagreement.
     const valid = rename(before);
     expect(compare(before, valid, { kind: 'result', document: before }, { kind: 'result', document: valid })).toBeDefined();
+  });
+
+  it('refuses malformed binding entries before the duplicate check reads them', () => {
+    // Two scalar entries share a key (no `use`, no `argument`, the same missing `logicId`), so the whole-document check
+    // reads the first one's `from.field`; a copy of a binding without `from` is compared with the original the same way.
+    const before = compiled(), [first] = before.logicUseBindings!, { from: _, ...unsourced } = first;
+    for (const added of [['l', 'i'], [unsourced], [5, 5], [true, 'l']]) {
+      const candidate = { ...before, logicUseBindings: [...before.logicUseBindings!, ...added] } as unknown as Doc;
+      expect(() => oracleEdit(before, candidate)).toThrow(TypeError);
+      expect(documentEdit(before, candidate)).toBe(before);
+      expect(editSubtrees(before, candidate)).toBe(before);
+    }
+    // One scalar entry has nothing to be compared with; both refuse it.
+    for (const added of ['l', 5, true]) {
+      const candidate = { ...before, logicUseBindings: [...before.logicUseBindings!, added] } as unknown as Doc;
+      expect(run(() => oracleEdit(before, candidate))).toEqual({ kind: 'result', document: before });
+      expect(documentEdit(before, candidate)).toBe(before);
+    }
+  });
+
+  it('fails a scoped acceptance of each new non-JSON array, whatever else the revision holds', () => {
+    // The revision holds one non-JSON array (the canvases); the candidate adds another (the assets).
+    const base = fixtures['shared frame'](), at = ['studioCanvas', 'canvases'];
+    const defective = (extra: Record<string, string>) => {
+      const list = Object.assign([...valueAt(base, at) as unknown[]], extra);
+      list.length++;
+      return list;
+    };
+    const canvases = defective({ alias: 'held' });
+    const before = replaceAt(base, at, canvases);
+    expect(compiles(before)).toBe(true);
+    const candidate = { ...before, assets: Object.assign([...before.assets ?? []], { alias: 'new' }) };
+    const oracle = run(() => oracleEdit(before, candidate));
+    expect(compare(before, candidate, { kind: 'result', document: candidate }, oracle)).toMatch(/^scoped accepts a non-JSON array \(\/assets: /);
+    expect(compare(before, candidate, run(() => documentEdit(before, candidate)), oracle)).toBeUndefined();
+    // The held array (the same object, or a copy at the same path with the same defects) exempts only itself.
+    const renamed = rename(before), copied = replaceAt(renamed, at, defective({ alias: 'held' }));
+    for (const edit of [renamed, copied]) expect(compare(before, edit, { kind: 'result', document: edit }, run(() => oracleEdit(before, edit)))).toBeUndefined();
+    const worse = replaceAt(renamed, at, defective({ alias: 'held', other: 'new' }));
+    expect(compare(before, worse, { kind: 'result', document: worse }, run(() => oracleEdit(before, worse)))).toMatch(/^scoped accepts a non-JSON array \(\/studioCanvas\/canvases: /);
+  });
+
+  it('agrees with jsonList on which lists are JSON: holes and extra enumerable keys, nothing more', () => {
+    const shapes: [string, unknown[]][] = [['dense', [1, 2]], ['empty', []], ['a hole at the end', Object.assign(new Array(2), [1])],
+      ['a hole inside', [1, , 3]], ['an extra key', Object.assign([1], { alias: 'a' })], ['a negative key', Object.assign([1], { '-1': 'a' })],
+      ['a hole and an extra key', Object.assign([1, , 3], { alias: 'a' })]];
+    for (const [name, list] of shapes) {
+      const json = !name.startsWith('a');
+      expect([name, jsonList(list)]).toEqual([name, json]);
+      expect([name, nonJsonArray({ list }) === undefined, listDefect(list) === undefined]).toEqual([name, json, json]);
+    }
   });
 
   it('refuses every edit to a revision whose bindings value is not a list', () => {

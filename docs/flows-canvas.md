@@ -503,8 +503,20 @@ ever passed the boundary: reload compiles the stored authored draft and
 installs it as is, and expansion can hide a broken component binding from the
 compiler (one that fills an argument the logic never reads). A `before` the
 compiler rejects that the boundary never accepted (a repeated component ID,
-say) is outside the contract. Two deviations are allowed, both refusals that
-keep `before`, never an acceptance with a different result:
+say) is outside the contract.
+
+The contract covers documents and candidates that are JSON values: plain
+objects and arrays as `JSON.parse` produces them, holding strings, numbers,
+booleans and null. Like mutating a committed revision in place, these are
+outside it, and neither boundary is checked against them: an own property
+that shadows an array method (`some: 0`), symbol keys (`Symbol.iterator`
+included), non-enumerable or accessor properties, and objects with any other
+prototype. An array with a hole or with an own enumerable key other than an
+index is not JSON either, but it stays covered: the scoped boundary refuses it
+wherever the edit reaches it (below).
+
+Two deviations are allowed, both refusals that keep `before`, never an
+acceptance with a different result:
 
 - where the oracle throws a raw error (a field without an unambiguous owner,
   an owner it cannot walk, a component library or bindings value it cannot
@@ -526,8 +538,20 @@ possible and is a bug. They do not all run before the candidate is read:
 
 - an `edit` that is not a plain object is refused before anything reads it,
   the redo walk included;
-- the linked check and the bindings checks read the candidate first, exactly
-  as the oracle does (so they refuse where its reads would throw);
+- the linked check and the bindings checks then read the lists the oracle
+  reads first, in its order, and refuse the shapes on which those reads throw:
+  a component library that is not a list, or a missing entry the oracle
+  reaches before any entry with bindings; a `before` bindings value that is
+  not a list; and, where `before` holds bindings, a candidate bindings value
+  that is not a list or holds a missing entry. The duplicate check refuses any
+  binding entry that is not an object with an object `from` before reading
+  it: the oracle throws on such an entry only when an earlier binding shares
+  its `use`, `argument` and `logicId` (it then reads both entries'
+  `from.field`), and otherwise refuses it when it validates the bindings
+  last. These cover only those reads, not every throw: the oracle's later
+  reads (walking owners, anchoring fields) throw on shapes these checks pass,
+  and the scoped boundary refuses those through the checks below or its
+  reconciliation;
 - the revision's index is then built or reused (it reads only `before`), and
   every array the edit changed or placed is checked as `changedPaths` hands
   it over, before anything else of the candidate is read; the paths that
