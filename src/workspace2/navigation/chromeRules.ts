@@ -2,6 +2,7 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import { PAGE_CHROME_HIDE_CAPABILITY, PAGE_WIDE_OPEN_CAPABILITY, TABS_VISIBILITY_CAPABILITY } from '../../shared/composition/global-chrome';
 import { pendingCompositionCapabilities } from '../../shared/composition/pending';
 import { collectLinks, hideCount } from '../outline';
+import { wideOpenOf, type WideOpen } from '../../preview2/wide-open';
 
 /**
  * The rules behind the editor's global-chrome rows (proposal `build/design/global-chrome/proposal.md` in native-home, sections 2, 3 and 5): what a page hides for itself,
@@ -101,8 +102,12 @@ export interface HideRow {
 /** The caption under a row the app already hides on a pushed page. */
 export const FIRST_PAGE_ONLY = 'First page only';
 
-/** Whether a page is the first page of a tab: the one place the app's "First page only" items do show. */
-export const isTabFirstPage = (document: CompositionDocument, page: Pick<Page, 'id'>): boolean => document.navigation.tabs.some(tab => tab.pageId === page.id);
+/**
+ * Whether a page is the first page of a tab: the one place the app's "First page only" items do show. A document with no tabs has one first page, `initialPageId`,
+ * which is where the preview draws those items.
+ */
+export const isTabFirstPage = (document: CompositionDocument, page: Pick<Page, 'id'>): boolean =>
+  document.navigation.tabs.length === 0 ? page.id === document.navigation.initialPageId : document.navigation.tabs.some(tab => tab.pageId === page.id);
 
 /**
  * The rows of "Hide on this page" for a page (a page with Custom shows only the Tabs row). A row the app shows on "First page only" is off, disabled and captioned on a page
@@ -157,7 +162,8 @@ export const hiddenWords = (count: number): string => `Hidden on ${count} ${coun
 
 /** The three ways a page opens in a wide window, in the words of the row. */
 export const wideChoices = [{ value: 'automatic', label: 'Automatic' }, { value: 'full', label: 'Full width' }, { value: 'beside', label: 'Beside' }] as const;
-export type WideOpen = (typeof wideChoices)[number]['value'];
+export type { WideOpen };
+export { wideOpenOf };
 
 /** The footer under each choice (proposal section 5). */
 export const wideFooters: Record<WideOpen, string> = {
@@ -165,15 +171,6 @@ export const wideFooters: Record<WideOpen, string> = {
   full: 'Always the whole window. Back returns to the page it came from.',
   beside: 'Always beside the page it came from. That page takes the left half.',
 };
-
-/**
- * How a page opens: what it says, else Full width for a columns page that still says `standalone` (the row "Start a new column set here" is gone, and the migration
- * writes `wideOpen: "full"` for it), else Automatic.
- */
-export function wideOpenOf(page: Page): WideOpen {
-  if (page.wideOpen) return page.wideOpen;
-  return page.navigation.type === 'navigation-columns' && page.navigation.standalone ? 'full' : 'automatic';
-}
 
 /**
  * The page opening the way `value` says. `standalone` is cleared on a columns page, because the choice now says what it said; Automatic on a page that never said writes

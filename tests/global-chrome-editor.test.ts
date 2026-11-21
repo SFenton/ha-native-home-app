@@ -9,7 +9,7 @@ import { runChecks, sentenceFor } from '../src/workspace2/checks';
 import { buildOutline, hideCount } from '../src/workspace2/outline';
 import { blankPage } from '../src/workspace2/navigation/edit';
 import {
-  chromeItems, chromeSummary, customWithoutQuickLinks, hideRows, hiddenWords, linkResult, newPageWideOpen, newerAppCaption, quickLinksFirstPageOnly,
+  chromeItems, chromeSummary, customWithoutQuickLinks, hideRows, hiddenWords, isTabFirstPage, linkResult, newPageWideOpen, newerAppCaption, quickLinksFirstPageOnly,
   resultParts, setHideItem, setHideTabs, setWideOpen, sheetOfLevel, tabsHiddenOnFirstPage, tabsShow, wideOpenOf, withHides, withoutHiddenItems,
   PAGE_CHROME_HIDE_CAPABILITY, PAGE_WIDE_OPEN_CAPABILITY,
 } from '../src/workspace2/navigation/chromeRules';
@@ -110,6 +110,15 @@ describe('the rows of Hide on this page', () => {
     const tabs = { ...document, navigation: { ...document.navigation, tabsVisibility: 'root-only' as const } };
     const hidden = setHideTabs(tabs, 0, true);
     expect(hideRows(hidden, hidden.pages[0])[0]).toMatchObject({ id: 'tabs', on: true, disabled: false });
+  });
+
+  it('in a document with no tabs, initialPageId is the first page, as the preview draws it', () => {
+    const tabless = { ...as(base()), navigation: { ...base().navigation, tabs: [], initialPageId: base().pages[0].id, initialTabId: null } } as CompositionDocument;
+    const rows = (index: number) => { const hidden = setHideItem(tabless, index, 'chrome-inspect', true); return hideRows(hidden, hidden.pages[index]).find(item => item.id === 'chrome-inspect'); };
+    expect(isTabFirstPage(tabless, tabless.pages[0])).toBe(true);
+    expect(isTabFirstPage(tabless, tabless.pages[2])).toBe(false);
+    expect(rows(0)).toMatchObject({ on: true, disabled: false, caption: undefined });
+    expect(rows(2)).toMatchObject({ on: false, disabled: true, caption: 'First page only' });
   });
 
   it('a row the app shows on First page only is off, disabled and captioned, even when a hide was written for it', () => {

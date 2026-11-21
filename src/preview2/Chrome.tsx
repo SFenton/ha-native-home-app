@@ -152,14 +152,15 @@ export function TabBarSlot({ document, tabId, vertical = false, hidden }: { docu
 }
 /**
  * The navigation flyout: the tabs as a full-height glass drawer flush to the leading edge (300 pt, at most 80% of the window)
- * under a "Navigation" heading, opened by the header's menu button, with the dim over the whole window including the status
- * strip. At regular width with no hinge (the iPad) it replaces the tab bar; in the iPhone window the `shell-menu` button opens it
- * over the tab bar. Its rows are the same tabs, so Edit still selects them.
+ * under a "Navigation" heading, with the dim over the whole window including the status strip. The header's `shell-menu` button
+ * opens it over the tab bar. It is drawn wherever the document has tabs and the window has neither the vertical rail (which has
+ * no menu button) nor tabs at the top; it is mounted only while open or sliding out. Its rows are the same tabs as the bar's,
+ * a second copy that is never selected in Edit (`selectable` is false) and is not drawn for a tab its visibility rule hides in Use.
  */
 export function Flyout({ document, tabId, open, onClose }: { document: CompositionDocument; tabId?: string; open: boolean; onClose: () => void }) {
   const ctx = useRender();
   const tabs = document.navigation.tabs;
-  return <div className="sh-flyout-layer" data-open={open ? '' : undefined} data-beside="" inert={!open || undefined}>
+  return <div className="sh-flyout-layer" data-open={open ? '' : undefined} inert={!open || undefined}>
     <div className="sh-flyout-scrim" data-passthrough="" onClick={onClose}/>
     <nav className="sh-flyout" aria-label="Navigation menu">
       <h2 className="sh-flyout-heading">Navigation</h2>
