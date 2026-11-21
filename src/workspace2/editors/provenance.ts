@@ -50,8 +50,8 @@ function retainedObjects(before: unknown, after: unknown, base: EditorPath, fiel
   return relocated;
 }
 
-export function rebuildField(document: CompositionDocument, path: EditorPath, value: unknown, extra: Pick<EditReferences, 'relocated' | 'discardLayouts'> = {}): CompositionDocument {
-  const next = replaceAt(document, path, value);
+/** What `rebuildField` declares for `value` rebuilt at `path`: the field deleted, its ancestors rebuilt in place, their other keys and the objects it keeps relocated. */
+function rebuildReferences(document: CompositionDocument, path: EditorPath, value: unknown, extra: Pick<EditReferences, 'relocated' | 'discardLayouts'> = {}): EditReferences {
   const fields = new Map<string, readonly string[]>();
   const relocated = retainedObjects(valueAt(document, path), value, path, fields);
   for (let depth = 0; depth <= path.length; depth++) {
@@ -65,9 +65,62 @@ export function rebuildField(document: CompositionDocument, path: EditorPath, va
     }
   }
   for (const [from, to] of extra.relocated ?? []) relocated.set(from, [...to]);
-  return documentEdit(document, next, {
-    relocated, fields, deleted: [path], ...(extra.discardLayouts ? { discardLayouts: extra.discardLayouts } : {}),
-  });
+  return { relocated, fields, deleted: [path], ...(extra.discardLayouts ? { discardLayouts: extra.discardLayouts } : {}) };
+}
+
+export function rebuildField(document: CompositionDocument, path: EditorPath, value: unknown, extra: Pick<EditReferences, 'relocated' | 'discardLayouts'> = {}): CompositionDocument {
+  return documentEdit(document, replaceAt(document, path, value), rebuildReferences(document, path, value, extra));
+}
+
+/**
+ * A declared edit confined to `scope`: what an operation changes (`candidate`), the subtrees it changes (`scope`, plus the
+ * saved canvas layout when `references.layout` is given) and what it declares about them. `retained` says whether
+ * retained identities are declared too (as `editSubtrees` does) or only `references`.
+ */
+export interface ScopedEdit {
+  readonly candidate: CompositionDocument;
+  readonly scope: readonly EditorPath[];
+  readonly references: EditReferences;
+  readonly retained: boolean;
+}
+
+/**
+ * Applies a `ScopedEdit`. Its declarations speak only for its scope: whatever else the candidate changes is taken first
+ * as an ordinary, undeclared edit (the candidate with every scoped subtree, and a declared layout, put back as they
+ * were), which the boundary keeps or refuses on its own. Only then is the operation's own change made, as declared, from
+ * that result, so a declaration can never stand in for a link change outside its scope. Returns `before` when either step
+ * is refused.
+ */
+export function editWithin(before: CompositionDocument, edit: ScopedEdit): CompositionDocument {
+  const { candidate, scope, references, retained } = edit;
+  if (before === candidate) return candidate;
+  const scoped = scope.map(path => fieldPointer(path));
+  // A scope the candidate or `before` does not hold cannot be put back: the whole candidate is then an ordinary edit.
+  if (scope.some(path => valueAt(before, path) === undefined || valueAt(candidate, path) === undefined)) return documentEdit(before, candidate);
+  /** The candidate with each scoped subtree put back as `before` holds it; wherever nothing else changed, `before`'s own object. */
+  const restore = (from: unknown, to: unknown, path: EditorPath): unknown => {
+    const pointer = fieldPointer(path);
+    if (scoped.includes(pointer)) return from;
+    if (from === to || !scoped.some(base => base.startsWith(`${pointer}/`)) || !from || !to || typeof from !== 'object' || typeof to !== 'object' || Array.isArray(from) !== Array.isArray(to)) return to;
+    const keys = Object.keys(to), held = from as Record<string, unknown>;
+    const children = keys.map(key => restore(held[key], (to as Record<string, unknown>)[key], [...path, Array.isArray(to) ? Number(key) : key]));
+    if (keys.length === Object.keys(held).length && keys.every((key, at) => Object.hasOwn(held, key) && children[at] === held[key])) return from;
+    if (Array.isArray(to)) return children;
+    return Object.fromEntries(keys.map((key, at) => [key, children[at]]));
+  };
+  let outside = restore(before, candidate, []) as CompositionDocument;
+  if (references.layout?.length && outside.studioCanvas !== before.studioCanvas) {
+    const { studioCanvas: _layout, ...rest } = outside;
+    const back = (before.studioCanvas === undefined ? rest : { ...rest, studioCanvas: before.studioCanvas }) as CompositionDocument;
+    outside = Object.keys(back).length === Object.keys(before).length && Object.keys(back).every(key => Reflect.get(back, key) === Reflect.get(before, key)) ? before : back;
+  }
+  let from = before;
+  if (outside !== before) {
+    from = documentEdit(before, outside);
+    if (from === before) return before;
+  }
+  const next = retained ? editSubtrees(from, candidate, references) : documentEdit(from, candidate, references);
+  return next === from ? before : next;
 }
 
 /** What `changeFieldVariant` copies from the old value into the new one, unchanged and at the same key. */
@@ -79,6 +132,15 @@ const layoutCount = (document: CompositionDocument) => {
   return stored?.success ? stored.data.canvases.reduce((count, canvas) => count + canvas.roots.length, 0) : 0;
 };
 
+/** The type change of the field at `path` (see `changeFieldType`) as a scoped edit: it changes, and speaks for, that field only. */
+export function fieldTypeEdit(document: CompositionDocument, path: EditorPath, schema: SchemaField, key: string): ScopedEdit {
+  const previous = valueAt(document, path) as Json, value = changeFieldVariant(schema, previous, document, key);
+  const kept = value && typeof value === 'object' && !Array.isArray(value) && previous && typeof previous === 'object' && !Array.isArray(previous)
+    ? keptAcrossTypes.filter(field => Object.hasOwn(value, field) && Object.hasOwn(previous, field)) : [];
+  const relocated = new Map(kept.map(field => { const pointer = fieldPointer([...path, field]); return [pointer, [pointer]] as const; }));
+  return { candidate: replaceAt(document, path, value), scope: [path], references: rebuildReferences(document, path, value, { relocated, discardLayouts: [path] }), retained: false };
+}
+
 /**
  * A field's type change (the variant picker) as a declared edit. The old value is rebuilt as the new type: whatever lived
  * under it is declared deleted, so an automatic binding or component parameter binding into it is removed, and every saved
@@ -88,11 +150,7 @@ const layoutCount = (document: CompositionDocument) => {
  * linked is lost, so nothing needs asking); `document` comes back unchanged when the boundary refuses.
  */
 export function changeFieldType(document: CompositionDocument, path: EditorPath, schema: SchemaField, key: string): { document: CompositionDocument; bindings: number; layouts: number } {
-  const previous = valueAt(document, path) as Json, value = changeFieldVariant(schema, previous, document, key);
-  const kept = value && typeof value === 'object' && !Array.isArray(value) && previous && typeof previous === 'object' && !Array.isArray(previous)
-    ? keptAcrossTypes.filter(field => Object.hasOwn(value, field) && Object.hasOwn(previous, field)) : [];
-  const relocated = new Map(kept.map(field => { const pointer = fieldPointer([...path, field]); return [pointer, [pointer]] as const; }));
-  const next = rebuildField(document, path, value, { relocated, discardLayouts: [path] });
+  const next = editWithin(document, fieldTypeEdit(document, path, schema, key));
   return { document: next, bindings: next === document ? 0 : linkCount(document) - linkCount(next), layouts: next === document ? 0 : layoutCount(document) - layoutCount(next) };
 }
 

@@ -5,7 +5,7 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
 import { compileCompositionDocument, supportedCompositionCapabilities } from '../../shared/composition/compiler';
 import { canonicalOfBounded } from '../../shared/composition/json';
-import { lift, projectGraph, type CanvasHost, type CanvasLens, type CanvasSnapshot, type CanvasWriteResult, type LogicGraph } from '../../shared/composition/graph';
+import { lift, projectGraph, type CanvasHost, type CanvasLens, type CanvasSnapshot, type CanvasWriteResult, type GraphSourceMap, type LogicGraph } from '../../shared/composition/graph';
 import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { readStudioCanvas } from '../../shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema } from '../../shared/composition/studio-logic/schemas';
@@ -13,7 +13,7 @@ import { sameJson } from '../../sameJson';
 import { replaceAt, valueAt, type EditorPath } from '../../composition-editor';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import { documentEdit } from '../editors/documentEdit';
-import { canvasReferences, editSubtrees, retargetLogicLayout, type CanvasProvenance } from '../editors/provenance';
+import { canvasReferences, editSubtrees, editWithin, retargetLogicLayout, type CanvasProvenance, type ScopedEdit } from '../editors/provenance';
 import type { EditReferences } from '../editors/documentEdit';
 import FlowCanvas, { arrangeCanvas, type CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import type { CanvasObservations } from '../canvas/observations';
@@ -85,7 +85,8 @@ export function canonicalBody(view: CompositionDocument, path: EditorPath): Comp
  * Done of a value editor over a template body, as a declared edit of `document`: the slot view handed back as the canonical
  * body. The body field is rebuilt in place. Its saved canvas layout comes from the editor, which already checked each edit,
  * so the body's roots are the layout this edit writes; canvas nodes (or roots) of the body the editor no longer holds are
- * declared deleted with their origins. Every other link and layout stays exactly as it was, or the edit is refused.
+ * declared deleted with their origins. These declarations speak for the body and its layout only (`editWithin`): anything
+ * else the view changed is an ordinary edit, which keeps every other link and layout exactly as it was or is refused.
  */
 export function bodyFromSlotView(document: CompositionDocument, view: CompositionDocument, path: EditorPath): CompositionDocument {
   const candidate = canonicalBody(view, path), body = fieldPointer(path), deleted: EditorPath[] = [];
@@ -98,7 +99,45 @@ export function bodyFromSlotView(document: CompositionDocument, view: Compositio
     for (const node of canvas.nodes) if (node.rootId === root.id && !saved.nodes.some(next => next.id === node.id))
       for (const origin of node.origins) deleted.push([...pointerPath(target), ...pointerPath(origin)]);
   }
-  return editSubtrees(document, candidate, { fields: new Map([[body, [body]]]), layout: [path], ...(deleted.length ? { deleted } : {}) });
+  return editWithin(document, { candidate, scope: [path], retained: true, references: { fields: new Map([[body, [body]]]), layout: [path], ...(deleted.length ? { deleted } : {}) } });
+}
+
+/**
+ * The source map of a canvas opened to combine the field at `at` (relative to the canvas root) with a second check: both
+ * copies of the field (`<at>/of/0`, `<at>/of/1`) map back to the field as authored, the combining block itself (`<at>`)
+ * maps nowhere because the document does not hold it yet, and every location outside the field is kept as lifted.
+ */
+export function combinedSourceMap(sourceMap: GraphSourceMap, at: string): GraphSourceMap {
+  const copy = new RegExp(`^${at.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/of/[01](?=/|$)`);
+  return sourceMap.flatMap(location => copy.test(location.pointer) ? [{ ...location, pointer: location.pointer.replace(copy, at) }]
+    : location.pointer === at || location.pointer.startsWith(`${at}/`) ? [] : [location]);
+}
+
+/**
+ * A canvas Apply through a value editor's slot view as a scoped edit of the slot view's document `inner`. `writes` are the
+ * canonical places the canvas replaces (as `before`'s anchors resolve). One inside the template body is made where the
+ * slot view holds the operand (`logicLibrary/<i>/body`, or its `value` under an `expr` wrapper; a read or a text slot
+ * stays a slot, wrapping the new operand when it needs one), and the canvas provenance is written for that place. The edit
+ * speaks for the places it writes only; `placed` is where each write's operand now sits, for the saved layout.
+ */
+export function slotApplyEdit(inner: CompositionDocument, slotPath: EditorPath, kind: LogicFieldKind, writes: readonly { path: EditorPath; ast: Json }[],
+  generated: { readonly generatedSources: readonly unknown[]; readonly generatedLibrary: readonly unknown[] }, previous: CanvasProvenance, provenance: CanvasProvenance): ScopedEdit & { placed: EditorPath[] } {
+  const slot = fieldPointer(slotPath), inside = (path: EditorPath) => fieldPointer(path) === slot || fieldPointer(path).startsWith(`${slot}/`);
+  let next = inner;
+  const bases: EditorPath[] = [], placed: EditorPath[] = [], scope: EditorPath[] = [];
+  for (const { path, ast } of writes) {
+    if (!inside(path)) { bases.push(path); placed.push(path); scope.push(path); next = fieldAdapters[kind].write(next, path, ast); continue; }
+    const base = [...slotBase(next, slotPath), ...path.slice(slotPath.length)];
+    bases.push(base);
+    if (base.length > path.length || fieldPointer(path) !== slot) { placed.push(base); scope.push(base); next = fieldAdapters[kind].write(next, base, ast); continue; }
+    next = replaceAt(next, slotPath, operandSlot(ast as unknown as Operand, valueAt(next, slotPath)));
+    placed.push(slotBase(next, slotPath)); scope.push(slotPath);
+  }
+  if (generated.generatedSources.length) next = { ...next, dataSources: [...next.dataSources, ...generated.generatedSources] } as CompositionDocument;
+  if (generated.generatedLibrary.length) next = { ...next, logicLibrary: [...next.logicLibrary ?? [], ...generated.generatedLibrary] } as CompositionDocument;
+  let references = canvasReferences(bases, previous, provenance);
+  bases.forEach((base, index) => { references = rebased(references, base, placed[index]); });
+  return { candidate: next, scope, references, retained: true, placed };
 }
 
 /** Canonical views over slot-view drafts: what each one reads, so a canvas Apply can write where the slot view holds the body. */
@@ -194,8 +233,7 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
       let graph = lifted.graph;
       if (!layout.metadata || field.combine) graph = arrangeCanvas(graph);
       setError('');
-      const sourceMap = field.combine ? lifted.sourceMap.flatMap(location => /^\/of\/[01](?:\/|$)/.test(location.pointer)
-        ? [{ ...location, pointer: location.pointer.replace(/^\/of\/[01]/, '') }] : []) : lifted.sourceMap;
+      const sourceMap = field.combine ? combinedSourceMap(lifted.sourceMap, fieldPointer(field.path.slice(scoped.path.length))) : lifted.sourceMap;
       setOpened({ ...scoped, graph, sourceMap, returnFocus: globalThis.document.activeElement instanceof HTMLElement ? globalThis.document.activeElement : null });
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   }, []);
@@ -270,29 +308,16 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
    */
   async function applyThroughSlot(transaction: Parameters<CanvasHost['apply']>[0], layout: CanvasLayoutHandoff | undefined, before: CompositionDocument,
     slot: { readonly draft: Draft; readonly path: EditorPath }): Promise<CanvasWriteResult> {
-    const inner = slot.draft.get(), inside = (path: EditorPath) => fieldPointer(path) === fieldPointer(slot.path) || fieldPointer(path).startsWith(`${fieldPointer(slot.path)}/`);
-    let next = inner, references: EditReferences = {};
-    const paths: EditorPath[] = [], bases: EditorPath[] = [], placed: EditorPath[] = [];
+    const inner = slot.draft.get(), writes: { path: EditorPath; ast: Json }[] = [], paths: EditorPath[] = [];
     for (const replacement of transaction.replacements) {
       const resolved = resolveLogicAnchor(before, appliedAnchors.current.get(canonicalOfBounded(replacement.anchor)) ?? replacement.anchor);
       if (!resolved) return invalid('The logic owner moved or was removed. Local canvas edits have been retained.');
-      const path = pointerPath(resolved.pointer); paths.push(path);
-      if (!inside(path)) { bases.push(path); placed.push(path); next = fieldAdapters[field.kind].write(next, path, replacement.ast as Json); continue; }
-      const base = [...slotBase(next, slot.path), ...path.slice(slot.path.length)];
-      bases.push(base);
-      if (base.length > path.length || fieldPointer(path) !== fieldPointer(slot.path)) { placed.push(base); next = fieldAdapters[field.kind].write(next, base, replacement.ast as Json); continue; }
-      // The slot is the operand itself (a read or a text): keep it a slot, wrapping the new operand when it needs one.
-      next = replaceAt(next, slot.path, operandSlot(replacement.ast as unknown as Operand, valueAt(next, slot.path)));
-      placed.push(slotBase(next, slot.path));
+      const path = pointerPath(resolved.pointer); paths.push(path); writes.push({ path, ast: replacement.ast as Json });
     }
-    if (transaction.generatedSources.length) next = { ...next, dataSources: [...next.dataSources, ...transaction.generatedSources] } as CompositionDocument;
-    if (transaction.generatedLibrary.length) next = { ...next, logicLibrary: [...next.logicLibrary ?? [], ...transaction.generatedLibrary] } as CompositionDocument;
     const provenance = layout ?? { graph: workingRef.current, sourceMap: projectGraph(workingRef.current).sourceMap };
-    references = canvasReferences(bases, appliedProvenance.current, provenance);
-    bases.forEach((base, index) => { references = rebased(references, base, placed[index]); });
-    const proposed = next;
-    next = editSubtrees(inner, next, references);
-    if (next === inner && proposed !== inner) return invalid("This change can't keep its linked values, so it wasn't applied.");
+    const edit = slotApplyEdit(inner, slot.path, field.kind, writes, transaction, appliedProvenance.current, provenance), placed = edit.placed;
+    let next = editWithin(inner, edit);
+    if (next === inner && edit.candidate !== inner) return invalid("This change can't keep its linked values, so it wasn't applied.");
     if (layout) next = saveCanvasLayout(next, transaction.replacements, layout, { document: inner, paths: placed });
     const canonical = canonicalBody(next, slot.path);
     compileCompositionDocument(canonical);

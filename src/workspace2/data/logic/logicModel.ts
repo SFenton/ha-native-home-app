@@ -9,7 +9,7 @@ import { replacePointer, resolveLogicAnchor } from '../../../shared/composition/
 import { fieldSteps } from '../../../shared/composition/components';
 import { fieldAnchor, fieldPointer, pointerPath } from '../../logic-fields/registry';
 import { operandSlot, slotOperand } from '../../expr/tokens';
-import { copySubtree, editSubtrees } from '../../editors/provenance';
+import { copySubtree, editSubtrees, editWithin, type ScopedEdit } from '../../editors/provenance';
 import {
   argFits, expandLogic, MAX_LOGIC_ENTRIES, MAX_LOGIC_PARAMS, type LogicEntry,
 } from '../../../shared/composition/logic-library';
@@ -200,9 +200,18 @@ const fillHoles = (value: unknown, name: string, replacement: unknown): unknown 
  * binding or a component parameter binding that filled it in is removed with it, and every other link stays exactly as it was.
  */
 export function removeSetting(document: CompositionDocument, id: string, name: string): CompositionDocument {
+  const edit = settingRemovalEdit(document, id, name);
+  return edit ? editWithin(document, edit) : document;
+}
+
+/**
+ * Remove Setting as a scoped edit: it changes, and speaks for, the template's entry and each use's `args` only. Undefined when the template or the
+ * setting is gone.
+ */
+export function settingRemovalEdit(document: CompositionDocument, id: string, name: string): ScopedEdit | undefined {
   const entry = entryOf(document, id);
   const param = entry?.params.find(item => item.name === name);
-  if (!entry || !param) return document;
+  if (!entry || !param) return undefined;
   const next = mapEntry(document, id, held => ({ ...held, params: held.params.filter(item => item.name !== name), body: fillHoles(held.body, name, param.sample ?? defaultSample(settingKindOf(param))) as Rec }));
   const deleted: EditorPath[] = [];
   const strip = (value: unknown, path: EditorPath): unknown => {
@@ -224,22 +233,37 @@ export function removeSetting(document: CompositionDocument, id: string, name: s
     }
     return out ?? value;
   };
-  return editSubtrees(document, strip(next, []) as CompositionDocument, { deleted });
+  const at = document.logicLibrary!.findIndex(held => held.id === id);
+  return { candidate: strip(next, []) as CompositionDocument, scope: [['logicLibrary', at], ...deleted.map(path => path.slice(0, -1))], references: { deleted }, retained: true };
 }
 
-/** The tiles a link fills in: a place on a page or sheet by its node, or, inside a tile template, each place of that template. */
+/**
+ * The tiles a link fills in, each counted once however many of its links are lost: a place on a page or sheet by its node; inside a tile template, the
+ * template's node at each of the template's placements. A placement is every component-ref that shows the template on a page or sheet, also through
+ * another template that holds it (one per placement of that one), so two linked tiles in a template shown twice are four tiles.
+ */
 function filledTiles(before: CompositionDocument, after: CompositionDocument): number {
-  const tiles = new Set<string>();
-  const places = (componentId: string) => componentLocations(before, true).filter(({ node }) => node.type === 'component-ref' && node.componentId === componentId).map(({ node }) => node.id);
+  const tiles = new Set<string>(), located = componentLocations(before, true), placements = new Map<string, string[]>();
+  const placementsOf = (componentId: string, visiting: ReadonlySet<string> = new Set()): string[] => {
+    const known = placements.get(componentId);
+    if (known) return known;
+    if (visiting.has(componentId)) return [];
+    const inside = new Set([...visiting, componentId]);
+    const found = located.filter(({ node }) => node.type === 'component-ref' && node.componentId === componentId).flatMap(({ node, path }) =>
+      path[0] === 'componentLibrary' ? placementsOf(before.componentLibrary![Number(path[1])].id, inside).map(outer => `${outer}/${node.id}`) : [`${path[0]}:${path[1]}/${node.id}`]);
+    placements.set(componentId, found);
+    return found;
+  };
   const kept = new Set((after.logicUseBindings ?? []).map(binding => JSON.stringify(binding)));
   for (const binding of before.logicUseBindings ?? []) {
     if (kept.has(JSON.stringify(binding))) continue;
-    if (binding.use.kind === 'component') for (const place of places(binding.use.id)) tiles.add(place);
+    if (binding.use.kind === 'component') for (const place of placementsOf(binding.use.id)) tiles.add(`${place}:${binding.use.nodeId ?? ''}`);
     else tiles.add(binding.use.kind === 'document' ? 'document' : `${binding.use.kind}:${binding.use.id}:${binding.use.nodeId ?? binding.use.field}`);
   }
   for (const entry of before.componentLibrary ?? []) {
     const held = new Set((after.componentLibrary?.find(next => next.id === entry.id)?.bindings ?? []).map(binding => JSON.stringify(binding)));
-    if ((entry.bindings ?? []).some(binding => !held.has(JSON.stringify(binding)))) for (const place of places(entry.id)) tiles.add(place);
+    for (const binding of entry.bindings ?? []) if (!held.has(JSON.stringify(binding)))
+      for (const place of placementsOf(entry.id)) tiles.add(`${place}:${binding.nodeId ?? ''}`);
   }
   return tiles.size;
 }

@@ -16,15 +16,18 @@ import type { Operand } from '../../../src/shared/composition/expression';
 import type { Json } from '../../../src/shared/types';
 import { createDraft } from '../../../src/workspace2/editors/draft';
 import { LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
-import { changeFieldType, replaceDocument } from '../../../src/workspace2/editors/provenance';
-import { moveFlowStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
+import { changeFieldType, editWithin, fieldTypeEdit, replaceDocument } from '../../../src/workspace2/editors/provenance';
+import { flowStepMoveEdit, moveFlowStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import LogicSettings from '../../../src/workspace2/data/logic/LogicSettings';
 import { removeSettingPlan } from '../../../src/workspace2/data/logic/logicModel';
-import { LogicFieldsProvider, bodyFromSlotView, canonicalBody, operandBodyDraft, slotBodyView, useLogicFields } from '../../../src/workspace2/logic-fields/LogicFields';
+import { LogicFieldsProvider, bodyFromSlotView, canonicalBody, combinedSourceMap, operandBodyDraft, slotApplyEdit, slotBodyView, useLogicFields } from '../../../src/workspace2/logic-fields/LogicFields';
 import { liftField } from '../../../src/workspace2/logic-fields/registry';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
 import { toastManager } from '../../../src/workspace2/toasts';
 import { houseFrom } from '../../../src/preview2/projections';
+import { projectGraph } from '../../../src/shared/composition/graph';
+import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
+import { binding, componentDocument, tile } from '../draft/fixtures';
 import { LiveHouse } from '../../../src/preview2/live-house';
 import { deriveTheme } from '../../../src/workspace2/theme';
 import { resetLiveRuns } from '../../../src/workspace2/data/liveRun';
@@ -133,6 +136,45 @@ describe('Remove Setting asks before tiles lose the value they fill in', () => {
     expect(removeSettingPlan(sampledComponent, 'tile-label', 'sourceId').tiles).toBe(3);
     expect(() => removeSettingPlan(document, 'tile-label', 'sourceId')).toThrow('Give “sourceId” a Try With value its template can read, then remove it.');
   });
+
+  /** Two linked tiles inside one tile template, the template placed twice: four tiles fill the setting in. */
+  function pairedTemplate(secondLinkOnFirstTile: boolean) {
+    const raw = componentDocument(), inner = raw.componentLibrary[0].node;
+    const first = secondLinkOnFirstTile ? { ...inner, visibleWhen: { type: 'compare', op: 'eq', left: structuredClone(inner.props.subtitle.value), right: text('Demo') }, whenUnknown: 'keep' } : inner;
+    const bindings = ['inner-tile', 'inner-second'].map(nodeId => ({ ...binding(nodeId), use: { kind: 'component', id: 'saved-tile', nodeId, field: '/props/subtitle/value' } }));
+    if (secondLinkOnFirstTile) bindings.push({ ...binding('inner-tile'), use: { kind: 'component', id: 'saved-tile', nodeId: 'inner-tile', field: '/visibleWhen/left' } });
+    return compileCompositionDocument({
+      ...raw,
+      logicLibrary: raw.logicLibrary.map(entry => ({ ...entry, params: [{ name: 'source', kind: 'source-id', sample: 'source-b' }] })),
+      componentLibrary: [{ ...raw.componentLibrary[0], node: { id: 'pair', type: 'stack', title: 'Pair', layout: { span: 1 },
+        props: { axis: 'vertical', spacing: { type: 'token', name: 's' } }, children: [first, tile('inner-second', 'source-a')] } }],
+      logicUseBindings: bindings,
+    } as unknown as CompositionDocument).document;
+  }
+
+  it('counts each linked tile inside a tile template at each of its placements', () => {
+    const before = pairedTemplate(false);
+    expect(before.pages[0].components.filter(node => node.type === 'component-ref')).toHaveLength(2);
+    const plan = removeSettingPlan(before, 'tile-label', 'source');
+    expect(plan.tiles).toBe(4);
+    expect(plan.document.logicUseBindings).toEqual([]);
+    valid(plan.document);
+  });
+
+  it('counts a tile once however many of its links are lost, but each different tile in the template', () => {
+    const before = pairedTemplate(true);
+    expect(before.logicUseBindings).toHaveLength(3);
+    const plan = removeSettingPlan(before, 'tile-label', 'source');
+    expect(plan.tiles).toBe(4);
+    expect(plan.document.logicUseBindings).toEqual([]);
+    // On a page: tile-a with two links and tile-b with one are two tiles.
+    const base = replaceAt(linked(), ['logicLibrary', 0, 'params', 0, 'sample'], 'source-b'), root = ['pages', 0, 'components', 0];
+    const use = structuredClone(valueAt(base, ['pages', 0, 'components', 0, 'props', 'subtitle', 'value']));
+    const twice = replaceAt(base, root, { ...valueAt(base, root) as object, visibleWhen: { type: 'compare', op: 'eq', left: use, right: text('sensor.demo_1') }, whenUnknown: 'keep' });
+    const page = { ...twice, logicUseBindings: [...twice.logicUseBindings!, { ...twice.logicUseBindings![0], use: { ...twice.logicUseBindings![0].use, field: '/visibleWhen/left' } }] };
+    valid(page);
+    expect(removeSettingPlan(page, 'tile-label', 'source').tiles).toBe(2);
+  });
 });
 
 describe("A field's type change asks before linked values go", () => {
@@ -181,44 +223,66 @@ describe("A field's type change asks before linked values go", () => {
 
   it('is refused whole when the type change is not declared', () => {
     const before = linked(), draft = createDraft(before), notice = refusals();
-    draft.set(replaceAt(before, root, structuredClone(changeFieldType(before, root, textType(), 'tile').document.pages[0].components[0])));
+    // The very candidate the type change makes, without what it declares.
+    draft.set(fieldTypeEdit(before, root, textType(), 'tile').candidate);
     expect(draft.get()).toBe(before); expect(refused(notice)).toBe(1);
+    // Declared, the same change also refuses an unrelated binding removal made with it.
+    const edit = fieldTypeEdit(before, root, textType(), 'tile');
+    expect(editWithin(before, { ...edit, candidate: { ...edit.candidate, logicUseBindings: edit.candidate.logicUseBindings!.slice(0, 2) } })).toBe(before);
+    expect(refused(notice)).toBe(2);
   });
 });
 
 describe('Reordering flow steps carries their saved layout', () => {
+  /** A flow of two steps with a saved layout of the whole flow: a node per step and per input, each at its own place and in its own group. */
   function withFlowLayout() {
     const made = newFlow(linked(), 'group');
     let document = updateFlow(made.document, made.id, inputs => ({ ...inputs, steps: [{ id: 'one', op: 'limit', count: 10 }, { id: 'two', op: 'limit', count: 20 }] }));
-    const at = document.dataSources.findIndex(source => source.id === made.id), graph = liftField(document, ['dataSources', at, 'inputs'], 'flow').graph;
-    const extra = encodeStudioCanvas(document, [{ id: 'flow-layout', roots: [{ anchor: graph.roots[0].anchor, nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins, x: 40, y: 700 })) }] }]);
+    const at = document.dataSources.findIndex(source => source.id === made.id), graph = liftField(document, ['dataSources', at], 'flow').graph;
+    const extra = encodeStudioCanvas(document, [{ id: 'flow-layout', roots: [{ anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, index) => ({ id: node.id, origins: node.origins, x: index * 100, y: 700 + index * 40 })) }] }]);
+    extra.canvases[0].groups = extra.canvases[0].nodes.map((node, index) => ({ id: `group-${index}`, label: `Group ${index}`, nodeIds: [node.id] }));
     const stored = studioCanvasMetadataSchema.parse(document.studioCanvas);
     document = { ...document, studioCanvas: { ...stored, canvases: [...stored.canvases, ...extra.canvases] } };
-    return { document, id: made.id, at };
+    valid(document);
+    return { document, id: made.id, at, saved: extra.canvases[0] };
   }
+  const flowCanvas = (value: CompositionDocument) => studioCanvasMetadataSchema.parse(value.studioCanvas).canvases.find(canvas => canvas.id === 'flow-layout')!;
 
-  it('moves a step without asking, keeps every node position and link, and is one undo step', () => {
-    const { document, id, at } = withFlowLayout(), draft = createDraft(document), notice = refusals();
+  it('moves a step without asking, each step\'s node keeping its position and group, and is one undo step', () => {
+    const { document, id, at, saved } = withFlowLayout(), draft = createDraft(document), notice = refusals();
+    const steps = saved.nodes.filter(node => node.origins.some(origin => /^\/inputs\/steps\/[01](?:\/|$)/.test(origin)));
+    expect(new Set(steps.map(node => node.origins[0].split('/')[3])).size).toBe(2);
     draft.set(moveFlowStep(document, id, 0, 1));
     expect(refused(notice)).toBe(0);
     const after = draft.get();
     expect((valueAt(after, ['dataSources', at, 'inputs', 'steps']) as { id: string }[]).map(step => step.id)).toEqual(['two', 'one']);
     expect(after.logicUseBindings).toBe(document.logicUseBindings);
-    const layout = (value: CompositionDocument) => studioCanvasMetadataSchema.parse(value.studioCanvas).canvases;
-    expect(layout(after).slice(0, -1)).toEqual(layout(document).slice(0, -1));
-    expect(layout(after).at(-1)!.nodes.map(node => [node.origins, node.x, node.y])).toEqual([[[''], 40, 700]]);
+    const layout = (value: CompositionDocument) => studioCanvasMetadataSchema.parse(value.studioCanvas).canvases.filter(canvas => canvas.id !== 'flow-layout');
+    expect(layout(after)).toEqual(layout(document));
+    // Every node follows its step: origins under step 0 are now under step 1 and back, at the same place, in the same group.
+    const held = flowCanvas(after), swap = (origin: string) => origin.replace(/^\/inputs\/steps\/([01])(?=\/|$)/, (_, index) => `/inputs/steps/${index === '0' ? 1 : 0}`);
+    expect(held.nodes).toHaveLength(saved.nodes.length);
+    for (const old of saved.nodes) {
+      const moved = held.nodes.find(node => JSON.stringify(node.origins) === JSON.stringify(old.origins.map(swap)));
+      expect(moved, old.origins.join(',')).toBeDefined();
+      expect([moved!.x, moved!.y]).toEqual([old.x, old.y]);
+      expect(held.groups!.filter(group => group.nodeIds.includes(moved!.id)).map(group => group.id)).toEqual(saved.groups!.filter(group => group.nodeIds.includes(old.id)).map(group => group.id));
+    }
+    expect(readStudioCanvas(after).warnings).toEqual([]);
     valid(after);
     act(() => draft.undo()); expect(draft.get()).toBe(document);
     act(() => draft.redo()); expect(draft.get()).toBe(after);
   });
 
-  it('does nothing past either end, and is refused whole when the move is not declared', () => {
+  it('does nothing past either end; the same move undeclared, or with an unrelated binding removal, is refused whole', () => {
     const { document, id } = withFlowLayout();
     expect(moveFlowStep(document, id, 0, -1)).toBe(document);
     expect(moveFlowStep(document, id, 1, 1)).toBe(document);
-    const draft = createDraft(document), notice = refusals();
-    draft.set(updateFlow(document, id, inputs => ({ ...inputs, steps: [inputs.steps[1], inputs.steps[0]] })));
+    const draft = createDraft(document), notice = refusals(), edit = flowStepMoveEdit(document, id, 0, 1)!;
+    draft.set(edit.candidate);
     expect(draft.get()).toBe(document); expect(refused(notice)).toBe(1);
+    expect(editWithin(document, { ...edit, candidate: { ...edit.candidate, logicUseBindings: edit.candidate.logicUseBindings!.slice(1) } })).toBe(document);
+    expect(refused(notice)).toBe(2);
   });
 });
 
@@ -233,7 +297,8 @@ describe('Canvas Apply over a template body slot view in a linked document', () 
   /** A linked document (automatic bindings, component bindings, saved layouts) whose `other-label` body is a rule, so its slot view wraps it. */
   function document(bodyLayout: boolean) {
     let value = linked();
-    value = replaceAt(value, path, { type: 'choose', cases: [{ when: check, then: valueAt(value, path) }], otherwise: text('Guest') });
+    // A clone, as a parsed document holds it: the fixture's two templates share one body object, which no JSON document can.
+    value = replaceAt(value, path, { type: 'choose', cases: [{ when: check, then: structuredClone(valueAt(value, path)) }], otherwise: text('Guest') });
     if (bodyLayout) {
       const graph = liftField(value, path, 'operand').graph, stored = studioCanvasMetadataSchema.parse(value.studioCanvas);
       const extra = encodeStudioCanvas(value, [{ id: 'body-layout', roots: [{ anchor: graph.roots[0].anchor, nodes: graph.nodes.map((node, at) => ({ id: node.id, origins: node.origins, x: at * 80, y: 500 })) }] }]);
@@ -303,5 +368,71 @@ describe('Canvas Apply over a template body slot view in a linked document', () 
     expect(body(done)).toEqual(body(real));
     expect(others(done)).toEqual(others(real));
     expect(done.logicUseBindings).toBe(real.logicUseBindings);
+  });
+
+  /** `document(true)` with every node of the body's saved layout in one group, when asked. */
+  const grouped = (groups: boolean) => {
+    const value = document(true);
+    if (!groups) return value;
+    const stored = studioCanvasMetadataSchema.parse(value.studioCanvas);
+    return { ...value, studioCanvas: { ...stored, canvases: stored.canvases.map(canvas => canvas.id === 'body-layout' ? { ...canvas, groups: [{ id: 'all', label: 'All', nodeIds: canvas.nodes.map(node => node.id) }] } : canvas) } };
+  };
+  const bodyCanvas = (value: CompositionDocument) => studioCanvasMetadataSchema.parse(value.studioCanvas).canvases.find(canvas => canvas.id === 'body-layout')!;
+
+  it.each([false, true])('adds an And check inside a body that has a saved layout, through the slot view and canonically; groups=%s', async groups => {
+    const real = grouped(groups), view = slotBodyView(real, path, valueAt(real, path) as Operand), pushed = createDraft(view), notice = refusals();
+    await applyOnCanvas(real, canvas => canvas.open({ draft: pushed, path: [...path, 'value', 'cases', 0, 'when'], kind: 'condition', label: 'Rule', combine: 'all' }));
+    expect(screen.getAllByText('Edits applied to the draft. Not published.').length).toBeGreaterThan(0);
+    expect(refused(notice)).toBe(0);
+    const applied = pushed.get();
+    expect(valueAt(applied, [...path, 'value', 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
+    expect(applied.logicUseBindings).toBe(view.logicUseBindings);
+    expect(others(applied)).toEqual(others(view));
+    // The body's saved layout is the one the canvas handed back (a combine tidies the canvas, so positions are its own): the
+    // same root, every node it had still placed (origins under the combined check now in its copies), and the group kept.
+    const kept = bodyCanvas(applied), previous = bodyCanvas(view);
+    expect(kept.roots.map(root => root.anchor)).toEqual([{ kind: 'logic', id: 'other-label', field: '/body/value' }]);
+    expect(kept.nodes.length).toBeGreaterThan(previous.nodes.length);
+    const placedOrigins = new Set(kept.nodes.flatMap(node => node.origins));
+    for (const node of previous.nodes) for (const origin of node.origins)
+      expect(placedOrigins.has(origin) || placedOrigins.has(origin.replace(/^\/cases\/0\/when(?=\/|$)/, '/cases/0/when/of/0')), origin).toBe(true);
+    if (groups) {
+      const group = kept.groups!.find(group => group.id === 'all')!;
+      expect(group.nodeIds.length).toBeGreaterThanOrEqual(previous.nodes.length);
+      for (const id of group.nodeIds) expect(kept.nodes.some(node => node.id === id)).toBe(true);
+    } else expect(kept.groups ?? []).toEqual([]);
+    expect(readStudioCanvas(applied).warnings).toEqual([]);
+    act(() => pushed.undo()); expect(pushed.get()).toBe(view);
+    act(() => pushed.redo()); expect(pushed.get()).toBe(applied);
+    const done = createDraft(real);
+    done.set(bodyFromSlotView(real, applied, path));
+    expect(refused(notice)).toBe(0);
+    expect(valueAt(done.get(), [...path, 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
+    expect(bodyCanvas(done.get()).roots.map(root => root.anchor)).toEqual([{ kind: 'logic', id: 'other-label', field: '/body' }]);
+    valid(done.get());
+    cleanup();
+
+    // The same edit on the canonical body (no slot view) is applied too.
+    const canonical = createDraft(real);
+    await applyOnCanvas(real, canvas => canvas.open({ draft: canonical, path: [...path, 'cases', 0, 'when'], kind: 'condition', label: 'Rule', combine: 'all' }));
+    expect(refused(notice)).toBe(0);
+    expect(valueAt(canonical.get(), [...path, 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
+    expect(bodyCanvas(canonical.get()).nodes.length).toBeGreaterThan(bodyCanvas(real).nodes.length);
+  });
+
+  it('declares an Apply through the slot view for the places it writes only: an unrelated binding removal with it is refused', () => {
+    const real = document(false), view = slotBodyView(real, path, valueAt(real, path) as Operand), notice = refusals();
+    // What the canvas works from and hands back when it combines the body's rule with a second check.
+    const when = [...path, 'cases', 0, 'when'], working = replaceAt(real, when, { type: 'all', of: [check, check] });
+    const lifted = liftField(working, path, 'operand'), projected = projectGraph(lifted.graph);
+    const edit = slotApplyEdit(view, path, 'operand', [{ path, ast: projected.ast }], { generatedSources: [], generatedLibrary: [] },
+      { graph: lifted.graph, sourceMap: combinedSourceMap(lifted.sourceMap, '/cases/0/when') }, { graph: lifted.graph, sourceMap: projected.sourceMap });
+    expect(edit.placed).toEqual([[...path, 'value']]);
+    expect(editWithin(view, { ...edit, candidate: { ...edit.candidate, logicUseBindings: edit.candidate.logicUseBindings!.slice(1) } })).toBe(view);
+    expect(refused(notice)).toBe(1);
+    const applied = editWithin(view, edit);
+    expect(applied).not.toBe(view); expect(refused(notice)).toBe(1);
+    expect(valueAt(applied, [...path, 'value', 'cases', 0, 'when'])).toEqual({ type: 'all', of: [check, check] });
+    expect(applied.logicUseBindings).toBe(view.logicUseBindings);
   });
 });

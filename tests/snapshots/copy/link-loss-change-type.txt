@@ -1,0 +1,19 @@
+Change Tile to Text?
+1 linked value can't carry over to Text, so it will be removed.
+Cancel
+Change Type
+
+Change Tile to Text?
+1 saved canvas layout can't carry over to Text, so it will be removed.
+Cancel
+Change Type
+
+Change Tile to Text?
+1 linked value and 1 saved canvas layout can't carry over to Text, so they will be removed.
+Cancel
+Change Type
+
+Change to Text?
+3 linked values and 2 saved canvas layouts can't carry over to Text, so they will be removed.
+Cancel
+Change Type

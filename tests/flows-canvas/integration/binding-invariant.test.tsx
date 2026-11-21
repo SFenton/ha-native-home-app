@@ -23,7 +23,7 @@ import TokenField, { writeParts } from '../../../src/workspace2/expr/TokenField'
 import TokenSettings from '../../../src/workspace2/expr/TokenSettings';
 import RulesList from '../../../src/workspace2/expr/RulesList';
 import RulePage, { duplicateRule } from '../../../src/workspace2/expr/RulePage';
-import { bodyWithSamples, deleteEntry, removeSetting, removeSettingPlan, saveLogicTemplate, workedOut } from '../../../src/workspace2/data/logic/logicModel';
+import { bodyWithSamples, deleteEntry, removeSetting, removeSettingPlan, saveLogicTemplate, settingRemovalEdit, workedOut } from '../../../src/workspace2/data/logic/logicModel';
 import { resolvedLogicValue, unlinkTemplate } from '../../../src/workspace2/logic-fields/templates';
 import { evaluateOperand as editorValue, registerFill } from '../../../src/workspace2/data/logic/logicEval';
 import { useSentence } from '../../../src/workspace2/data/logic/logicNames';
@@ -36,7 +36,7 @@ import { newToken, operandSlot, slotOperand } from '../../../src/workspace2/expr
 import { toSlot } from '../../../src/workspace2/expr/value';
 import { authoredNodes, walkableList, walkableOwner, walkedOwnerLists } from '../../../src/workspace2/logic-fields/registry';
 import { documentEdit as wholeDocumentEdit } from './oracle/documentEdit';
-import { canvasReferences, changeFieldType, copySubtree, editSubtrees, rebuildField, replaceDocument } from '../../../src/workspace2/editors/provenance';
+import { canvasReferences, changeFieldType, copySubtree, editSubtrees, editWithin, fieldTypeEdit, rebuildField, replaceDocument, type ScopedEdit } from '../../../src/workspace2/editors/provenance';
 import { bodyFromSlotView, canonicalBody, slotBodyView } from '../../../src/workspace2/logic-fields/LogicFields';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../../../src/workspace2/editors/documentEdit';
 import { WorkspaceDataProvider } from '../../../src/workspace2/pickers/WorkspaceData';
@@ -63,7 +63,7 @@ import { areaAt, duplicateArea } from '../../../src/workspace2/layout/areaOps';
 import { buildDocumentIndex } from '../../../src/preview2/model';
 import { groupPredicate } from '../../../src/workspace2/expr/condition';
 import { writeRule } from '../../../src/workspace2/expr/useRule';
-import { moveFlowStep, moveStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
+import { flowStepMoveEdit, moveFlowStep, moveStep, newFlow, updateFlow } from '../../../src/workspace2/data/flow';
 import { duplicateStyle } from '../../../src/shared/composition/state-style-library';
 import { builtInStyles } from '../../../src/shared/composition/state-styles';
 import type { Json } from '../../../src/shared/types';
@@ -1097,30 +1097,58 @@ describe('fail-closed meaning matrix for remaining transformation areas', () => 
     valid(draft.get()); notice.mockRestore();
   });
 
-  // The same changes made without declaring what they remove or move: the boundary still refuses each one whole.
-  for (const policy of ['fallback', 'keep'] as const) it.each(declaredOperations)(`${policy}: %s without its declaration is cleanly refused`, operation => {
-    const { before, root, flowId } = remainingFixture(operation, policy);
-    const draft = createDraft(before), notice = vi.spyOn(toastManager, 'add');
-    const declared = declaredExpectation(operation, before, flowId);
-    let undeclared: CompositionDocument;
-    if (operation === 'remove bound logic setting') undeclared = JSON.parse(JSON.stringify(declared));
-    else if (operation === 'reorder flow steps') undeclared = updateFlow(before, flowId, inputs => ({ ...inputs, steps: moveStep(inputs.steps, 0, 1) }));
-    else if (operation === 'typed conversion') {
-      const type = fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!;
-      undeclared = replaceAt(before, root, changeFieldVariant(type, valueAt(before, root) as Json, before, 'component'));
-    } else if (operation === 'import') undeclared = importCompositionText(compositionSourceText({ ...before, name: 'Imported layout' }), before.id);
-    else {
-      // What Done did before: the slot view's body set back as is, with no provenance for its layout.
-      const pushed = createDraft(slotBodyView(before, templateBody, valueAt(before, templateBody) as Operand));
-      pushed.set(rebuildField(pushed.get(), [...templateBody, 'value', 'otherwise'], text('Elsewhere')));
-      undeclared = replaceAt(canonicalBody(pushed.get(), templateBody), ['logicLibrary', 1, 'name'], 'Other label');
-      undeclared = JSON.parse(JSON.stringify(undeclared));
+  /**
+   * Each declared operation's own change: the candidate it makes, offered with no declaration (`undeclared`), and the same
+   * change declared as the operation declares it, after `change` (an unrelated edit) is made to the candidate too.
+   */
+  const declaredChange = (operation: RemainingOperation, before: CompositionDocument, root: EditorPath, flowId: string) => {
+    const scoped = (edit: ScopedEdit) => ({ undeclared: edit.candidate, declare: (change: (document: CompositionDocument) => CompositionDocument) => editWithin(before, { ...edit, candidate: change(edit.candidate) }) });
+    if (operation === 'remove bound logic setting') return scoped(settingRemovalEdit(before, 'tile-label', 'source')!);
+    if (operation === 'reorder flow steps') return scoped(flowStepMoveEdit(before, flowId, 0, 1)!);
+    if (operation === 'typed conversion') return scoped(fieldTypeEdit(before, root, fieldVariants(nodeDefinition()).find(type => variantName(type) === 'text')!, 'component'));
+    if (operation === 'import') {
+      // An import is a new document by nature: every object in it is fresh, so it has nothing but its declaration.
+      const imported = () => importCompositionText(compositionSourceText({ ...before, name: 'Imported layout' }), before.id);
+      return { undeclared: imported(), declare: (change: (document: CompositionDocument) => CompositionDocument) => replaceDocument(before, change(imported())) };
     }
-    draft.set(undeclared);
+    const pushed = createDraft(slotBodyView(before, templateBody, valueAt(before, templateBody) as Operand));
+    pushed.set(rebuildField(pushed.get(), [...templateBody, 'value', 'otherwise'], text('Elsewhere')));
+    const view = pushed.get();
+    return { undeclared: canonicalBody(view, templateBody), declare: (change: (document: CompositionDocument) => CompositionDocument) => bodyFromSlotView(before, change(view), templateBody) };
+  };
+  const refused = (before: CompositionDocument, notice: ReturnType<typeof vi.spyOn>, offer: (draft: ReturnType<typeof createDraft>) => void) => {
+    const draft = createDraft(before);
+    offer(draft);
     expect(draft.get()).toBe(before);
     expect(draft.canUndo()).toBe(false); expect(draft.canRedo()).toBe(false);
     expect(notice).toHaveBeenLastCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
     draft.undo(); draft.redo(); expect(draft.get()).toBe(before);
+  };
+
+  // The very candidate each operation makes, offered without what it declares: the boundary refuses it whole.
+  for (const policy of ['fallback', 'keep'] as const) it.each(declaredOperations)(`${policy}: %s without its declaration is cleanly refused`, operation => {
+    const { before, root, flowId } = remainingFixture(operation, policy);
+    const notice = vi.spyOn(toastManager, 'add'), change = declaredChange(operation, before, root, flowId);
+    refused(before, notice, draft => draft.set(change.undeclared));
+    // The control: declared, the same change is applied (afterwards, so the refusal above is not read from an accepted revision).
+    notice.mockClear();
+    expect(change.declare(document => document)).not.toBe(before);
+    expect(notice).not.toHaveBeenCalledWith({ title: LINKED_EDIT_REFUSAL, type: 'error' });
+    notice.mockRestore();
+  });
+
+  // A declaration speaks only for its own change: an unrelated binding dropped in the same candidate is refused, with the operation.
+  for (const policy of ['fallback', 'keep'] as const) it.each(declaredOperations.filter(operation => operation !== 'import'))(`${policy}: %s does not declare an unrelated binding removal`, operation => {
+    const { before, root, flowId } = remainingFixture(operation, policy);
+    const notice = vi.spyOn(toastManager, 'add'), change = declaredChange(operation, before, root, flowId);
+    // A binding the operation does not reach: tile-a's for the other template's body, otherwise the other template's own.
+    const unrelated = before.logicUseBindings![operation === 'template body slot view' ? 0 : 2];
+    expect(documentEdit(before, { ...before, logicUseBindings: before.logicUseBindings!.filter(binding => binding !== unrelated) })).toBe(before);
+    refused(before, notice, draft => draft.set(change.declare(document => ({ ...document, logicUseBindings: document.logicUseBindings!.filter(binding => !sameJson(binding, unrelated)) }))));
+    // An unrelated change the boundary keeps on its own is kept, and the operation is made too, as one step.
+    const renamed = change.declare(document => ({ ...document, name: 'Renamed too' }));
+    expect(renamed).not.toBe(before);
+    expect(renamed).toEqual({ ...change.declare(document => document), name: 'Renamed too' });
     notice.mockRestore();
   });
 });

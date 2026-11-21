@@ -17,6 +17,8 @@ import { previewWindows } from '../src/workspace2/preview';
 import { ToastHost } from '../src/workspace2/toasts';
 import type { HaPublicationSummary } from '../src/ha-publication';
 import LinkedQuestion from '../src/workspace2/LinkedQuestion';
+import { fieldTypeWords, LinkLossQuestion, type LinkLoss } from '../src/workspace2/LinkLossQuestion';
+import { logicWords } from '../src/workspace2/data/logic/logicWords';
 import SavedComponents from '../src/workspace2/SavedComponents';
 import { componentReferences } from '../src/shared/composition/components';
 import { newStateTile } from '../src/shared/composition/state-style-library';
@@ -311,6 +313,29 @@ describe('copy snapshots: the visible text of each surface (spec 10)', () => {
       const view = render(<RowsProvider value={{ document, onChange: () => {}, onError: () => {} }}><PushStack rootTitle="Swipe to Adjust" root={<SwipePage path={entry(id).path as never}/>}/></RowsProvider>);
       await check(name, view.container);
       view.unmount();
+    }
+  });
+
+  it('the questions before a change removes linked values: Remove Setting and a type change, one and many', async () => {
+    const asks: [string, LinkLoss][] = [
+      ['remove-setting', { title: logicWords.removeSettingTitle('Source'), text: logicWords.removeSettingText(1), confirm: logicWords.removeSetting }],
+      ['remove-setting', { title: logicWords.removeSettingTitle('Source'), text: logicWords.removeSettingText(3), confirm: logicWords.removeSetting }],
+      ['change-type', { title: fieldTypeWords.title('Tile', 'Text'), text: fieldTypeWords.text(1, 0, 'Text'), confirm: fieldTypeWords.confirm }],
+      ['change-type', { title: fieldTypeWords.title('Tile', 'Text'), text: fieldTypeWords.text(0, 1, 'Text'), confirm: fieldTypeWords.confirm }],
+      ['change-type', { title: fieldTypeWords.title('Tile', 'Text'), text: fieldTypeWords.text(1, 1, 'Text'), confirm: fieldTypeWords.confirm }],
+      ['change-type', { title: fieldTypeWords.title('', 'Text'), text: fieldTypeWords.text(3, 2, 'Text'), confirm: fieldTypeWords.confirm }],
+    ];
+    for (const name of ['remove-setting', 'change-type']) {
+      let text = '';
+      const issues: string[] = [];
+      for (const [, asking] of asks.filter(([key]) => key === name)) {
+        const view = render(<LinkLossQuestion asking={asking} onCancel={() => {}} onConfirm={() => {}}/>);
+        const question = await screen.findByTestId('link-loss-question');
+        text += `${text ? '\n' : ''}${copyOf(question)}`; issues.push(...voiceIssues(question));
+        view.unmount();
+      }
+      surfaces.push({ name: `link-loss-${name}`, text, issues });
+      await expect(text).toMatchFileSnapshot(`${dir}/link-loss-${name}.txt`);
     }
   });
 
