@@ -7,7 +7,7 @@ Templates
 Window
 Checks
 Tabs
-Header Buttons
+Tabs and Header Buttons
 Wallpaper
 State Styles
 Flows

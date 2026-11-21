@@ -1,5 +1,12 @@
-Header Buttons
+Tabs and header buttons
 Used on every page
+Show on pages
+Tabs
+Every page
+First page only
+Needs a newer app. Publishing it waits for an app update.
+Every page: a page shows this however it is opened, at any depth. Sheets and modals never show it. A page can hide it for itself.
+1 shown on every page
 Leading
 Menu
 Advanced

@@ -89,7 +89,7 @@ test.describe('A6, in both engines: choosing a More row with the pointer', () =>
       await expect(more).toHaveAttribute('aria-expanded', 'false');
       if (mode === 'Use') await expect(previewRoot(page).locator('.sh-sheet-layer, [role=dialog]').first()).toBeVisible();
       // The selection is the chosen row's item (the header buttons), not the page it sits on: a press that lands on the layer behind selects the page, "Home".
-      else await expect(page.getByLabel('Properties').getByRole('heading').first()).toHaveText('Header Buttons');
+      else await expect(page.getByLabel('Properties').getByRole('heading').first()).toHaveText('Tabs and header buttons');
     });
   }
 });

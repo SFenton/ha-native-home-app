@@ -13,6 +13,10 @@ import type { Workspace2 } from '../useWorkspace2';
 import { useDeepRows } from '../editors/overrides';
 import { LinksList } from './Links';
 import { FoldSidesRow } from '../layout/FoldSides';
+import { SwitchRow } from './SwitchRow';
+import { HideOnThisPage } from './HideOnThisPage';
+import { WideWindow } from './WideWindow';
+import { withoutHiddenItems } from './chromeRules';
 
 type Page = CompositionDocument['pages'][number];
 type Modal = CompositionDocument['modals'][number];
@@ -31,15 +35,6 @@ export function OpenedFrom({ document, kind, id, onGo }: { document: Composition
           <span>{link.holder?.title ?? (link.from.kind === 'chrome' ? 'Header' : surfaces.find(item => item.id === link.from.id)?.title)}</span><span className="w2-page-via">{link.from.kind === 'chrome' ? 'Header' : surfaces.find(item => item.id === link.from.id)?.title}</span><ChevronRight size={16} aria-hidden/></button></li>)}
       </ul>}
   </section>;
-}
-
-/** A switch row with an optional caption under it. */
-function SwitchRow({ label, checked, onChange, disabled, caption, path }: { label: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; caption?: string; path?: string }) {
-  return <>
-    <label className="w2-switch-row" data-field-path={path}><span className="w2-row-label w2-wide-label">{label}</span>
-      <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)}/></label>
-    {caption && <p className="w2-caption">{caption}</p>}
-  </>;
 }
 
 /**
@@ -66,9 +61,15 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
         <div className="w2-segment" role="group" aria-label="Header buttons" data-field-path={`${at.join('/')}/type`}>
           <span className="w2-row-label">Header buttons</span>
           {(['inherit', 'replace'] as const).map(type => <button key={type} type="button" aria-pressed={surface.toolbar.type === type}
-            onClick={() => type !== surface.toolbar.type && set(at, type === 'inherit' ? { type: 'inherit' } : { type: 'replace', groups: [] })}>{type === 'inherit' ? 'Same as app' : 'Custom'}</button>)}
+            onClick={() => {
+              if (type === surface.toolbar.type) return;
+              const next = replaceAt(document, at, (type === 'inherit' ? { type: 'inherit' } : { type: 'replace', groups: [] }) as Json);
+              // Custom has no inherited items to drop: the compiler refuses a hidden item beside it, so the list goes (the Tabs switch stays).
+              onChange(kind === 'page' && type === 'replace' ? replaceAt(next, path, withoutHiddenItems(valueAt(next, path) as Page) as unknown as Json) : next);
+            }}>{type === 'inherit' ? 'Same as app' : 'Custom'}</button>)}
         </div>
         {custom && <ChromeGroups path={[...at, 'groups']}/>}
+        {kind === 'page' && <HideOnThisPage index={Number(path[1])}/>}
       </>;
   };
   const overrides: Record<string, RowOverride> = { ...deep, toolbar, ...(kind === 'page' ? {} : {
@@ -85,20 +86,13 @@ export default function SurfaceSettings({ ws, kind, path, onGo }: { ws: Workspac
     'presentation.fullScreen': ({ path: at }) => <SwitchRow label="Full screen" path={at.join('/')} checked={Boolean(presentation?.fullScreen)}
       onChange={on => setPresentation(on ? { fullScreen: true, adaptive: false, height: { type: 'full' } } : { fullScreen: false })}/>,
   }) };
-  const navigationRows = kind === 'page' ? <>
-    <SwitchRow label="Open pages beside this one" path={[...path, 'navigation', 'type'].join('/')} checked={columns} caption="Used when the window is wide enough for two."
-      onChange={on => set([...path, 'navigation'], on ? { type: 'navigation-columns', placeholder: 'Select an item', standalone: false } : { type: 'stack' })}/>
-    {columns && <CompositionFields schema={{ type: 'string', maxLength: 240 }} value={(surface.navigation as { placeholder: string }).placeholder} path={[...path, 'navigation', 'placeholder']}
-      label="Empty side text" document={document} onChange={onChange} onError={ws.studio.setError} options={options}/>}
-  </> : undefined;
   const routes = (document.extensions?.routes ?? []).filter(route => route.pageId === surface.id);
-  const advancedExtra = columns ? <>
-    {(['onDemand', 'standalone'] as const).map(name => <div className="w2-row" key={name}><CompositionFields schema={{ type: 'boolean' }} value={Boolean((surface.navigation as unknown as Record<string, Json>)[name])}
-      path={[...path, 'navigation', name]} label={name === 'onDemand' ? 'Start with one pane' : 'Start a new column set here'} document={document} onChange={onChange} onError={ws.studio.setError} options={options}/></div>)}
-  </> : kind === 'modal' && surface.presentation.height.type === 'fitted' ? <div className="w2-row"><CompositionFields schema={{ enum: ['root', 'top-page'] }} value={surface.presentation.height.follows}
+  const advancedExtra = columns ? <div className="w2-row"><CompositionFields schema={{ type: 'boolean' }} value={Boolean((surface.navigation as unknown as Record<string, Json>).onDemand)}
+    path={[...path, 'navigation', 'onDemand']} label="Start with one pane" document={document} onChange={onChange} onError={ws.studio.setError} options={options}/></div> : kind === 'modal' && surface.presentation.height.type === 'fitted' ? <div className="w2-row"><CompositionFields schema={{ enum: ['root', 'top-page'] }} value={surface.presentation.height.follows}
     path={[...path, 'presentation', 'height', 'follows']} label="Fit to" document={document} onChange={onChange} onError={ws.studio.setError} options={fieldOptions('sheet', path)}/></div> : undefined;
   return <>
-    <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']} extra={{ look: <>{navigationRows}{kind === 'page' && <FoldSidesRow path={path}/>}</> }}/>
+    <ObjectRows path={path} owner={owner} skip={skip} overrides={overrides} groups={['what', 'look', 'behaviour']} extra={{ look: kind === 'page' ? <FoldSidesRow path={path}/> : undefined }}/>
+    {kind === 'page' && <WideWindow ws={ws} path={path} index={Number(path[1])}/>}
     {kind === 'page' && <section className="w2-group"><button type="button" className="w2-disclosure-head" onClick={() => push?.push({
       title: 'Links', body: <LinksList pageId={surface.id}/>,
     })}><span className="w2-row-label w2-wide-label">Opens from outside the app</span><span className="w2-summary">{routes.length}</span><ChevronRight size={16} aria-hidden/></button></section>}

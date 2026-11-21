@@ -265,7 +265,7 @@ test('every surface speaks the new vocabulary and nothing from the cut list', as
   }
   await project('About', true);
   await page.getByRole('button', { name: 'Close', exact: true }).last().click();
-  for (const item of ['Tabs', 'Header Buttons', 'Wallpaper']) { await project(item); await page.getByLabel('Properties').getByRole('button', { name: 'Close', exact: true }).click(); }
+  for (const item of ['Tabs', 'Tabs and Header Buttons', 'Wallpaper']) { await project(item); await page.getByLabel('Properties').getByRole('button', { name: 'Close', exact: true }).click(); }
   await page.getByRole('button', { name: 'Publish' }).click(); await check('publish'); await page.keyboard.press('Escape');
 });
 
@@ -283,7 +283,7 @@ test('the Project menu, Pages and the tab panel work at both sizes', async ({ pa
   await expectOnPage(page, 'Climate');
   await page.getByRole('button', { name: 'Project' }).click();
   await snap(page, `${tag}-project`);
-  if (isPhone(page)) await page.getByText('Tabs', { exact: true }).first().click(); else await page.getByRole('menuitem', { name: 'Tabs' }).click();
+  if (isPhone(page)) await page.getByText('Tabs', { exact: true }).first().click(); else await page.getByRole('menuitem', { name: 'Tabs', exact: true }).click();
   await expect(page.getByText('Tab bar · 3 of 5')).toBeVisible();
   await expect(page.getByText('The tab bar holds 5.')).toHaveCount(0);
 });

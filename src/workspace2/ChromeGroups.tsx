@@ -12,10 +12,10 @@ const sides = [['leading', 'Leading'], ['trailing', 'Trailing']] as const;
 const itemName = (item: Item) => item.type === 'shell-menu' ? 'Menu' : item.type === 'shell-header' ? 'Quick Links and Profile' : item.label || 'Button';
 
 /** One header item's rows, with its Remove row. */
-function ItemRows({ path, onRemove }: { path: EditorPath; onRemove: () => void }) {
+function ItemRows({ path, onRemove, showElsewhere }: { path: EditorPath; onRemove: () => void; showElsewhere?: boolean }) {
   const overrides = useDeepRows(path);
   return <>
-    <ObjectRows path={path} owner="chrome-item" overrides={overrides}/>
+    <ObjectRows path={path} owner="chrome-item" overrides={overrides} skip={showElsewhere ? at => at.at(-1) === 'visibility' : undefined}/>
     <div className="w2-row"><button type="button" className="w2-danger" onClick={onRemove}>Remove Button</button></div>
   </>;
 }
@@ -24,7 +24,7 @@ function ItemRows({ path, onRemove }: { path: EditorPath; onRemove: () => void }
  * Header buttons as rows (spec 5.2): "Leading" and "Trailing", each item a row that opens into its fields, "Add Button" under
  * each. `path` is the groups array: the project's (`navigation/chrome/groups`) or a page's own.
  */
-export function ChromeGroups({ path }: { path: EditorPath }) {
+export function ChromeGroups({ path, showElsewhere }: { path: EditorPath; /** The app panel draws each item's Show row in its own group above, so the item's fields leave it out. */ showElsewhere?: boolean }) {
   const { document, onChange, onError } = useRows();
   const groups = (valueAt(document, path) ?? []) as Group[];
   const add = (placement: Group['placement']) => {
@@ -48,7 +48,7 @@ export function ChromeGroups({ path }: { path: EditorPath }) {
       const room = groups.length < 3 || held.length > 0;
       return <section key={placement} aria-label={title} className="w2-group"><h3 className="w2-group-title">{title}</h3>
         {held.flatMap(({ group, at }) => group.items.map((item, index) => <Disclosure key={item.id} label={itemName(item)} path={[...path, at, 'items', index].join('/')}>
-          <ItemRows path={[...path, at, 'items', index]} onRemove={() => remove(at, index)}/>
+          <ItemRows path={[...path, at, 'items', index]} onRemove={() => remove(at, index)} showElsewhere={showElsewhere}/>
         </Disclosure>))}
         {held.length > 0 && <Disclosure label="Advanced" path={`${path.join('/')}/${title.toLowerCase()}`}>
           {held.map(({ group, at }) => <ObjectRows key={group.id} path={[...path, at]} owner="chrome-group" skip={child => child.at(-1) === 'items'}/>)}
