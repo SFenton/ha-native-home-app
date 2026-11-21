@@ -114,6 +114,9 @@ test('Compound checks: the canvas keeps three levels, one true answer, and an at
   await expect(canvas).toHaveCount(0);
   await openGraph();
   await canvas.getByRole('button', { name: /^Select All Of/ }).first().click();
+  // A header click opens the data peek (a sheet on a phone); the inspector opens from the selected block's Inspect action.
+  if (isPhone(page)) await page.getByRole('button', { name: 'Close Data peek: All Of', exact: true }).click();
+  await canvas.getByRole('button', { name: /^Inspect All Of/ }).first().click();
   const inspector = isPhone(page) ? page.getByRole('dialog', { name: 'Block inspector', exact: true }) : canvas;
   await inspector.getByText('Position', { exact: true }).click();
   const x = inspector.getByRole('spinbutton', { name: 'X', exact: true });

@@ -194,7 +194,8 @@ export default function VisibilityField({ path, label, itemName }: { path: Edito
     blocked={next => ruleProblem(next, path, ruleAt(next, path))}
     head={start => <div className="w2-expr-fieldrow" data-field-path={at}>
       <span className="w2-row-label">{label}</span>
-      <button type="button" className="w2-expr-fieldbtn" aria-label={`${label}: ${line}.`} onClick={start}>
+      {/* The pushed page also edits the state rule, so the row reaches `props/visibility` as well as `visibleWhen`. */}
+      <button type="button" className="w2-expr-fieldbtn" data-field-path={[...path, 'props', 'visibility'].join('/')} aria-label={`${label}: ${line}.`} onClick={start}>
         <span className={`w2-expr-line1 ${visibility || condition ? '' : 'w2-expr-none'}`}>{line}</span><ChevronRight size={16} aria-hidden/>
       </button>
     </div>}>
