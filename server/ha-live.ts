@@ -6,8 +6,8 @@ import type { NativeState } from '../src/shared/native-state';
 
 /**
  * The live entity stream. One Home Assistant websocket per server subscribes to `subscribe_entities`, keeps the latest state of
- * every entity and tells each connected Studio page what changed. The token stays in this module's socket: a page receives only
- * projected entity states (native fields plus safe draft-requested attributes), never an upstream URL, header or credential.
+ * every entity and tells each connected Studio page what changed. Configured credentials stay server-side: a page receives only
+ * projected entity states (native fields plus allowlisted draft-requested attributes).
  *
  * Three parts: {@link EntityCache} (the compressed event format applied to full states), {@link LiveEntityHub} (the socket, with
  * reconnect and backoff, keeping the last good states while it is down) and {@link openLiveSession} (one page's view: a
@@ -159,7 +159,7 @@ export class LiveEntityHub {
     };
   }
   /** The entity as the app reads it, or undefined when Home Assistant does not have it or its state is unusable. */
-  project(entityId: string, wantedAttributes?: ReadonlySet<string>): NativeState | undefined {
+  project(entityId: string, wantedAttributes?: ReadonlySet<string>, credentials: readonly string[] = []): NativeState | undefined {
     const raw = this.cache.get(entityId);
     if (!raw) return undefined;
     let found = this.projections.get(raw);
@@ -169,7 +169,7 @@ export class LiveEntityHub {
       this.projections.set(raw, found);
     }
     if (!found) return undefined;
-    const attributes = wantedAttributes && projectNativeAttributes(raw.attributes, wantedAttributes);
+    const attributes = wantedAttributes && projectNativeAttributes(raw.attributes, wantedAttributes, credentials);
     return attributes ? { ...found, attributes } : found;
   }
   /** Closes the socket and cancels every timer. Cached states stay. */
@@ -302,7 +302,7 @@ export type NativeAttributeRequests = ReadonlyMap<string, ReadonlySet<string>>;
 
 /** Per-page tuning. */
 export interface LiveSessionOptions {
-  /** Server credentials: a state containing any of them is dropped, never sent. */
+  /** Server credentials: exact matches drop the state; reconstructed custom-attribute matches drop the attribute. */
   credentials?: string[];
   /** Changes within this window go out as one update. */
   batchMs?: number;
@@ -328,7 +328,7 @@ export function openLiveSession(hub: LiveEntityHub, wanted: () => ReadonlySet<st
   let lastAttributes: NativeAttributeRequests | undefined;
 
   const read = (id: string, requested: NativeAttributeRequests | undefined): { state: NativeState; json: string } | undefined => {
-    const state = hub.project(id, requested?.get(id));
+    const state = hub.project(id, requested?.get(id), credentials);
     if (!state) return undefined;
     const json = JSON.stringify(state);
     if (credentials.some(credential => credential && json.includes(credential))) return undefined;

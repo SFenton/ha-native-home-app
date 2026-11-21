@@ -415,7 +415,7 @@ export function projectNativeState(raw: unknown, wantedAttributes?: ReadonlySet<
 
 const sensitiveAttributeName = /token|secret|password|passwd|credential|apikey|webhook|bearer|session|cookie|signature|privatekey|pushurl|(?:auth|authorization|sig)$/;
 const plainAttributeText = /^[\x20-\x7e\p{L}\p{N}\p{Zs}\u2010-\u2015\u2018-\u201f\u2026]*$/u;
-const refusedAttributeText = /:\/\/|[?%=@{\[\\\p{Cc}\p{Cf}\uFF00-\uFFEF]|[A-Za-z0-9+/_-]{24}/u;
+const refusedAttributeText = /\/\/|[?%=@{\[\\\p{Cc}\p{Cf}\uFF00-\uFFEF]|[\p{L}\p{N}+/_-]{24}/u;
 type PlainAttributeScalar = string | number | boolean | null;
 
 /** Custom live attributes only; native-house metadata follows its existing validation. */
@@ -426,9 +426,9 @@ export function isForwardedAttributeName(name: string): boolean {
 
 function isPlainAttributeScalar(value: unknown): value is PlainAttributeScalar {
   if (value === null || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  return typeof value === 'string' && value.length <= 256 && plainAttributeText.test(value)
-    && !refusedAttributeText.test(value) && !/^data:|\bbearer\b/i.test(value);
+  if (typeof value === 'number') return Number.isFinite(value) && Math.abs(value) <= 1e15;
+  return typeof value === 'string' && value.length <= 256 && value.normalize('NFKC') === value && plainAttributeText.test(value)
+    && !refusedAttributeText.test(value) && !/^data:|\bbearer\b/i.test(value.trimStart());
 }
 
 function isPlainAttributeValue(value: unknown): value is PlainAttributeScalar | PlainAttributeScalar[] {
@@ -438,13 +438,25 @@ function isPlainAttributeValue(value: unknown): value is PlainAttributeScalar | 
   return true;
 }
 
-/** Extra attributes never become native fields; only small plain scalars and flat arrays are forwarded. */
-export function projectNativeAttributes(attributes: Readonly<Record<string, unknown>>, wanted: ReadonlySet<string>): Record<string, Json> | undefined {
+function canonicalCredentialText(value: string): string {
+  return value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/** Extra attributes never become native fields; only small plain values without configured-credential fragments are forwarded. */
+export function projectNativeAttributes(attributes: Readonly<Record<string, unknown>>, wanted: ReadonlySet<string>, credentials: readonly string[] = []): Record<string, Json> | undefined {
+  const credentialFragments = credentials.filter(credential => credential.length >= 8).flatMap(credential => {
+    const canonical = canonicalCredentialText(credential);
+    const length = Math.min(12, canonical.length);
+    return Array.from({ length: canonical.length - length + 1 }, (_, start) => canonical.slice(start, start + length));
+  });
   const extra: [string, Json][] = [];
   for (const name of wanted) {
     if (!isForwardedAttributeName(name) || !Object.hasOwn(attributes, name)) continue;
     const raw = attributes[name];
     if (!isPlainAttributeValue(raw)) continue;
+    const joined = canonicalCredentialText((Array.isArray(raw) ? raw : [raw])
+      .filter(item => typeof item === 'string' || typeof item === 'number').join(''));
+    if (credentialFragments.some(fragment => joined.includes(fragment))) continue;
     extra.push([name, raw]);
   }
   return extra.length ? Object.fromEntries(extra) : undefined;

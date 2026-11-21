@@ -231,13 +231,14 @@ describe('safe custom attribute projection', () => {
     '{"access_token":"x"}',
     '["demo-private"]',
     `data:text/plain;base64,${Buffer.from('demo-private').toString('base64')}`,
-    'data:Off', 'DATA:Off', 'Bearer', 'A BEARER label',
+    'data:Off', 'DATA:Off', '  data:Off', '//example.invalid/path', 'Bearer', 'A BEARER label',
     'Public https://demo.invalid/image', 'plain://value',
     'Question?', 'Percent 50%', 'A=B', 'demo@example.invalid', 'Object {', 'Array [', String.raw`Path \ demo`,
     'Control \0', 'Control \t', 'Control \n', 'Control \u007f', 'Control \u0085',
     'Format \u200b', 'Format \u202e', 'Format \u2066', 'Format \ufeff',
     'Fullwidth \uff41', 'Fullwidth \uff11', 'Fullwidth \uff1f', 'Fullwidth \uffef',
     'Symbol \u221e', 'Emoji \ud83d\ude00', 'Private \ue000', 'Surrogate \ud800', 'Combining e\u0301',
+    'Demo\u00a0Owner', 'Paused\u2026', '\u00e9'.repeat(24), '\u6570'.repeat(24),
     'a'.repeat(24), 'Prefix ' + 'a'.repeat(25), '+/_-'.repeat(6),
   ])('drops the whole attribute for refused top-level or flat-array strings: %s', input => {
     const attributes = {
@@ -250,7 +251,7 @@ describe('safe custom attribute projection', () => {
   it('keeps ordinary text and non-sensitive ASCII names, including common Unicode letters and punctuation', () => {
     const attributes = {
       signal: 'Strong', design: 'Compact', key: 'demo-row', author: 'Demo Owner', note: 'Token count is 3',
-      accented: 'Caf\u00e9', letters: '\u6570\u5024 12', punctuation: '\u201cOff\u201d \u2013 paused\u2026', space: 'Demo\u00a0Owner',
+      accented: 'Caf\u00e9', letters: '\u6570\u5024 12', punctuation: '\u201cOff\u201d \u2013 paused', space: 'Demo Owner',
       ordinary_word: 'Unbearable', near_run: 'a'.repeat(23),
       n: 'One', ['n'.repeat(64)]: 'Sixty-four', _: 'Underscore',
     };
@@ -284,6 +285,17 @@ describe('safe custom attribute projection', () => {
     expect(state.attributes).toEqual({
       boundary, array_boundary: [boundary], unicode_boundary: attributes.unicode_boundary,
       items_boundary: attributes.items_boundary, text_items_boundary: attributes.text_items_boundary,
+    });
+  });
+
+  it('bounds finite scalar and array numbers to an absolute value of 1e15', () => {
+    const attributes = {
+      minimum: -1e15, maximum: 1e15, numbers: [-1e15, 0, 1e15],
+      above: 1e15 + 1, below: -1e15 - 1, exponent: 1e21,
+      array_above: [0, 1e15 + 1], array_below: [-1e15 - 1, 0],
+    };
+    expect(projectNativeState(raw(attributes), new Set(Object.keys(attributes))).attributes).toEqual({
+      minimum: -1e15, maximum: 1e15, numbers: [-1e15, 0, 1e15],
     });
   });
 
@@ -328,6 +340,102 @@ function liveHub() {
   return { hub, socket };
 }
 const statesOf = (message: LiveMessage): NativeState[] => message.type === 'status' ? [] : message.states;
+
+describe.each(['snapshot', 'delta'] as const)('credential-safe custom attributes on the %s path', phase => {
+  beforeEach(() => vi.useFakeTimers());
+  const haCredential = 'demo-ha-a1b2c3d4e5f6g7h8';
+  const supervisorCredential = 'demo-supervisor-i9j0k1l2m3n4o5p6';
+  const authCredential = 'demo-studio-q7r8s9t0u1v2w3x4';
+  const digitCredential = '1234567890123456';
+  const credentials = [haCredential, supervisorCredential, authCredential, digitCredential, '10000000000000000', '1000000000000000000000', 'demo-42-a'];
+  const mathematicalBold = Array.from(haCredential, character => /[a-z]/.test(character)
+    ? String.fromCodePoint(0x1d41a + character.charCodeAt(0) - 97)
+    : /[0-9]/.test(character) ? String.fromCodePoint(0x1d7ce + character.charCodeAt(0) - 48) : character).join('');
+
+  it.each([
+    { name: 'literal configured token', input: haCredential },
+    { name: 'mathematical-bold configured token', input: mathematicalBold },
+    { name: 'fullwidth configured digits', input: Array.from(digitCredential, character => String.fromCharCode(character.charCodeAt(0) + 0xfee0)).join('') },
+    { name: 'space-separated HA credential', input: haCredential.split('').join(' ') },
+    { name: 'colon-separated Supervisor credential', input: supervisorCredential.split('').join(':') },
+    { name: 'punctuation-separated Studio credential', input: authCredential.split('').join(",'-") },
+    { name: 'credential fragments across flat array items', input: ['demo-studio-', false, 'q7r8s9t0', null, 'u1v2w3x4'] },
+    { name: 'credential fragments across strings and numbers', input: ['1234', 5678, '9012', 3456] },
+    { name: 'credential fragments across number items', input: [1234, 5678, 9012, 3456] },
+    { name: 'non-prefix credential window with mixed case', input: 'Read: A1 B2 C3 D4 E5 F6, done.' },
+    { name: 'credential shorter than twelve canonical characters', input: 'DE MO: 42: A' },
+    { name: 'in-range numeric credential', input: 123456789012345 },
+    { name: 'large numeric configured credential', input: 10000000000000000 },
+    { name: 'exponent-form configured credential', input: 1e+21 },
+    { name: 'large numeric credential in an array', input: [0, 1e+21] },
+    { name: 'leading-whitespace data prefix', input: '  data:Off' },
+    { name: 'leading-whitespace data prefix in an array', input: ['Safe', '  DaTa:Off'] },
+    { name: 'protocol-relative URL', input: '//example.invalid/path' },
+    { name: 'protocol-relative URL in an array', input: ['Safe', '//example.invalid/path'] },
+    { name: 'Unicode opaque run', input: '\u00e9'.repeat(24) },
+    { name: 'Unicode opaque run in an array', input: ['Safe', '\u6570'.repeat(24)] },
+  ])('drops the whole attribute for $name', ({ input }) => {
+    const { hub, socket } = liveHub();
+    const messages: LiveMessage[] = [], wanted = new Set([entityId]), requested = new Map([[entityId, new Set(['line', 'level'])]]);
+    cleanup.push(openLiveSession(hub, () => wanted, message => messages.push(message), {
+      credentials, attributes: () => requested,
+    }));
+    socket.connect({ line: phase === 'snapshot' ? input : 'Off', level: 0 });
+    vi.advanceTimersByTime(60);
+    if (phase === 'delta') {
+      expect(statesOf(messages.at(-1)!)[0].attributes).toEqual({ line: 'Off', level: 0 });
+      messages.length = 0;
+      socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: input } } } } } });
+      vi.advanceTimersByTime(60);
+    }
+    const expectedState = { ...projectNativeState(raw({})), attributes: { level: 0 } };
+    expect(messages.at(-1)).toEqual(phase === 'snapshot'
+      ? { type: 'snapshot', connected: true, states: [expectedState] }
+      : { type: 'update', states: [expectedState], removed: [] });
+    for (const credential of credentials) expect(JSON.stringify(messages)).not.toContain(credential);
+  });
+
+  it('preserves ordinary scalars, sentences, ISO timestamps and numeric arrays', () => {
+    const { hub, socket } = liveHub();
+    const ordinary = {
+      line: 'Off', level: 0, ends_at: null, enabled: false,
+      sentence: "Ready, mode: Off; it's paused.",
+      timestamp: '2026-11-21T17:55:42+00:00',
+      numbers: [-42, 0, 1, 2.5],
+    };
+    const messages: LiveMessage[] = [], wanted = new Set([entityId]), requested = new Map([[entityId, new Set(Object.keys(ordinary))]]);
+    cleanup.push(openLiveSession(hub, () => wanted, message => messages.push(message), {
+      credentials, attributes: () => requested,
+    }));
+    socket.connect(phase === 'snapshot' ? ordinary : { line: 'On' });
+    vi.advanceTimersByTime(60);
+    if (phase === 'delta') {
+      messages.length = 0;
+      socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: ordinary } } } } });
+      vi.advanceTimersByTime(60);
+    }
+    expect(statesOf(messages.at(-1)!)[0].attributes).toEqual(ordinary);
+  });
+
+  it('keeps credential filtering per session instead of caching it in shared projections', () => {
+    const { hub, socket } = liveHub();
+    const input = haCredential.split('').join(' ');
+    const first: LiveMessage[] = [], second: LiveMessage[] = [], wanted = new Set([entityId]);
+    const requested = new Map([[entityId, new Set(['line'])]]);
+    cleanup.push(openLiveSession(hub, () => wanted, message => first.push(message), { credentials, attributes: () => requested }));
+    cleanup.push(openLiveSession(hub, () => wanted, message => second.push(message), { credentials: ['demo-unrelated-credential'], attributes: () => requested }));
+    socket.connect({ line: phase === 'snapshot' ? input : 'Off' });
+    vi.advanceTimersByTime(60);
+    if (phase === 'delta') {
+      first.length = second.length = 0;
+      socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: input } } } } } });
+      vi.advanceTimersByTime(60);
+    }
+    expect(statesOf(first.at(-1)!)[0].attributes).toBeUndefined();
+    expect(statesOf(second.at(-1)!)[0].attributes).toEqual({ line: input });
+    expect(hub.project(entityId)?.attributes).toBeUndefined();
+  });
+});
 
 describe('live draft revisions and session isolation', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -388,7 +496,7 @@ describe('live draft revisions and session isolation', () => {
     expect(second).toEqual([]);
   });
 
-  it('still drops and removes a state if a safely named attribute contains a server credential', () => {
+  it('still drops and removes a state if a native field contains a server credential', () => {
     const { hub, socket } = liveHub();
     const credential = 'demo-private';
     const messages: LiveMessage[] = [], document = draft(text('demo-line'));
@@ -396,7 +504,7 @@ describe('live draft revisions and session isolation', () => {
     socket.connect({ line: 'Off' });
     vi.advanceTimersByTime(60);
     messages.length = 0;
-    socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { line: `State ${credential}` } } } } } });
+    socket.receive({ id: 1, type: 'event', event: { c: { [entityId]: { '+': { a: { friendly_name: `State ${credential}` } } } } } });
     vi.advanceTimersByTime(60);
     expect(messages).toEqual([{ type: 'update', states: [], removed: [entityId] }]);
     expect(JSON.stringify(messages)).not.toContain(credential);
