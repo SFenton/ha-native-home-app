@@ -88,6 +88,11 @@ test('the Sheets list draws a sheet\'s levels beneath it, tagged Level, with "Ne
   await expect(list.getByText('Demo Spare Level').first()).toBeVisible();
   await expect(list.getByText('No Way In').first()).toBeVisible();
   await expect(page.getByText('A level opens inside its sheet, with Back and Close. Move it to Pages and it opens as a page, with the tabs and header buttons.')).toBeVisible();
+  // Bringing the current row into view scrolls the list, never the sheet's own header: Pages and Done stay on screen after the sheet reopens.
+  if (isPhone(page)) {
+    await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('.w2-sheet-title', { hasText: 'Pages' })).toBeInViewport({ ratio: 1 });
+  }
   await shoot(page, 'sheets-levels');
   // The level no sheet reaches, in the phone's list too: scrolled to the end of the list, inside the list, so the sheet's title stays.
   if (isPhone(page)) {
@@ -291,4 +296,210 @@ test('New Level on a document without levels carries the first-level sentence in
   await expect(dialog.getByText('This will be the first level. After it, a page opened from any sheet closes that sheet first; today it opens inside the sheet.')).toBeVisible();
   await dialog.getByLabel('Name').fill('Demo Dimmer');
   await shoot(page, 'new-level-first');
+});
+
+// --- Going into a level (`sl-library`, option C) ----------------------------------------------------------------------------------------------
+
+/** The library's header: its title, its Back button's name and the crumbs of its path. */
+const head = (page: Page) => ({
+  title: page.locator('.w2-lib-level-head h2'),
+  back: page.locator('.w2-lib-level-head .w2-lib-back'),
+  path: page.locator('.w2-lib-level-head').getByRole('navigation', { name: 'Path' }),
+});
+/** The simulator's open sheet: its title, its Back (named for where it goes) and its Close. */
+const sheetView = (page: Page) => ({ sheet: page.locator('.sh-sheet'), back: page.locator('.sh-sheet-bar').getByRole('button', { name: 'Back' }) });
+/** Goes into a level of Lights from the Sheets list, by its row. */
+async function goIn(page: Page, name = 'Demo Room 1 Level') {
+  const list = await openSheets(page);
+  await list.getByRole('treeitem', { name: new RegExp(`^${name}, level of Lights$`) }).click();
+  await expect(head(page).title).toHaveText(name);
+  return list;
+}
+/** The crumbs' words in order, without the separators. */
+const crumbs = (page: Page) => head(page).path.locator('.w2-crumb').allTextContents();
+
+test('the level row goes into the level, and its header is Back, the name and the path "Sheets › Lights"', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  await goIn(page);
+  await expect(head(page).back).toHaveAttribute('aria-label', 'Back to Lights');
+  expect(await crumbs(page)).toEqual(['Sheets', 'Lights']);
+  // The simulator shows the level inside Lights: the sheet's own bar with Back, the level's name and Close; nothing is selected and the Studio adds nothing to the stage.
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Demo Room 1 Level');
+  await expect(sheetView(page).back).toHaveAttribute('title', 'Back to Lights');
+  await expect(page.getByLabel('Properties')).toHaveCount(0);
+  // The list is the level's rows from the edge, and its footer is Add Here and Level Settings.
+  await expect(page.getByRole('button', { name: 'Add Here' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Level Settings' })).toBeVisible();
+  await expect(page.locator('[role=status]').filter({ hasText: 'Showing Demo Room 1 Level, a level of Lights.' })).toBeAttached();
+  await shoot(page, 'in-level');
+});
+
+test('going into a level puts keyboard focus in its header, on Back', async ({ page }) => {
+  await openWorkspace(page);
+  const inside = (selector: string) => page.evaluate(sel => !!document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest(sel), selector);
+  if (isPhone(page)) {
+    // The phone's level sheet is a dialog: opening it moves focus into it, onto its Back or its header.
+    await openSheets(page);
+    await page.locator('.w2-pages .w2-page-row').filter({ has: page.locator('.w2-page-title', { hasText: /^Demo Room 1 Level$/ }) }).click();
+    await page.getByRole('button', { name: 'This Level' }).click();
+    await expect(page.getByTestId('level-sheet')).toBeVisible();
+    await expect.poll(() => inside('[data-testid="level-sheet"]')).toBe(true);
+    return;
+  }
+  const list = await openSheets(page);
+  const row = list.getByRole('treeitem', { name: /^Demo Room 1 Level, level of Lights$/ });
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect(head(page).title).toHaveText('Demo Room 1 Level');
+  await expect.poll(() => inside('.w2-lib-level-head')).toBe(true);
+  await expect(head(page).back).toBeFocused();
+  // Back puts focus on the row again.
+  await page.keyboard.press('Enter');
+  await expect(head(page).title).toHaveText('Sheets');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? '')).toMatch(/^Demo Room 1 Level/);
+  // A click goes in the same way.
+  await row.click();
+  await expect.poll(() => inside('.w2-lib-level-head')).toBe(true);
+});
+
+test('the triangle opens a level in place, one indent deeper, and Back returns with the level\'s row marked', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  const list = await openSheets(page);
+  const row = list.getByRole('treeitem', { name: 'Demo Room 1 Level, level of Lights' });
+  await expect(row).toHaveAttribute('aria-level', '2');
+  await row.getByRole('button', { name: 'Show what is in Demo Room 1 Level' }).click();
+  await expect(row).toHaveAttribute('aria-expanded', 'true');
+  await expect(list.locator('[role=treeitem][aria-level="3"]').first()).toBeVisible();
+  await shoot(page, 'level-open-in-place');
+  await row.getByRole('button', { name: 'Hide what is in Demo Room 1 Level' }).click();
+  // In, and Back: the Sheets list with Lights open, shown in the simulator, and the level's row marked and focused.
+  await row.click();
+  await head(page).back.click();
+  await expect(head(page).title).toHaveText('Sheets');
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Lights');
+  await expect(row).toHaveAttribute('data-selected', 'true');
+  await expect(row).toBeFocused();
+  await shoot(page, 'back-from-level');
+});
+
+test('a level opened from another level has the chain in its path, a long name keeps the header whole, and Back goes up one step at a time', async ({ request, page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  // Level 4 is opened only by level 2, which Lights opens: Sheets › Lights › Demo Room 2 Level, and the level's own name as the title.
+  const document = project();
+  const deep = levelFrom(document, 'hc-climate-demo-room-1-detail', 'demo_level_4', 'Advanced Controls Protection Settings');
+  document.levels.push(deep);
+  document.levels[1].components.push(tile('demo_open_deep', 'Deep', push('demo_level_4')));
+  await seed(request, document);
+  await openWorkspace(page);
+  const list = await openSheets(page);
+  await list.getByRole('treeitem', { name: /^Advanced Controls Protection Settings, level of Lights$/ }).click();
+  await expect(head(page).title).toHaveText('Advanced Controls Protection Settings');
+  // Whether the path folds depends on the font, so the words are read from the crumbs and the Back button, not from how wide they draw.
+  await expect(head(page).back).toHaveAttribute('aria-label', 'Back to Demo Room 2 Level');
+  expect((await crumbs(page))[0]).toBe('Sheets');
+  await expect(head(page).path.getByRole('button', { name: 'Demo Room 2 Level' }).or(head(page).path.getByRole('button', { name: 'More of the path' })).first()).toBeVisible();
+  await expect(sheetView(page).back).toHaveAttribute('title', 'Back to Demo Room 2 Level');
+  await shoot(page, 'level-three-steps');
+  await head(page).back.click();
+  await expect(head(page).title).toHaveText('Demo Room 2 Level');
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Demo Room 2 Level');
+  await head(page).back.click();
+  await expect(head(page).title).toHaveText('Sheets');
+});
+
+test('Level Settings opens the level\'s title and list icon in the inspector, and a rename shows in the header', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  await goIn(page);
+  await page.getByRole('button', { name: 'Level Settings' }).click();
+  const panel = page.getByLabel('Properties');
+  await expect(panel.getByRole('heading', { name: 'Demo Room 1 Level', exact: true })).toBeVisible();
+  await expect(panel.getByText('Level settings · Lights')).toBeVisible();
+  await expect(panel.getByText('Hide on this page')).toHaveCount(0);
+  await shoot(page, 'level-settings');
+  await panel.getByLabel('Title', { exact: true }).first().fill('Demo Dimmers');
+  await expect(head(page).title).toHaveText('Demo Dimmers');
+});
+
+test('a level no sheet opens has the path "Sheets", Close and no Back in the simulator, and Back in the library returns to the list', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  const list = await openPagesList(page, 'Sheets');
+  await list.getByRole('treeitem', { name: 'Demo Spare Level' }).click();
+  await expect(head(page).title).toHaveText('Demo Spare Level');
+  expect(await crumbs(page)).toEqual(['Sheets']);
+  await expect(head(page).back).toHaveAttribute('aria-label', 'Back to Sheets');
+  await expect(sheetView(page).back).toHaveCount(0);
+  await shoot(page, 'loose-level');
+  await head(page).back.click();
+  await expect(head(page).title).toHaveText('Sheets');
+});
+
+test('the simulator\'s Back in Edit steps out of the level and the library follows; Close stays inert', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  await goIn(page);
+  await page.locator('.sh-sheet-bar').getByRole('button', { name: 'Close' }).click();
+  await expect(head(page).title).toHaveText('Demo Room 1 Level');
+  await sheetView(page).back.click();
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Lights');
+  await expect(head(page).title).toHaveText('Sheets');
+});
+
+test('a click on the level\'s bar or its empty area selects the level, and its settings open', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  await goIn(page);
+  await page.locator('.sh-sheet-title').click();
+  await expect(page.getByLabel('Properties').getByText('Level settings · Lights')).toBeVisible();
+});
+
+test('a node of a level says where it is in the inspector: the line carries the sheet and the level, with the whole text as its title', async ({ page }) => {
+  test.skip(isPhone(page), 'The wide library.');
+  await openWorkspace(page);
+  await goIn(page);
+  const level = page.locator('.sh-sheet [data-sel^="node:"]').first();
+  await level.click();
+  const line = page.getByLabel('Properties').locator('.w2-props-titles p');
+  await expect(line).toContainText('Lights › Demo Room 1 Level');
+  expect(await line.getAttribute('title')).toBe(await line.textContent());
+  await shoot(page, 'node-in-level');
+});
+
+test('+ Level shows the new level, empty, inside its sheet, with the library in it', async ({ page }) => {
+  await openWorkspace(page);
+  await openSheets(page);
+  await page.getByRole('button', { name: 'Level', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'New Level' });
+  await dialog.getByLabel('Name').fill('Demo Dimmer');
+  await dialog.getByRole('button', { name: 'Create' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Demo Dimmer');
+  if (isPhone(page)) {
+    await expect(page.getByRole('button', { name: 'Pages', exact: true }).first()).toContainText('Demo Dimmer');
+  } else {
+    await expect(head(page).title).toHaveText('Demo Dimmer');
+    await expect(page.getByText('Nothing here yet.')).toBeVisible();
+  }
+  await shoot(page, 'new-level-shown');
+});
+
+test('on a phone the Pages sheet shows the level in its sheet and the top bar names it; This Level has Back and the path', async ({ page }) => {
+  test.skip(!isPhone(page), 'The phone sheets.');
+  await openWorkspace(page);
+  await openSheets(page);
+  await page.locator('.w2-pages .w2-page-row').filter({ has: page.locator('.w2-page-title', { hasText: /^Demo Room 1 Level$/ }) }).click();
+  await expect(page.getByRole('button', { name: 'Pages', exact: true }).first()).toContainText('Demo Room 1 Level');
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Demo Room 1 Level');
+  await page.getByRole('button', { name: 'This Level' }).click();
+  const sheet = page.getByTestId('level-sheet');
+  await expect(sheet.getByRole('heading', { name: 'Demo Room 1 Level', exact: true })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Back to Lights' })).toBeVisible();
+  await expect(sheet.getByRole('navigation', { name: 'Path' }).getByRole('button', { name: 'Lights' })).toBeVisible();
+  await shoot(page, 'this-level');
+  await sheet.getByRole('button', { name: 'Back to Lights' }).click();
+  await expect(sheet.getByRole('heading', { name: 'This Sheet', exact: true })).toBeVisible();
+  await expect(sheetView(page).sheet).toHaveAttribute('aria-label', 'Lights');
 });

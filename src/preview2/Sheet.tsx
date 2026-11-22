@@ -42,7 +42,8 @@ export interface SheetViewProps {
  */
 export function SheetView({ modal, frame, page, closeAlways, alone, back, backTo, rail, top, onClose, onBack }: SheetViewProps) {
   const ctx = useRender();
-  const ownKey = alone && page ? `level:${page.id}` as const : `modal:${modal.id}` as const;
+  // A level on show is the surface: a click on its bar or empty area selects the level (its Level Settings), not the sheet it is shown in. A page pushed in a sheet of a document without levels is the sheet's.
+  const ownKey = (alone || closeAlways) && page ? `level:${page.id}` as const : `modal:${modal.id}` as const;
   const selected = useIsSelected(ctx.store, ownKey);
   // The present animation belongs to the sheet's arrival in Use. Fixed at mount: switching between Edit and Use never adds or
   // drops it, so an open sheet stays put instead of sliding in again.

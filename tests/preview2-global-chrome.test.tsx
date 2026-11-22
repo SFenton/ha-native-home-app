@@ -89,6 +89,14 @@ describe('a level in Edit (sl-surface)', () => {
     expect(sheet.querySelector('button[aria-label="Back"]')!.getAttribute('title')).toBe('Back to Demo Level A');
   });
 
+  it('a click on the level\'s bar or empty area selects the level (its Level Settings), not the sheet it is shown in; a sheet\'s own bar still selects the sheet', () => {
+    const { container, unmount } = render(<Held surface={{ kind: 'level', id: 'demo_level_b' }}/>);
+    expect(container.querySelector('.sh-sheet')!.getAttribute('data-sel')).toBe('level:demo_level_b');
+    unmount();
+    const root = render(<Held surface={{ kind: 'modal', id: 'demo_sheet' }}/>);
+    expect(root.container.querySelector('.sh-sheet')!.getAttribute('data-sel')).toBe('modal:demo_sheet');
+  });
+
   it('Back steps out of a level in Edit, to the level beneath and then to the sheet, and the shell is told; Close does nothing', () => {
     const { container } = render(<Held surface={{ kind: 'level', id: 'demo_level_b' }}/>);
     act(() => { fireEvent.click(container.querySelector('.sh-sheet button[aria-label="Close"]')!); });

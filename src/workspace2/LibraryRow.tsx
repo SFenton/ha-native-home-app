@@ -32,6 +32,8 @@ export interface TreeItem {
   stacked?: boolean;
   /** The note on a stacked row, after its tags: a level's "Needs a newer app" while the app has not shipped levels. */
   note?: string;
+  /** The sheet a level's row hangs from: the row's name says it is a level of it ("Demo Room 1, level of Lights"). */
+  levelOf?: string;
   /** A place that uses a saved component: the row carries the link tag, and its accessible name says so. */
   linked?: { places: number };
 }
@@ -68,7 +70,7 @@ export interface RowProps {
 export default function LibraryRow({ item, selected, shown, active, handleColumn, use, more, badge, onActivate, onToggle, onHandleDown, onHandleKey, onContext }: RowProps) {
   const label = item.open ? `Hide what is in ${item.title}` : `Show what is in ${item.title}`;
   return <div role="treeitem" className="w2-tree-row" data-row={item.key} data-open={item.open || undefined} data-selected={selected || undefined} data-muted={item.muted || undefined} data-stacked={(item.stacked && item.note) || undefined}
-    aria-label={item.linked ? `${item.title}, linked template, used in ${item.linked.places} ${item.linked.places === 1 ? 'place' : 'places'}` : undefined}
+    aria-label={item.linked ? `${item.title}, linked template, used in ${item.linked.places} ${item.linked.places === 1 ? 'place' : 'places'}` : item.levelOf ? `${item.title}, level of ${item.levelOf}` : undefined}
     aria-level={item.depth + 1} aria-expanded={item.container ? item.open : undefined} aria-current={shown ? 'page' : selected ? 'true' : undefined}
     tabIndex={active ? 0 : -1} data-active={active || undefined} style={{ paddingInlineStart: 6 + item.depth * 16 }} title={item.title}
     onClick={onActivate} onContextMenu={onContext} onKeyDown={event => {

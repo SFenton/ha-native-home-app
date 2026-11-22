@@ -10,7 +10,7 @@ import { useAdd } from '../add/AddHost';
 import type { TopBarProps } from '../TopBar';
 import type { Workspace2 } from '../useWorkspace2';
 import { surfaceWordOf } from '../levels';
-import { listedSurface } from '../selection';
+import { listedSurface, surfaceAfterMove } from '../selection';
 
 const DRAFT = 'Draft · ';
 /** Below this width the top bar drops Redo (it stays in the Project sheet) so every slot keeps its size. */
@@ -42,8 +42,9 @@ export function PhoneTopBar({ ws, window: current, onWindow, pagesOpen, onPagesO
     <div className="w2-page-slot">
       <Overlay narrow open={pagesOpen} onOpenChange={onPagesOpen} trigger={pageTrigger} label="Pages" popupWidth={320} fullHeight className="w2-pages-pop">
         <PushStack rootTitle="Pages" rootHeader={<div className="w2-sheet-bar"><h2 className="w2-sheet-title">Pages</h2><button type="button" onClick={() => onPagesOpen(false)}>Done</button></div>}
-          root={<PagesPanel ws={ws} document={document} current={listedSurface(surface, document)} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}
-            actions={{ onDismiss: () => onPagesOpen(false), onSettings: next => ws.selectAnywhere(`${next.kind}:${next.id}`), onTabs: () => onPanel('tabs'), onChange: ws.studio.apply, onShow: next => { ws.setSurface(next); ws.select(undefined); } }}/>}/>
+          root={<PagesPanel ws={ws} document={document} current={listedSurface(surface, document)} currentLevel={surface?.kind === 'level' ? surface.id : undefined} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}
+            onPickLevel={(id, sheetId) => { ws.setSurface({ kind: 'level', id, ...(sheetId ? { sheetId } : {}) }); ws.select(undefined); onPagesOpen(false); }}
+            actions={{ onDismiss: () => onPagesOpen(false), onSettings: next => ws.selectAnywhere(`${next.kind}:${next.id}`), onTabs: () => onPanel('tabs'), onChange: next => { const moved = surfaceAfterMove(next, surface); ws.studio.apply(next); if (moved) ws.setSurface(moved); }, onShow: next => { ws.setSurface(next); ws.select(undefined); } }}/>}/>
       </Overlay>
       <span className="w2-page-status" role="status" data-testid="status-tag" data-tone={status.tone}>{status.text}</span>
     </div>

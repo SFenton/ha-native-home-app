@@ -11,7 +11,8 @@ import type { Cue } from './dnd/geometry';
 import LibraryLevelHead, { RAIL_CRUMB } from './LibraryLevelHead';
 import LibraryRow, { type TreeItem } from './LibraryRow';
 import { categoryInfo } from './LibraryRail';
-import { isOverlayLevel, levelName, levelRows, OVERLAY_SLOT, pathTo, searchLevel, type Crumb } from './levels';
+import { isOverlayLevel, levelCrumbs, levelName, levelRows, OVERLAY_SLOT, pathTo, searchLevel, type Crumb } from './levels';
+import { listedSurface, surfaceAfterMove } from './selection';
 import { moveTab, tabRoom } from './navigation/edit';
 import type { NavSurface } from '../preview2/navigation';
 import { flatRows, levelOwners, libraryGroups, matchGroups, surfaceWord, type LibraryRow as ListRow, type SurfaceRef } from './outline';
@@ -24,7 +25,7 @@ import { listIcons, useListIcons } from './listIcons';
 import { LevelMenuItems, LibraryFooter, RowMenu, SurfaceMenuItems, type PagesActions } from './PagesPanel';
 import { tabGroups } from './capacity';
 import type { Library } from './useLibrary';
-import { categoryOfSurface, enterLevel, followSelection, leaveLevel, rowKeyFor, setTrail, toggleOpen, trailOf, useTrailState, validTrail, type LibraryTrail } from './useLibraryTrail';
+import { categoryOfSurface, enterLevel, followSelection, inLevelTrail, leaveLevel, rowKeyFor, setTrail, toggleOpen, trailOf, useTrailState, validTrail, type LibraryTrail } from './useLibraryTrail';
 import type { TreeCategory } from './layout';
 import { typeName } from './util';
 import { AreaMenu, AreaMenuItems } from './layout/AreaMenu';
@@ -80,6 +81,15 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   const [lift, setLift] = useState<{ key: SelectionKey; to: number }>();
   const [tabCue, setTabCue] = useState<number>();
   const [said, setSaid] = useState('');
+  /** The level the person just came out of: its row stays marked and takes focus, so the next sibling is one step away. */
+  const [marked, setMarked] = useState<SelectionKey>();
+  // The mark is a "you were here" cue, not a selection: a new selection (a tile picked in the simulator), a press or a key clears it, so two rows never read as selected.
+  const goingIn = useRef(false), host = useRef<HTMLDivElement>(null);
+  /** Focus is nowhere, or already in the library: the only places a reveal may take it from. */
+  const restsHere = () => { const resting = window.document.activeElement; return !resting || resting === window.document.body || !!host.current?.contains(resting); };
+  const markedAt = useRef<SelectionKey | undefined>(undefined);
+  useEffect(() => { markedAt.current = ws.selection as SelectionKey | undefined; }, [marked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (marked && ws.selection !== markedAt.current) setMarked(undefined); }, [ws.selection]); // eslint-disable-line react-hooks/exhaustive-deps
   const [refusal, setRefusal] = useState<string>();
   // A refusal stays until the person's next action in the library (a press, a key, another list): a line that goes by itself leaves slower readers and screen readers behind.
   useEffect(() => { setRefusal(undefined); }, [category]);
@@ -103,14 +113,22 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     const item: TreeItem = { key: row.key, title: row.title, icon: row.icon, type: row.type, tags: [...(row.rule ? ['Rule'] : []), ...(row.tags ?? [])], count: row.count, container: row.container, depth, open: open.has(row.key), root: false, movable: node ? 'node' : area && area.node.blocks ? 'area' : false, hasMenu: node || Boolean(area), muted: muted || undefined, chosen: picked[row.key], ...(row.linked ? { linked: { places: row.places ?? 0 } } : {}) };
     return [item, ...(item.open && row.container ? nodeItems(row.key, depth + 1) : [])];
   });
-  /** A level's row: indented under its sheet, tagged Level, with the app-update note while the level is not in a shipped app. It opens nothing of its own: it shows its sheet. */
-  const levelItem = (row: ListRow): TreeItem => ({ key: row.key, title: row.title, icon: row.icon, type: 'page', tags: row.tags, count: 0, container: false, depth: row.level?.sheetId ? 1 : 0, open: false, root: true, movable: false, hasMenu: true, stacked: true, note: newerApp });
+  /**
+   * A level's row: indented under its sheet, tagged Level, with the app-update note while the level is not in a shipped app. A click goes into the level (as it does for a container row); the triangle opens
+   * its rows in place, one indent deeper, and the row carries the count every container has. Its name says which sheet it is a level of.
+   */
+  const levelItem = (row: ListRow): TreeItem[] => {
+    const depth = row.level?.sheetId ? 1 : 0;
+    const item: TreeItem = { key: row.key, title: row.title, icon: row.icon, type: 'page', tags: row.tags, count: index.children(row.key).length, container: true, depth, open: open.has(row.key), root: true, movable: false, hasMenu: true, stacked: true, note: newerApp,
+      levelOf: row.level?.sheetId ? document.modals.find(modal => modal.id === row.level!.sheetId)?.title : undefined };
+    return [item, ...(item.open ? nodeItems(row.key, depth + 1) : [])];
+  };
   const rootItems = (row: ListRow): TreeItem[] => {
-    if (row.level) return [levelItem(row)];
+    if (row.level) return levelItem(row);
     const surface = surfaceKey(row.surface);
     const item: TreeItem = { key: row.key, title: row.title, icon: row.icon, type: surfaceType(category, row.surface), tags: row.tags, count: index.children(surface).length, container: true, depth: 0, open: open.has(row.key), root: true, movable: category === 'tabs' && document.navigation.tabs.length > 1 ? 'tab' : false, hasMenu: true, chosen: picked[row.key] };
     // An open sheet lists its levels, then its own rows; a closed one lists neither. Find still shows a level that matches, under its sheet, open or not.
-    const levels = item.open || needle ? (row.levels ?? []).map(levelItem) : [];
+    const levels = item.open || needle ? (row.levels ?? []).flatMap(levelItem) : [];
     return [item, ...levels, ...(item.open ? nodeItems(surface, 1) : [])];
   };
   const needle = query.trim().toLowerCase();
@@ -135,17 +153,43 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     ? (document.navigation.tabs.length ? `${document.navigation.tabs.length} of ${tabGroups[0].capacity ?? 5} in the tab bar` : 'Not using a tab bar')
     : `${plural(total, category === 'pages' ? 'page' : category === 'sheets' ? 'sheet' : 'modal')}${levelCount ? ` · ${plural(levelCount, 'level')}` : ''}`;
   const tabLabel = (page: SelectionKey) => document.navigation.tabs.find(tab => `page:${tab.pageId}` === page)?.label;
-  const above: Crumb[] = atRoot ? [] : [{ key: RAIL_CRUMB, title: info.label }, ...pathTo(document, index, level!).map((crumb, at) => at === 0 && category === 'tabs' ? { ...crumb, title: tabLabel(crumb.key) ?? crumb.title } : crumb)];
+  // A level of a sheet is a surface of its own: its path starts at the rail item, then the sheet and the levels it is reached through, then the containers down to the one on show.
+  const inLevel = inLevelTrail(trail), levelId = inLevel ? trail[0].slice('level:'.length) : undefined;
+  const reached = useMemo(() => levelId === undefined ? [] : levelCrumbs(document, ws.surface, levelId), [document, ws.surface, levelId]);
+  const reachedSheet = reached[0]?.key.startsWith('modal:') ? reached[0].key.slice('modal:'.length) : undefined;
+  const inside: Crumb[] = atRoot ? [] : inLevel && level === trail[0] ? [] : pathTo(document, index, level!).map((crumb, at) => at === 0 && category === 'tabs' ? { ...crumb, title: tabLabel(crumb.key) ?? crumb.title } : crumb);
+  const above: Crumb[] = atRoot ? [] : [{ key: RAIL_CRUMB, title: info.label }, ...reached, ...inside];
   const title = atRoot ? info.label : levelName(document, index, level!);
 
   // --- Moving through levels -------------------------------------------------------------------------------
   const openRow = (state_: typeof state, surface: SelectionKey) => toggleOpen(state_, rowKeyFor(document, category, surface), true);
   const toRoot = (surface?: SelectionKey) => { setDirection('back'); setQuery(''); update(old => { const next = setTrail(old, category, []); return surface ? openRow(next, surface) : next; }); };
-  const goInto = (key: SelectionKey) => { setDirection('forward'); setQuery(''); update(old => enterLevel(old, category, index, key)); };
-  const back = () => { setDirection('back'); setQuery(''); update(old => { const next = leaveLevel(old, category); return trail.length <= 2 ? openRow(next, trail[0]) : next; }); };
+  const goInto = (key: SelectionKey) => { goingIn.current = true; setMarked(undefined); setDirection('forward'); setQuery(''); update(old => enterLevel(old, category, index, key)); };
+  /** Shows a level of a sheet in the simulator (nothing selected) and goes into it here. The sheet is always named, so a level two sheets open is shown in the one the person came from. */
+  const intoLevel = (id: string, sheetId: string | undefined, way: 'forward' | 'back') => {
+    ws.setSurface({ kind: 'level', id, ...(sheetId ? { sheetId } : {}) }); ws.select(undefined);
+    goingIn.current = true; setMarked(undefined); setDirection(way); setQuery('');
+    update(old => { const next = enterLevel(old, category, index, selectionKey('level', id)); return sheetId ? openRow(next, selectionKey('modal', sheetId)) : next; });
+  };
+  /** Out of a level to its sheet: the list of its kind with the sheet open and shown in the simulator, and the level's row marked, so the next one is a click away. */
+  const toSheet = (sheet: SelectionKey, from: SelectionKey) => {
+    ws.setSurface({ kind: 'modal', id: sheet.slice('modal:'.length) }); ws.select(undefined);
+    setMarked(from); toRoot(sheet);
+  };
+  const back = () => {
+    if (inLevel && trail.length === 1) { const parent = above.at(-1); if (parent) jump(parent.key); return; }
+    setDirection('back'); setQuery(''); update(old => { const next = leaveLevel(old, category); return !inLevel && trail.length <= 2 ? openRow(next, trail[0]) : next; });
+  };
   const jump = (key: SelectionKey) => {
-    if (key === RAIL_CRUMB) { toRoot(); return; }
-    if (index.get(key)?.kind === 'page' || index.get(key)?.kind === 'modal') { toRoot(key); return; }
+    if (key === RAIL_CRUMB) { setMarked(inLevel ? trail[0] : undefined); toRoot(); return; }
+    const kind = index.get(key)?.kind;
+    if (kind === 'modal' && inLevel) { toSheet(key, trail[0]); return; }
+    if (kind === 'page' || kind === 'modal') { toRoot(key); return; }
+    // A level the path names (the one this was reached through, or this one from a container inside it): the simulator shows it, as it does a sheet.
+    if (kind === 'level') {
+      if (key === trail[0]) { setDirection('back'); setQuery(''); update(old => enterLevel(old, category, index, key)); } else intoLevel(key.slice('level:'.length), reachedSheet, 'back');
+      return;
+    }
     setDirection('back'); setQuery(''); update(old => enterLevel(old, category, index, key));
   };
 
@@ -159,7 +203,7 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     if (!selection || selection === lastSeen.current) return;
     lastSeen.current = selection;
     if (visibleKeys.has(selection) || trail.includes(selection) || hits.some(hit => hit.row.key === selection)) return;
-    const found = followSelection(document, index, selection);
+    const found = followSelection(document, index, selection, ws.surface);
     if (!found) return;
     // A transition: a drop selects the tile, and drawing the panel's new level must not be part of the drop's own task.
     startTransition(() => {
@@ -175,16 +219,50 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     // Only a change while the panel is open: opening it from a rail button keeps the list that was asked for.
     if (lastShown.current === shownKey) return;
     lastShown.current = shownKey;
-    if (!shownKey || !trail.length || trail[0] === shownKey) return;
+    if (!shownKey || trail[0] === shownKey) return;
+    // A level on show, from Use, a Show button, a check or Undo: the panel goes into it, in the list of its sheet, wherever it was.
+    if (ws.surface?.kind === 'level') {
+      // A reveal (+ Level) leaves focus on the panel or nowhere: it goes to Back. A press in the simulator keeps its own focus.
+      if (restsHere()) goingIn.current = true;
+      const next = categoryOfSurface(document, shownKey, ws.surface), sheet = listedSurface(ws.surface, document);
+      update(old => { const left = next !== category ? setTrail(old, category, []) : old, there = setTrail(left, next, [shownKey]); return sheet ? openRow(there, selectionKey('modal', sheet.id)) : there; });
+      if (next !== category) library.show(next);
+      setDirection('forward');
+      return;
+    }
+    if (!trail.length) return;
     const next = categoryOfSurface(document, shownKey);
     update(old => openRow(setTrail(old, category, []), shownKey));
     if (next !== category) library.show(next);
   }, [shownKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Into a level (Enter, a click, a reveal): focus goes to the header's Back, the way Back puts it on the row, so the keyboard is not left on the body.
+  useEffect(() => {
+    if (!goingIn.current || atRoot) return;
+    goingIn.current = false;
+    // Checked again when the frame runs: a Show button may have focused the simulator since, and that focus stays.
+    const frame = window.requestAnimationFrame(() => { if (restsHere()) host.current?.querySelector<HTMLElement>('.w2-lib-back')?.focus(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [atRoot, trail.length, shownKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Out of a level: its row, in the list the person comes back to, is marked and takes focus.
+  useEffect(() => {
+    if (!marked || !atRoot) return;
+    const frame = window.requestAnimationFrame(() => focusRow(list.current?.querySelector<HTMLElement>(`[data-row="${marked}"]`) ?? undefined));
+    return () => window.cancelAnimationFrame(frame);
+  }, [marked, atRoot]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Into a level: the live region says where the person is, since the list changes under them.
+  const entered = inLevel && trail.length === 1 ? trail[0] : undefined;
+  useEffect(() => {
+    if (!entered) return;
+    const parent = reached.at(-1)?.title;
+    setSaid(`Showing ${levelName(document, index, entered)}${parent ? `, a level of ${parent}` : ''}.`);
+  }, [entered]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // --- Row actions -----------------------------------------------------------------------------------------------
   const actions: PagesActions = {
     onSettings: surface => ws.selectAnywhere(surfaceKey(surface)),
-    onChange: next => { setRefusal(undefined); ws.studio.apply(next); },
+    // A move to Pages or to Sheets keeps the surface on show on show, as the page or the level it became.
+    onChange: next => { setRefusal(undefined); const moved = surfaceAfterMove(next, ws.surface); ws.studio.apply(next); if (moved) ws.setSurface(moved); },
     onShow: surface => { ws.setSurface(surface); ws.select(undefined); },
     onNotice: line => refuse(line),
   };
@@ -200,11 +278,12 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     return out;
   };
   const activate = (item: TreeItem, event?: MouseEvent | KeyboardEvent) => {
-    setActiveKey(item.key);
-    if (item.root && allRows.find(candidate => candidate.key === item.key)?.level) {
-      // A level has no page of its own in the simulator yet: its row shows the sheet that holds it.
-      const row = allRows.find(candidate => candidate.key === item.key)!;
-      if (row.level!.sheetId) { ws.setSurface(row.surface); ws.select(undefined); }
+    setActiveKey(item.key); setMarked(undefined);
+    const levelRow = item.root ? allRows.find(candidate => candidate.key === item.key)?.level : undefined;
+    if (levelRow) {
+      // A level goes in like a container row: the simulator shows it inside the sheet that holds it, and the header says where it is. Alt-click and the triangle open it in place.
+      if (event && 'altKey' in event && event.altKey) { toggle(item, event as MouseEvent); return; }
+      intoLevel(levelRow.id, levelRow.sheetId, 'forward');
       return;
     }
     if (item.root) {
@@ -439,7 +518,7 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   // --- Drawing ---------------------------------------------------------------------------------------------------------
   const first = visible[0]?.key;
   const activeAt = activeKey && visibleKeys.has(activeKey) ? activeKey : first;
-  const renderItem = (item: TreeItem) => <LibraryRow key={item.key} item={item} selected={ws.selection === item.key} shown={item.root && ws.surface !== undefined && item.key !== undefined && surfaceKey(ws.surface) === (item.key.startsWith('tab:') ? `page:${document.navigation.tabs.find(tab => `tab:${tab.id}` === item.key)?.pageId}` : item.key)}
+  const renderItem = (item: TreeItem) => <LibraryRow key={item.key} item={item} selected={ws.selection === item.key || marked === item.key} shown={item.root && ws.surface !== undefined && item.key !== undefined && surfaceKey(ws.surface) === (item.key.startsWith('tab:') ? `page:${document.navigation.tabs.find(tab => `tab:${tab.id}` === item.key)?.pageId}` : item.key)}
     active={item.key === activeAt} handleColumn={handleColumn} use={use} more={moreOf(item)}
     onActivate={event => activate(item, event)} onToggle={event => { event.stopPropagation(); setActiveKey(item.key); toggle(item, event); }}
     onHandleDown={handleDown(item)} onHandleKey={handleKey(item)} onContext={openMenu(item)}/>;
@@ -452,14 +531,14 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     const parent = index.get(key)?.parent, surface = index.get(key)?.surface;
     setQuery('');
     ws.selectAnywhere(key);
-    if (parent && surface && parent !== surface) { setDirection('forward'); update(old => enterLevel(old, category, index, parent)); } else if (surface) toRoot(surface);
+    if (parent && surface && parent !== surface) { setDirection('forward'); update(old => enterLevel(old, category, index, parent)); } else if (surface && index.get(surface)?.kind === 'level') { setDirection('forward'); update(old => enterLevel(old, category, index, surface)); } else if (surface) toRoot(surface);
     if (index.get(key)?.kind === 'node') onKeepPanel(key);
   };
 
   const here = level ? index.get(level) : undefined;
   const settingsKey = level;
   const settingsEntry = settingsKey ? index.get(settingsKey) : undefined;
-  const settingsName = here?.kind === 'local-tab' ? 'Area Settings' : `${titleCase(typeName(settingsEntry?.node ?? 'section'))} Settings`;
+  const settingsName = here?.kind === 'local-tab' ? 'Area Settings' : here?.kind === 'level' ? 'Level Settings' : `${titleCase(typeName(settingsEntry?.node ?? 'section'))} Settings`;
   const tabsHere = here?.node?.type === 'local-tabs' ? { node: here.node as TabsNode, path: here.path } : undefined;
   const addArea = (shared: boolean) => {
     if (!tabsHere) return;
@@ -475,7 +554,8 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   const destination = level ? endOf(document, level) : undefined;
   /** The sheet "+ Level" adds to: the one the simulator shows, when it is of this list's kind. */
   const levelSheet = (() => {
-    const shown = ws.surface?.kind === 'modal' ? document.modals.find(modal => modal.id === ws.surface!.id) : undefined;
+    const holder = listedSurface(ws.surface, document);
+    const shown = holder?.kind === 'modal' ? document.modals.find(modal => modal.id === holder.id) : undefined;
     return shown && (surfaceWord(shown) === 'Modal') === (category === 'modals') ? { id: shown.id, title: shown.title } : undefined;
   })();
   const footer = atRoot
@@ -496,7 +576,7 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   const menuNode = menuItem && !menuItem.root ? index.get(menuItem.key) : undefined;
   const menuArea = menuNode?.kind === 'local-tab';
 
-  return <ListIconHost rowOf={key => list.current?.querySelector<HTMLElement>(`[data-row="${key}"]`) ?? null}><div className="w2-pages w2-tree-host" data-library={category} data-testid="library-tree" data-level={atRoot ? 'root' : 'level'} onPointerDownCapture={() => setRefusal(undefined)} onKeyDownCapture={() => setRefusal(undefined)}>
+  return <ListIconHost rowOf={key => list.current?.querySelector<HTMLElement>(`[data-row="${key}"]`) ?? null}><div ref={host} className="w2-pages w2-tree-host" data-library={category} data-testid="library-tree" data-level={atRoot ? 'root' : 'level'} onPointerDownCapture={() => { setRefusal(undefined); setMarked(undefined); }} onKeyDownCapture={() => { setRefusal(undefined); setMarked(undefined); }}>
     <LibraryLevelHead title={title} summary={summary} path={above} onBack={back} onJump={jump} onClose={onClose}/>
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder={placeholder} aria-label={placeholder} value={query} onChange={event => setQuery(event.target.value)}/></label>
     <div className="w2-pages-scroll w2-lib-scroll" data-base-ui-swipe-ignore>

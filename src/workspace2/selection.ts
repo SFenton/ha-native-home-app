@@ -46,3 +46,18 @@ export function listedSurface(surface: NavSurface | undefined, document: Composi
   const sheetId = [...owners.reach].find(([, levels]) => levels.has(surface.id))?.[0];
   return sheetId === undefined ? undefined : { kind: 'modal', id: sheetId };
 }
+
+/**
+ * Where the preview stands after Move to Pages or Move to Sheets changed the document: the surface on show stays on show, as what it became. A level moved to Pages is shown as a page; a page moved
+ * to Sheets is shown as a level, inside the sheet that opens it. Undefined when the surface is not what the move changed.
+ */
+export function surfaceAfterMove(next: CompositionDocument, surface: NavSurface | undefined): NavSurface | undefined {
+  if (!surface || surface.kind === 'modal') return undefined;
+  const level = next.levels?.some(item => item.id === surface.id) ?? false, page = next.pages.some(item => item.id === surface.id);
+  if (surface.kind === 'level' && !level && page) return { kind: 'page', id: surface.id };
+  if (surface.kind === 'page' && level && !page) {
+    const sheetId = [...levelOwners(next).bySheet].find(([, ids]) => ids.includes(surface.id))?.[0];
+    return { kind: 'level', id: surface.id, ...(sheetId ? { sheetId } : {}) };
+  }
+  return undefined;
+}

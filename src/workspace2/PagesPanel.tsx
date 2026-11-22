@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { ChangeListIconItem } from './ListIconPicker';
 import { AlertTriangle, MoreHorizontal, Plus, Search } from 'lucide-react';
@@ -146,19 +146,22 @@ export function RowMenu({ document, surface, title, actions, className = 'w2-ico
  * a page; its More menu renames, duplicates, opens settings or deletes it. "This Page" is its own sheet (`phone/LevelSheet.tsx`); the
  * wide library has its own lists (`LibraryTree.tsx`).
  */
-export default function PagesPanel({ document, current, onPick, actions = {} }: { document: CompositionDocument; current: SurfaceRef | undefined; onPick: (surface: SurfaceRef) => void; actions?: PagesActions; ws?: Workspace2 }) {
+export default function PagesPanel({ document, current, currentLevel, onPick, onPickLevel, actions = {} }: { document: CompositionDocument; current: SurfaceRef | undefined; /** The level on show, whose row is the current one (its sheet is `current`). */ currentLevel?: string; onPick: (surface: SurfaceRef) => void;
+  /** A level's row: shows the level, inside the sheet it hangs from (none for a level no sheet opens). Without it a level's row shows its sheet. */ onPickLevel?: (levelId: string, sheetId: string | undefined) => void; actions?: PagesActions; ws?: Workspace2 }) {
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState<string>();
   // Opens on the list that holds the page or sheet on show, so the row for "here" is in view.
   const [scope, setScope] = useState<ListKind>(() => current ? categoryOfSurface(document, selectionKey(current.kind, current.id)) : 'tabs');
   const groups = useMemo(() => libraryGroups(document, scope), [document, scope]);
   const same = (surface: SurfaceRef) => current?.kind === surface.kind && current.id === surface.id;
+  /** The row for what is on show: a level's own row when one is, else the page's or sheet's. */
+  const here = (row: LibraryRow) => row.level ? Boolean(onPickLevel) && currentLevel === row.level.id : same(row.surface) && currentLevel === undefined;
   const say: PagesActions = { ...actions, onChange: next => { setNotice(undefined); actions.onChange?.(next); }, onNotice: text => { setNotice(text); actions.onNotice?.(text); } };
   const newerApp = isPending(SHEET_LEVELS_CAPABILITY) ? NEWER_APP_WORDS : undefined;
   const render = (row: LibraryRow, depth = 0): ReactNode => <li key={row.key}>
     <div className="w2-page-item">
-      <button type="button" className="w2-page-row" style={{ paddingInlineStart: 16 + depth * 16 }} data-current={(!row.level && same(row.surface)) || undefined}
-        aria-current={!row.level && same(row.surface) ? 'page' : undefined} onClick={() => { setNotice(undefined); if (!row.level || row.level.sheetId) onPick(row.surface); }}>
+      <button type="button" className="w2-page-row" style={{ paddingInlineStart: 16 + depth * 16 }} data-current={here(row) || undefined}
+        aria-current={here(row) ? 'page' : undefined} onClick={() => { setNotice(undefined); if (row.level && onPickLevel) onPickLevel(row.level.id, row.level.sheetId); else if (!row.level || row.level.sheetId) onPick(row.surface); }}>
         <GlyphByName name={row.icon} size={18}/>
         <span className="w2-page-text"><span className="w2-page-title">{row.title}</span>{(row.level ? newerApp : row.via) && <span className="w2-page-via">{row.level ? newerApp : row.via}</span>}</span>
         {row.tags.map(tag => <Tag key={tag} tone={tag === 'No Way In' ? 'warning' : 'neutral'}>{tag}</Tag>)}
@@ -181,7 +184,17 @@ export default function PagesPanel({ document, current, onPick, actions = {} }: 
       <ul>{group.rows.map(row => render(row))}</ul>
     </section>);
   };
-  return <div className="w2-pages" onPointerDownCapture={() => setNotice(undefined)} onKeyDownCapture={() => setNotice(undefined)}>
+  // On a phone the sheet is the scroller (the list is not one): it opens from its top, so the title and Done are on screen, and scrolls only as far as the current row needs, never by scrolling the header away.
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = root.current?.closest<HTMLElement>('.w2-sheet-content'), row = root.current?.querySelector<HTMLElement>('[data-current]');
+    if (!scroller) return;
+    scroller.scrollTop = 0;
+    if (!row) return;
+    const over = row.getBoundingClientRect().bottom - (root.current!.querySelector('.w2-pages-foot')?.getBoundingClientRect().top ?? scroller.getBoundingClientRect().bottom);
+    if (over > 0) scroller.scrollTop = over + 8;
+  }, []);
+  return <div ref={root} className="w2-pages" onPointerDownCapture={() => setNotice(undefined)} onKeyDownCapture={() => setNotice(undefined)}>
     <label className="w2-search"><Search size={16} aria-hidden/><input type="search" placeholder={`Find a ${noun}`} aria-label={`Find a ${noun}`} value={query} onChange={event => setQuery(event.target.value)}/></label>
     <div className="w2-pages-scope" role="group" aria-label="List">
       {scopes.map(item => <button key={item} type="button" aria-pressed={scope === item} onClick={() => setScope(item)}>{categoryInfo[item].label}</button>)}

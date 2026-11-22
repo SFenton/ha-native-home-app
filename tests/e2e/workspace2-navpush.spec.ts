@@ -178,7 +178,7 @@ test.describe('a level in the Studio', () => {
     await expect(page.getByLabel('Properties').getByRole('heading', { name: 'New button' })).toBeVisible();
   });
 
-  for (const scheme of ['light', 'dark'] as const) test(`a level no sheet opens is shown alone in the workspace, and a click on it opens no empty inspector (${scheme})`, async ({ page, request }, info) => {
+  for (const scheme of ['light', 'dark'] as const) test(`a level no sheet opens is shown alone in the workspace, and a click on its bar opens its Level Settings (${scheme})`, async ({ page, request }, info) => {
     await seed(request, documentWithLevels());
     await page.emulateMedia({ colorScheme: scheme });
     await openWorkspace(page);
@@ -191,10 +191,15 @@ test.describe('a level in the Studio', () => {
     await expect(sheet(page).getByRole('button', { name: 'Close', exact: true })).toHaveCount(1);
     await expect(page.locator('.sh-page')).toHaveCount(0);
     await snap(page, `level-5-alone-${info.project.name}-${scheme}`);
-    // A click on the level's own bar: the level is selected, and the inspector stays shut rather than opening empty.
+    // The check selects the level, and a level has Level Settings: they are up. Closed, a click on the level's own bar selects the level and brings them back.
+    const settings = page.getByLabel('Properties');
+    await expect(settings.getByRole('heading', { name: 'Demo Level Alone', exact: true })).toBeVisible();
+    await expect(settings.getByText('Level settings')).toBeVisible();
+    await settings.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(settings).toHaveCount(0);
     await expect(addButton(page)).toBeVisible();
     await sheet(page).locator('.sh-sheet-title').click();
-    await expect(page.getByLabel('Properties')).toHaveCount(0);
+    await expect(settings.getByText('Level settings')).toBeVisible();
     await snap(page, `level-6-alone-clicked-${info.project.name}-${scheme}`);
   });
 });

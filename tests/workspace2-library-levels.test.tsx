@@ -86,15 +86,17 @@ describe('the Sheets list with levels', () => {
     expect(screen.getByText('3 levels', { exact: false }).textContent).toContain('1 sheet · 3 levels');
   });
 
-  it('shows a level\'s sheet in the simulator when the level is chosen, and nothing for one no sheet reaches', () => {
+  it('shows the level in the simulator, inside the sheet its row hangs from, when the level is chosen; one no sheet reaches is shown alone', () => {
     const setSurface = vi.fn();
     render(<Harness setSurface={setSurface}/>);
     open();
     fireEvent.click(rowOf('Demo Level B'));
-    expect(setSurface).toHaveBeenCalledWith({ kind: 'modal', id: 'modal-swatch' });
+    expect(setSurface).toHaveBeenCalledWith({ kind: 'level', id: 'demo_level_b', sheetId: 'modal-swatch' });
+    cleanup();
     setSurface.mockClear();
+    render(<Harness setSurface={setSurface}/>);
     fireEvent.click(rowOf('Demo Level C'));
-    expect(setSurface).not.toHaveBeenCalled();
+    expect(setSurface).toHaveBeenCalledWith({ kind: 'level', id: 'demo_level_c' });
   });
 
   it('a closed sheet lists neither its levels nor its rows; Not Linked levels stay', () => {
