@@ -50,9 +50,11 @@ export function lowerSheetLevels(document: CompositionDocument, target: readonly
   /** Whether a saved component's body holds a push to a page (or any push) or takes a page as an argument. */
   const pushes = (id: string): boolean => {
     const entry = library.get(id);
-    return entry !== undefined && ((entry.params ?? []).some(param => param.kind === 'page-id') || JSON.stringify(entry.node).includes('"type":"push"'));
+    return entry !== undefined && ((entry.params ?? []).some(param => param.kind === 'page-id') || /"type":"(push|room-navigation-grid)"/.test(JSON.stringify(entry.node)));
   };
   const changes: string[] = [], unlowered: string[] = [];
+  /** Room-navigation grids inside a sheet or a level: their actions are the source's items, at the top level of the document, which the walk below does not visit. */
+  const grids: { sourceId: string; pointer: string }[] = [];
   const lower = (value: unknown, at: string, pointerOf: (path: string) => string): unknown => {
     if (Array.isArray(value)) return value.map((item, index) => lower(item, step(at, index), pointerOf));
     if (!isRecord(value)) return value;
@@ -62,6 +64,7 @@ export function lowerSheetLevels(document: CompositionDocument, target: readonly
       changes.push(`dismiss then push at ${pointerOf(at)}`);
       return { type: 'dismiss-then-push', destination: value };
     }
+    if (value.type === 'room-navigation-grid' && isRecord(value.binding) && typeof value.binding.sourceId === 'string') grids.push({ sourceId: value.binding.sourceId, pointer: pointerOf(at) });
     if (value.type === 'component-ref' && typeof value.componentId === 'string' && pushes(value.componentId)) unlowered.push(pointerOf(at));
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, lower(item, step(at, key), pointerOf)]));
   };
@@ -69,7 +72,24 @@ export function lowerSheetLevels(document: CompositionDocument, target: readonly
   const moved = levels.map((level, index) => ({
     ...(lower(level, '', path => `/document/levels/${index}${path}`) as typeof level), navigation: { type: 'stack' as const },
   }));
+  // A room chosen in a sheet or a level closes the sheet on the new build, as a push from a sheet does. Its items are written once, on the source: when only sheets and levels
+  // use the source they become dismiss-then-push; when a page uses it too, one source cannot be written two ways and the use is left as it is.
+  const used = (value: unknown, sourceId: string): boolean => Array.isArray(value) ? value.some(item => used(item, sourceId))
+    : isRecord(value) && ((value.type === 'room-navigation-grid' && isRecord(value.binding) && value.binding.sourceId === sourceId) || Object.values(value).some(item => used(item, sourceId)));
+  const rewritten = new Set<string>();
+  const dataSources = document.dataSources.map((source, index) => {
+    if (source.kind !== 'model' || source.model !== 'room-navigation@1') return source;
+    const own = grids.filter(grid => grid.sourceId === source.id);
+    if (!own.length || !source.items.some(item => item.action.type === 'push' && pageIds.has(item.action.pageId))) return source;
+    if (used(document.pages, source.id)) { unlowered.push(...own.map(grid => grid.pointer)); return source; }
+    rewritten.add(source.id);
+    return { ...source, items: source.items.map((item, at) => {
+      if (item.action.type !== 'push' || !pageIds.has(item.action.pageId)) return item;
+      changes.push(`dismiss then push at /document/dataSources/${index}/items/${at}/action`);
+      return { ...item, action: { type: 'dismiss-then-push' as const, destination: item.action } };
+    }) };
+  });
   const { levels: _levels, ...rest } = document;
   if (moved.length) changes.push(`write ${moved.length} ${moved.length === 1 ? 'level' : 'levels'} as pages`);
-  return { document: { ...rest, pages: [...document.pages, ...moved], modals }, changes, unlowered };
+  return { document: { ...rest, pages: [...document.pages, ...moved], modals, dataSources: rewritten.size ? dataSources : document.dataSources }, changes, unlowered };
 }
