@@ -15,8 +15,10 @@ export type PlainNode = Exclude<CompositionNode, ComponentRefNode>;
  * Identifiers never contain `:` or `/`, so a key splits at its first colon and a local tab's id can join its node and
  * tab ids with a slash.
  */
-export type SelectionKind = 'node' | 'page' | 'modal' | 'tab' | 'local-tab' | 'chrome-group' | 'chrome-item' | 'source';
-/** A selection key such as `node:hc-lights` or `page:home`. */
+export type SelectionKind = 'node' | 'page' | 'modal' | 'level' | 'tab' | 'local-tab' | 'chrome-group' | 'chrome-item' | 'source';
+/**
+ * A selection key such as `node:hc-lights` or `page:home`. `level:<id>` names an entry of `levels[]` in the library only: the index does not hold levels yet, so nothing else selects one.
+ */
 export type SelectionKey = `${SelectionKind}:${string}`;
 
 /** One indexed thing: where it lives in the document and what encloses it. */

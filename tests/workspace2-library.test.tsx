@@ -182,9 +182,9 @@ describe('the docked panel and the categories', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tabs' }));
     expect(buttons()).toEqual(['Tab', 'Edit Tabs']);
     fireEvent.click(screen.getByRole('button', { name: 'Sheets' }));
-    expect(buttons()).toEqual(['Sheet']);
+    expect(buttons()).toEqual(['Sheet', 'Level']);
     fireEvent.click(screen.getByRole('button', { name: 'Modals' }));
-    expect(buttons()).toEqual(['Modal']);
+    expect(buttons()).toEqual(['Modal', 'Level']);
   });
 
   it('Sheets groups its sheets by how they open, and a group header toggles and remembers', () => {

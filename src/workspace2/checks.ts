@@ -7,7 +7,7 @@ import { targetOf, wordsFor, type Destination } from './checkWords';
 import type { DialogKey } from './projectDialogs';
 import type { PanelKind } from './useWorkspace2';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
-import { buildOutline, collectLinks } from './outline';
+import { buildOutline, collectLinks, levelOwners } from './outline';
 import { tabGroups } from './capacity';
 import { labelFor } from './labels';
 import { pendingUseWords } from './pendingUse';
@@ -86,6 +86,13 @@ export function runChecks(document: CompositionDocument): Checks {
     suggestions.push({ id: `no-way-in-${surface.kind}-${surface.id}`, sentence: `${title} has no way in.`, place: title, select: `${surface.kind}:${surface.id}` });
   }
   const links = collectLinks(document);
+  // A level no sheet reaches: published to a build without levels it is a page nothing opens, so it is said like any other surface with no way in.
+  for (const id of levelOwners(document, links).loose) {
+    // A level some link reaches (a page's, say) has a way in; the error names that link, so the suggestion would be untrue.
+    if (links.some(link => link.to.kind === 'page' && link.to.id === id)) continue;
+    const title = (document.levels ?? []).find(item => item.id === id)?.title ?? id;
+    suggestions.push({ id: `no-way-in-level-${id}`, sentence: `${title} has no way in.`, place: title });
+  }
   for (const page of document.pages) {
     if (page.navigation.type === 'navigation-columns' && !links.some(link => link.from.kind === 'page' && link.from.id === page.id && link.to.kind === 'page'))
       suggestions.push({ id: `columns-${page.id}`, sentence: `${page.title} opens pages beside it but links to none.`, place: page.title, select: `page:${page.id}` });

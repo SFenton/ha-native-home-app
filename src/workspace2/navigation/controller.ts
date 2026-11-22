@@ -28,7 +28,11 @@ export type NavigationRequest =
   | { kind: 'sheet'; options: CreateSheetOptions; resolve: (id: string | undefined) => void }
   | { kind: 'tab'; resolve: (id: string | undefined) => void }
   | { kind: 'rename'; surface: SurfaceRef }
-  | { kind: 'delete'; surface: SurfaceRef };
+  | { kind: 'delete'; surface: SurfaceRef }
+  | { kind: 'level'; sheetId: string; resolve: (id: string | undefined) => void }
+  | { kind: 'first-level'; pageId: string; onMoved: () => void }
+  | { kind: 'rename-level'; levelId: string }
+  | { kind: 'delete-level'; levelId: string };
 
 let listener: ((request: NavigationRequest) => void) | undefined;
 /** Registers the one mounted host; returns its release. */
@@ -52,3 +56,11 @@ export const createTab = () => ask(resolve => ({ kind: 'tab', resolve }));
 export const renameSurfaceDialog = (surface: SurfaceRef) => { listener?.({ kind: 'rename', surface }); };
 /** Opens the delete confirmation for a page or sheet. */
 export const deleteSurfaceDialog = (surface: SurfaceRef) => { listener?.({ kind: 'delete', surface }); };
+/** Opens "New Level" for a sheet and resolves to the new level's id, or undefined when cancelled. The level opens inside that sheet, from a tile added at the end of it. */
+export const createLevel = (sheetId: string) => ask(resolve => ({ kind: 'level', sheetId, resolve }));
+/** Asks whether to make the document's first level of a page (Move to Sheets); `onMoved` runs after a yes, once the move is applied. */
+export const askFirstLevel = (pageId: string, onMoved: () => void) => { listener?.({ kind: 'first-level', pageId, onMoved }); };
+/** Opens the rename dialog for a level. */
+export const renameLevelDialog = (levelId: string) => { listener?.({ kind: 'rename-level', levelId }); };
+/** Opens the delete confirmation for a level. */
+export const deleteLevelDialog = (levelId: string) => { listener?.({ kind: 'delete-level', levelId }); };

@@ -626,9 +626,14 @@
 .w2-tree-hit { height: auto; min-height: 44px; padding-block: 4px; }
 .w2-tree-text { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-inline-start: 6px; }
 .w2-tree-text .w2-tree-title { margin-inline-start: 0; }
+.w2-tree-row[data-stacked] { height: auto; min-height: 44px; padding-block: 4px; }
+.w2-tree-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; }
 .w2-tree-path { font-size: 12px; color: var(--w2-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .w2-tree-note { margin: 8px 12px; font-size: 12px; color: var(--w2-muted); }
 .w2-tree-note button { min-height: 28px; }
+/* A refusal is a warning the person has to read, so it is drawn in the text colour with the mark Checks uses, not as a caption. */
+.w2-tree-refusal, .w2-pages-notice[data-refusal] { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; color: var(--w2-ink-card); }
+.w2-tree-refusal > svg, .w2-pages-notice[data-refusal] > svg { flex: none; margin-top: 2px; }
 .w2-crumbs[data-align=start] { justify-content: flex-start; }
 @media (pointer: coarse) {
   .w2-tree-row { min-height: 44px; height: 44px; font-size: 15px; }
@@ -767,6 +772,8 @@ button.w2-tick, .w2-scope button.w2-tick { appearance: none; padding: 0; min-hei
 .w2-scope .w2-tpl-emptycta { margin: 0 12px 8px; justify-self: start; }
 .w2-lib-foot .w2-tree-count { margin-inline: 2px 0; }
 .w2-lib-foot .w2-tpl-foothint { flex-basis: 100%; margin: 0; }
+.w2-lib-foot .w2-lib-level-note { flex-basis: 100%; margin: 0; }
+.w2-pages-notice { flex: none; flex-basis: 100%; margin: 0; padding: 0 4px 4px; }
 .w2-tpl-everywhere { display: flex; gap: 8px; align-items: center; margin: 4px 16px 8px; padding: 8px 10px; border-radius: 10px; background: var(--w2-selected); font-size: 13px; }
 .w2-tpl-everywhere svg { flex: none; color: var(--w2-link); }
 .w2-tpl-editor-actions { padding: 8px 0; }

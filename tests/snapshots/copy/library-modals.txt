@@ -2,6 +2,9 @@ Modals
 0 modals
 No modals yet. A modal covers the whole screen.
 Modal
+Level
+Choose a sheet first
+A level opens inside its modal, with Back and Close. Move it to Pages and it opens as a page, with the tabs and header buttons.
 
 [names]
 Close
