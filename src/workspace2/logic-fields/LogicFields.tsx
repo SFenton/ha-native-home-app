@@ -174,7 +174,6 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
     setPreview({ collapsed, storageUnavailable });
   };
   const document = useDraftDocument(field.draft), data = useWorkspaceData();
-  const { liveClock, clockTimeZone } = useSimulationClock(document);
   const names = useNameContext(document);
   const entry = field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined;
   const nameContext = useMemo(() => entry ? { ...names, logic: { library: document.logicLibrary ?? [], settings: entry.params } } : names, [names, entry, document.logicLibrary]);
@@ -262,6 +261,9 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
       }) };
     } catch (reason) { return { error: reason instanceof Error ? reason.message : String(reason) }; }
   }, [working, document, field.kind, field.path, lens, tryWith]);
+  const clockProgram = useMemo(() => simulation.program
+    ? [...simulation.program.roots.map(root => root.body), ...simulation.program.flows.values()] : [], [simulation.program]);
+  const { liveClock, clockTimeZone } = useSimulationClock(clockProgram);
   const observe = useCallback((value: SimulationObservations) => { setLastObservation(value); setObservations(canvasPortObservations(value)); }, []);
   const close = () => { setActive(false); };
   useEffect(() => { if (!active) onClose(); }, [active, onClose]);

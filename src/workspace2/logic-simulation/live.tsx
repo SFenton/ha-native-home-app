@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ALL_KEY, READY_KEY, TIME_ZONE_KEY, VIEWER_KEY } from '../../preview2/live-house';
-import { usePreviewClock, useReadsSecondClock } from '../../preview2/clock';
+import { ALL_KEY, READY_KEY, TIME_ZONE_KEY, VIEWER_KEY, browserTimeZone } from '../../preview2/live-house';
+import { usePreviewClock, useReadsSecondClock, wallClock } from '../../preview2/clock';
 import { createEnvironment, emptyOverlay } from '../../preview2/projections';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Environment } from '../../shared/composition/evaluator';
@@ -17,7 +17,9 @@ import type { HeldSnapshot } from './engine';
 export interface FlowState { readonly fingerprint: string; readonly run: LiveRun }
 
 /** A live house clock includes the zone's offset at this instant, not the browser's offset. */
-export function simulationClock(date: Date, timeZone: string): SimulationCase['base']['clock'] {
+export function simulationClock(date: Date, suppliedTimeZone: string): SimulationCase['base']['clock'] {
+  const timeZone = browserTimeZone(suppliedTimeZone);
+  if (!timeZone) return wallClock(date);
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
     timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -31,7 +33,8 @@ export function useSimulationClock(document: unknown) {
   const subscribe = useCallback((listener: () => void) => live ? live.subscribe(keys => {
     if (keys.includes(TIME_ZONE_KEY)) listener();
   }) : () => {}, [live]);
-  const clockTimeZone = useSyncExternalStore(subscribe, () => live ? live.timeZone : house?.timeZone);
+  const suppliedTimeZone = useSyncExternalStore(subscribe, () => live ? live.timeZone : house?.timeZone);
+  const clockTimeZone = browserTimeZone(suppliedTimeZone);
   const browserClock = usePreviewClock(useReadsSecondClock(document));
   const liveClock = useMemo(() => clockTimeZone ? simulationClock(new Date(clockInstant(browserClock)), clockTimeZone) : browserClock,
     [browserClock, clockTimeZone]);
@@ -86,7 +89,8 @@ export function useSimulationSnapshot(program: SimulationProgram, document: Pick
     if (broad || keys.some(changed => changed === READY_KEY || changed === VIEWER_KEY || entityIds.includes(changed))) listener();
   }) : () => {}, [live, key, broad]); // eslint-disable-line react-hooks/exhaustive-deps
   const versions = useSyncExternalStore(subscribe, () => live ? `${live.ready}|${live.versionOf(VIEWER_KEY)}|${broad ? live.versionOf(ALL_KEY) : entityIds.map(id => live.versionOf(id)).join(',')}` : '');
-  const { liveClock } = useSimulationClock(program.roots.map(root => root.body));
+  const clockProgram = useMemo(() => [...program.roots.map(root => root.body), ...program.flows.values()], [program]);
+  const { liveClock } = useSimulationClock(clockProgram);
   const now = options.clock ?? liveClock;
   return useMemo(() => {
     const environment: Environment = createEnvironment(document, house ?? {}, emptyOverlay, undefined, now);

@@ -2,6 +2,7 @@ import type { SimulationClock, SimulationResult } from '../../shared/composition
 import { formatObservedValue, type ObservedValue } from './observations';
 import { resultText } from './words';
 import { describeValue, formatValue, type ValueFormatOptions } from '../canvas/value-format';
+import { browserTimeZone } from '../../preview2/live-house';
 
 export interface ValuePresentation {
   readonly name: string;
@@ -60,19 +61,14 @@ export function clockInstant(clock: SimulationClock): string {
   return new Date(Date.parse(`${clock.now}Z`) - clock.utcOffsetMinutes * 60_000).toISOString();
 }
 /** Resolve the authored wall time locally. Keep the captured offset for ambiguous times; reject nonexistent DST times. */
-export function editClock(base: SimulationClock, date: string, time: string, timeZone?: string): SimulationClock | undefined {
+export function editClock(base: SimulationClock, date: string, time: string, suppliedTimeZone?: string): SimulationClock | undefined {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return undefined;
   const now = `${date}T${time}:00`;
   const parsed = new Date(`${now}Z`);
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 19) !== now) return undefined;
+  const timeZone = browserTimeZone(suppliedTimeZone);
   if (!timeZone) return { now, utcOffsetMinutes: base.utcOffsetMinutes };
-  let formatter: Intl.DateTimeFormat;
-  try {
-    formatter = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch (error) {
-    if (error instanceof RangeError) return undefined;
-    throw error;
-  }
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const wanted = parsed.getTime();
   let instant = wanted - base.utcOffsetMinutes * 60_000;
   for (let attempt = 0; attempt < 4; attempt++) {
