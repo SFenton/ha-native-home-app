@@ -3,7 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Field, IconField } from '../../ui';
 import { Modal } from '../kit';
 import type { SurfaceRef } from '../outline';
-import { listedSurface } from '../selection';
+import { listedSurface, surfaceAfterMove } from '../selection';
 import type { Workspace2 } from '../useWorkspace2';
 import { FIRST_LEVEL_WORDS, firstLevelTitle, moveToSheets, addLevel, addPage, addSheet, addTab, deleteLevel, deleteSurface, levelOpenerCount, openerCount, renameLevel, renameSurface, tabRoom } from './edit';
 import { listenForNavigation, type CreatePageOptions, type CreateSheetOptions, type NavigationRequest } from './controller';
@@ -137,6 +137,8 @@ function NewLevel({ ws, sheetId, onDone }: { ws: Workspace2; sheetId: string; on
     if (!name.trim() || !sheet) return;
     const made = addLevel(ws.document!, sheetId, name);
     ws.studio.apply(made.document);
+    // The Studio shows the new level, inside the sheet it was made for: empty, with its Add slot, and the library goes in with it.
+    ws.setSurface({ kind: 'level', id: made.id, sheetId }); ws.select(undefined);
     onDone(made.id);
   };
   return <Modal open onOpenChange={open => { if (!open) onDone(undefined); }} size="s" title="New Level" footer={<Footer form={form} onCancel={() => onDone(undefined)} disabled={!name.trim() || !sheet}/>}>
@@ -152,7 +154,7 @@ function NewLevel({ ws, sheetId, onDone }: { ws: Workspace2; sheetId: string; on
 function FirstLevel({ ws, pageId, onMoved, onDone }: { ws: Workspace2; pageId: string; onMoved: () => void; onDone: () => void }) {
   const page = ws.document!.pages.find(item => item.id === pageId);
   return <LinkLossQuestion asking={page && { title: firstLevelTitle(page.title), text: FIRST_LEVEL_WORDS, confirm: 'Move to Sheets', tone: 'plain' }} onCancel={onDone}
-    onConfirm={() => { const moved = moveToSheets(ws.document!, pageId, true); if (moved.ok) { ws.studio.apply(moved.document); onMoved(); } onDone(); }}/>;
+    onConfirm={() => { const moved = moveToSheets(ws.document!, pageId, true); if (moved.ok) { const shown = surfaceAfterMove(moved.document, ws.surface); ws.studio.apply(moved.document); if (shown) ws.setSurface(shown); onMoved(); } onDone(); }}/>;
 }
 
 /** Rename a level. */

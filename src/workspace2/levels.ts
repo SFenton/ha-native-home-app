@@ -4,6 +4,8 @@ import type { DocumentIndex, SelectionKey } from '../preview2/model';
 import { typeName, type NodeLike } from './util';
 import { surfaceWord } from './outline';
 import { componentUses } from '../shared/composition/components';
+import { levelStack, type NavSurface } from '../preview2/navigation';
+import { sheetForLevel } from './selection';
 
 /** The name of a saved component. */
 const componentName = (document: CompositionDocument, id: string | undefined) => document.componentLibrary?.find(entry => entry.id === id)?.name;
@@ -152,6 +154,18 @@ export function pathTo(document: CompositionDocument, index: DocumentIndex, leve
   const above = index.ancestors(level);
   const keys = above.length ? above : surfaceOf(index, level) ? [surfaceOf(index, level)!] : [];
   return keys.map(key => ({ key, title: levelName(document, index, key) }));
+}
+
+/**
+ * The places a level is reached through, outermost first: the sheet it is shown in (the one `shown` names, else the one on show that reaches it, else the first that does) and then the
+ * levels between the sheet and it ("Lights", "Demo Room 1"). Empty for a level no sheet opens. The library's header, the phone sheet and the inspector write it as the path.
+ */
+export function levelCrumbs(document: CompositionDocument, shown: NavSurface | undefined, levelId: string): Crumb[] {
+  const sheetId = sheetForLevel(shown, document, levelId);
+  const sheet = sheetId === undefined ? undefined : document.modals.find(modal => modal.id === sheetId);
+  if (!sheet) return [];
+  const between = (levelStack(document, sheet.id, levelId) ?? [levelId]).slice(0, -1);
+  return [{ key: `modal:${sheet.id}` as SelectionKey, title: sheet.title }, ...between.map(id => ({ key: `level:${id}` as SelectionKey, title: document.levels?.find(level => level.id === id)?.title ?? id }))];
 }
 
 /** The levels from the page down to `level`, inclusive: the stack the sheet has pushed. */

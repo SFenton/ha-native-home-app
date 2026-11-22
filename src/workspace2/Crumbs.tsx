@@ -44,7 +44,7 @@ export default function Crumbs({ path, atRoot, onJump, align }: { path: Crumb[];
         return <span key={'crumb' in item ? item.crumb.key : 'hidden'} className="w2-crumb-item" data-last={last || undefined}>
           {'crumb' in item
             ? <button type="button" className="w2-crumb" data-drop-level={item.crumb.key} onClick={() => onJump(item.crumb.key)}><span>{item.crumb.title}</span></button>
-            : <Menu.Root><Menu.Trigger className="w2-crumb w2-crumb-more" aria-label="Hidden levels">…</Menu.Trigger>
+            : <Menu.Root><Menu.Trigger className="w2-crumb w2-crumb-more" aria-label="More of the path">…</Menu.Trigger>
               <Menu.Portal><Menu.Positioner sideOffset={4} align="start" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu">
                 {item.hidden.map(crumb => <Menu.Item key={crumb.key} className="w2-menu-item" onClick={() => onJump(crumb.key)}>{crumb.title}</Menu.Item>)}
               </Menu.Popup></Menu.Positioner></Menu.Portal></Menu.Root>}

@@ -34,7 +34,7 @@ export interface ActivityEntry { id: number; text: string }
 export type PanelKind = 'tabs' | 'header' | 'wallpaper' | 'styles';
 /** What the properties surface shows. */
 export type PropertiesTarget =
-  | { kind: 'node' | 'page' | 'modal'; key: SelectionKey; path: (string | number)[] }
+  | { kind: 'node' | 'page' | 'modal' | 'level'; key: SelectionKey; path: (string | number)[] }
   | { kind: PanelKind; key?: SelectionKey }
   /** An area of a tab container (`local-tab` in the index), shown in the inspector with its tabs and rule. */
   | { kind: 'area'; key: SelectionKey; path: (string | number)[] }
@@ -145,7 +145,7 @@ export function useWorkspace2(active: boolean) {
     if (!selection || !index) return undefined;
     const entry = index.get(selection);
     if (!entry) return undefined;
-    if (entry.kind === 'node' || entry.kind === 'page' || entry.kind === 'modal') return { kind: entry.kind, key: selection, path: entry.path };
+    if (entry.kind === 'node' || entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'level') return { kind: entry.kind, key: selection, path: entry.path };
     if (entry.kind === 'tab') return { kind: 'tabs', key: selection };
     if (entry.kind === 'local-tab') return { kind: 'area', key: selection, path: entry.path };
     if (entry.kind === 'chrome-group' || entry.kind === 'chrome-item') return { kind: 'header', key: selection };

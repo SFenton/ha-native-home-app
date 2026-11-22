@@ -226,6 +226,11 @@ function stackToLevel(document: CompositionDocument, open: readonly string[] | u
   }
   return undefined;
 }
+/**
+ * The levels the sheet `modalId` pushes through to show `levelId`, outermost first, ending with `levelId` itself: the shortest chain of links from the sheet. Undefined when the sheet
+ * does not reach the level. The library's path and the inspector's line read it, so they name the same sheet and levels the preview opens.
+ */
+export const levelStack = (document: CompositionDocument, modalId: string, levelId: string): string[] | undefined => stackToLevel(document, undefined, modalId, levelId);
 /** The sheet that shows `levelId`: the one named, else the one on top when it reaches the level, else the first that does. Undefined when no sheet reaches it. */
 function sheetOfLevel(document: CompositionDocument, state: NavState, levelId: string, named?: string): string | undefined {
   const reaches = (modalId: string) => document.modals.some(modal => modal.id === modalId) && stackToLevel(document, undefined, modalId, levelId) !== undefined;

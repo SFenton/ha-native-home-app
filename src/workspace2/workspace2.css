@@ -86,6 +86,8 @@
 .w2-popover, .w2-menu { background: var(--w2-card); border: 1px solid var(--w2-line); border-radius: var(--w2-radius); box-shadow: var(--w2-shadow); color: var(--w2-ink-card); max-height: min(80vh, 640px); overflow: auto; }
 .w2-popover { padding: 8px; }
 .w2-pages-pop { padding: 8px 0 0; }
+/* The Pages sheet scrolls as one (its list is not a scroller on a phone), so its title and Done stay put: a scroll left over from an earlier visit, or a row brought into view, never clips them. */
+.w2-pages-pop .w2-sheet-bar { position: sticky; top: 0; z-index: 2; background: var(--w2-card); }
 .w2-menu { padding: 6px; min-width: 220px; }
 .w2-menu-item { display: flex; align-items: center; min-height: 36px; padding: 0 10px; border-radius: 6px; cursor: default; user-select: none; outline: 0; }
 .w2-menu-item[data-highlighted] { background: var(--w2-hover); }

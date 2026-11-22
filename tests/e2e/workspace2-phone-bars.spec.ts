@@ -163,9 +163,9 @@ test('every control of both bars is a 44 px target with a name', async ({ page }
   }
 });
 
-/** In a level the middle button reads "This Level", and the sheet it opens is titled so, with no settings button that names the wrong thing. */
+/** In a level the middle button reads "This Level"; the sheet it opens is titled with the level's name, with Back and the path under a sheet, and its footer has Add Here and Level Settings. */
 for (const scheme of ['light', 'dark'] as const) for (const where of ['in a sheet', 'alone'] as const) {
-  test(`the middle button reads This Level ${where}, and its sheet is titled so (${scheme})`, async ({ page, request }) => {
+  test(`the middle button reads This Level ${where}, and its sheet is the level's, with Level Settings (${scheme})`, async ({ page, request }) => {
     await seed(request, documentWithLevels());
     await page.emulateMedia({ colorScheme: scheme });
     await openWorkspace(page);
@@ -180,18 +180,49 @@ for (const scheme of ['light', 'dark'] as const) for (const where of ['in a shee
       await page.getByRole('button', { name: 'Checks', exact: true }).click();
       await page.getByRole('button', { name: /Demo Level Alone has no way in/ }).first().click();
       await expect(page.locator('.sh-sheet')).toHaveAttribute('aria-label', 'Demo Level Alone');
+      // The check selects the level: its settings are up over the bar. Close them to reach the bar.
+      await page.getByLabel('Properties').getByRole('button', { name: 'Close', exact: true }).click();
     }
-    // The alone level arrives selected (from its check) and a level has no inspector, so the bar stays; nothing to clear.
     const middle = page.locator('.w2-bottom-page');
     await expect(middle).toHaveAttribute('aria-label', 'This Level');
     await expect(middle).toHaveText('This Level');
     await middle.click();
     const sheet = page.getByTestId('level-sheet');
     await expect(sheet).toHaveAttribute('aria-label', 'This Level');
-    await expect(sheet.getByRole('heading', { name: 'This Level', exact: true })).toBeVisible();
+    const name = where === 'alone' ? 'Demo Level Alone' : 'Demo Level A';
+    await expect(sheet.getByRole('heading', { name, exact: true })).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Add Here' })).toBeVisible();
-    await expect(sheet.locator('.w2-level-settings')).toHaveCount(0);
-    await expect(sheet.getByRole('button', { name: /Settings/ })).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: 'Level Settings' })).toBeVisible();
+    if (where === 'in a sheet') {
+      // Back and the path name the sheet the level is a level of.
+      await expect(sheet.getByRole('button', { name: 'Back to Demo Sheet' })).toBeVisible();
+      await expect(sheet.getByRole('navigation', { name: 'Path' }).getByRole('button', { name: 'Demo Sheet' })).toBeVisible();
+    } else {
+      // A level no sheet opens has no sheet to go back to.
+      await expect(sheet.getByRole('button', { name: /^Back to/ })).toHaveCount(0);
+    }
     await snap(page, `level-7-this-level-${where === 'alone' ? 'alone' : 'in-sheet'}-phone-${scheme}`);
+    // Level Settings selects the level and the properties sheet takes over.
+    await sheet.getByRole('button', { name: 'Level Settings' }).click();
+    const settings = page.getByLabel('Properties');
+    await expect(settings.getByRole('heading', { name, exact: true })).toBeVisible();
+    await expect(settings.getByText('Level settings', { exact: false }).first()).toBeVisible();
+    await snap(page, `level-8-level-settings-${where === 'alone' ? 'alone' : 'in-sheet'}-phone-${scheme}`);
   });
 }
+
+test('on the phone Back out of a level goes to the sheet and its rows, and the sheet follows', async ({ page, request }) => {
+  await seed(request, documentWithLevels());
+  await openWorkspace(page);
+  await page.getByRole('button', { name: 'Use', exact: true }).click();
+  await page.locator('[data-sel="node:demo_home_to_sheet"]').first().click();
+  await page.locator('.sh-sheet [data-sel="node:demo_sheet_to_demo_level_a"]').first().click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.locator('.w2-bottom-page').click();
+  const sheet = page.getByTestId('level-sheet');
+  await sheet.getByRole('button', { name: 'Back to Demo Sheet' }).click();
+  // The simulator shows the sheet, and the sheet is "This Sheet" with the sheet's own rows.
+  await expect(page.locator('.sh-sheet')).toHaveAttribute('aria-label', 'Demo Sheet');
+  await expect(sheet.getByRole('heading', { name: 'This Sheet', exact: true })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: /^Back to/ })).toHaveCount(0);
+});
