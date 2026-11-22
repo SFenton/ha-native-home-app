@@ -1,5 +1,8 @@
 import type { SimulationClock, SimulationResult } from '../../shared/composition/graph/types';
+import { formatObservedValue, type ObservedValue } from './observations';
 import { resultText } from './words';
+import { describeValue, formatValue, type ValueFormatOptions } from '../canvas/value-format';
+import { browserTimeZone } from '../../preview2/live-house';
 
 export interface ValuePresentation {
   readonly name: string;
@@ -19,22 +22,25 @@ export interface SimulationPresentation {
   readonly scenarioInputs?: readonly string[];
   readonly scenarioOutputs?: readonly string[];
 }
-export function displayValue(result: SimulationResult | undefined, presentation?: ValuePresentation): string {
+/** Pass observations for completed values to distinguish computed text from HA availability. */
+export function displayValue(result: SimulationResult | undefined, presentation?: ValuePresentation, observation?: ObservedValue, options: ValueFormatOptions = {}): string {
+  if (observation && (!observation.observed || observation.state !== 'known')) return formatObservedValue(observation);
   if (result?.kind === 'operand' && result.answer.status === 'value') {
     const value = result.answer.value;
-    if (typeof value === 'string' && presentation?.states?.[value]) return presentation.states[value];
-    if (presentation?.format === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`));
-    }
+    const valueOptions = { ...options, ...observation?.valueFormat,
+      ...(presentation?.format === 'date' ? { shape: { kind: 'string', format: 'date' } as const } : {}) };
+    if (!valueOptions.literal && typeof value === 'string' && presentation?.states?.[value]) return presentation.states[value];
     if (presentation?.unit && (typeof value === 'number' || typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))) {
       return `${Number(value).toFixed(1)} ${presentation.unit}`;
     }
-    if (Array.isArray(value)) return `${value.length} items`;
-    if (value !== null && typeof value === 'object') return `${Object.keys(value).length} fields`;
-    if (value === 'unavailable') return 'Unavailable';
-    if (value === 'unknown') return "Can't tell";
+    if (!observation && !valueOptions.literal && value === 'unavailable') return 'Unavailable';
+    if (!observation && !valueOptions.literal && value === 'unknown') return "Can't tell";
+    return formatValue(value, valueOptions);
   }
   return resultText(result);
+}
+export function describeResult(result: SimulationResult | undefined, options: ValueFormatOptions = {}): string {
+  return result?.kind === 'operand' && result.answer.status === 'value' ? describeValue(result.answer.value, options) : resultText(result);
 }
 export function localTime(iso: string): string {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
@@ -55,19 +61,14 @@ export function clockInstant(clock: SimulationClock): string {
   return new Date(Date.parse(`${clock.now}Z`) - clock.utcOffsetMinutes * 60_000).toISOString();
 }
 /** Resolve the authored wall time locally. Keep the captured offset for ambiguous times; reject nonexistent DST times. */
-export function editClock(base: SimulationClock, date: string, time: string, timeZone?: string): SimulationClock | undefined {
+export function editClock(base: SimulationClock, date: string, time: string, suppliedTimeZone?: string): SimulationClock | undefined {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return undefined;
   const now = `${date}T${time}:00`;
   const parsed = new Date(`${now}Z`);
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 19) !== now) return undefined;
+  const timeZone = browserTimeZone(suppliedTimeZone);
   if (!timeZone) return { now, utcOffsetMinutes: base.utcOffsetMinutes };
-  let formatter: Intl.DateTimeFormat;
-  try {
-    formatter = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch (error) {
-    if (error instanceof RangeError) return undefined;
-    throw error;
-  }
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const wanted = parsed.getTime();
   let instant = wanted - base.utcOffsetMinutes * 60_000;
   for (let attempt = 0; attempt < 4; attempt++) {

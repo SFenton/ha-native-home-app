@@ -105,8 +105,8 @@ test('Compound checks: the canvas keeps three levels, one true answer, and an at
     await canvas.getByRole('button', { name: 'More canvas controls', exact: true }).click();
     await canvas.getByRole('button', { name: 'Fit all', exact: true }).click();
     await expect(canvas.getByRole('button', { name: /^Select All Of/ })).toHaveCount(3);
-    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value yes/ })).toHaveCount(1);
-    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value no/ })).toHaveCount(2);
+    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value Yes$/ })).toHaveCount(1);
+    await expect(canvas.getByRole('button', { name: /^Entity State, .*output.*known, live, value No$/ })).toHaveCount(2);
   }
   await openGraph();
   await snap(page, `${prefix(page)}-x-nest-page`);
@@ -114,6 +114,9 @@ test('Compound checks: the canvas keeps three levels, one true answer, and an at
   await expect(canvas).toHaveCount(0);
   await openGraph();
   await canvas.getByRole('button', { name: /^Select All Of/ }).first().click();
+  // A header click opens the data peek (a sheet on a phone); the inspector opens from the selected block's Inspect action.
+  if (isPhone(page)) await page.getByRole('button', { name: 'Close Data peek: All Of', exact: true }).click();
+  await canvas.getByRole('button', { name: /^Inspect All Of/ }).first().click();
   const inspector = isPhone(page) ? page.getByRole('dialog', { name: 'Block inspector', exact: true }) : canvas;
   await inspector.getByText('Position', { exact: true }).click();
   const x = inspector.getByRole('spinbutton', { name: 'X', exact: true });

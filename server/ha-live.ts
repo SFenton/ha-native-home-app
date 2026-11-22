@@ -1,10 +1,13 @@
-import { projectNativeState } from './native-home';
+import { isForwardedAttributeName, projectNativeAttributes, projectNativeState } from './native-home';
+import { expandDocument, ownedSources } from '../src/shared/composition/components';
+import { publishedDocument } from '../src/shared/composition/logic-library';
+import type { CompositionDocument } from '../src/shared/composition/schema';
 import type { NativeState } from '../src/shared/native-state';
 
 /**
  * The live entity stream. One Home Assistant websocket per server subscribes to `subscribe_entities`, keeps the latest state of
- * every entity and tells each connected Studio page what changed. The token stays in this module's socket: a page receives only
- * projected entity states (the same projection `/api/native-home` serves), never a URL, header or credential.
+ * every entity and tells each connected Studio page what changed. Configured credentials stay server-side: a page receives only
+ * projected entity states (native fields plus allowlisted draft-requested attributes).
  *
  * Three parts: {@link EntityCache} (the compressed event format applied to full states), {@link LiveEntityHub} (the socket, with
  * reconnect and backoff, keeping the last good states while it is down) and {@link openLiveSession} (one page's view: a
@@ -156,7 +159,7 @@ export class LiveEntityHub {
     };
   }
   /** The entity as the app reads it, or undefined when Home Assistant does not have it or its state is unusable. */
-  project(entityId: string): NativeState | undefined {
+  project(entityId: string, wantedAttributes?: ReadonlySet<string>, credentials: readonly string[] = []): NativeState | undefined {
     const raw = this.cache.get(entityId);
     if (!raw) return undefined;
     let found = this.projections.get(raw);
@@ -165,7 +168,9 @@ export class LiveEntityHub {
       catch { found = null; }
       this.projections.set(raw, found);
     }
-    return found ?? undefined;
+    if (!found) return undefined;
+    const attributes = wantedAttributes && projectNativeAttributes(raw.attributes, wantedAttributes, credentials);
+    return attributes ? { ...found, attributes } : found;
   }
   /** Closes the socket and cancels every timer. Cached states stay. */
   stop() {
@@ -293,32 +298,37 @@ export type LiveMessage =
   | { type: 'update'; states: NativeState[]; removed: string[] }
   | { type: 'status'; connected: boolean };
 
+export type NativeAttributeRequests = ReadonlyMap<string, ReadonlySet<string>>;
+
 /** Per-page tuning. */
 export interface LiveSessionOptions {
-  /** Server credentials: a state containing any of them is dropped, never sent. */
+  /** Server credentials: exact matches drop the state; reconstructed custom-attribute matches drop the attribute. */
   credentials?: string[];
   /** Changes within this window go out as one update. */
   batchMs?: number;
-  /** How often the wanted set is checked for growth. */
+  /** Draft-named attributes, stable until the draft revision changes. */
+  attributes?: () => NativeAttributeRequests;
+  /** How often the wanted entities and attributes are checked for changes. */
   refreshMs?: number;
 }
 
 /**
  * One page's stream. `wanted` names the entities the page draws (it may change as the draft is edited; return the same set while
  * it has not). The page gets a snapshot of those once Home Assistant has answered, then an update for each batch of real changes
- * and for an entity that newly became wanted. A dropped hub connection sends `status` and changes no state. Returns the closer.
+ * and when the wanted entities or attributes change. A dropped hub connection sends `status` and changes no state. Returns the closer.
  */
 export function openLiveSession(hub: LiveEntityHub, wanted: () => ReadonlySet<string>, send: (message: LiveMessage) => void, options: LiveSessionOptions = {}): () => void {
-  const { credentials = [], batchMs = 50, refreshMs = 1000 } = options;
+  const { credentials = [], attributes, batchMs = 50, refreshMs = 1000 } = options;
   /** What the page holds, as JSON: an entity is sent again only when its projection differs. */
   const held = new Map<string, string>();
   const pending = new Set<string>();
   const removedPending = new Set<string>();
   let snapshotSent = false, timer: ReturnType<typeof setTimeout> | undefined, closed = false;
   let lastWanted: ReadonlySet<string> | undefined;
+  let lastAttributes: NativeAttributeRequests | undefined;
 
-  const read = (id: string): { state: NativeState; json: string } | undefined => {
-    const state = hub.project(id);
+  const read = (id: string, requested: NativeAttributeRequests | undefined): { state: NativeState; json: string } | undefined => {
+    const state = hub.project(id, requested?.get(id), credentials);
     if (!state) return undefined;
     const json = JSON.stringify(state);
     if (credentials.some(credential => credential && json.includes(credential))) return undefined;
@@ -328,25 +338,28 @@ export function openLiveSession(hub: LiveEntityHub, wanted: () => ReadonlySet<st
     timer = undefined;
     if (closed) return;
     const now = wanted();
-    const grew = now !== lastWanted;
-    lastWanted = now;
+    const requested = attributes?.();
+    const wantedChanged = now !== lastWanted, attributesChanged = requested !== lastAttributes;
+    lastWanted = now; lastAttributes = requested;
     if (!snapshotSent) {
       if (!hub.hasStates) return;
       const states: NativeState[] = [];
-      for (const id of now) { const found = read(id); if (found) { held.set(id, found.json); states.push(found.state); } }
+      for (const id of now) { const found = read(id, requested); if (found) { held.set(id, found.json); states.push(found.state); } }
       snapshotSent = true; pending.clear(); removedPending.clear();
       send({ type: 'snapshot', connected: hub.connected, states });
       return;
     }
-    const ids = grew ? new Set([...pending, ...now].filter(id => pending.has(id) || !held.has(id))) : pending;
+    const ids = attributesChanged ? new Set([...pending, ...now])
+      : wantedChanged ? new Set([...pending, ...now].filter(id => pending.has(id) || !held.has(id))) : pending;
     const states: NativeState[] = [], removed: string[] = [];
     for (const id of ids) {
       if (!now.has(id)) continue;
-      const found = read(id);
+      const found = read(id, requested);
       if (!found) { if (held.delete(id)) removed.push(id); continue; }
       if (held.get(id) === found.json) continue;
       held.set(id, found.json); states.push(found.state);
     }
+    if (wantedChanged) for (const id of held.keys()) if (!now.has(id)) { held.delete(id); removed.push(id); }
     for (const id of removedPending) if (held.delete(id)) removed.push(id);
     pending.clear(); removedPending.clear();
     if (states.length || removed.length) send({ type: 'update', states, removed });
@@ -358,7 +371,7 @@ export function openLiveSession(hub: LiveEntityHub, wanted: () => ReadonlySet<st
     for (const id of event.removed) { pending.delete(id); removedPending.add(id); }
     schedule();
   });
-  const refresh = setInterval(() => { if (!snapshotSent || wanted() !== lastWanted) schedule(); }, refreshMs);
+  const refresh = setInterval(() => { if (!snapshotSent || wanted() !== lastWanted || attributes?.() !== lastAttributes) schedule(); }, refreshMs);
   refresh.unref?.();
   send({ type: 'status', connected: hub.connected });
   if (hub.hasStates) schedule();
@@ -389,6 +402,55 @@ export function wantedEntities(references: () => ReadonlySet<string>, draft: () 
     if (key && key.references === refs && key.revision === current.revision) return value;
     key = { references: refs, revision: current.revision };
     value = new Set([...refs, ...documentEntityIds(current.document)]);
+    return value;
+  };
+}
+
+/** Attribute reads on literal `ha-entity` sources, including worked-out logic and component instances. Dynamic entity ids are not resolved here. */
+export function documentAttributeReads(document: CompositionDocument): NativeAttributeRequests {
+  const wanted = new Map<string, Set<string>>();
+  const entities = (sources: CompositionDocument['dataSources'], inherited: ReadonlyMap<string, string> = new Map()) => {
+    const ids = new Map(inherited);
+    for (const source of sources) {
+      ids.delete(source.id);
+      if (source.kind !== 'ha-entity') continue;
+      if (source.entityId.type === 'literal' && /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/.test(source.entityId.value)) ids.set(source.id, source.entityId.value);
+    }
+    return ids;
+  };
+  const visit = (value: unknown, ids: ReadonlyMap<string, string>): void => {
+    if (Array.isArray(value)) { value.forEach(item => visit(item, ids)); return; }
+    if (!isRecord(value) || value.type === 'literal') return;
+    const from = value.type === 'state' || value.type === 'numeric' ? value
+      : ['read', 'list-count', 'list-includes'].includes(String(value.type)) && isRecord(value.from) && value.from.type === 'source' ? value.from : undefined;
+    if (from && typeof from.sourceId === 'string' && Array.isArray(from.path) && from.path[0] === 'attributes' && typeof from.path[1] === 'string' && isForwardedAttributeName(from.path[1])) {
+      const id = ids.get(from.sourceId);
+      if (id) {
+        const names = wanted.get(id) ?? new Set<string>();
+        names.add(from.path[1]); wanted.set(id, names);
+      }
+    }
+    for (const [key, nested] of Object.entries(value)) if (!['componentLibrary', 'studioCanvas', 'logicUseBindings'].includes(key)) visit(nested, ids);
+  };
+  const collect = (view: CompositionDocument) => {
+    const ids = entities(view.dataSources);
+    visit(view, ids);
+    for (const entry of view.componentLibrary ?? []) visit(entry, entities(ownedSources(entry), ids));
+  };
+  collect(document);
+  collect(expandDocument(publishedDocument(document)));
+  return wanted;
+}
+
+/** Like `wantedEntities`, keep the map's identity until the draft revision changes, even if the entity ids stayed the same. */
+export function wantedAttributes(draft: () => { revision: number; document: CompositionDocument }): () => NativeAttributeRequests {
+  let revision: number | undefined, value: NativeAttributeRequests = new Map();
+  return () => {
+    const current = draft();
+    if (revision !== current.revision) {
+      value = documentAttributeReads(current.document);
+      revision = current.revision;
+    }
     return value;
   };
 }

@@ -1,0 +1,109 @@
+{
+  "id": "past-due-tasks",
+  "title": "Past Due Tasks",
+  "purpose": "Shows unfinished tasks overdue by at least one calendar day, oldest first.",
+  "where": "Chores page, Past Due section, row collection provider",
+  "construct": "flow",
+  "entities": [
+    { "id": "todo.demo_past_due", "provenance": "synthetic-demo", "replaceWith": "The owner's to-do list whose overdue open tasks should appear in Chores" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.assets.publisher@1", "sh.backdrop@1", "sh.bindings@1",
+    "sh.chrome@1", "sh.composition@1", "sh.grid@1", "sh.page@1", "sh.pipeline-operands@1",
+    "sh.pipeline@1", "sh.power-toggle@1", "sh.row-collection@1", "sh.sheet@1", "sh.shell@1",
+    "sh.symbols@1", "sh.text@1", "sh.tile-ink-default@1", "sh.tiles@1"
+  ],
+  "changes": [
+    {
+      "op": "add", "pointer": "/dataSources/-",
+      "value": {
+        "id": "past-due-rows", "kind": "model", "model": "pipeline@1",
+        "inputs": {
+          "title": "Past Due Tasks", "parameters": [],
+          "request": { "type": "ha-subscription", "kind": "todo-items", "entityId": { "type": "literal", "value": "todo.demo_past_due" } },
+          "steps": [
+            { "id": "items", "op": "get", "path": ["items"] },
+            {
+              "id": "late", "op": "filter", "where": {
+                "type": "all", "of": [
+                  { "type": "compare", "op": "eq", "left": { "type": "item", "path": ["status"] }, "right": { "type": "literal", "value": "needs_action" } },
+                  { "type": "exists", "value": { "type": "item", "path": ["due"] } },
+                  {
+                    "type": "compare", "op": "above",
+                    "left": { "type": "date", "op": "days-between", "from": { "type": "item", "path": ["due"] }, "to": { "type": "clock", "part": "today" } },
+                    "right": { "type": "literal", "value": 0 }
+                  }
+                ]
+              }
+            },
+            { "id": "oldest", "op": "sort", "by": [{ "value": { "type": "item", "path": ["due"] }, "direction": "ascending", "kind": "date" }] },
+            {
+              "id": "labels", "op": "map", "fields": {
+                "id": { "type": "item", "path": ["uid"] }, "title": { "type": "item", "path": ["summary"] },
+                "late": { "type": "date", "op": "days-between", "from": { "type": "item", "path": ["due"] }, "to": { "type": "clock", "part": "today" } }
+              }
+            }
+          ],
+          "output": {
+            "kind": "rows", "max": 50,
+            "row": {
+              "id": { "type": "item", "path": ["id"] }, "title": { "type": "item", "path": ["title"] },
+              "subtitle": {
+                "type": "map", "of": { "type": "item", "path": ["late"] },
+                "cases": [{ "equals": 1, "then": { "type": "literal", "value": "1 day overdue" } }],
+                "otherwise": { "type": "format", "pattern": "{days} days overdue", "args": { "days": { "type": "item", "path": ["late"] } } }
+              }
+            }
+          },
+          "schema": {
+            "kind": "array", "of": { "kind": "object", "fields": {
+              "id": { "shape": { "kind": "string" } }, "title": { "shape": { "kind": "string" } },
+              "late": { "shape": { "kind": "union", "of": [{ "kind": "null" }, { "kind": "number", "integer": true }] } }
+            } }
+          }
+        }
+      }
+    },
+    {
+      "op": "add", "pointer": "/pages/2/components/-",
+      "value": {
+        "id": "past-due-list", "title": "Past Due", "type": "row-collection", "layout": {},
+        "props": {
+          "providerId": "past-due-rows", "loadingText": "Loading past-due tasks", "emptyText": "No tasks overdue by a day",
+          "unavailableText": "Tasks unavailable", "errorText": "Unable to read tasks", "staleText": "Showing earlier tasks"
+        }
+      }
+    }
+  ],
+  "simulation": [
+    {
+      "name": "Native-style fixture tasks sorted oldest first",
+      "inputs": { "entities": {}, "response": { "items": [
+        { "uid": "p2", "summary": "Return the library books", "status": "needs_action", "due": "2026-11-12" },
+        { "uid": "p3", "summary": "Renew the parking permit", "status": "completed", "due": "2026-11-05" },
+        { "uid": "p1", "summary": "Replace the hallway bulb", "status": "needs_action", "due": "2026-11-09" }
+      ] } },
+      "expect": { "answered": true, "rows": [{ "id": "p1", "title": "Replace the hallway bulb", "subtitle": "7 days overdue" }, { "id": "p2", "title": "Return the library books", "subtitle": "4 days overdue" }], "emptyText": null }
+    },
+    {
+      "name": "Yesterday is singular; today, future, completed and undated are absent",
+      "inputs": { "entities": {}, "response": { "items": [
+        { "uid": "today", "summary": "Today", "status": "needs_action", "due": "2026-11-16" },
+        { "uid": "yesterday", "summary": "Yesterday", "status": "needs_action", "due": "2026-11-15" },
+        { "uid": "future", "summary": "Future", "status": "needs_action", "due": "2026-11-17" },
+        { "uid": "undated", "summary": "No due date", "status": "needs_action" },
+        { "uid": "done", "summary": "Done", "status": "completed", "due": "2026-11-01" }
+      ] } },
+      "expect": { "answered": true, "rows": [{ "id": "yesterday", "title": "Yesterday", "subtitle": "1 day overdue" }], "emptyText": null }
+    },
+    { "name": "Answered empty subscription", "inputs": { "entities": {}, "response": { "items": [] } }, "expect": { "answered": true, "rows": [], "emptyText": "No tasks overdue by a day" } },
+    { "name": "Failed subscription has no captured answer, not an empty list", "inputs": { "entities": {}, "requestError": "Synthetic subscription failure" }, "expect": { "answered": false, "issues": ["Missing captured flow response: past-due-rows"] } },
+    { "name": "Not yet answered subscription is also Can't Tell", "inputs": { "entities": {} }, "expect": { "answered": false, "issues": ["Missing captured flow response: past-due-rows"] } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/composition-first-slice.json; the existing detail page is labelled Chores in the test copy.",
+    "All simulations use 2026-11-16T12:00:00 with utcOffsetMinutes -480. This is calendar-day wording, not native hours/weeks/months formatting.",
+    "No grammar correction. Unanswered/failed requests are exercised through the real simulation host without a flow response, never by passing an empty list or null to the step evaluator and calling that a request failure.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest."
+  ]
+}

@@ -43,7 +43,30 @@ export function fixedAverage(graph: LogicGraph, node: GraphNode, index?: CanvasG
   return sum?.catalogKey === 'operand.math.add' && sum.inputs.length >= 2 && sum.inputs.length <= 8
     && value !== undefined && value.type === 'literal' && value.value === sum.inputs.length;
 }
-export function nodeName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string { return graph && fixedAverage(graph, node, index) ? 'Average' : blockName(node.catalogKey); }
+export function generatedName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string { return graph && fixedAverage(graph, node, index) ? 'Average' : blockName(node.catalogKey); }
+export function settingLabel(node: GraphNode, graph?: LogicGraph): string | undefined {
+  if (node.payload.kind !== 'hole') return undefined;
+  const name = node.payload.value.name;
+  const owner = graph?.nodes.find(candidate => candidate.payload.kind === 'logic-entry' && candidate.scopeId === node.scopeId);
+  if (owner?.payload.kind === 'logic-entry') return owner.payload.value.params.find(param => param.name === name)?.label ?? name;
+  for (const root of graph?.roots ?? []) {
+    const document = blockFields(root.destination.context?.document);
+    const library = document?.logicLibrary;
+    const entry = Array.isArray(library) ? library.map(blockFields).find(entry => entry?.id === root.anchor.id) : undefined;
+    const params = entry?.params;
+    const param = Array.isArray(params) ? params.map(blockFields).find(param => param?.name === name) : undefined;
+    if (typeof param?.label === 'string') return param.label;
+  }
+  return name;
+}
+export function nodeTitle(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string {
+  return node.annotation?.label ?? settingLabel(node, graph) ?? generatedName(node, graph, index);
+}
+export function nodeName(node: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string {
+  const generated = generatedName(node, graph, index);
+  const title = nodeTitle(node, graph, index);
+  return title !== generated ? `${title}, ${generated}` : generated;
+}
 export function portLabel(binding: string, node?: GraphNode, graph?: LogicGraph, index?: CanvasGraphIndex): string {
   if (node) {
     if (binding === 'value') return 'Result';
@@ -145,22 +168,37 @@ export function paletteAvailability(entry: BlockCatalogEntry, scope: GraphScopeK
   if (!available.enabled) return available;
   return blockSeed(entry, sourceId) ? available : { enabled: false, reason: 'Requires a destination or template supplied by the workspace host. Existing blocks remain preserved and editable in the canvas.' };
 }
+/**
+ * The source a block reads: the wired source block's selection when one is connected, else the id written in the block itself (a block
+ * lifted whole, such as a text slot whose read keeps its fallback). `graph-setting` marks a source that lives on a wired block, so a
+ * disconnected port still reads as unchosen.
+ */
+function wiredSourceId(node: GraphNode, port: string, inline: unknown, index?: CanvasGraphIndex): unknown {
+  const wired = index?.source(node.id, port)?.payload.value;
+  if (wired !== undefined) return wired;
+  return typeof inline === 'string' && inline !== 'graph-setting' ? inline : undefined;
+}
+function wiredSettingLabel(node: GraphNode, port: string, graph?: LogicGraph, index?: CanvasGraphIndex): string | undefined {
+  const wired = index?.source(node.id, port);
+  return wired?.payload.kind === 'hole' ? nodeTitle(wired, graph, index) : undefined;
+}
 export function nodeDetail(node: GraphNode, sources: CanvasHost['data']['sources'] = [], graph?: LogicGraph, index?: CanvasGraphIndex): string {
+  index ??= graph ? indexGraph(graph) : undefined;
   const value = blockFields(node.payload.value);
   if (node.payload.kind === 'source-selection') return sources.find(source => source.id === node.payload.value)?.name ?? String(node.payload.value);
   if (!value) return '';
   if (graph && fixedAverage(graph, node, index)) return 'Fixed values · total divided by count';
   if (value.type === 'literal') return '';
-  if (value.type === 'state') return `State is ${Array.isArray(value.in) ? value.in.join(' or ') : ''}`;
+  if (value.type === 'state') return [wiredSettingLabel(node, '/sourceId', graph, index), `State is ${Array.isArray(value.in) ? value.in.join(' or ') : ''}`].filter(Boolean).join(' · ');
   const from = value.from;
   const fromFields = blockFields(from);
   if (fromFields && typeof fromFields.sourceId === 'string') {
-    const sourceId = index ? index.source(node.id, '/from/sourceId')?.payload.value : fromFields.sourceId;
-    return [sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity'), Array.isArray(fromFields.path) ? fromFields.path.join(' · ') : ''].filter(Boolean).join(' · ');
+    const sourceId = wiredSourceId(node, '/from/sourceId', fromFields.sourceId, index);
+    return [wiredSettingLabel(node, '/from/sourceId', graph, index) ?? sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity'), Array.isArray(fromFields.path) ? fromFields.path.join(' · ') : ''].filter(Boolean).join(' · ');
   }
   if (typeof value.sourceId === 'string') {
-    const sourceId = index ? index.source(node.id, '/sourceId')?.payload.value : value.sourceId;
-    return sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity');
+    const sourceId = wiredSourceId(node, '/sourceId', value.sourceId, index);
+    return wiredSettingLabel(node, '/sourceId', graph, index) ?? sources.find(source => source.id === sourceId)?.name ?? (typeof sourceId === 'string' ? sourceId : 'Choose an entity');
   }
   if (value.type === 'math' || value.type === 'compare' || value.type === 'all' || value.type === 'any') return '';
   return String(value.part ?? value.field ?? value.pattern ?? '');

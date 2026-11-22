@@ -76,7 +76,7 @@ it('notifies once per working revision with the edit reason and exact sealed gra
   fireEvent.click(screen.getByRole('button', { name: 'Close block palette' }));
   const root = screen.getByRole('button', { name: /^Select Attribute/ });
   fireEvent.click(root);
-  fireEvent.click(screen.getByRole('button', { name: 'Move with arrow keys' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Move Attribute' }));
   fireEvent.keyDown(root, { key: 'ArrowRight' });
   expect(onGraphChange).toHaveBeenCalledOnce();
   fireEvent.keyDown(root, { key: 'Enter' });
@@ -85,10 +85,11 @@ it('notifies once per working revision with the edit reason and exact sealed gra
   expect(Object.isFrozen(onGraphChange.mock.calls[1][0])).toBe(true);
   expect(onGraphChange.mock.calls[1][0]).not.toBe(onGraphChange.mock.calls[0][0]);
 });
-it('hands moved positions through Apply, canonical save and reopen with bindings intact', async () => {
+it('hands moved positions and both annotation fields through Apply, canonical save and reopen with bindings intact', async () => {
   const { document, options } = setup();
   let saved = document;
   render(<FlowCanvas {...options} onApply={async (transaction, handoff) => {
+    expect(handoff.annotations[options.graph.nodes[0].id]).toEqual({ label: 'Room value', note: 'Read the room state for this flow.' });
     let next = fieldAdapters.operand.write(document, path, transaction.replacements[0].ast as import('../../../src/shared/types').Json);
     next = saveCanvasLayout(next, transaction.replacements, handoff, { document, paths: [path] });
     saved = compileCompositionDocument(JSON.parse(JSON.stringify(next))).document;
@@ -97,7 +98,11 @@ it('hands moved positions through Apply, canonical save and reopen with bindings
   fireEvent.click(screen.getByRole('button', { name: 'Close block palette' }));
   const root = screen.getByRole('button', { name: /^Select Attribute/ });
   fireEvent.click(root);
-  fireEvent.click(screen.getByRole('button', { name: 'Move with arrow keys' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Rename or describe Attribute' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Label' }), { target: { value: 'Room value' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), { target: { value: 'Read the room state for this flow.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Move Room value, Attribute' }));
   fireEvent.keyDown(root, { key: 'ArrowRight', shiftKey: true });
   fireEvent.keyDown(root, { key: 'Enter' });
   fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' }));
@@ -112,5 +117,10 @@ it('hands moved positions through Apply, canonical save and reopen with bindings
     context: reopened.graph.roots[0].destination.context,
   }).graph;
   expect(restored.nodes[0].position!.x).toBe(options.graph.nodes[0].position!.x + 32);
+  expect(restored.nodes[0].annotation).toEqual({ label: 'Room value', note: 'Read the room state for this flow.' });
   expect(lower(restored).ok).toBe(true);
+  cleanup();
+  render(<FlowCanvas {...options} graph={restored}/>);
+  expect(screen.getByRole('button', { name: /^Select Room value, Attribute/ })).toBeTruthy();
+  expect(screen.getByText('Read the room state for this flow.')).toBeTruthy();
 });

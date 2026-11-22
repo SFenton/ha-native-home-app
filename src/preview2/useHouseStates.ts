@@ -68,7 +68,7 @@ export function useHouseStates(document: Pick<CompositionDocument, 'dataSources'
         const snapshot = await request<NativeSnapshot>('/api/native-home', { signal: controller.signal });
         if (controller.signal.aborted) return;
         const next = houseFrom(snapshot);
-        live.applySnapshot(snapshot.states, next.viewer);
+        live.applySnapshot(snapshot.states, next.viewer, next.timeZone);
         setHouse(next); setStatus('ready'); setError(undefined);
       } catch (cause) {
         if (controller.signal.aborted) return;

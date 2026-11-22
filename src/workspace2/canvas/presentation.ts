@@ -1,5 +1,5 @@
 import type { CanvasHost, GraphNode, GraphPort, LogicGraph } from '../../shared/composition/graph';
-import { nodeDetail, portLabel } from './blocks';
+import { generatedName, nodeDetail, nodeTitle, portLabel } from './blocks';
 import type { CanvasGraphIndex } from './graph-index';
 import { listItemKind } from './PortGlyph';
 import { wireKind } from './theme';
@@ -17,6 +17,8 @@ export interface PortPresentation {
 export interface BlockPresentation {
   readonly node: GraphNode;
   readonly name: string;
+  readonly title: string;
+  readonly generated: string;
   readonly detail: string;
   readonly ordinal: number | undefined;
   readonly root: boolean;
@@ -40,7 +42,7 @@ export function presentBlocks(graph: LogicGraph, index: CanvasGraphIndex, names:
       };
     });
     const model: BlockPresentation = {
-      node, name: names.get(node.id)!, detail: nodeDetail(node, sources, graph, index),
+      node, name: names.get(node.id)!, title: nodeTitle(node, graph, index), generated: generatedName(node, graph, index), detail: nodeDetail(node, sources, graph, index),
       ordinal: index.ordinals.get(node.id), root: index.roots.has(node.id), ports: [...ports('input'), ...ports('output')],
     };
     const held = previous?.get(node.id);
@@ -56,7 +58,7 @@ export function presentBlocks(graph: LogicGraph, index: CanvasGraphIndex, names:
 export function blockLayoutKey(graph: LogicGraph, models: ReadonlyMap<string, BlockPresentation>): string {
   return JSON.stringify([
     [...models.values()].map(model => [
-      model.node.id, model.node.position, model.name, model.detail, model.root,
+      model.node.id, model.node.position, model.name, model.node.annotation, model.detail, model.root,
       model.ports.map(port => [port.port.id, port.direction, port.label, port.kind, port.itemKind]),
     ]),
     graph.edges.map(edge => [edge.id, edge.from, edge.to]),

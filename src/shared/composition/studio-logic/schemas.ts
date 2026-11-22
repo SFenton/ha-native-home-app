@@ -23,6 +23,13 @@ export const logicUseBindingSchema = z.strictObject({
 }) satisfies z.ZodType<StoredLogicUseBinding>;
 export const logicUseBindingsSchema = z.array(logicUseBindingSchema).max(MAX_LOGIC_USE_BINDINGS);
 
+const annotationText = (limit: number) => z.string().min(1).max(limit)
+  .refine(value => value === value.trim() && !/[\p{Cc}\p{Cf}]/u.test(value));
+export const canvasAnnotationSchema = z.strictObject({
+  label: annotationText(60).optional(),
+  note: annotationText(280).optional(),
+});
+
 export const studioCanvasMetadataSchema = z.strictObject({
   version: z.literal(2),
   canvases: z.array(z.strictObject({
@@ -33,6 +40,7 @@ export const studioCanvasMetadataSchema = z.strictObject({
     nodes: z.array(z.strictObject({
       id: z.string().min(1), rootId: z.string().min(1), nodeId: z.string().min(1),
       origins: z.array(jsonPointerSchema).min(1), x: z.number(), y: z.number(),
+      ...canvasAnnotationSchema.shape,
     })),
     viewport: z.strictObject({ x: z.number(), y: z.number(), zoom: z.number().positive() }).optional(),
     groups: z.array(z.strictObject({ id: z.string(), label: z.string(), nodeIds: z.array(z.string()) })).optional(),

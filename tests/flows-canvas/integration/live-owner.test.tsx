@@ -26,6 +26,43 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); resetLiveRuns(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it('ticks the house clock each second when unapplied canvas edits add second-resolution logic', async () => {
+  vi.setSystemTime(new Date('2026-11-21T20:00:00Z'));
+  localStorage.clear();
+  const base = integrationDocument();
+  const document: CompositionDocument = { ...base, logicLibrary: [...base.logicLibrary ?? [], {
+    id: 'demo_pending_clock', name: 'Pending clock', kind: 'operand', params: [], body: { type: 'clock', part: 'now' },
+  }] };
+  const draft = createDraft(document), live = new LiveHouse();
+  live.applySnapshot([], undefined, 'America/Los_Angeles');
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No requests allowed'));
+  function Controls() {
+    const canvas = useLogicFields()!;
+    return <button type="button" onClick={() => canvas.open({
+      draft, path: ['logicLibrary', document.logicLibrary!.length - 1, 'body'], kind: 'operand', label: 'Pending clock',
+    })}>Open clock canvas</button>;
+  }
+  render(<WorkspaceDataProvider document={document} house={live.house} live={live}>
+    <LogicFieldsProvider ws={Project.workspace(document)} theme={deriveTheme({}, false)}><Controls/></LogicFieldsProvider>
+  </WorkspaceDataProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Open clock canvas' }));
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Find a block' }), { target: { value: 'Now Each Second' } });
+  fireEvent.click(screen.getByRole('button', { name: /^Add Now Each Second,/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^Inspect Now Each Second/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Use as output' }));
+  const result = screen.getByLabelText('Result value');
+  expect(result.getAttribute('aria-description')).toContain('2026-11-21T12:00:00');
+  await act(() => vi.advanceTimersByTimeAsync(999));
+  expect(result.getAttribute('aria-description')).toContain('2026-11-21T12:00:00');
+  await act(() => vi.advanceTimersByTimeAsync(1));
+  expect(result.getAttribute('aria-description')).toContain('2026-11-21T12:00:01');
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  expect(result.getAttribute('aria-description')).toContain('2026-11-21T12:00:02');
+  expect(result.textContent).toBe('Today, 12:00 PM');
+  expect(draft.get()).toBe(document);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it('applies a template body slot-view edit where the slot view holds it and keeps its canonical owner on reopen', async () => {
   const path = ['logicLibrary', 1, 'body'];
   const body = { type: 'choose' as const, cases: [{ when: { type: 'viewer' as const, isAdmin: true }, then: { type: 'literal' as const, value: 'Owner' } }], otherwise: { type: 'literal' as const, value: 'Guest' } };

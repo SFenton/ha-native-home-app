@@ -1,0 +1,109 @@
+{
+  "id": "office-windows",
+  "title": "Office Windows severity",
+  "purpose": "Explains whether open Office windows matter because security is armed or the household is away.",
+  "where": "Office page, Windows tile, subtitle; the main tile stays visible",
+  "construct": "operand",
+  "entities": [
+    { "id": "binary_sensor.demo_office_2", "provenance": "synthetic-demo", "replaceWith": "The Office Windows contact aggregate, where on/open means open" },
+    { "id": "alarm_control_panel.demo_alarm_control_panel_1", "provenance": "synthetic-demo", "replaceWith": "The household alarm panel" },
+    { "id": "sensor.demo_away_1", "provenance": "synthetic-demo", "replaceWith": "The effective Home/Away sensor" },
+    { "id": "binary_sensor.demo_contact_1", "provenance": "synthetic-demo", "replaceWith": "The fallback Away flag, where on means Away" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.assets.publisher@1", "sh.backdrop@1", "sh.bindings@1",
+    "sh.chrome@1", "sh.composition@1", "sh.conditions@1", "sh.grid@1", "sh.operands@1",
+    "sh.page@1", "sh.power-toggle@1", "sh.raw-state@1", "sh.rules@1", "sh.sheet@1",
+    "sh.shell@1", "sh.state-style@1", "sh.symbols@1", "sh.text@1", "sh.tile-ink-default@1",
+    "sh.tile-parts@1", "sh.tiles@1"
+  ],
+  "changes": [
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "office-windows", "kind": "ha-entity", "entityId": { "type": "literal", "value": "binary_sensor.demo_office_2" } } },
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "alarm", "kind": "ha-entity", "entityId": { "type": "literal", "value": "alarm_control_panel.demo_alarm_control_panel_1" } } },
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "home-mode", "kind": "ha-entity", "entityId": { "type": "literal", "value": "sensor.demo_away_1" } } },
+    { "op": "add", "pointer": "/dataSources/-", "value": { "id": "away-fallback", "kind": "ha-entity", "entityId": { "type": "literal", "value": "binary_sensor.demo_contact_1" } } },
+    {
+      "op": "add", "pointer": "/logicLibrary",
+      "value": [{
+        "id": "effective-away", "name": "Effective Away", "kind": "condition",
+        "params": [
+          { "name": "mode", "kind": "source-id", "label": "Effective mode", "sample": "home-mode" },
+          { "name": "fallback", "kind": "source-id", "label": "Away fallback", "sample": "away-fallback" }
+        ],
+        "body": {
+          "type": "any", "of": [
+            { "type": "compare", "op": "eq", "left": { "type": "raw-state", "sourceId": { "type": "hole", "name": "mode" } }, "right": { "type": "literal", "value": "Away" } },
+            {
+              "type": "all", "of": [
+                { "type": "in", "value": { "type": "raw-state", "sourceId": { "type": "hole", "name": "mode" } }, "in": [{ "type": "literal", "value": "unknown" }, { "type": "literal", "value": "unavailable" }] },
+                { "type": "state", "sourceId": { "type": "hole", "name": "fallback" }, "path": ["state"], "in": ["on"] }
+              ]
+            }
+          ]
+        }
+      }]
+    },
+    {
+      "op": "add", "pointer": "/pages/0/components/0/children/2/props/subtitle",
+      "value": {
+        "type": "expr",
+        "value": {
+          "type": "choose",
+          "cases": [
+            {
+              "when": { "type": "in", "value": { "type": "raw-state", "sourceId": "office-windows" }, "in": [{ "type": "literal", "value": "off" }, { "type": "literal", "value": "closed" }] },
+              "then": { "type": "literal", "value": "All Closed" }
+            },
+            {
+              "when": { "type": "in", "value": { "type": "raw-state", "sourceId": "office-windows" }, "in": [{ "type": "literal", "value": "on" }, { "type": "literal", "value": "open" }] },
+              "then": {
+                "type": "choose",
+                "cases": [
+                  {
+                    "when": {
+                      "type": "in", "value": { "type": "raw-state", "sourceId": "alarm" },
+                      "in": [
+                        { "type": "literal", "value": "armed_home" }, { "type": "literal", "value": "armed_away" },
+                        { "type": "literal", "value": "armed_night" }, { "type": "literal", "value": "armed_vacation" },
+                        { "type": "literal", "value": "armed_custom_bypass" }, { "type": "literal", "value": "triggered" }
+                      ]
+                    },
+                    "then": { "type": "literal", "value": "Open - security armed" }
+                  },
+                  {
+                    "when": { "type": "logic-ref", "logicId": "effective-away", "args": { "mode": "home-mode", "fallback": "away-fallback" } },
+                    "then": { "type": "literal", "value": "Open - household away" }
+                  }
+                ],
+                "otherwise": { "type": "literal", "value": "Open - household home" }
+              }
+            }
+          ],
+          "otherwise": { "type": "literal", "value": "Contact status unavailable" }
+        },
+        "fallback": "Contact status unavailable"
+      }
+    }
+  ],
+  "simulation": [
+    { "name": "Closed outranks armed", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "off" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "armed_away" } } }, "expect": { "answer": { "status": "value", "value": "All Closed" }, "text": { "status": "value", "value": "All Closed" }, "visible": true } },
+    { "name": "Closed spelling", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "closed" } } }, "expect": { "answer": { "status": "value", "value": "All Closed" }, "text": { "status": "value", "value": "All Closed" }, "visible": true } },
+    { "name": "Armed outranks Away", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "on" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "armed_away" }, "sensor.demo_away_1": { "state": "Away" } } }, "expect": { "answer": { "status": "value", "value": "Open - security armed" }, "text": { "status": "value", "value": "Open - security armed" }, "visible": true } },
+    { "name": "Triggered is security severity", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "open" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "triggered" } } }, "expect": { "answer": { "status": "value", "value": "Open - security armed" }, "text": { "status": "value", "value": "Open - security armed" }, "visible": true } },
+    { "name": "Open while Away", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "on" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "disarmed" }, "sensor.demo_away_1": { "state": "Away" } } }, "expect": { "answer": { "status": "value", "value": "Open - household away" }, "text": { "status": "value", "value": "Open - household away" }, "visible": true } },
+    { "name": "Open while Home", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "on" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "disarmed" }, "sensor.demo_away_1": { "state": "Home" } } }, "expect": { "answer": { "status": "value", "value": "Open - household home" }, "text": { "status": "value", "value": "Open - household home" }, "visible": true } },
+    { "name": "Open with fallback Away", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "on" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "disarmed" }, "sensor.demo_away_1": { "state": "unavailable" }, "binary_sensor.demo_contact_1": { "state": "on" } } }, "expect": { "answer": { "status": "value", "value": "Open - household away" }, "text": { "status": "value", "value": "Open - household away" }, "visible": true } },
+    { "name": "Unknown contact never becomes Closed", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "unknown" } } }, "expect": { "answer": { "status": "value", "value": "Contact status unavailable" }, "text": { "status": "value", "value": "Contact status unavailable" }, "visible": true } },
+    { "name": "Unavailable contact never becomes Closed", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "unavailable" } } }, "expect": { "answer": { "status": "value", "value": "Contact status unavailable" }, "text": { "status": "value", "value": "Contact status unavailable" }, "visible": true } },
+    { "name": "Missing contact stalls the Choose", "inputs": { "entities": {} }, "expect": { "answer": { "status": "loading" }, "text": { "status": "loading" }, "visible": true } },
+    { "name": "Missing contact retains previously answered open text", "inputs": { "entities": {}, "previousText": "Open - security armed" }, "expect": { "answer": { "status": "loading" }, "text": { "status": "value", "value": "Open - security armed" }, "visible": true } },
+    { "name": "Missing alarm does not manufacture Home", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "on" }, "sensor.demo_away_1": { "state": "Home" } } }, "expect": { "answer": { "status": "loading" }, "text": { "status": "loading" }, "visible": true } },
+    { "name": "Missing household mode does not manufacture Home", "inputs": { "entities": { "binary_sensor.demo_office_2": { "state": "on" }, "alarm_control_panel.demo_alarm_control_panel_1": { "state": "disarmed" } } }, "expect": { "answer": { "status": "loading" }, "text": { "status": "loading" }, "visible": true } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/composition-first-slice.json. The test adds only a minimal Office Windows state tile at children/2 before applying this subtitle change.",
+    "No grammar correction. A Choose whose condition is unanswered returns loading (Can't Tell); it does not reach otherwise or the unavailable fallback. Text may retain the prior answer.",
+    "The effective-away entry is identical to starter 3 and is included for independent compilation; reuse it and its sources instead of adding duplicates to an existing draft.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest."
+  ]
+}

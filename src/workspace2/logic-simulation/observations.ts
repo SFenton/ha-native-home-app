@@ -1,9 +1,12 @@
 import type { Json } from '../../shared/types';
-import type { GraphNode, SimulationCase, SimulationPin, SimulationResult } from '../../shared/composition/graph/types';
+import type { GraphNode, SimulationCase, SimulationPin, SimulationResult, TraceEvent } from '../../shared/composition/graph/types';
 import type { SimulationRun } from './engine';
 import { anchorKey } from './contracts';
 import { blockMode, blockSources, sourceCaptureForNode, type SimulationProgram } from './program';
 import { sourceKey } from './contracts';
+import { describeValue, formatValue, nodeValueOptions, type ValueFormatOptions } from '../canvas/value-format';
+import { blockResultPointers, itemContextText, noItemsText, type ItemContext } from './per-item';
+import { generatedName } from '../canvas/blocks';
 
 export interface ObservedValue {
   readonly observed: boolean;
@@ -16,6 +19,8 @@ export interface ObservedValue {
   readonly pinned: boolean;
   /** Undefined means the keep decision wasn't observed, not false. */
   readonly kept?: boolean;
+  readonly item?: ItemContext;
+  readonly valueFormat?: ValueFormatOptions;
 }
 export interface PortObservation extends ObservedValue {
   readonly portId: string;
@@ -27,19 +32,30 @@ export interface BlockObservation extends ObservedValue {
 }
 export interface CanvasObservations {
   readonly blocks: Readonly<Record<string, BlockObservation>>;
+  /** Completed root answers, including flow roots without an expression callback. */
+  readonly results?: Readonly<Record<string, ObservedValue>>;
   /** Actual callback completion order, followed by each root's native text-policy result. */
   readonly order: readonly string[];
   readonly truncated: boolean;
 }
-function answer(result: SimulationResult | undefined, computed = false) {
+function answer(result: SimulationResult | undefined, sourceRead = false) {
   if (!result) return { observed: false, state: 'not-observed' as const };
   if (result.kind === 'condition') return {
     observed: true, result, value: result.answer, state: result.answer === 'unknown' ? 'cant-tell' as const : 'known' as const,
   };
   if (result.answer.status !== 'value') return { observed: true, result,
-    state: computed && result.answer.status === 'unavailable' ? 'cant-tell' as const : result.answer.status };
+    state: !sourceRead && result.answer.status === 'unavailable' ? 'cant-tell' as const : result.answer.status };
   return { observed: true, result, value: result.answer.value as Json,
-    state: result.answer.value === 'unavailable' ? 'unavailable' as const : result.answer.value === 'unknown' ? 'cant-tell' as const : 'known' as const };
+    state: sourceRead && result.answer.value === 'unavailable' ? 'unavailable' as const : sourceRead && result.answer.value === 'unknown' ? 'cant-tell' as const : 'known' as const };
+}
+
+export function formatObservedValue(observation?: ObservedValue, rows = false, exact = false): string {
+  if (!observation?.observed) return observation?.item?.count === 0 ? noItemsText(observation.item) : 'Not observed';
+  const value = observation.result?.kind === 'condition' ? observation.value === 'yes' : observation.value;
+  const format = exact ? describeValue : formatValue, options = { ...observation.valueFormat, rows };
+  if (observation.state === 'known' && value !== undefined) return format(value, options);
+  const state = observation.state === 'unavailable' ? 'Unavailable' : observation.state === 'loading' ? 'Loading' : "Can't tell";
+  return observation.kept && value !== undefined ? `${state}; Kept: ${format(value, options)}` : state;
 }
 /** Pure projection of a completed run. No evaluator, environment, request or cost meter is invoked. */
 export function canvasObservations(program: SimulationProgram, run: SimulationRun, options: {
@@ -52,12 +68,19 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
   readonly freshness?: 'live' | 'held' | 'sample';
   readonly liveBlocks?: ReadonlySet<string>;
   readonly previousText?: SimulationCase['base']['previousText'];
+  readonly blockNames?: Readonly<Record<string, string>>;
+  readonly clock?: SimulationCase['base']['clock'];
+  readonly timeZone?: string;
 } = {}): CanvasObservations {
-  const pins = options.pins ?? [], blocks: Record<string, BlockObservation> = {}, order: string[] = [];
+  const pins = options.pins ?? [], blocks: Record<string, BlockObservation> = {}, results: Record<string, ObservedValue> = {}, order: string[] = [];
   const liveSources = new Set(program.roots.flatMap(root => root.graph.nodes.filter(node => options.liveBlocks?.has(node.id))).flatMap(node => {
     const source = sourceCaptureForNode(node, program);
     return source ? [sourceKey(source)] : [];
   }));
+  const readsSource = (node: GraphNode) => {
+    const source = sourceCaptureForNode(node, program);
+    return Boolean(source && !program.flows.has(source.sourceId));
+  };
   const provenance = (node: GraphNode) => {
     const sources = blockSources(program, node, pins, false, Boolean(options.clockPinned), options.liveBlocks);
     const localSources = blockSources(program, node, options.localPins ?? (options.scenario ? [] : pins), false, Boolean(options.localClockPinned ?? (!options.scenario && options.clockPinned)), options.liveBlocks);
@@ -73,10 +96,29 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
   };
   for (const root of program.roots) {
     const output = run.outputs.find(output => anchorKey(output.output) === anchorKey(root.anchor));
+    const resultPointers = blockResultPointers(root);
+    const completed = (blockId: string, events: readonly TraceEvent[] = []) =>
+      events.filter(event => event.output && resultPointers.get(blockId)?.has(event.pointer));
+    const readingFor = (blockId: string, item?: TraceEvent['item']) => {
+      const events = completed(blockId, output?.trace.events);
+      return (item ? events.find(event => event.item?.index === item.index && event.item.identity === item.identity) : events.find(event => event.item) ?? events.at(-1))
+        ?? completed(blockId, output?.perItem?.trace.events).at(-1);
+    };
+    const itemReading = (blockId: string, event?: TraceEvent): { item?: ItemContext } => {
+      const context = output?.perItem?.contexts[blockId];
+      if (!context) return {};
+      const step = root.graph.nodes.find(node => node.id === context.stepId), name = options.blockNames?.[context.stepId];
+      const suffix = step && `, ${generatedName(step, root.graph)}`;
+      // Preview lenses retain block identities but may omit annotations. The host supplies the current canvas display names.
+      const title = name && suffix && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name ?? context.step;
+      return { item: { step: title, count: context.count, ...(event?.item ? { index: event.item.index } : {}) } };
+    };
     for (const node of root.graph.nodes) {
       const events = output?.trace.events.filter(event => event.blockId === node.id) ?? [];
-      const event = events.filter(event => event.output).at(-1);
-      const sourceRead = sourceCaptureForNode(node, program);
+      const event = readingFor(node.id);
+      const context = output?.perItem?.contexts[node.id];
+      const item = itemReading(node.id, event);
+      const sourceRead = readsSource(node);
       const isRoot = root.graph.roots.some(candidate => candidate.nodeId === node.id);
       const resolved = isRoot && root.body.kind === 'slot' ? output?.result : event?.output;
       const seed = options.previousText?.find(seed => anchorKey(seed.output) === anchorKey(root.anchor));
@@ -88,24 +130,36 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
             && (unresolved.answer.status === 'loading' || root.body.value.type !== 'literal' && root.body.value.whenUnavailable === 'keep')
         : undefined;
       const common = provenance(node);
+      const valueFormat = { clock: options.clock ?? options.scenario?.clock ?? options.scenario?.base.clock,
+        timeZone: options.timeZone, ...nodeValueOptions(node) };
       const ports: PortObservation[] = [
         ...node.outputs.map(port => {
           // A single output is unambiguous. Multi-output nodes require a real matching port callback.
           const result = node.outputs.length === 1 ? resolved : events.filter(event => event.portId === port.id).at(-1)?.output;
-          return { portId: port.id, direction: 'output' as const, ...common, ...answer(result, !sourceRead), ...(kept === undefined ? {} : { kept }) };
+          return { portId: port.id, direction: 'output' as const, ...common, ...answer(result, sourceRead), ...item,
+            valueFormat: { ...valueFormat, ...nodeValueOptions(node, port.type) }, ...(kept === undefined ? {} : { kept }) };
         }),
         ...node.inputs.map(port => {
           const edge = root.graph.edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === port.id);
           const upstream = edge && root.graph.nodes.find(candidate => candidate.id === edge.from.nodeId);
+          const contextualInput = node.payload.kind === 'step' || node.catalogKey === 'output.rows';
+          const reading = upstream && (context?.count === 0 || contextualInput || node.payload.kind === 'logic-ref')
+            ? readingFor(upstream.id, event?.item) : undefined;
+          const recorded = node.payload.kind === 'logic-ref' ? undefined
+            : event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result;
+          const result = recorded ?? reading?.output;
+          const inputItem = !recorded && upstream && contextualInput ? itemReading(upstream.id, reading) : item;
           return { portId: port.id, direction: 'input' as const, ...(upstream ? provenance(upstream) : common),
-            ...answer(event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result,
-              upstream ? !sourceCaptureForNode(upstream, program) : !sourceRead) };
+            ...answer(result, upstream ? readsSource(upstream) : sourceRead), ...inputItem,
+            valueFormat: { ...valueFormat, ...nodeValueOptions(upstream ?? node, port.type.valueType === 'time' ? port.type : upstream?.outputs[0]?.type ?? port.type) } };
         }),
       ];
-      blocks[node.id] = { blockId: node.id, ...common, ...answer(resolved, !sourceRead), ...(kept === undefined ? {} : { kept }), ports };
+      blocks[node.id] = { blockId: node.id, ...common, ...answer(resolved, sourceRead), ...item, valueFormat, ...(kept === undefined ? {} : { kept }), ports };
+      if (isRoot) results[node.id] = { ...common, ...answer(output?.result, sourceRead), valueFormat, ...(kept === undefined ? {} : { kept }) };
     }
     for (const event of output?.trace.events ?? []) if (event.output && !order.includes(event.blockId)) order.push(event.blockId);
     if (root.body.kind === 'slot' && output?.result) for (const rootNode of root.graph.roots) if (!order.includes(rootNode.nodeId)) order.push(rootNode.nodeId);
   }
-  return { blocks, order, truncated: run.outputs.some(output => output.trace.truncated) };
+  return { blocks, results, order, truncated: run.outputs.some(output => output.trace.truncated || output.perItem?.trace.truncated) };
 }
+export { itemContextText };

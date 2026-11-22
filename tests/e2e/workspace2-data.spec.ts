@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { isPhone, openLibrary, openWorkspace, previewRoot, railButton, seed, snap } from './workspace2-helpers';
 import { newFlow, updateFlow } from '../../src/workspace2/data/flow';
 import type { CompositionDocument } from '../../src/shared/composition/schema';
+import type { NativeSnapshot } from '../../src/shared/native-state';
 
 const fixture = JSON.parse(readFileSync(new URL('../../src/preview2/fixtures/home-domains.json', import.meta.url), 'utf8')) as { document: CompositionDocument };
 
@@ -102,7 +103,8 @@ test.describe('the flow editor', () => {
     await menu.getByRole('menuitem', { name: /A Group of Entities/ }).click();
     const props = page.getByLabel('Properties');
     await expect(props.getByRole('heading', { name: 'Data Flow', exact: true })).toBeVisible();
-    await expect(props.getByTestId('run-bar')).toContainText(/Nothing to run\./);
+    await expect(props.getByTestId('run-bar')).toContainText('Made-up values, not yours. Follows the entities when Home Assistant is connected.');
+    await expect(props.getByTestId('run-bar')).not.toContainText('Nothing to run.');
     await expect(props.getByRole('region', { name: 'Refresh' })).toHaveCount(0);
     await expect(props.getByRole('button', { name: /^Run/ })).toHaveCount(0);
     await expect(props.getByRole('button', { name: 'Entities' })).toBeVisible();
@@ -160,6 +162,48 @@ test.describe('the flow editor', () => {
     await expect(field.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeVisible();
     await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toHaveCount(0);
     await props.getByRole('button', { name: 'Cancel' }).click();
+  });
+});
+
+test.describe('empty live output explanations', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 1440) < 700, 'The expanded Flows library preview is desktop-only');
+
+  test('four lights read and filtered out have the same explanation in the run bar and Flows preview', async ({ page, request }) => {
+    const entityIds = ['light.demo_one', 'light.demo_two', 'light.demo_three', 'light.demo_four'];
+    const made = newFlow(fixture.document, 'group', { entityIds, title: 'Demo lights on' });
+    const document = updateFlow(made.document, made.id, inputs => ({ ...inputs, steps: [
+      { id: 'filter-on', op: 'filter', where: { type: 'compare', op: 'eq', left: { type: 'item', path: ['state'] }, right: { type: 'literal', value: 'on' } } },
+    ] }));
+    const snapshot: NativeSnapshot = { mode: 'live', houseConfig: { schema: 2, hash: 'demo-empty-flow', config: {} }, states: entityIds.map(entityId => ({ entityId, name: 'Demo light', state: 'off' })) };
+    await seed(request, document);
+    await page.route('**/api/native-home', route => route.fulfill({ json: snapshot }));
+    const panel = await openData(page);
+    await panel.getByRole('button', { name: /^Demo lights on, data flow/ }).click();
+    const props = inspector(page);
+    const summary = 'Live · Read 4 lights · none left after Filter (state is on) · Output 0 items';
+    await expect(props.getByTestId('run-bar').getByRole('status')).toHaveAccessibleName(new RegExp(`^${summary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    await expect(panel.getByTestId('empty-live-summary')).toHaveText(summary);
+    await expect(props.getByRole('button', { name: 'Step 1, Filter, state is on, 4 → 0' })).toBeVisible();
+    await expect(panel.getByText('Output · 0 items', { exact: true })).toBeVisible();
+    await expect(props.getByTestId('run-bar')).not.toContainText('Nothing to run');
+    await expect(props.getByTestId('empty-live-hint')).toContainText('Edit Flow in Canvas, then Simulation · Studio only');
+  });
+
+  test('a live to-do list with no items is an answered empty list, not an unanswered request', async ({ page, request }) => {
+    const made = newFlow(fixture.document, 'live-list', { entityId: 'todo.demo_list', title: 'Demo empty list' });
+    const snapshot: NativeSnapshot = { mode: 'live', houseConfig: { schema: 2, hash: 'demo-empty-list', config: {} }, states: [{ entityId: 'todo.demo_list', name: 'Demo list', state: '0' }] };
+    await seed(request, made.document);
+    await page.route('**/api/native-home', route => route.fulfill({ json: snapshot }));
+    await page.route('**/native/api/ha/flow-run', route => route.fulfill({ json: { source: 'live', at: '2026-11-21T20:00:00.000Z', response: { items: [] }, output: [], items: 0 } }));
+    const panel = await openData(page);
+    await panel.getByRole('button', { name: /^Demo empty list, data flow/ }).click();
+    const props = inspector(page);
+    const summary = 'Live · Read 0 items from the list · Output 0 items';
+    await expect(props.getByTestId('run-bar')).toContainText(summary);
+    await expect(panel.getByTestId('empty-live-summary')).toHaveText(summary);
+    await expect(props.getByTestId('run-bar')).toContainText('Home Assistant answered at');
+    await expect(props.getByTestId('run-bar')).not.toContainText('none left after');
+    await expect(panel.getByText(/^Try it:/)).toContainText('Simulation · Studio only');
   });
 });
 

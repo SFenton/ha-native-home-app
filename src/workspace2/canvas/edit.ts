@@ -5,6 +5,8 @@ import { operandBase } from '../../shared/composition/expression';
 import type { BlockSeed } from './blocks';
 import { nodeName } from './blocks';
 import { indexGraph, type CanvasGraphIndex } from './graph-index';
+import { normalizeAnnotation } from '../../shared/composition/studio-logic/layout';
+import { annotationError } from './AnnotationEditor';
 
 export interface Socket { readonly nodeId: string; readonly portId: string }
 export interface CanvasFocus { readonly nodeId: string; readonly portId?: string; readonly direction?: 'input' | 'output' }
@@ -20,6 +22,7 @@ export type EditCommand =
   | { type: 'disconnect'; edgeId: string }
   | { type: 'delete'; nodeId: string }
   | { type: 'move'; nodeId: string; x: number; y: number }
+  | { type: 'annotate'; nodeId: string; label?: string; note?: string }
   | { type: 'update'; nodeId: string; value: GraphNode['payload']['value'] }
   | { type: 'rule'; nodeId: string; action: 'add' | 'remove' | 'up' | 'down'; index: number }
   | { type: 'combine'; nodeId: string; operation: 'all' | 'any' }
@@ -115,6 +118,12 @@ export function edit(state: EditState, command: EditCommand): EditState {
     if (![command.x, command.y].every(Number.isFinite)) return refuse('Enter finite X and Y coordinates.');
     updated = { ...graph, nodes: graph.nodes.map(held => held.id === node.id ? { ...held, position: { x: command.x, y: command.y } } : held) };
     focus = { nodeId: node.id }; message = `${nodeName(node)} moved to X ${command.x}, Y ${command.y}.`;
+  } else if (command.type === 'annotate') {
+    const error = annotationError(command.label ?? '', command.note ?? '');
+    if (error) return refuse(error);
+    const annotation = normalizeAnnotation({ label: command.label, note: command.note });
+    updated = { ...graph, nodes: graph.nodes.map(held => held.id === node.id ? { ...held, annotation } : held) };
+    message = 'Block details updated.';
   } else if (command.type === 'rule') {
     const parsed = operandBase.safeParse(node.payload.value);
     if (node.payload.kind !== 'operand' || !parsed.success || parsed.data.type !== 'choose') return refuse('Select a Choose block to edit its rules.');

@@ -50,6 +50,24 @@ legacy readers suspended for retirement. `observations.ts` maps supported
 provenance and preserves false, zero, kept and loading values; it never labels
 Mixed as Live. Values, stand-in and use lenses project temporary graphs without
 writing their resolved values or overrides into the document.
+The Preview starts with a compact **Result** summary above the lens and Try
+with controls. It projects the Simulation host's completed root answer and
+observed template/flow inputs through the canvas value formatter; collapsing
+Simulation does not hide it or pause observations. Live, Pinned, Scenario and
+Can't tell are explicit; Mixed and Demo remain distinct rather than being
+mislabelled Live. Retained readings show Last known values guidance.
+
+Preview can collapse with or without a selected block: its 310px pane becomes
+a labelled 44px rail, or a 44px horizontal bar below the existing 700px
+stacking breakpoint. The hidden pane stays mounted but leaves the accessibility
+tree and tab order, preserving its lens, Try with values, pins/scenarios,
+selection and observation producer. The toggle transfers focus to its visible
+counterpart. Conflict notices, invalid-layout warnings and Reset saved layout
+remain in a persistent session-level status area.
+
+The browser preference uses `sh-studio.canvas.preview-collapsed`; all storage
+reads and writes are guarded. If storage is unavailable, the choice lasts in
+memory until the page closes and a visible status explains the limitation.
 
 ## Verification
 

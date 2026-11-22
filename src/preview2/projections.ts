@@ -22,6 +22,7 @@ import { evaluateOperand, finiteNumber, loading, scalarText, unavailable, value,
 export interface House {
   states?: ReadonlyMap<string, NativeState>;
   viewer?: Viewer;
+  timeZone?: string;
 }
 /** Simulated changes laid over the house. A call updates this, never a device. */
 export interface Overlay {
@@ -36,11 +37,12 @@ export type Phase = 'loading' | 'unavailable' | 'ready';
 export interface Projection { model: string; phase: Phase; fields: Readonly<Record<string, Json>> }
 
 /** Builds a house from a `/api/native-home` snapshot. */
-export function houseFrom(snapshot: { states: NativeState[]; currentUser?: NativeCurrentUser }): House {
+export function houseFrom(snapshot: { states: NativeState[]; currentUser?: NativeCurrentUser; timeZone?: string }): House {
   const user = snapshot.currentUser;
   return {
     states: new Map(snapshot.states.map(state => [state.entityId, state])),
     viewer: user ? { userId: user.id, isAdmin: user.isAdmin, personEntityId: user.personEntityId } : undefined,
+    timeZone: snapshot.timeZone,
   };
 }
 
@@ -58,13 +60,14 @@ const snake = (name: string) => name.replace(/_([a-z0-9])/g, (_, letter: string)
 const attributeAliases: Record<string, keyof NativeState> = {
   friendly_name: 'name', unit_of_measurement: 'unit', device_class: 'deviceClass',
 };
-/** A Home Assistant attribute from a flat `NativeState`, by its snake-case name. */
+/** Known projected fields take precedence over the draft-scoped live attribute map. */
 export function attributeOf(entity: NativeState, name: string): Json | undefined {
   const field = attributeAliases[name] ?? snake(name);
   // The time of last change is the `last-changed` operand's, never an attribute: the phone reads Home Assistant's attributes, which have none.
   if (field === 'lastChanged') return undefined;
-  const found = (entity as Record<string, unknown>)[field];
-  return found === undefined ? undefined : found as Json;
+  const found = field !== 'attributes' && Object.hasOwn(entity, field) ? (entity as Record<string, unknown>)[field] : undefined;
+  if (found !== undefined) return found as Json;
+  return entity.attributes && Object.hasOwn(entity.attributes, name) ? entity.attributes[name] : undefined;
 }
 
 /** `RoomFormat.compact`: the state a tile line shows. */

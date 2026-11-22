@@ -175,6 +175,18 @@ export function sourceCaptureForNode(node: GraphNode, program: SimulationProgram
   if (value.type === 'state' || value.type === 'numeric') return { sourceId: String(value.sourceId), path: value.path as string[] };
   return undefined;
 }
+/** The same de-duplicated reading inputs power Simulation tools and the compact preview. */
+export function simulationInputs(program: SimulationProgram, nodes: readonly GraphNode[]): GraphNode[] {
+  const inputs = new Map<string, GraphNode>();
+  for (const node of nodes) {
+    if (node.payload.kind === 'source-selection') continue;
+    const source = sourceCaptureForNode(node, program);
+    if (!source || !program.reads.some(read => sourceKey(read) === sourceKey(source))) continue;
+    const key = sourceKey(source);
+    if (!inputs.has(key)) inputs.set(key, node);
+  }
+  return [...inputs.values()];
+}
 /** Structural graph sockets are hints; stream pin validation uses the native flow typer. */
 export function simulationPort(program: SimulationProgram, node: GraphNode, portId = 'value'): PortType | undefined {
   const port = node.outputs.find(port => port.id === portId);

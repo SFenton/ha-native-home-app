@@ -3,8 +3,75 @@ import { canvasObservations } from '../../../src/workspace2/logic-simulation/obs
 import { displayValue, editClock, localTime, changedAgo } from '../../../src/workspace2/logic-simulation/presentation';
 import { runSimulation } from '../../../src/workspace2/logic-simulation/engine';
 import { simulationFixture } from './fixture';
+import { lift } from '../../../src/shared/composition/graph';
+import { createSimulationProgram } from '../../../src/workspace2/logic-simulation/program';
+import { formatObservedValue } from '../../../src/workspace2/logic-simulation/observations';
 
 describe('human-readable simulation and canvas observation seam', () => {
+  it.each(['unknown', 'unavailable'])('keeps computed literal %s known on blocks, ports and the completed result', text => {
+    const formatted = { type: 'format', pattern: '{value}', args: { value: { type: 'literal', value: text } } } as const;
+    const graph = lift({ type: 'format', pattern: '{value}', args: { value: formatted } },
+      { kind: 'operand', anchor: { kind: 'logic', id: 'demo_format', field: '/body' } }).graph;
+    const program = createSimulationProgram([graph]), run = runSimulation(program, simulationFixture().held);
+    const observation = canvasObservations(program, run);
+    const inner = graph.nodes.find(node => node.catalogKey === 'operand.format.value' && node.id !== graph.roots[0].nodeId)!;
+    expect(observation.blocks[inner.id]).toMatchObject({ observed: true, state: 'known', value: text });
+    expect(observation.blocks[inner.id].ports).toContainEqual(expect.objectContaining({ direction: 'output', state: 'known', value: text }));
+    expect(observation.blocks[graph.roots[0].nodeId].ports).toContainEqual(expect.objectContaining({ direction: 'input', state: 'known', value: text }));
+    expect(observation.results?.[graph.roots[0].nodeId]).toMatchObject({ observed: true, state: 'known', value: text });
+    expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe(text);
+    expect(displayValue(run.outputs[0].result, { name: 'Formatted text' }, observation.results?.[graph.roots[0].nodeId])).toBe(text);
+    expect(run.outputs[0].result).toEqual({ kind: 'operand', answer: { status: 'value', value: text } });
+  });
+  it.each(['unknown', 'unavailable'])('does not treat computed flow text %s as an HA sentinel reading', text => {
+    const graph = lift({ type: 'read', from: { type: 'source', sourceId: 'demo_flow', path: ['value'] }, as: 'string', missing: 'unavailable' },
+      { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph], { flows: [{ id: 'demo_flow', inputs: {
+      title: 'Demo text', parameters: [], request: { type: 'none', value: { type: 'literal', value: text } },
+      steps: [], output: { kind: 'scalar' }, schema: { kind: 'string' },
+    } }] });
+    const run = runSimulation(program, simulationFixture().held);
+    const observation = canvasObservations(program, run);
+    expect(observation.results?.[graph.roots[0].nodeId]).toMatchObject({ observed: true, state: 'known', value: text });
+    expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe(text);
+    expect(displayValue(run.outputs[0].result, { name: 'Flow text' }, observation.results?.[graph.roots[0].nodeId])).toBe(text);
+  });
+  it.each(['unknown', 'unavailable', 'ordinary text'])('keeps literal %s known on its block and connected inputs while preserving real HA raw-state treatment', text => {
+    const graph = lift({ type: 'compare', op: 'eq', left: { type: 'raw-state', sourceId: 'demo_mode' }, right: { type: 'literal', value: text } },
+      { kind: 'condition', anchor: { kind: 'logic', id: 'demo_compare', field: '/body' } }).graph;
+    const program = createSimulationProgram([graph], { sourceEntities: { demo_mode: 'input_select.demo_mode' } });
+    const held = { ...simulationFixture().held, base: { ...simulationFixture().held.base,
+      reads: [{ sourceId: 'demo_mode', access: 'raw-state' as const, answer: { status: 'value' as const, value: text } }] } };
+    const run = runSimulation(program, held), observation = canvasObservations(program, run);
+    const literal = graph.nodes.find(node => node.payload.kind === 'operand' && node.payload.value.type === 'literal')!;
+    const read = graph.nodes.find(node => node.payload.kind === 'operand' && node.payload.value.type === 'raw-state')!;
+    expect(observation.blocks[literal.id]).toMatchObject({ state: 'known', value: text });
+    expect(observation.blocks[literal.id].ports).toContainEqual(expect.objectContaining({ direction: 'output', state: 'known', value: text }));
+    expect(observation.blocks[graph.roots[0].nodeId].ports).toContainEqual(expect.objectContaining({ portId: '/right', state: 'known', value: text }));
+    expect(formatObservedValue(observation.blocks[literal.id])).toBe(text);
+    expect(observation.blocks[read.id].state).toBe(text === 'unknown' ? 'cant-tell' : text === 'unavailable' ? 'unavailable' : 'known');
+    expect(displayValue(observation.blocks[read.id].result, { name: 'HA state' }, observation.blocks[read.id]))
+      .toBe(text === 'unknown' ? "Can't tell" : text === 'unavailable' ? 'Unavailable' : text);
+    expect(formatObservedValue(observation.results?.[graph.roots[0].nodeId])).toBe('Yes');
+    expect(run.outputs[0].result).toEqual({ kind: 'condition', answer: 'yes' });
+  });
+  it('preserves unit presentation for observed numbers', () => {
+    const graph = lift({ type: 'literal', value: 25 }, { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph]), run = runSimulation(program, simulationFixture().held);
+    const observation = canvasObservations(program, run);
+    expect(displayValue(run.outputs[0].result, { name: 'Bedroom', unit: '°C' }, observation.results?.[graph.roots[0].nodeId])).toBe('25.0 °C');
+  });
+  it('presents the typed clock date against the simulation clock while keeping literal Text exact', () => {
+    const held = simulationFixture().held;
+    const graph = lift({ type: 'clock', part: 'today' }, { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph]), run = runSimulation(program, held);
+    const observation = canvasObservations(program, run, { clock: held.base.clock });
+    expect(displayValue(run.outputs[0].result, { name: 'Today', format: 'date' }, observation.results?.[graph.roots[0].nodeId])).toBe('Today');
+    const literal = lift({ type: 'literal', value: '2026-11-18' }, { kind: 'operand' }).graph;
+    const literalProgram = createSimulationProgram([literal]), literalRun = runSimulation(literalProgram, held);
+    const literalObservation = canvasObservations(literalProgram, literalRun, { clock: held.base.clock });
+    expect(displayValue(literalRun.outputs[0].result, { name: 'Text' }, literalObservation.results?.[literal.roots[0].nodeId])).toBe('2026-11-18');
+  });
   it('formats units, unknowns, local clock and change times without IDs or ISO timestamps', () => {
     expect(displayValue({ kind: 'operand', answer: { status: 'value', value: 25 } }, { name: 'Bedroom', unit: '°C' })).toBe('25.0 °C');
     expect(displayValue({ kind: 'condition', answer: 'unknown' })).toBe("Can't tell");

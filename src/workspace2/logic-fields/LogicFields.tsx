@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ApiError, request } from '../../api';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
@@ -18,6 +19,7 @@ import type { EditReferences } from '../editors/documentEdit';
 import FlowCanvas, { arrangeCanvas, type CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import type { CanvasObservations } from '../canvas/observations';
 import { SimulationHost } from '../logic-simulation/SimulationHost';
+import { useSimulationClock } from '../logic-simulation/live';
 import { createSimulationProgram } from '../logic-simulation/program';
 import type { CanvasObservations as SimulationObservations } from '../logic-simulation/observations';
 import { flowSources } from '../data/flow';
@@ -32,6 +34,7 @@ import { canvasPortObservations } from './observations';
 import { RetireWorkspaceFlows } from './live';
 import { previewGraph, templateUses } from './lenses';
 import { LensChooser } from './LensChooser';
+import ResultSummary from './ResultSummary';
 import { displayValue } from '../logic-simulation/presentation';
 import { useNameContext } from '../expr/useExpr';
 import { graphBlockLabel, sourceLabel } from './presentation';
@@ -250,7 +253,34 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
     {opened && <CanvasSession key={canonicalOfBounded(opened.graph.roots[0].anchor)} field={opened} ws={ws} theme={theme} onClose={() => { setRetiring(true); setOpened(undefined); }}/>}
   </Fields.Provider>;
 }
+let previewCollapsedInMemory = false;
+let previewPreferenceUnsaved = false;
 function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Workspace2; theme: DerivedTheme; onClose: () => void }) {
+  const previewStorageKey = 'sh-studio.canvas.preview-collapsed';
+  const [preview, setPreview] = useState(() => {
+    try {
+      const stored = localStorage.getItem(previewStorageKey) === 'true';
+      return { collapsed: previewPreferenceUnsaved ? previewCollapsedInMemory : stored, storageUnavailable: previewPreferenceUnsaved };
+    }
+    catch { return { collapsed: previewCollapsedInMemory, storageUnavailable: true }; }
+  });
+  const previewId = useId(), collapseToggle = useRef<HTMLButtonElement>(null), expandToggle = useRef<HTMLButtonElement>(null);
+  const focusPreviewToggle = useRef(false);
+  useEffect(() => {
+    previewCollapsedInMemory = preview.collapsed;
+    if (focusPreviewToggle.current) {
+      (preview.collapsed ? expandToggle : collapseToggle).current?.focus();
+      focusPreviewToggle.current = false;
+    }
+  }, [preview.collapsed]);
+  const togglePreview = (collapsed: boolean) => {
+    let storageUnavailable = false;
+    try { localStorage.setItem(previewStorageKey, String(collapsed)); }
+    catch { storageUnavailable = true; }
+    previewPreferenceUnsaved = storageUnavailable;
+    focusPreviewToggle.current = true;
+    setPreview({ collapsed, storageUnavailable });
+  };
   const document = useDraftDocument(field.draft), data = useWorkspaceData();
   const names = useNameContext(document);
   const entry = field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined;
@@ -370,6 +400,9 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
       }) };
     } catch (reason) { return { error: reason instanceof Error ? reason.message : String(reason) }; }
   }, [working, document, field.kind, field.path, lens, tryWith]);
+  const clockProgram = useMemo(() => simulation.program
+    ? [...simulation.program.roots.map(root => root.body), ...simulation.program.flows.values()] : [], [simulation.program]);
+  const { liveClock, clockTimeZone } = useSimulationClock(clockProgram);
   const observe = useCallback((value: SimulationObservations) => { setLastObservation(value); setObservations(canvasPortObservations(value)); }, []);
   const close = () => { setActive(false); };
   useEffect(() => { if (!active) onClose(); }, [active, onClose]);
@@ -377,30 +410,46 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
   return <Dialog.Root open modal onOpenChange={() => {}}>
     <Dialog.Portal><Dialog.Backdrop className="w2-logic-backdrop" style={theme.variables}/><Dialog.Popup className="w2-scope w2-logic-overlay" style={theme.variables} aria-label={`${field.label} canvas`} finalFocus={() => field.returnFocus}>
       <Dialog.Title className="w2-logic-sr">{field.label}</Dialog.Title>
-      <div className="w2-logic-work">
-        <FlowCanvas host={{ ...host, observations }} graph={field.graph} title={field.label} theme={theme} onClose={close} returnFocus={field.returnFocus}
-          selectedNodeId={selected} onSelectionChange={setSelected} onGraphChange={setWorking}
-          onApply={(transaction, layout) => apply(transaction, layout)}/>
-        <aside className="w2-logic-simulation" aria-label="Canvas preview">
-          <LensChooser document={document} entry={field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined}
-            lens={lens} onLens={setLens} onArguments={setTryWith}/>
-          {lens.kind !== 'values' && <article className="w2-logic-field-preview" aria-label={lens.kind === 'stand-in' ? 'Stand-in field preview' : 'Use field preview'}>
-            <strong>{field.label}</strong><output>{displayValue(lastObservation?.blocks[working.roots[0].nodeId]?.result, { name: field.label })}</output>
-            <small>{lens.kind === 'stand-in' ? 'Preview only - not saved' : 'Resolved for the selected use'}</small>
-          </article>}
-          <details><summary>Simulation · Studio only</summary>
-          {ready && simulation.program ? <SimulationHost program={simulation.program} document={document} canvasId={canonicalOfBounded(field.graph.roots[0].anchor)}
-            blockNames={blockNames}
-            selectedBlockId={selected ?? undefined} onSelectBlock={setSelected} onObservation={observe} active={active}
-            freshness={{ stale: !data.live || !ws.houseStates.streaming }}/>
-            : <p className="w2-caption" role="status">{simulation.error}</p>}
-          </details>
+      <div className="w2-logic-work" data-preview-collapsed={preview.collapsed}>
+        <div className="w2-logic-session-status">
           {conflict && <p role="alert">The saved revision changed. Local canvas edits are retained; close the canvas to compare revisions in the workspace.</p>}
           {warnings.map(warning => <p role="alert" key={warning.pointer}>{warning.message}</p>)}
           {warnings.length > 0 && <button type="button" onClick={() => {
             const before = field.draft.get(), { studioCanvas: _removed, ...rest } = before;
             field.draft.set(documentEdit(before, rest as CompositionDocument, { deleted: [['studioCanvas']] }));
           }}>Reset saved layout</button>}
+          {preview.storageUnavailable && <p role="status">Browser storage is unavailable. The Preview choice will only be remembered until this page closes.</p>}
+        </div>
+        <FlowCanvas host={{ ...host, observations }} graph={field.graph} title={field.label} theme={theme} onClose={close} returnFocus={field.returnFocus}
+          selectedNodeId={selected} onSelectionChange={setSelected} onGraphChange={setWorking}
+          onApply={(transaction, layout) => apply(transaction, layout)}/>
+        <aside className="w2-logic-simulation" aria-label="Canvas preview" id={previewId} hidden={preview.collapsed} inert={preview.collapsed}>
+          <header className="w2-logic-preview-header"><strong>Preview</strong>
+            <button type="button" ref={collapseToggle} aria-label="Collapse Preview" aria-expanded={!preview.collapsed} aria-controls={previewId} onClick={() => togglePreview(true)}>
+              <PanelRightClose size={18} aria-hidden />
+            </button>
+          </header>
+          <ResultSummary graph={working} program={simulation.program} observations={lastObservation} blockNames={blockNames} error={simulation.error}/>
+          {!clockTimeZone && (!lastObservation || Object.values(lastObservation.results ?? {}).some(value => value.valueFormat?.timeZone))
+            && <p role="note" className="w2-caption">Times shown in this browser's time zone</p>}
+          <LensChooser document={document} entry={field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined}
+            lens={lens} onLens={setLens} onArguments={setTryWith}/>
+          {lens.kind !== 'values' && <article className="w2-logic-field-preview" aria-label={lens.kind === 'stand-in' ? 'Stand-in field preview' : 'Use field preview'}>
+            <strong>{field.label}</strong><output>{displayValue(lastObservation?.blocks[working.roots[0].nodeId]?.result, { name: field.label }, lastObservation?.blocks[working.roots[0].nodeId])}</output>
+            <small>{lens.kind === 'stand-in' ? 'Preview only - not saved' : 'Resolved for the selected use'}</small>
+          </article>}
+          <details><summary>Simulation · Studio only</summary>
+          {ready && simulation.program ? <SimulationHost program={simulation.program} document={document} canvasId={canonicalOfBounded(field.graph.roots[0].anchor)}
+            blockNames={blockNames} liveClock={liveClock} clockTimeZone={clockTimeZone}
+            selectedBlockId={selected ?? undefined} onSelectBlock={setSelected} onObservation={observe} active={active}
+            freshness={{ stale: !data.live || !ws.houseStates.streaming }}/>
+            : <p className="w2-caption" role="status">{simulation.error}</p>}
+          </details>
+        </aside>
+        <aside className="w2-logic-preview-rail" aria-label="Collapsed canvas preview" hidden={!preview.collapsed}>
+          <button type="button" ref={expandToggle} aria-label="Expand Preview" aria-expanded={!preview.collapsed} aria-controls={previewId} onClick={() => togglePreview(false)}>
+            <PanelRightOpen size={18} aria-hidden /><span>Preview</span>
+          </button>
         </aside>
       </div>
     </Dialog.Popup></Dialog.Portal>

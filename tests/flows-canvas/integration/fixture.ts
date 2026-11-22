@@ -59,6 +59,38 @@ export function integrationDocument() {
   const rows = newFlow(withFormula, 'group', { title: 'Row output', entityIds: ['sensor.demo_living_room_temperature'] });
   return updateFlow(rows.document, rows.id, inputs => ({ ...inputs, output: { kind: 'rows', max: 50, row: { id: { type: 'item', path: ['entityId'] }, title: { type: 'format', pattern: '{value}', args: { value: formula } } } } }));
 }
+export const effectiveAwaySnapshot: NativeSnapshot = {
+  ...integrationSnapshot,
+  states: [...integrationSnapshot.states,
+    { entityId: 'input_select.demo_mode', name: 'Demo mode', state: 'Home' },
+    { entityId: 'input_boolean.demo_away_fallback', name: 'Demo away fallback', state: 'off' },
+  ],
+};
+export function effectiveAwayDocument() {
+  const document = integrationDocument();
+  const mode = { type: 'raw-state', sourceId: { type: 'hole', name: 'mode' } };
+  return compileCompositionDocument({
+    ...document,
+    dataSources: [...document.dataSources,
+      { id: 'demo_mode', kind: 'ha-entity', entityId: { type: 'literal', value: 'input_select.demo_mode' } },
+      { id: 'demo_fallback', kind: 'ha-entity', entityId: { type: 'literal', value: 'input_boolean.demo_away_fallback' } },
+    ],
+    logicLibrary: [...document.logicLibrary ?? [], {
+      id: 'demo_effective_away', name: 'Effective Away', kind: 'condition',
+      params: [
+        { name: 'mode', label: 'Effective mode', kind: 'source-id', sample: 'demo_mode' },
+        { name: 'fallback', label: 'Away fallback', kind: 'source-id', sample: 'demo_fallback' },
+      ],
+      body: { type: 'any', of: [
+        { type: 'compare', op: 'eq', left: mode, right: { type: 'literal', value: 'Away' } },
+        { type: 'all', of: [
+          { type: 'in', value: mode, in: [{ type: 'literal', value: 'unknown' }, { type: 'literal', value: 'unavailable' }] },
+          { type: 'state', sourceId: { type: 'hole', name: 'fallback' }, path: ['state'], in: ['on'] },
+        ] },
+      ] },
+    }],
+  }).document;
+}
 export const reroutedFields: readonly [string, LogicFieldKind, EditorPath][] = [
   ['selectedWhen', 'condition', ['pages', 0, 'components', 4, 'props', 'options', 0, 'selectedWhen']],
   ['isOn', 'condition', ['pages', 0, 'components', 9, 'props', 'isOn']],

@@ -6,7 +6,17 @@ backward-compatible extension of `CanvasHost`), an initial `LogicGraph`,
 the existing `DerivedTheme`, a title, an `onClose` callback, and optionally the
 element to restore focus to on close and friendly output names for the meter.
 Remount for a different anchor/snapshot.
-`arrangeCanvas` supplies an initial readable layout without reordering node IDs.
+`arrangeCanvas` delegates to the shared canvas `tidyCanvas` engine without
+reordering node IDs. Already crossing-free positions retain their identity.
+Opening a session and **Tidy Up** fit the measured graph at a minimum 60% zoom.
+If the whole graph needs a smaller scale, 60% is retained and the **Result**
+block is brought into view without moving keyboard focus. Manual zoom and
+explicit Fit all remain available. Result headers carry a visible badge and
+include "result" in their accessible name.
+An exceptionally tall result starts at its header instead of hiding the badge
+by centering the middle of the card. Windowed graphs measure the result first,
+then the framed neighborhood; wires reuse the card's normalized port positions.
+ResizeObserver border-box sizes are already unscaled, even at 60% zoom.
 
 The host provides sources, target capabilities, an immutable revision snapshot,
 atomic Apply and separate Save. Apply uses the graph core's single lowering
@@ -41,6 +51,106 @@ silently dropping or repairing user content.
   entity names and output label come from the selected graph's real connections.
 - **Average Fixed Values** inserts the native Add / Divide / count recipe with
   two editable numbers and all its wires in one undoable transaction.
+
+## Block details and observed data
+
+The selected block's **Rename or describe** pencil expands an editor inside the
+card. The Inspector exposes the same Label / Description editor. Apply details
+validates with `normalizeAnnotation`, trims both fields, and sends one undoable
+`annotate` edit; empty fields remove metadata. Limits are 60 / 280 characters.
+Control characters are refused, not stripped. Pasted line breaks are rejected
+with **Use a single paragraph; line breaks are not supported.** Invalid drafts
+stay editable with a linked error. Cancel/Escape discards only the unsent draft.
+Changing selection or closing with an unsent draft offers Apply / Discard / Stay.
+Canvas Apply refuses unsent block details rather than silently ignoring them.
+
+A custom label is the title, with the generated block name on a secondary line.
+Template Setting blocks likewise use the setting's label as their title and
+retain Template Setting below it. Readers wired to a setting name that setting,
+not an unchosen entity; genuinely disconnected source placeholders keep their
+Choose an entity prompt.
+The description soft-wraps and clamps to two lines on the card. Full labels and
+generated names remain in accessible names, Outline, connection descriptions,
+and named problems. These details change presentation only, never native logic.
+`CanvasLayoutHandoff.annotations` maps canvas node IDs to annotation objects.
+Apply passes this map beside positions and the compiler source map; the host's
+existing `saveCanvasLayout` stores/restores it through `studioCanvas`.
+
+Header activation now selects and opens one data peek; it does **not** open the
+Inspector. Inspect and the toolbar still do, and a deliberately open desktop
+Inspector remains open. The eye on every header reopens the peek. Arrow-only
+selection never opens it. Close, Escape, or outside activation dismisses without
+clearing selection. Keyboard activation focuses the nonmodal peek; live
+observation updates do not refocus it. Escape/Close restores its header origin,
+while outside dismissal preserves the newly activated control's focus.
+
+The desktop peek sits outside the zoomed board, flips to the available side,
+and shifts or uses vertical space within the current canvas bounds. Below 600px
+it uses the existing Base UI modal bottom sheet instead; Peek and Inspector
+sheets are never stacked. The sheet keeps Close and Compare reachable around a
+scrolling body and returns focus to its origin.
+
+`value-format.ts` owns visible and accessible value text: Yes/No, Empty text,
+Null, Not observed, Unavailable, Can't tell, explicit Kept values, named record
+fields (four fields / two nesting levels in compact views), and list/row counts
+with the first three items and exact remaining count. Item previews prefer
+title / summary / name. Port chips stay absent when the host supplies nothing.
+There is no configuration-value, evaluator, or connected-output fallback.
+Each observed input/result has its own Live / Pinned / Scenario badge.
+Rows inputs are one **Observed item**, not an invented execution history.
+Per-item readings identify the actual displayed iteration as **Item 1 of N**.
+An item-dependent block on an empty step has a **No items** chip; its peek,
+comparison and summary explain **Didn't run: no items reached \<step label\>**.
+The step's annotation wins over its generated name. Item-independent readings
+come from the host's frozen-context diagnostic observation, even for an empty
+list. A single output named Result shares the section heading rather than
+repeating it as a port heading.
+
+**Compare in full** captures a local copy of the currently supplied observations.
+It is a read-only Base UI dialog with Inputs left, Result right (stacked when
+narrow), semantic row headers, result-only search/column filtering, and exact
+matching counts. Source order is retained. The view explicitly reports the
+supplied row count without claiming an unavailable total or shared run identity.
+Host withdrawal or a changed block invalidates the captured comparison.
+Raw JSON is initially off and unmounted until explicitly disclosed; it contains
+only supplied input/result values, never a document or internal scope dump.
+The existing Advanced block-fields authoring form likewise renders serialized
+configuration only inside its explicit Raw JSON disclosure. Internal focus and
+geometry keys use serialization, but never render it as value text.
+
+Port tooltips use `aria-describedby`, a 300ms hover delay, immediate focus,
+collision-aware placement, hover retention, and Escape dismissal. They name
+the block/port, static type, formatted observation and source; no native `title`
+attribute is needed. Activating a port still authors connections, not peeks.
+Blur and activation dismiss the trigger tooltip immediately so a lingering
+tooltip cannot consume Escape from a newly opened connection dialog.
+
+## Measured geometry and Tidy Up
+
+Selected actions are four equal, icon-only Move / Inspect / Rename or describe /
+Delete cells. At 190px the desktop row has four 41px cells; coarse-pointer
+targets are at least 44px. Header title columns use `minmax(0, 1fr)` so the eye,
+root marker and long annotations cannot force overflow. Socket/focus rings are
+not clipped by an overflow-hidden card. The selected card is raised above its
+siblings so expanded actions remain clickable when saved or estimated positions
+overlap.
+
+The graph reads mounted card dimensions and port-center offsets, divided by the
+current zoom, into `TidyMeasure`. Resize observations track expanding annotation
+editors and selected chrome, remeasuring only cards whose border-box size changed
+since their initial measurement. Mounted cards retain their measurements when
+viewport windowing changes; layout changes invalidate them, and Tidy Up reads
+fresh measurements. Board extents include negative positions, 48px
+card-edge margins (at least 32px beyond sockets/focus), and another 96px bottom
+navigation clearance. Fit all uses both current viewport width and height after
+the host/Inspector/Preview layout; it does not rewrite positions.
+
+Tidy Up counts the current measured crossings, calls `tidyCanvas` with the same
+measurements, and sends one `layout` edit only when the graph changes. It keeps
+zoom, selection and button focus, announcing **Tidied: wire crossings N -> M** (the UI
+uses an arrow glyph) or **Already tidy**. The engine never accepts more
+crossings; Undo restores the previous layout in one step. Unmounted cards and
+zero-size jsdom rectangles use the engine's existing estimates.
 
 Styling uses existing workspace/HA tokens. Distinct Lucide block icons, named
 ports, type-specific socket glyphs/shapes, accessible type descriptions and the
@@ -279,3 +389,21 @@ actual measurements as a test attachment.
 Curated screenshots and measured results live in `docs/evidence/w2-c/`.
 Browser geometry is an interaction preview, not unchanged iOS SDUI or physical
 device/runtime evidence.
+
+W3 acceptance additionally runs:
+
+```sh
+npx vitest run tests/flows-canvas/canvas tests/flows-canvas/integration/canvas-seam.test.tsx
+npx playwright test tests/e2e/workspace2-flows-w3.spec.ts
+```
+
+The W3 browser spec uses the standard server config: `STUDIO_E2E_PORT` defaults
+to 4815 and data is isolated under `test-results/studio-data`. It proves real
+Apply / server Save / reload / reopen annotation persistence, and separately
+mounts the production canvas with explicitly scripted grocery observations for
+peek/comparison and measured Tidy Up. The ten-block grocery topology is lifted
+from the real service-response corpus pipeline and the owner's screenshot
+positions; no HA service is called. The real browser reports 1 crossing to 0.
+The jsdom render test also reaches 0 but explicitly uses estimates because its
+rectangles are zero; another test supplies zoom-normalized card/port rectangles.
+Desktop/phone dark screenshots are retained under `docs/evidence/w3/`.

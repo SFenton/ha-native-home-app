@@ -69,6 +69,7 @@ export interface GraphNode {
   readonly origins: readonly string[];
   readonly provenance: 'lifted' | 'authored' | 'opaque';
   readonly position?: { readonly x: number; readonly y: number };
+  readonly annotation?: { readonly label?: string; readonly note?: string };
 }
 export interface GraphEdge {
   readonly id: string;

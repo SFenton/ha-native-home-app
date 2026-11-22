@@ -94,7 +94,7 @@ export default function EditorRow({ label, summary, itemName, document, onApply,
         <footer className="w2-dialog-foot w2-editor-foot">
           {remove && <button type="button" className="w2-editor-remove" onClick={() => { remove.run(wide); finish(wide); close(); }}>{remove.label}</button>}
           <button type="button" onClick={() => { if (wide.tryLeave()) close(); }}>Cancel</button>
-          <button type="button" className="w2-primary" onClick={() => { if (wide.dirty()) finish(wide); close(); }}>Done</button>
+          <DoneButton draft={wide} blocked={blocked} onDone={() => { if (blocked?.(wide.get())) return; if (wide.dirty()) finish(wide); close(); }}/>
         </footer>
         <DiscardPrompt draft={wide} onDiscard={close}/>
       </Dialog.Popup></Dialog.Viewport></Dialog.Portal>

@@ -1,6 +1,11 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
 
 export interface CanvasWindow { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
+export function canvasWindowAt(left: number, top: number, width: number, height: number, zoom: number): CanvasWindow {
+  const overscan = 240;
+  return { left: (left - overscan) / zoom, top: (top - overscan) / zoom,
+    right: (left + width + overscan) / zoom, bottom: (top + height + overscan) / zoom };
+}
 export function intersectsWindow(window: CanvasWindow, left: number, top: number, right: number, bottom: number): boolean {
   return right >= window.left && left <= window.right && bottom >= window.top && top <= window.bottom;
 }
@@ -13,8 +18,7 @@ export function useCanvasWindow(viewport: RefObject<HTMLDivElement | null>, enab
     const update = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
-      const overscan = 240, left = (element.scrollLeft - overscan) / zoom, top = (element.scrollTop - overscan) / zoom;
-      const right = (element.scrollLeft + element.clientWidth + overscan) / zoom, bottom = (element.scrollTop + element.clientHeight + overscan) / zoom;
+      const { left, top, right, bottom } = canvasWindowAt(element.scrollLeft, element.scrollTop, element.clientWidth, element.clientHeight, zoom);
       setWindow(held => held.left === left && held.top === top && held.right === right && held.bottom === bottom ? held : { left, top, right, bottom });
     };
     const scroll = () => { if (!frame) frame = requestAnimationFrame(update); };

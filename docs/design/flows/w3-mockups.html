@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Flows canvas W3 - owner review mockups</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #111111; --foreground: #e1e1e1; --card: #1c1c1c;
+      --popover: #242424; --secondary: #2a2a2a; --muted: #a7a7a7;
+      --border: rgba(225, 225, 225, .16); --ring: #03a9f4;
+      --primary: #03a9f4; --primary-foreground: #06222e; --accent: #123444;
+      --destructive: #ff9a94; --warning: #f6c56f; --success: #87d69b;
+      --info: #79b8ff; --code-background: #151515;
+      --chart-1: #79b8ff; --chart-2: #f6c56f; --chart-3: #87d69b;
+      --chart-4: #c6a5ef; --chart-5: #6ed3df; --chart-6: #b6c1d2;
+      --radius: 12px; --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+      --w2-bg: var(--background); --w2-card: var(--card); --w2-ink-card: var(--foreground);
+      --w2-muted: var(--muted); --w2-line: var(--border); --w2-field: var(--secondary);
+      --w2-selected: var(--accent); --w2-canvas-focus: var(--ring);
+      --w2-wire-number: var(--chart-1); --w2-wire-text: var(--chart-2);
+      --w2-wire-condition: var(--chart-3); --w2-wire-time: var(--chart-4);
+      --w2-wire-list: var(--chart-5); --w2-wire-record: var(--chart-6);
+      --w2-wire-entity: var(--chart-6); --w2-observation-pinned: var(--chart-4);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--foreground); font: 13px/1.5 var(--font-sans); }
+    main { max-width: 1440px; margin-inline: auto; }
+    h1, h2, h3, h4, p, figure { margin: 0; }
+    h2 { font-size: 23px; line-height: 1.25; letter-spacing: -.5px; font-weight: 650; }
+    h3 { font-size: 14px; font-weight: 650; }
+    h4 { font-size: 12px; font-weight: 650; }
+    button, input, textarea, select, summary { font: inherit; }
+    button, .button, summary { cursor: pointer; }
+    button, .button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      min-height: 32px; border: 1px solid var(--border); border-radius: 8px;
+      padding: 5px 10px; color: var(--foreground); background: var(--card); text-decoration: none;
+    }
+    button:hover, .button:hover { background: var(--secondary); }
+    button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 3px solid var(--ring); outline-offset: 3px;
+    }
+    input, textarea, select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--foreground); background: var(--secondary); }
+    textarea { resize: vertical; }
+    input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); }
+    label { display: grid; gap: 6px; }
+    small, .muted { color: var(--muted); }
+    small { font-size: 11px; }
+    a { color: var(--primary); }
+    code { font: 11px var(--font-mono); overflow-wrap: anywhere; }
+    kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--secondary); font: 11px var(--font-mono); }
+    .icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .icon-button { width: 32px; min-width: 32px; padding: 5px; }
+    .primary { background: var(--primary); color: var(--primary-foreground); border-color: transparent; font-weight: 650; }
+    .primary:hover { background: var(--primary); filter: brightness(1.08); }
+    .quiet { background: transparent; border-color: transparent; }
+    .danger { color: var(--destructive); }
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    [hidden] { display: none !important; }
+    .section { margin-block: 0 42px; scroll-margin-top: 16px; }
+    .section-heading { display: flex; align-items: flex-start; gap: 16px; padding-block: 25px 20px; }
+    .section-id { min-width: 39px; color: var(--primary); font: 600 12px/29px var(--font-mono); }
+    .section-heading p { max-width: 950px; margin-top: 6px; color: var(--muted); }
+    .surface { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+    .canvas { background-color: var(--background); background-image: radial-gradient(var(--border) .8px, transparent .8px); background-size: 16px 16px; }
+    .eyebrow { color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: 1px; text-transform: uppercase; }
+    .caption { margin-top: 12px; color: var(--muted); font-size: 12px; }
+    .caption strong { color: var(--foreground); font-weight: 550; }
+    .row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .between { justify-content: space-between; }
+    .stack { display: grid; gap: 12px; min-width: 0; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 10px; white-space: nowrap; }
+    .pill .icon { width: 12px; height: 12px; }
+    .live { color: var(--success); background: color-mix(in srgb, var(--success) 7%, var(--card)); }
+    .pinned, .scenario { color: var(--chart-4); background: color-mix(in srgb, var(--chart-4) 8%, var(--card)); }
+    .badge { color: var(--muted); padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; }
+    .note { padding: 12px 14px; border-inline-start: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 5%, var(--card)); }
+    .note p + p { margin-top: 6px; }
+    .block { width: 210px; max-width: 100%; border: 1px solid var(--border); border-radius: 11px; background: var(--card); color: var(--foreground); position: relative; }
+    .block.selected { border-color: var(--ring); box-shadow: 0 0 0 2px var(--accent); }
+    .block.scenario-block { outline: 1.5px dashed var(--chart-4); outline-offset: 4px; }
+    .block-head { display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; gap: 2px; padding: 5px 6px 5px 0; min-height: 48px; }
+    .block-head.no-peek { grid-template-columns: minmax(0, 1fr); padding-right: 0; }
+    .block-title { display: flex; justify-content: flex-start; gap: 7px; text-align: left; min-width: 0; width: 100%; border: 0; padding: 4px 8px; background: transparent; }
+    .block-title > span:last-child { min-width: 0; flex: 1; }
+    .block-title strong, .block-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .block-title strong { font-size: 12px; }
+    .block-title small { font-size: 10px; }
+    .block-icon { display: inline-grid; place-items: center; width: 25px; height: 25px; flex: none; border-radius: 6px; background: color-mix(in srgb, var(--wire, var(--chart-6)) 9%, transparent); color: var(--wire, var(--chart-6)); }
+    .block-note { padding: 0 10px; margin-bottom: 8px; font-size: 11px; line-height: 16px; color: var(--muted); }
+    .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+    .port { position: relative; display: flex; align-items: center; gap: 5px; min-height: 32px; padding: 5px 10px; border-top: 1px solid var(--border); font-size: 11px; }
+    .port-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .port-value { max-width: 96px; padding: 0 4px; background: color-mix(in srgb, var(--wire, var(--chart-6)) 8%, transparent); color: var(--wire, var(--chart-6)); border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+    .socket { display: inline-grid; place-items: center; flex: none; width: 15px; height: 15px; color: var(--wire, var(--chart-6)); background: var(--card); }
+    .socket .icon { width: 14px; height: 14px; stroke-width: 1.9; }
+    .socket.text { border: 1.5px solid currentColor; border-radius: 2px; }
+    .socket.text .icon { width: 10px; height: 10px; }
+    .socket.condition { border: 1.5px solid currentColor; border-radius: 2px; transform: rotate(45deg); }
+    .socket.condition .icon { transform: rotate(-45deg); width: 10px; height: 10px; }
+    .port.input .socket { margin-left: -18px; }
+    .port.output .socket { order: 4; margin-right: -18px; }
+    .text-wire { --wire: var(--chart-2); }
+    .record-wire, .entity-wire { --wire: var(--chart-6); }
+    .condition-wire { --wire: var(--chart-3); }
+    .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px; border-top: 1px solid var(--border); }
+    .actions button { padding: 4px; min-width: 0; min-height: 32px; }
+    .actions .active { background: var(--accent); border-color: var(--primary); }
+    .m1-layout { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(250px, 1fr) 292px minmax(200px, .8fr); gap: 24px; padding: 28px; align-items: start; }
+    .m1-layout .block { width: 220px; margin-top: 22px; }
+    .inline-form { display: grid; gap: 10px; border-top: 1px solid var(--border); padding: 10px; }
+    .inline-form label { font-size: 11px; }
+    .inline-form input, .inline-form textarea { padding: 7px; font-size: 12px; }
+    .inline-form textarea { min-height: 90px; }
+    .inline-form .row > button { flex: 1; }
+    .inspector { padding: 0; background: var(--card); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+    .panel-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .panel-head > div { flex: 1; min-width: 0; }
+    .panel-head small { display: block; }
+    .panel-body { display: grid; gap: 14px; padding: 14px; }
+    .panel-body textarea { min-height: 114px; }
+    .field-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
+    .anatomy { display: grid; gap: 18px; padding-top: 43px; }
+    .anatomy p { margin-top: 4px; font-size: 12px; color: var(--muted); }
+    .anatomy strong { color: var(--foreground); }
+    .peek-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .peek-stage { padding: 20px; min-width: 0; }
+    .peek-stage > .block { margin: 20px 0 18px 10px; width: 200px; }
+    .peek { position: relative; width: 100%; max-width: 380px; border: 1px solid var(--border); border-radius: 12px; background: var(--popover); box-shadow: 0 10px 24px color-mix(in srgb, var(--background) 60%, transparent); }
+    .peek::before { content: ""; position: absolute; top: -6px; left: 36px; width: 10px; height: 10px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); background: var(--popover); transform: rotate(45deg); }
+    .peek .panel-head { padding: 10px 12px; }
+    .peek .panel-head h3 { font-size: 12px; }
+    .peek .panel-body { padding: 12px; gap: 16px; }
+    .peek-group { display: grid; gap: 8px; min-width: 0; }
+    .peek-label { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; }
+    .kv { display: grid; grid-template-columns: minmax(70px, .7fr) minmax(0, 1.3fr); gap: 5px 12px; margin: 0; font-size: 12px; }
+    .kv dt { color: var(--muted); }
+    .kv dd { margin: 0; overflow-wrap: anywhere; }
+    .scalar { padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; color: var(--chart-6); background: var(--card); overflow-wrap: anywhere; }
+    .value-record { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+    .value-record small { display: block; margin-top: 6px; }
+    .sample-rows { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+    .sample-rows li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-height: 48px; }
+    .sample-rows li + li { border-top: 1px solid var(--border); }
+    .sample-rows strong, .sample-rows small { display: block; }
+    .sample-rows strong { font-size: 12px; font-weight: 550; }
+    .row-number { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 10px; }
+    .peek-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--border); }
+    .peek-foot .button { font-size: 11px; }
+    .state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+    .unknown { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--border) 40%, transparent) 0 3px, transparent 3px 9px); }
+    .state-grid .surface { display: grid; gap: 9px; }
+    .state-value { font-size: 16px; }
+    .m2-lower { display: grid; grid-template-columns: minmax(260px, 1fr) 390px minmax(240px, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+    .dismissed-stage { min-height: 380px; display: grid; align-content: center; justify-items: center; gap: 24px; padding: 28px; }
+    .dismissed-stage .block { width: 210px; }
+    .dismissed-stage .caption { max-width: 270px; margin: 0; }
+    .phone { width: 390px; max-width: 100%; height: 740px; overflow: hidden; position: relative; padding: 0; border: 1px solid var(--border); border-radius: 12px; }
+    .phone-top { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); background: var(--card); }
+    .phone-top button { min-width: 44px; min-height: 44px; }
+    .phone-graph { height: 220px; padding: 24px; }
+    .phone-shade { position: absolute; inset: 68px 0 0; background: color-mix(in srgb, var(--background) 60%, transparent); }
+    .phone-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: var(--popover); border-top: 1px solid var(--border); border-radius: 18px 18px 0 0; padding-top: 10px; }
+    .sheet-handle { width: 32px; height: 4px; margin: 0 auto 6px; background: var(--muted); border-radius: 4px; }
+    .phone-sheet .panel-head { padding: 6px 16px 10px; }
+    .phone-sheet .icon-button { width: 44px; min-height: 44px; }
+    .phone-sheet .panel-body { padding: 14px 16px; }
+    .phone-sheet .peek-foot { padding: 12px 16px 24px; }
+    .phone-sheet .peek-foot .button { min-height: 44px; font-size: 13px; }
+    .phone-sheet .sample-rows li { min-height: 49px; }
+    .phone-notes { display: grid; gap: 18px; padding-top: 30px; }
+    .phone-notes h3 { margin-bottom: 5px; }
+    .phone-notes p { color: var(--muted); font-size: 12px; }
+    .modal-stage { padding: 36px; background-color: var(--background); }
+    .compare { max-width: 1120px; margin-inline: auto; padding: 0; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--popover); box-shadow: 0 14px 36px color-mix(in srgb, var(--background) 75%, transparent); }
+    .compare .panel-head { padding: 16px 20px; }
+    .compare-toolbar { display: flex; align-items: end; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+    .search { flex: 1; position: relative; max-width: 460px; }
+    .search .icon { position: absolute; left: 11px; bottom: 11px; color: var(--muted); }
+    .search input { padding-left: 35px; }
+    .filter { min-width: 155px; }
+    .compare-count { margin-left: auto; align-self: center; white-space: nowrap; font-size: 12px; color: var(--muted); }
+    .compare-columns { display: grid; grid-template-columns: 310px minmax(0, 1fr); min-height: 365px; }
+    .compare-inputs { padding: 20px; border-right: 1px solid var(--border); background: var(--card); }
+    .compare-inputs .kv { grid-template-columns: 80px minmax(0, 1fr); margin-block: 18px; row-gap: 13px; }
+    .compare-result { padding: 20px; min-width: 0; }
+    .table-scroll { overflow: auto; margin-top: 14px; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+    th { padding: 9px 12px; background: var(--secondary); color: var(--muted); font-size: 11px; font-weight: 550; white-space: nowrap; }
+    td { padding: 10px 12px; border-top: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+    td:first-child { color: var(--muted); font-size: 11px; }
+    .table-scroll tr:nth-child(even) td { background: color-mix(in srgb, var(--card) 50%, transparent); }
+    .empty-search { padding: 24px; color: var(--muted); }
+    .raw { border-top: 1px solid var(--border); padding: 12px 20px; }
+    .raw summary { width: fit-content; color: var(--muted); }
+    .raw summary .raw-on, .raw[open] summary .raw-off { display: none; }
+    .raw[open] summary .raw-on { display: inline; }
+    .raw-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 12px; }
+    pre { max-height: 300px; overflow: auto; background: var(--code-background); padding: 12px; border-radius: 8px; font: 11px/1.7 var(--font-mono); }
+    .compare-foot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 11px; color: var(--muted); }
+    .m4-grid { display: grid; grid-template-columns: minmax(580px, 1.5fr) minmax(260px, 1fr); gap: 20px; }
+    .tooltip-stage { display: flex; gap: 38px; align-items: center; padding: 42px; min-height: 310px; }
+    .tooltip-stage .block { width: 210px; flex: none; }
+    .tooltip { position: relative; background: var(--popover); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; width: 290px; }
+    .tooltip::before { content: ""; position: absolute; width: 9px; height: 9px; top: 50%; left: -5px; transform: rotate(45deg); background: var(--popover); border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .tooltip p { margin-top: 8px; }
+    .tooltip .source-line { margin-top: 10px; }
+    .m4-aside { display: grid; align-content: center; gap: 16px; }
+    .m5-grid { display: grid; grid-template-columns: 232px 262px minmax(340px, 1fr); gap: 20px; }
+    .width-demo { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .ruler { width: 100%; border-top: 1px solid var(--muted); padding-top: 5px; text-align: center; font: 11px var(--font-mono); color: var(--muted); }
+    .edge-stage { position: relative; min-height: 385px; padding: 28px 40px; }
+    .edge-stage .block { margin-left: auto; width: 210px; z-index: 1; }
+    .edge-stage .edge-wire { position: absolute; top: 110px; left: 0; right: 230px; height: 1px; background: var(--chart-6); }
+    .edge-gutter { position: absolute; top: 30px; bottom: 75px; right: 8px; border-right: 1px dashed var(--muted); width: 24px; }
+    .edge-stage .caption { margin-top: 24px; max-width: 300px; }
+    .navigation { display: flex; align-items: center; gap: 3px; width: fit-content; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+    .navigation button { border-color: transparent; background: transparent; font-size: 11px; }
+    .navigation output { padding-inline: 5px; font-size: 11px; }
+    .session-label { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; }
+    .session { display: grid; grid-template-columns: 44px minmax(0, 1fr) 310px; padding: 0; overflow: hidden; }
+    .session.collapsed { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+    .ha-rail { border-right: 1px solid var(--border); padding: 14px 8px; display: flex; flex-direction: column; align-items: center; gap: 22px; color: var(--muted); background: var(--card); }
+    .ha-rail > .icon:first-child { color: var(--primary); width: 24px; height: 24px; }
+    .session-main { min-width: 0; }
+    .session-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+    .session-toolbar { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--border); }
+    .session-toolbar button { font-size: 12px; }
+    .session-toolbar .more { margin-left: auto; }
+    .segment { display: flex; padding: 2px; border-radius: 9px; background: var(--secondary); }
+    .segment button { border-color: transparent; background: transparent; }
+    .segment button:first-child { border-color: var(--border); background: var(--card); }
+    .session-canvas { height: 372px; position: relative; overflow: auto; }
+    .session-canvas .graph-image { display: block; width: 896px; height: 490px; max-width: none; }
+    .session-canvas .navigation { position: sticky; bottom: 10px; margin: 10px; z-index: 2; }
+    .session-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--border); }
+    .session-status .row { font-size: 11px; color: var(--muted); }
+    .session-status button { font-size: 11px; }
+    .preview-expanded { border-left: 1px solid var(--border); padding: 12px; }
+    .preview-expanded .row { margin-bottom: 12px; }
+    .preview-expanded select { margin-bottom: 10px; }
+    .preview-expanded details { margin-top: 24px; }
+    .preview-expanded summary { font-weight: 600; }
+    .preview-value { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 18px; background: var(--secondary); }
+    .preview-rail { border-left: 1px solid var(--border); background: var(--card); }
+    .preview-rail button { display: flex; flex-direction: column; width: 43px; padding: 12px 5px; min-height: 132px; border: 0; border-radius: 0; gap: 14px; background: transparent; }
+    .preview-rail span { writing-mode: vertical-rl; letter-spacing: .3px; }
+    .graph-scroll { overflow: auto; padding: 0; }
+    .graph-image { display: block; width: 100%; min-width: 1000px; height: 700px; }
+    .graph-image text { font-family: var(--font-sans); fill: var(--foreground); }
+    .graph-image .node-ground { fill: var(--card); stroke: var(--border); }
+    .graph-image .node-line { stroke: var(--border); }
+    .graph-image .node-label { font-size: 12px; font-weight: 600; }
+    .graph-image .port-label { font-size: 10px; }
+    .graph-image .detail-label { font-size: 10px; fill: var(--muted); }
+    .graph-image .wire-path { stroke-width: 1.6; fill: none; }
+    .graph-image .graph-icon { fill: none; stroke: var(--chart-6); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .graph-image .type-text { stroke: var(--chart-2); }
+    .graph-image .socket-ground { fill: var(--card); }
+    .graph-image .column-label { fill: var(--muted); font: 10px var(--font-mono); letter-spacing: .5px; }
+    .graph-summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 12px 0 24px; color: var(--muted); }
+    .graph-summary .good { color: var(--success); }
+    .footer-note { padding-block: 10px 26px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+    @media (max-width: 1199px) {
+      .m1-layout { grid-template-columns: minmax(220px, 1fr) minmax(230px, 1fr) 292px; padding: 20px; gap: 18px; }
+      .anatomy { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 8px; }
+      .peek-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .peek-grid > :last-child { grid-column: 1 / -1; max-width: 460px; }
+      .m2-lower { grid-template-columns: minmax(250px, 1fr) 390px; }
+      .phone-notes { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 0; }
+      .m4-grid { grid-template-columns: 1fr; }
+      .m4-aside { grid-template-columns: 1fr 1fr; }
+      .m5-grid { grid-template-columns: 232px 262px; }
+      .edge-stage { grid-column: 1 / -1; }
+      .compare-columns { grid-template-columns: 260px minmax(0, 1fr); }
+      .session-canvas .graph-image { min-width: 896px; }
+    }
+    @media (max-width: 799px) {
+      h2 { font-size: 20px; }
+      .m1-layout { grid-template-columns: 1fr 1fr; padding: 20px; }
+      .m1-layout > .inspector { grid-column: 1 / -1; max-width: 360px; }
+      .anatomy { grid-template-columns: 1fr; }
+      .peek-grid, .state-grid, .m2-lower { grid-template-columns: 1fr; }
+      .peek-grid > :last-child { grid-column: auto; max-width: none; }
+      .peek-stage { min-height: 0; }
+      .peek { max-width: none; }
+      .phone { justify-self: center; }
+      .phone-notes { grid-column: auto; grid-template-columns: 1fr; }
+      .modal-stage { padding: 16px; }
+      .compare-toolbar { flex-wrap: wrap; }
+      .compare-count { margin-left: 0; }
+      .compare-columns { grid-template-columns: 1fr; }
+      .compare-inputs { border-right: 0; border-bottom: 1px solid var(--border); }
+      .raw-columns { grid-template-columns: 1fr; }
+      .tooltip-stage { padding: 26px; flex-direction: column; align-items: flex-start; gap: 20px; }
+      .tooltip::before { top: -5px; left: 32px; border: 0; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+      .m4-aside { grid-template-columns: 1fr; }
+      .m5-grid { grid-template-columns: 1fr 1fr; }
+      .width-demo { padding: 14px 8px; }
+      .session { grid-template-columns: 36px minmax(0, 1fr) 230px; }
+      .session.collapsed { grid-template-columns: 36px minmax(0, 1fr) 44px; }
+      .session-header > small, .session-toolbar .label, .session-status > .row { display: none; }
+      .session-toolbar { gap: 4px; padding-inline: 6px; }
+      .session-toolbar button { padding-inline: 6px; }
+      .graph-summary { align-items: flex-start; flex-direction: column; }
+    }
+    @media (max-width: 479px) {
+      .m1-layout, .m5-grid { grid-template-columns: 1fr; }
+      .m1-layout > .inspector, .anatomy, .edge-stage { grid-column: auto; }
+      .m1-layout .block { margin-top: 12px; }
+      .width-demo .ruler { max-width: 220px; }
+      .session { grid-template-columns: minmax(0, 1fr); }
+      .session .ha-rail { display: none; }
+      .session .preview-expanded { border-left: 0; border-top: 1px solid var(--border); }
+      .session.collapsed { grid-template-columns: minmax(0, 1fr) 44px; }
+      .session-header { padding-inline: 10px; }
+      .section-heading { gap: 8px; }
+      .section-id { min-width: 30px; }
+      .phone { width: min(390px, 100%); }
+    }
+    @media (pointer: coarse) {
+      button, .button { min-height: 44px; }
+      .icon-button { min-width: 44px; }
+      .actions { padding: 5px; gap: 0; }
+      .actions button { min-width: 44px; }
+      .block-head { grid-template-columns: minmax(0, 1fr) 44px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; animation: none !important; } }
+    @media (forced-colors: active) {
+      .block.selected { outline: 2px solid Highlight; }
+      .socket, .icon, .graph-icon { color: CanvasText; stroke: CanvasText; }
+      .graph-image .wire-path { stroke: CanvasText; }
+      .pill { border: 1px solid CanvasText; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <defs>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14Z"/></symbol>
+      <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20m-14-6 4-4 4 4m-10 2-4 4 4 4m2 2 4 4 4-4m2-10 4 4-4 4"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M3 5h4m4 0h10M3 12h10m4 0h4M3 19h2m4 0h12M7 2v6m6 1v6M5 16v6"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+      <symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3M12 4v16m-4 0h8"/></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+      <symbol id="i-braces" viewBox="0 0 24 24"><path d="M8 3H6v6l-3 3 3 3v6h2m8-18h2v6l3 3-3 3v6h-2"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 5h13M8 12h13M8 19h13M3 5h.1M3 12h.1M3 19h.1"/></symbol>
+      <symbol id="i-rows" viewBox="0 0 24 24"><path d="M4 3v18M8 12h13m-5-5 5 5-5 5"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="m16 3 5 5-4 2-2 5-3 1-4-4 1-3 5-2ZM3 21l6-6"/></symbol>
+      <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6m-5 0v7l-6 9c-1 1 0 2 1 2h14c1 0 2-1 1-2l-6-9V3M7 15h10"/></symbol>
+      <symbol id="i-live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M6 6a8.5 8.5 0 0 0 0 12M18 6a8.5 8.5 0 0 1 0 12"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-8 8M10 21H3v-7m0 7 8-8"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6"/></symbol>
+      <symbol id="i-into" viewBox="0 0 24 24"><path d="M4 3v9h16m-5-5 5 5-5 5"/></symbol>
+      <symbol id="i-blocks" viewBox="0 0 24 24"><path d="M3 3h7v7H3Zm11 0h7v7h-7ZM3 14h7v7H3Zm11 0h7v7h-7Z"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 4 8 8-8 8"/></symbol>
+      <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v11h-7v-7h-4v7H3Z"/></symbol>
+      <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="4" r="2"/><circle cx="6" cy="20" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 6v12m0-4c8 0 12-2 12-6"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-wand" viewBox="0 0 24 24"><path d="m3 21 13-13 3 3L6 24m6-12 3 3M5 3v4M3 5h4m12-3v4m-2-2h4M21 17v4m-2-2h4"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.1"/></symbol>
+      <symbol id="i-question" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 5m0 3h.1"/></symbol>
+    </defs>
+  </svg>
+  <main>
+    <section class="section" id="m1" aria-labelledby="m1-title">
+      <header class="section-heading">
+        <span class="section-id">M1</span>
+        <div><h2 id="m1-title">A block's purpose, without losing its type</h2><p>Owner review mockups. Illustrative observations only: no HA request, device action, or native-runtime claim. These are Studio browser surfaces, not an iOS emulator.</p></div>
+      </header>
+      <div class="surface canvas m1-layout">
+        <div>
+          <div class="eyebrow">Selected / 220px</div>
+          <article class="block selected">
+            <header class="block-head">
+              <button class="block-title" aria-label="Select Office PC, Raw State">
+                <span class="block-icon text-wire"><svg class="icon" aria-hidden="true"><use href="#i-radio"/></svg></span>
+                <span><strong>Office PC</strong><small>Raw State</small></span>
+              </button>
+              <button class="icon-button quiet" aria-label="Show data peek for Office PC, Raw State" title="Show data peek"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
+            </header>
+            <p class="block-note clamp">Shows whether the office PC is on. Use this state to show the Office power controls.</p>
+            <div class="port output text-wire"><span class="port-name">Result</span><span class="port-value">on</span><span class="socket text"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg></span></div>
+            <div class="actions">
+              <button aria-label="Move Office PC" title="Move Office PC"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg></button>
+              <button aria-label="Inspect Office PC" title="Inspect Office PC"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></button>
+              <button class="active" aria-label="Rename or describe Office PC" title="Rename or describe"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg></button>
+              <button aria-label="Delete Office PC" title="Delete Office PC"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+          <p class="caption">Two-line description.<br>Full text remains in the inspector.</p>
+        </div>
+        <div>
+          <div class="eyebrow">Inline edit / same block</div>
+          <article class="block selected">
+            <header class="block-head no-peek"><div class="block-title"><span class="block-icon text-wire"><svg class="icon" aria-hidden="true"><use href="#i-radio"/></svg></span><span><strong>Office PC</strong><small>Raw State</small></span></div></header>
+            <div class="inline-form">
+              <label>Label<input value="Office PC" maxlength="60" aria-label="Inline block label"></label>
+              <label>Description<textarea maxlength="280" aria-label="Inline block description">Shows whether the office PC is on. Use this state to show the Office power controls.</textarea></label>
+              <small>Studio only. Does not change the rule.</small>
+              <div class="row"><button>Cancel</button><button class="primary">Apply</button></div>
+            </div>
+          </article>
+          <p class="caption">Pencil edits both annotations in place.<br>One Apply, one undoable change.</p>
+        </div>
+        <aside class="inspector" aria-label="Illustrated block inspector">
+          <div class="panel-head"><span class="block-icon text-wire"><svg class="icon" aria-hidden="true"><use href="#i-radio"/></svg></span><div><h3>Office PC</h3><small>Raw State</small></div><button class="icon-button quiet" aria-label="Close block inspector"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+          <div class="panel-body">
+            <div class="eyebrow">Block details</div>
+            <label>Label<input value="Office PC" maxlength="60" aria-describedby="label-help"></label>
+            <div class="field-meta" id="label-help"><span>Optional. Blank restores Raw State.</span><span>60 max</span></div>
+            <label>Description<textarea maxlength="280" aria-describedby="note-help">Shows whether the office PC is on. Use this state to show the Office power controls.</textarea></label>
+            <div class="field-meta" id="note-help"><span>Shown on this block.</span><span>280 max</span></div>
+            <div class="row"><button>Cancel</button><button class="primary">Apply details</button></div>
+            <div class="note"><small>Presentation metadata only. Save draft and Publish remain separate.</small></div>
+            <div><h4>Raw State settings</h4><p class="caption">Existing entity/source controls remain below. A label never changes a source binding.</p></div>
+          </div>
+        </aside>
+        <div class="anatomy">
+          <div><strong>01 / Identity stays legible</strong><p>Custom label first. Generated name second. Screen readers hear both.</p></div>
+          <div><strong>02 / No silent shortening</strong><p>Only the display clamps. Invalid annotation input is explained, never saved as repaired text.</p></div>
+          <div><strong>03 / Clear when empty</strong><p>Removing the label returns to Raw State. Removing the note removes its space.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="m2" aria-labelledby="m2-title">
+      <header class="section-heading"><span class="section-id">M2</span><div><h2 id="m2-title">Click a block. Read its inputs and result.</h2><p>One anchored, dismissible peek. No serialized payloads. Sample provenance is explicit; only a host observation supplies a value. Close/reopen works in the three examples below.</p></div></header>
+      <div class="peek-grid">
+        <div class="surface canvas peek-stage" data-peek-stage>
+          <div class="eyebrow">A / Scalar</div>
+          <article class="block selected">
+            <header class="block-head"><button class="block-title" data-open-peek="peek-scalar" aria-label="Select Grocery target, Text and show data peek"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg></span><span><strong>Grocery target</strong><small>Text</small></span></button><button class="icon-button quiet" data-open-peek="peek-scalar" aria-expanded="true" aria-controls="peek-scalar" aria-label="Show data peek for Grocery target"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header>
+            <div class="port output entity-wire"><span class="port-name">Result</span><span class="port-value">todo.demo_groceries</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span></div>
+          </article>
+          <div class="peek" id="peek-scalar" role="dialog" aria-modal="false" aria-labelledby="peek-scalar-title">
+            <header class="panel-head"><div><h3 id="peek-scalar-title">Grocery target <span class="muted">/ Peek</span></h3><small>Text</small></div><button class="icon-button quiet" data-close-peek="peek-scalar" aria-label="Dismiss data peek for Grocery target"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
+            <div class="panel-body">
+              <div class="peek-group"><div class="peek-label"><strong>Inputs</strong></div><p class="muted">No input ports.</p></div>
+              <div class="peek-group"><div class="peek-label"><strong>Result</strong><span class="pill live"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Live</span></div><div class="scalar">todo.demo_groceries</div><small>A complete text value, not quoted JSON.</small></div>
+            </div>
+            <div class="peek-foot"><small>Read-only observation</small><a class="button" href="#m3">Compare in full<svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></a></div>
+          </div>
+          <p class="caption">No inputs is different from missing inputs.<br>A literal is not a fallback observation.</p>
+        </div>
+        <div class="surface canvas peek-stage" data-peek-stage>
+          <div class="eyebrow">B / Record</div>
+          <article class="block selected">
+            <header class="block-head"><button class="block-title" data-open-peek="peek-record" aria-label="Select Choose Entry and show data peek"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span><strong>Choose Entry</strong></span></button><button class="icon-button quiet" data-open-peek="peek-record" aria-expanded="true" aria-controls="peek-record" aria-label="Show data peek for Choose Entry"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header>
+            <div class="port input entity-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span class="port-name">Key</span><span class="port-value">todo.demo_groceries</span></div>
+            <div class="port output record-wire"><span class="port-name">Result</span><span class="port-value">Items: 7 items</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div>
+          </article>
+          <div class="peek" id="peek-record" role="dialog" aria-modal="false" aria-labelledby="peek-record-title">
+            <header class="panel-head"><div><h3 id="peek-record-title">Choose Entry <span class="muted">/ Peek</span></h3><small>From Service Response</small></div><button class="icon-button quiet" data-close-peek="peek-record" aria-label="Dismiss data peek for Choose Entry"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
+            <div class="panel-body">
+              <div class="peek-group"><div class="peek-label"><strong>Inputs</strong><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div><dl class="kv"><dt>Key</dt><dd>todo.demo_groceries</dd></dl></div>
+              <div class="peek-group"><div class="peek-label"><strong>Result</strong><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div><div class="value-record"><div class="row between"><strong>Items</strong><span>7 items</span></div><small>Milk, Eggs, Bread</small><small>+4 more items</small></div><small>Named fields, with a compact nested-list summary.</small></div>
+            </div>
+            <div class="peek-foot"><small>1 field</small><a class="button" href="#m3">Compare in full<svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></a></div>
+          </div>
+          <p class="caption">The source badge belongs to the observed value.<br>A downstream pin is not a direct scenario pin.</p>
+        </div>
+        <div class="surface canvas peek-stage" data-peek-stage>
+          <div class="eyebrow">C / List of rows</div>
+          <article class="block selected scenario-block">
+            <header class="block-head"><button class="block-title" data-open-peek="peek-rows" aria-label="Select Shopping list, Rows and show data peek"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-rows"/></svg></span><span><strong>Shopping list</strong><small>Rows</small></span></button><button class="icon-button quiet" data-open-peek="peek-rows" aria-expanded="true" aria-controls="peek-rows" aria-label="Show data peek for Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header>
+            <div class="port input text-wire"><span class="socket text"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg></span><span class="port-name">Row Id</span><span class="port-value">grocery-milk</span></div>
+            <div class="port input text-wire"><span class="socket text"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg></span><span class="port-name">Row Title</span><span class="port-value">Milk</span></div>
+            <div class="port input text-wire"><span class="socket text"><svg class="icon" aria-hidden="true"><use href="#i-type"/></svg></span><span class="port-name">Subtitle</span><span class="port-value">Dairy - 2 litres</span></div>
+            <div class="port output record-wire"><span class="port-name">Result</span><span class="port-value">7 rows</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div>
+          </article>
+          <div class="peek" id="peek-rows" role="dialog" aria-modal="false" aria-labelledby="peek-rows-title">
+            <header class="panel-head"><div><h3 id="peek-rows-title">Shopping list <span class="muted">/ Peek</span></h3><small>Rows</small></div><button class="icon-button quiet" data-close-peek="peek-rows" aria-label="Dismiss data peek for Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
+            <div class="panel-body">
+              <div class="peek-group"><div class="peek-label"><strong>Inputs <span class="muted">/ observed item</span></strong><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><dl class="kv"><dt>Row Id</dt><dd>grocery-milk</dd><dt>Row Title</dt><dd>Milk</dd><dt>Subtitle</dt><dd>Dairy - 2 litres</dd></dl></div>
+              <div class="peek-group"><div class="peek-label"><strong>Result / 7 rows</strong><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><ol class="sample-rows"><li><span class="row-number">1</span><div><strong>Milk</strong><small>Dairy - 2 litres</small></div></li><li><span class="row-number">2</span><div><strong>Eggs</strong><small>Dairy - 12 eggs</small></div></li><li><span class="row-number">3</span><div><strong>Bread</strong><small>Bakery - wholemeal</small></div></li></ol></div>
+            </div>
+            <div class="peek-foot"><span>+4 more rows</span><a class="button" href="#m3">Compare in full<svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></a></div>
+          </div>
+        </div>
+      </div>
+      <div class="state-grid">
+        <div class="surface unknown"><div class="row between"><h4>Service Response / Result</h4><span class="pill live"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Live</span></div><div class="row state-value"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>Unavailable</div><small>No answer is available. Nothing is substituted.</small></div>
+        <div class="surface unknown"><div class="row between"><h4>Office PC on? / Result</h4><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><div class="row state-value"><svg class="icon" aria-hidden="true"><use href="#i-question"/></svg>Can't tell</div><small>This condition is unanswered. It is not No.</small></div>
+        <div class="surface unknown"><div class="row between"><h4>Shopping list / Result</h4><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div><div class="row state-value">Unavailable <span class="badge">Kept</span></div><small>7 rows retained, only when the host explicitly supplies a kept result.</small></div>
+      </div>
+      <div class="m2-lower">
+        <div>
+          <div class="surface canvas dismissed-stage">
+            <div class="eyebrow">Dismissed / selection retained</div>
+            <article class="block selected">
+              <header class="block-head"><button class="block-title" aria-label="Select Shopping list, Rows"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-rows"/></svg></span><span><strong>Shopping list</strong><small>Rows</small></span></button><button class="icon-button" aria-label="Show data peek for Shopping list, Rows" title="Show data peek"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header>
+              <p class="block-note clamp">Groceries with a useful title and subtitle.</p>
+              <div class="port output record-wire"><span class="port-name">Result</span><span class="port-value">7 rows</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div>
+              <div class="actions"><button aria-label="Move Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg></button><button aria-label="Inspect Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></button><button aria-label="Rename or describe Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg></button><button aria-label="Delete Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></div>
+            </article>
+            <p class="caption"><strong>Peek</strong> stays in the header. Dismiss does not deselect, open the inspector, or change simulation mode.</p>
+          </div>
+          <p class="caption">The eye's tooltip is "Show data peek". No hidden double-click gesture is required.</p>
+        </div>
+        <div class="stack">
+          <div class="eyebrow">Phone-width browser / 390px</div>
+          <div class="phone canvas">
+            <div class="phone-top"><div><small>Flows / Canvas</small><h3>Data Flow</h3></div><button class="icon-button quiet" aria-label="Close phone canvas illustration"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+            <div class="phone-graph" aria-hidden="true"><article class="block selected"><header class="block-head no-peek"><div class="block-title"><span class="block-icon"><svg class="icon"><use href="#i-rows"/></svg></span><span><strong>Shopping list</strong><small>Rows</small></span></div></header><div class="port output"><span>Result</span><span class="port-value">7 rows</span></div></article></div>
+            <div class="phone-shade"></div>
+            <div class="phone-sheet" role="group" aria-label="Illustration of the modal data peek bottom sheet">
+              <div class="sheet-handle" aria-hidden="true"></div>
+              <header class="panel-head"><div><h3>Shopping list</h3><small>Rows / Data peek</small></div><button class="icon-button quiet" aria-label="Close data peek for Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
+              <div class="panel-body">
+                <div class="peek-group"><div class="peek-label"><strong>Inputs / observed item</strong><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><dl class="kv"><dt>Row Id</dt><dd>grocery-milk</dd><dt>Row Title</dt><dd>Milk</dd><dt>Subtitle</dt><dd>Dairy - 2 litres</dd></dl></div>
+                <div class="peek-group"><div class="peek-label"><strong>Result / 7 rows</strong><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><ol class="sample-rows"><li><span class="row-number">1</span><div><strong>Milk</strong><small>Dairy - 2 litres</small></div></li><li><span class="row-number">2</span><div><strong>Eggs</strong><small>Dairy - 12 eggs</small></div></li><li><span class="row-number">3</span><div><strong>Bread</strong><small>Bakery - wholemeal</small></div></li></ol></div>
+              </div>
+              <div class="peek-foot"><span>+4 more rows</span><a class="button" href="#m3">Compare in full<svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></a></div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-notes">
+          <div><h3>Same information. A different container.</h3><p>Below 600px, use the existing modal-sheet primitive. Keep the title, explicit Close, source badges, and sticky comparison action. Respect the bottom safe area.</p></div>
+          <div><h3>One sheet at a time</h3><p>Compare replaces the peek sheet. Closing comparison returns to the peek and its originating action, rather than stacking two focus traps.</p></div>
+          <div><h3>Missing is not empty</h3><p>An absent host observation says "Not observed". An observed empty list says "0 rows". Neither becomes sample groceries.</p></div>
+          <div class="note"><p>This 390px frame is browser geometry only. It does not validate native presentation, ActivityKit, APNs, or unchanged iOS rendering.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="m3" aria-labelledby="m3-title">
+      <header class="section-heading"><span class="section-id">M3</span><div><h2 id="m3-title">Compare in full, without decoding a payload</h2><p>Inputs stay on the left. The result uses real column headings, an honest row count, and local search/filter. Raw JSON is off by default; its disclosure below is interactive.</p></div></header>
+      <div class="surface canvas modal-stage">
+        <div class="compare" role="group" aria-label="Illustration of Compare in full modal">
+          <header class="panel-head"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-rows"/></svg></span><div><h3>Shopping list <span class="muted">/ Compare in full</span></h3><small>Rows - captured illustrative observation, not a running service</small></div><button class="icon-button quiet" aria-label="Close comparison and return to data peek"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></header>
+          <div class="compare-toolbar">
+            <label class="search">Search result rows<svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><input id="row-search" type="search" placeholder="Search any displayed field" aria-controls="result-rows"></label>
+            <label class="filter">Search in<select id="row-filter" aria-controls="result-rows"><option value="all">All columns</option><option value="0">Row Id</option><option value="1">Row Title</option><option value="2">Subtitle</option></select></label>
+            <output class="compare-count" id="row-count" aria-live="polite">7 of 7 rows</output>
+          </div>
+          <div class="compare-columns">
+            <section class="compare-inputs" aria-labelledby="compare-input-title"><div class="row between"><h3 id="compare-input-title">Inputs</h3><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div><p class="caption">Observed item</p><dl class="kv"><dt>Row Id</dt><dd>grocery-milk</dd><dt>Row Title</dt><dd>Milk</dd><dt>Subtitle</dt><dd>Dairy - 2 litres</dd></dl><div class="note"><small>One observed item, not an invented input history for all seven rows.</small></div><p class="caption">Flow context<br><strong>Service Response</strong> / todo.demo_groceries<br><strong>Choose Entry</strong> / Key: todo.demo_groceries</p></section>
+            <section class="compare-result" aria-labelledby="compare-result-title"><div class="row between"><h3 id="compare-result-title">Result <span class="muted">/ 7 rows</span></h3><span class="pill scenario"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>Scenario</span></div>
+              <div class="table-scroll"><table><caption class="sr">Shopping list result. Seven observed rows with identifiers, titles, and subtitles.</caption><thead><tr><th scope="col">Row Id</th><th scope="col">Row Title</th><th scope="col">Subtitle</th></tr></thead><tbody id="result-rows">
+                <tr><td>grocery-milk</td><td>Milk</td><td>Dairy - 2 litres</td></tr>
+                <tr><td>grocery-eggs</td><td>Eggs</td><td>Dairy - 12 eggs</td></tr>
+                <tr><td>grocery-bread</td><td>Bread</td><td>Bakery - wholemeal</td></tr>
+                <tr><td>grocery-apples</td><td>Apples</td><td>Produce - 6 apples</td></tr>
+                <tr><td>grocery-rice</td><td>Rice</td><td>Pantry - 1 kg</td></tr>
+                <tr><td>grocery-coffee</td><td>Coffee</td><td>Pantry - ground</td></tr>
+                <tr><td>grocery-soap</td><td>Dish soap</td><td>Household - refill</td></tr>
+              </tbody></table><p class="empty-search" id="empty-search" hidden>No matching rows. Change or clear the search.</p></div>
+            </section>
+          </div>
+          <details class="raw"><summary>Raw JSON <span class="raw-off badge">Off</span><span class="raw-on badge">On</span></summary><p class="caption">Original observed values. Search changes the formatted table, not this captured payload. Still read-only.</p><div class="raw-columns"><div><h4>Inputs</h4><pre>{
+  "Row Id": "grocery-milk",
+  "Row Title": "Milk",
+  "Subtitle": "Dairy - 2 litres"
+}</pre></div><div><h4>Result</h4><pre>[
+  { "id": "grocery-milk", "title": "Milk", "subtitle": "Dairy - 2 litres" },
+  { "id": "grocery-eggs", "title": "Eggs", "subtitle": "Dairy - 12 eggs" },
+  { "id": "grocery-bread", "title": "Bread", "subtitle": "Bakery - wholemeal" },
+  { "id": "grocery-apples", "title": "Apples", "subtitle": "Produce - 6 apples" },
+  { "id": "grocery-rice", "title": "Rice", "subtitle": "Pantry - 1 kg" },
+  { "id": "grocery-coffee", "title": "Coffee", "subtitle": "Pantry - ground" },
+  { "id": "grocery-soap", "title": "Dish soap", "subtitle": "Household - refill" }
+]</pre></div></div></details>
+          <footer class="compare-foot"><span>Read-only. No Save, Publish, or Run service action.</span><span><kbd>Esc</kbd> returns to the data peek</span></footer>
+        </div>
+      </div>
+      <p class="caption">Static modal illustration, not a page-wide focus trap. In the product: Base UI Dialog; initial focus on the title, then search. Large collections scroll inside the table; inputs never disappear behind it.</p>
+    </section>
+
+    <section class="section" id="m4" aria-labelledby="m4-title">
+      <header class="section-heading"><span class="section-id">M4</span><div><h2 id="m4-title">Port hover explains the value, not its serialization</h2><p>The same formatter supplies port text, tooltip content, peek content, and accessible names. Socket type still comes from the graph descriptor, not this sample.</p></div></header>
+      <div class="m4-grid">
+        <div class="surface canvas tooltip-stage">
+          <article class="block"><header class="block-head no-peek"><div class="block-title"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span><strong>Choose Entry</strong></span></div></header><div class="port input entity-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span><span class="port-name">Key</span><span class="port-value">todo.demo_groceries</span></div><div class="port output record-wire" tabindex="0" aria-label="Choose Entry, Result output, record, pinned, Items: 7 items, Milk, Eggs, Bread, plus 4 more" aria-describedby="port-tooltip"><span class="port-name">Result</span><span class="port-value">Items: 7 items</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div></article>
+          <div class="tooltip" role="tooltip" id="port-tooltip"><div class="row between"><strong>Choose Entry / Result</strong><span class="badge">Record</span></div><p><strong>Items:</strong> 7 items</p><p class="muted">Milk, Eggs, Bread<br>+4 more items</p><div class="source-line"><span class="pill pinned"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>Pinned</span></div></div>
+        </div>
+        <div class="m4-aside">
+          <div class="surface"><div class="eyebrow">Today</div><p class="caption">Serialized object text gets clipped, even when the answer is simply a grocery list.</p></div>
+          <div class="surface"><div class="eyebrow">Proposed</div><p class="caption"><strong>Readable fields + count + item titles.</strong> Hover or keyboard focus reveals the same summary. No controls inside the tooltip; use the block peek to compare.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="m5" aria-labelledby="m5-title">
+      <header class="section-heading"><span class="section-id">M5</span><div><h2 id="m5-title">Compact controls. Complete blocks.</h2><p>The selected row fits the existing block width. All actions keep accessible names and hover/focus labels. Measured canvas bounds include the root, sockets, and focus ring.</p></div></header>
+      <div class="m5-grid">
+        <div class="surface canvas width-demo"><div class="ruler">190px / minimum</div><article class="block selected" style="width:190px"><header class="block-head"><button class="block-title" aria-label="Select Flow, root output"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><span><strong>Flow</strong><small>Root output</small></span></button><button class="icon-button quiet" aria-label="Show data peek for Flow"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header><div class="port input record-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span><span class="port-name">Inputs</span></div><div class="port output record-wire"><span class="port-name">Result</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div><div class="actions"><button aria-label="Move Flow" title="Move Flow"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg></button><button aria-label="Inspect Flow" title="Inspect Flow"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></button><button aria-label="Rename or describe Flow" title="Rename or describe Flow"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg></button><button aria-label="Delete Flow" title="Delete Flow"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></div></article><p class="caption">4 equal-width cells.<br>No "Move / Inspect" text competing for space.</p></div>
+        <div class="surface canvas width-demo"><div class="ruler">220px / roomy</div><article class="block selected" style="width:220px"><header class="block-head"><button class="block-title" aria-label="Select Shopping list for the weekly shop, Rows"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-rows"/></svg></span><span><strong>Shopping list for the weekly shop</strong><small>Rows</small></span></button><button class="icon-button quiet" aria-label="Show data peek for Shopping list for the weekly shop"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header><p class="block-note clamp">Groceries with a useful title and subtitle, ready for the household shopping screen.</p><div class="port output record-wire"><span class="port-name">Result</span><span class="port-value">7 rows</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div><div class="actions"><button aria-label="Move Shopping list for the weekly shop" title="Move Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg></button><button aria-label="Inspect Shopping list for the weekly shop" title="Inspect Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></button><button aria-label="Rename or describe Shopping list for the weekly shop" title="Rename or describe"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg></button><button aria-label="Delete Shopping list for the weekly shop" title="Delete Shopping list"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></div></article><p class="caption">Long labels ellipsize.<br>Controls and generated name never get pushed out.</p></div>
+        <div class="surface canvas edge-stage"><div class="edge-wire" aria-hidden="true"></div><div class="edge-gutter" aria-hidden="true"></div><article class="block selected"><header class="block-head"><button class="block-title" aria-label="Select Flow, root output"><span class="block-icon"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><span><strong>Flow</strong><small>Root output</small></span></button><button class="icon-button quiet" aria-label="Show data peek for root Flow"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button></header><div class="port input record-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span><span class="port-name">Request</span></div><div class="port input record-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span><span class="port-name">Steps 0</span></div><div class="port input record-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span><span class="port-name">Steps 1</span></div><div class="port input record-wire"><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span><span class="port-name">Output</span></div><div class="port output record-wire"><span class="port-name">Result</span><span class="port-value">7 rows</span><span class="socket"><svg class="icon" aria-hidden="true"><use href="#i-braces"/></svg></span></div><div class="actions"><button aria-label="Move root Flow"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg></button><button aria-label="Inspect root Flow"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></button><button aria-label="Rename or describe root Flow"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg></button><button aria-label="Delete root Flow"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></div></article><p class="caption"><strong>At least 32px breathing room</strong> beyond the outer socket/focus bounds. Fit all respects the current canvas viewport, not the width hidden behind Preview.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="m6" aria-labelledby="m6-title">
+      <header class="section-heading"><span class="section-id">M6</span><div><h2 id="m6-title">Preview is available, not compulsory</h2><p>Same HA window, same 70% graph zoom, no block selected. The expanded pane is the existing 310px; the collapsed rail is 44px. The canvas reclaims 266px.</p></div></header>
+      <div class="session-label"><span class="pill">Expanded / 310px</span><small>Collapse control belongs to the session, not the selection.</small></div>
+      <div class="surface session" data-session="expanded"></div>
+      <div class="session-label"><span class="pill">Collapsed / 44px</span><small>Labelled Preview toggle stays visible with nothing selected.</small></div>
+      <div class="surface session collapsed" data-session="collapsed"></div>
+      <p class="caption">Both toggles work locally in this mockup. Production remembers the choice per browser; this review file does not write localStorage. Collapsing the pane must not stop observation updates or remove conflict/warning notices.</p>
+    </section>
+
+    <section class="section" id="m7" aria-labelledby="m7-title">
+      <header class="section-heading"><span class="section-id">M7</span><div><h2 id="m7-title">Tidy Up follows the data, not the insertion order</h2><p>The owner's grocery-flow block family, before and after a layered arrangement. Only positions change: the target, Choose Entry key, Service Response, Rows fields, and root connections stay the same.</p></div></header>
+      <div class="session-label"><span class="pill">Before / tangled schematic</span><small>Source: owner's canvas screenshot; cropped lower operands completed illustratively.</small></div>
+      <figure class="surface canvas graph-scroll"><svg class="graph-image" id="graph-before" viewBox="0 0 1280 700" role="img" aria-label="Before Tidy Up: grocery flow with crossing paths between steps and crossing Row Id and Row Title wires"></svg></figure>
+      <div class="graph-summary"><span>Competing vertical orders send wires across one another.</span><span>No runtime crossing count is claimed by this illustration.</span></div>
+      <div class="session-label"><span class="pill">After / layered target</span><small>Left to right, then port-order-aware vertical placement.</small></div>
+      <figure class="surface canvas graph-scroll"><svg class="graph-image" id="graph-after" viewBox="0 0 1280 700" role="img" aria-label="After Tidy Up: same grocery flow with separated request, steps, and row-field lanes and no crossing wires"></svg></figure>
+      <div class="graph-summary"><span class="good">Illustrated target: no wire crossings. All root ports remain visible.</span><span>Tidy Up is one undoable position change.</span></div>
+      <div class="note"><p><strong>Not a promise that every graph is planar.</strong> If a candidate is worse, keep the better layout and say: "Kept the current layout because Tidy Up would add crossings." Never rewire, reorder steps, or rewrite annotations to make the drawing look better.</p></div>
+    </section>
+    <p class="footer-note">Design states, not shipped behavior. Interactive here: M2 peek dismissal/reopen, M3 search/filter and Raw JSON disclosure, M6 Preview collapse/expand. Compare links jump to the M3 illustration. Other controls illustrate the proposed product interaction. No external assets, network access, persistence, or device services.</p>
+  </main>
+  <script>
+    const icon = (id, className = "icon") => {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", className); svg.setAttribute("aria-hidden", "true");
+      const use = document.createElementNS(svg.namespaceURI, "use");
+      use.setAttribute("href", `#i-${id}`); svg.append(use); return svg;
+    };
+    document.querySelectorAll("[data-close-peek]").forEach(btn => btn.addEventListener("click", () => {
+      const id = btn.dataset.closePeek;
+      document.getElementById(id).hidden = true;
+      const trigger = document.querySelector(`[aria-controls="${id}"]`);
+      trigger.setAttribute("aria-expanded", "false"); trigger.focus();
+    }));
+    document.querySelectorAll("[data-open-peek]").forEach(btn => btn.addEventListener("click", () => {
+      const id = btn.dataset.openPeek;
+      const peek = document.getElementById(id); peek.hidden = false;
+      document.querySelector(`[aria-controls="${id}"]`).setAttribute("aria-expanded", "true");
+      peek.querySelector("[data-close-peek]").focus();
+    }));
+    document.querySelectorAll(".peek").forEach(peek => peek.addEventListener("keydown", ev => {
+      if (ev.key === "Escape") { ev.preventDefault(); peek.querySelector("[data-close-peek]").click(); }
+    }));
+    const search = document.getElementById("row-search"), filter = document.getElementById("row-filter");
+    const rows = [...document.querySelectorAll("#result-rows tr")];
+    function filterRows() {
+      const query = search.value.trim().toLocaleLowerCase();
+      let shown = 0;
+      for (const row of rows) {
+        const text = filter.value === "all" ? row.textContent : row.cells[Number(filter.value)].textContent;
+        row.hidden = !text.toLocaleLowerCase().includes(query);
+        if (!row.hidden) shown++;
+      }
+      document.getElementById("row-count").textContent = `${shown} of ${rows.length} rows`;
+      document.getElementById("empty-search").hidden = shown !== 0;
+    }
+    search.addEventListener("input", filterRows); filter.addEventListener("change", filterRows);
+
+    const NS = "http://www.w3.org/2000/svg";
+    function svgEl(tag, attributes = {}, text) {
+      const element = document.createElementNS(NS, tag);
+      for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+      if (text !== undefined) element.textContent = text;
+      return element;
+    }
+    const nodes = [
+      { id: "target", title: "Text", icon: "type", ports: [["Result", "output", "entity", "todo.demo_groceries"]] },
+      { id: "service", title: "Service Response", icon: "download", ports: [["Target Entity_id", "input", "entity"], ["Result", "output", "record"]] },
+      { id: "key", title: "Text", icon: "type", ports: [["Result", "output", "entity", "todo.demo_groceries"]] },
+      { id: "choose", title: "Choose Entry", icon: "tag", ports: [["Key", "input", "entity"], ["Result", "output", "record"]] },
+      { id: "into", title: "Go Into", icon: "into", ports: [["Result", "output", "record"]] },
+      { id: "id", title: "This Item", icon: "blocks", detail: "Row Id / uid", ports: [["Result", "output", "text"]] },
+      { id: "title", title: "This Item", icon: "blocks", detail: "Row Title / summary", ports: [["Result", "output", "text"]] },
+      { id: "subtitle", title: "This Item", icon: "blocks", detail: "Subtitle / description", ports: [["Result", "output", "text"]] },
+      { id: "rows", title: "Rows", icon: "rows", ports: [["Row Id", "input", "text"], ["Row Title", "input", "text"], ["Subtitle", "input", "text"], ["Result", "output", "record"]] },
+      { id: "flow", title: "Flow", icon: "check", root: true, ports: [["Request", "input", "record"], ["Steps 0", "input", "record"], ["Steps 1", "input", "record"], ["Output", "input", "record"], ["Result", "output", "record"]] }
+    ];
+    const after = { target: [34, 30], service: [344, 30], key: [34, 180], choose: [344, 180], into: [654, 330], id: [34, 342], title: [34, 454], subtitle: [34, 566], rows: [654, 492], flow: [1044, 30] };
+    const before = { ...after, choose: [344, 230], into: [34, 330], id: [34, 566], title: [34, 454], subtitle: [344, 566], rows: [654, 430] };
+    const edges = [["target", 0, "service", 0], ["service", 1, "flow", 0], ["key", 0, "choose", 0], ["choose", 1, "flow", 1], ["into", 0, "flow", 2], ["id", 0, "rows", 0], ["title", 0, "rows", 1], ["subtitle", 0, "rows", 2], ["rows", 3, "flow", 3]];
+    function drawGraph(svg, positions) {
+      const byId = new Map(nodes.map(node => [node.id, node]));
+      const head = node => node.detail ? 52 : 40;
+      const socketY = (node, index) => positions[node.id][1] + head(node) + 16 + index * 32;
+      for (const [fromId, fromPort, toId, toPort] of edges) {
+        const from = byId.get(fromId), to = byId.get(toId);
+        const x1 = positions[fromId][0] + 190, x2 = positions[toId][0];
+        const y1 = socketY(from, fromPort), y2 = socketY(to, toPort);
+        const bend = Math.max(48, (x2 - x1) / 2);
+        svg.append(svgEl("path", { class: "wire-path", stroke: from.ports[fromPort][2] === "text" ? "var(--chart-2)" : "var(--chart-6)", d: `M${x1} ${y1} C${x1 + bend} ${y1},${x2 - bend} ${y2},${x2} ${y2}` }));
+      }
+      for (const node of nodes) {
+        const [x, y] = positions[node.id], height = head(node) + 32 * node.ports.length;
+        const group = svgEl("g");
+        group.append(svgEl("rect", { x, y, width: 190, height, rx: 11, class: "node-ground" }));
+        const blockIcon = svgEl("use", { href: `#i-${node.icon}`, x: x + 10, y: y + 11, width: 18, height: 18, class: `graph-icon${node.detail ? " type-text" : ""}` });
+        group.append(blockIcon, svgEl("text", { x: x + 38, y: y + 25, class: "node-label" }, node.title));
+        if (node.root) group.append(svgEl("text", { x: x + 139, y: y + 25, class: "detail-label" }, "Output"));
+        if (node.detail) group.append(svgEl("text", { x: x + 10, y: y + 43, class: "detail-label" }, node.detail));
+        node.ports.forEach(([label, direction, kind, value], index) => {
+          const cy = socketY(node, index), cx = x + (direction === "input" ? 0 : 190);
+          group.append(svgEl("line", { x1: x, x2: x + 190, y1: cy - 16, y2: cy - 16, class: "node-line" }));
+          group.append(svgEl("text", { x: x + 12, y: cy + 4, class: "port-label" }, label));
+          if (value) group.append(svgEl("text", { x: x + 82, y: cy + 4, class: "detail-label" }, value));
+          group.append(svgEl("rect", { x: cx - 8, y: cy - 8, width: 16, height: 16, rx: 2, class: "socket-ground" }));
+          if (kind === "text") group.append(svgEl("rect", { x: cx - 6, y: cy - 6, width: 12, height: 12, rx: 1, fill: "none", stroke: "var(--chart-2)" }));
+          group.append(svgEl("use", { href: `#i-${kind === "entity" ? "tag" : kind === "text" ? "type" : "braces"}`, x: cx - (kind === "text" ? 5 : 8), y: cy - (kind === "text" ? 5 : 8), width: kind === "text" ? 10 : 16, height: kind === "text" ? 10 : 16, class: `graph-icon${kind === "text" ? " type-text" : ""}` }));
+        });
+        svg.append(group);
+      }
+    }
+    drawGraph(document.getElementById("graph-before"), before);
+    drawGraph(document.getElementById("graph-after"), after);
+    function el(tag, className, text) {
+      const element = document.createElement(tag); if (className) element.className = className; if (text) element.textContent = text; return element;
+    }
+    function button(label, iconName, text, className = "") {
+      const result = el("button", className); result.setAttribute("aria-label", label);
+      if (iconName) result.append(icon(iconName));
+      if (text) result.append(el("span", "label", text));
+      return result;
+    }
+    document.querySelectorAll("[data-session]").forEach((session, index) => {
+      const rail = el("div", "ha-rail"); rail.setAttribute("aria-hidden", "true"); ["home", "list", "blocks", "sliders"].forEach(name => rail.append(icon(name)));
+      const main = el("div", "session-main"), header = el("div", "session-header"), title = el("div");
+      title.append(el("small", "", "Flows / Canvas"), el("h3", "", "Data Flow"));
+      header.append(title, el("small", "", "Configuration only - No device actions"), button("Close canvas illustration", "x", null, "icon-button quiet"));
+      const toolbar = el("div", "session-toolbar"), segment = el("div", "segment");
+      segment.append(button("Graph", "branch", "Graph"), button("Outline", "list", "Outline"));
+      toolbar.append(segment, button("Add Block", "plus", "Add Block"), button("Inspector", "sliders", "Inspector"), button("More canvas controls", "more", null, "icon-button more"));
+      const board = el("div", "session-canvas canvas"), svg = svgEl("svg", { viewBox: "0 0 1280 700", class: "graph-image", role: "img", "aria-label": "Unselected grocery flow graph at 70 percent zoom" });
+      drawGraph(svg, after); board.append(svg);
+      const nav = el("div", "navigation");
+      nav.append(button("Zoom out", "minus"), el("output", "", "70%"), button("Zoom in", "plus"), button("Tidy Up", "wand", "Tidy Up"), button("Canvas problems", "check", "No Problems"));
+      board.append(nav);
+      const footer = el("div", "session-status"), status = el("div", "row");
+      status.append(icon("info"), el("span", "", "No block selected - design sample"));
+      const footerButtons = el("div", "row"); footerButtons.append(button("Save draft", null, "Save draft"), button("Apply to draft", null, "Apply to draft", "primary"));
+      footer.append(status, footerButtons); main.append(header, toolbar, board, footer);
+      const expanded = el("aside", "preview-expanded"); expanded.id = `preview-pane-${index}`; expanded.setAttribute("aria-label", "Canvas Preview");
+      const previewHead = el("div", "row between"), collapse = button("Collapse Preview", "panel", null, "icon-button");
+      collapse.setAttribute("aria-expanded", "true"); collapse.setAttribute("aria-controls", expanded.id);
+      previewHead.append(el("h3", "", "Preview"), collapse);
+      const lensLabel = el("label", "", "Preview lens"), select = el("select");
+      ["Just the Values", "Stand-in"].forEach(name => select.append(el("option", "", name))); lensLabel.append(select);
+      const value = el("div", "preview-value");
+      value.append(el("small", "", "Result / Flow"), el("strong", "", "7 rows"), el("small", "", "Milk, Eggs, Bread +4 more"), el("small", "", "Illustrative observation"));
+      const simulation = el("details"); simulation.append(el("summary", "", "Simulation - Studio only"), el("p", "caption", "Live is the default. Pins and scenarios are local simulation data, not published configuration."));
+      expanded.append(previewHead, lensLabel, el("p", "muted", "Typed outputs. No component is required."), value, simulation);
+      const collapsed = el("aside", "preview-rail"), expand = button("Expand Preview", "panel", "Preview");
+      expand.setAttribute("aria-expanded", "false"); expand.setAttribute("aria-controls", expanded.id); collapsed.append(expand);
+      const setCollapsed = value => { session.classList.toggle("collapsed", value); expanded.hidden = value; collapsed.hidden = !value; };
+      collapse.addEventListener("click", () => { setCollapsed(true); expand.focus(); });
+      expand.addEventListener("click", () => { setCollapsed(false); collapse.focus(); });
+      session.append(rail, main, expanded, collapsed); setCollapsed(session.dataset.session === "collapsed");
+    });
+  </script>
+</body>
+</html>

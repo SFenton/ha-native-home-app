@@ -3,6 +3,7 @@ import { assertJsonBounds, DocumentValidationError, entityIdSchema, jsonSchema }
 import { nativeClimateRoomEntities } from '../src/shared/native-entities';
 import { nativeTodoItemSchema, nativeTodoReadSchema, choreRecord, choreRecords } from '../src/shared/native-chores';
 import type { NativeCurrentUser, NativeForecast, NativeSnapshot, NativeState } from '../src/shared/native-state';
+import { isNativeTimeZone } from '../src/shared/native-state';
 import type { Json } from '../src/shared/types';
 import { HttpError } from './store';
 
@@ -348,9 +349,9 @@ export function houseConfigReferences(houseConfig: Pick<NativeHouseConfig, 'conf
 
 /**
  * Projects one Home Assistant state object (`{ entity_id, state, attributes }`, as REST or the entity stream gives it) to the
- * fields the app reads. Throws a 502 `HttpError` for a malformed or out-of-bounds state.
+ * fields the app reads, plus explicitly wanted attributes for the Studio's live preview. Throws a 502 `HttpError` for a malformed or out-of-bounds state.
  */
-export function projectNativeState(raw: unknown): NativeEntityState {
+export function projectNativeState(raw: unknown, wantedAttributes?: ReadonlySet<string>): NativeEntityState {
   if (!isRecord(raw) || typeof raw.entity_id !== 'string') throw new HttpError(502, 'Invalid Home Assistant state record');
   if (!isRecord(raw.attributes)) throw new HttpError(502, 'Invalid Home Assistant state attributes');
   const attributes = raw.attributes;
@@ -409,7 +410,60 @@ export function projectNativeState(raw: unknown): NativeEntityState {
   if (domain === 'weather' && projected.unit === undefined) projectFields(projected, attributes, { temperature_unit: 'unit' });
   const parsed = stateSchema.safeParse(projected);
   if (!parsed.success) throw new HttpError(502, 'Invalid projected Home Assistant state');
-  return parsed.data;
+  const extra = wantedAttributes && projectNativeAttributes(attributes, wantedAttributes);
+  return extra ? { ...parsed.data, attributes: extra } : parsed.data;
+}
+
+const sensitiveAttributeName = /token|secret|password|passwd|credential|apikey|webhook|bearer|session|cookie|signature|privatekey|pushurl|(?:auth|authorization|sig)$/;
+const plainAttributeText = /^[\x20-\x7e\p{L}\p{N}\p{Zs}\u2010-\u2015\u2018-\u201f\u2026]*$/u;
+const refusedAttributeText = /\/\/|[?%=@{\[\\\p{Cc}\p{Cf}\uFF00-\uFFEF]|[\p{L}\p{N}+/_-]{24}/u;
+type PlainAttributeScalar = string | number | boolean | null;
+
+/** Custom live attributes only; native-house metadata follows its existing validation. */
+export function isForwardedAttributeName(name: string): boolean {
+  return name.length >= 1 && name.length <= 64 && !/[^a-z0-9_]/.test(name)
+    && name !== 'entity_picture' && !sensitiveAttributeName.test(name.replace(/_/g, ''));
+}
+
+function isPlainAttributeScalar(value: unknown): value is PlainAttributeScalar {
+  if (value === null || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value) && Math.abs(value) <= 1e15;
+  return typeof value === 'string' && value.length <= 256 && value.normalize('NFKC') === value && plainAttributeText.test(value)
+    && !refusedAttributeText.test(value) && !/^data:|\bbearer\b/i.test(value.trimStart());
+}
+
+function isPlainAttributeValue(value: unknown): value is PlainAttributeScalar | PlainAttributeScalar[] {
+  if (!Array.isArray(value)) return isPlainAttributeScalar(value);
+  if (value.length > 32) return false;
+  for (const item of value) if (!isPlainAttributeScalar(item)) return false;
+  return true;
+}
+
+function canonicalCredentialText(value: string): string {
+  return value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/** Extra attributes never become native fields; only small plain values without configured-credential fragments are forwarded. */
+export function projectNativeAttributes(attributes: Readonly<Record<string, unknown>>, wanted: ReadonlySet<string>, credentials: readonly string[] = []): Record<string, Json> | undefined {
+  const credentialFragments = credentials.filter(credential => credential.length >= 8).flatMap(credential => {
+    const canonical = canonicalCredentialText(credential);
+    // A credential with few or no letters and digits (all punctuation) has no meaningful fragments: matching an empty or tiny fragment
+    // would drop every attribute. Such a credential is still removed verbatim by the live session's exact scrubber.
+    if (canonical.length < 6) return [];
+    const length = Math.min(12, canonical.length);
+    return Array.from({ length: canonical.length - length + 1 }, (_, start) => canonical.slice(start, start + length));
+  });
+  const extra: [string, Json][] = [];
+  for (const name of wanted) {
+    if (!isForwardedAttributeName(name) || !Object.hasOwn(attributes, name)) continue;
+    const raw = attributes[name];
+    if (!isPlainAttributeValue(raw)) continue;
+    const joined = canonicalCredentialText((Array.isArray(raw) ? raw : [raw])
+      .filter(item => typeof item === 'string' || typeof item === 'number').join(''));
+    if (credentialFragments.some(fragment => joined.includes(fragment))) continue;
+    extra.push([name, raw]);
+  }
+  return extra.length ? Object.fromEntries(extra) : undefined;
 }
 
 /**
@@ -463,6 +517,7 @@ function projectFields(target: Record<string, unknown>, source: Record<string, u
 }
 
 function validateSnapshot(snapshot: NativeSnapshot, credentials: string[]): NativeSnapshot {
+  if (snapshot.timeZone !== undefined && !isNativeTimeZone(snapshot.timeZone)) throw new HttpError(502, 'Invalid native home time zone');
   inspectConfig(snapshot.states, new Set());
   if (snapshot.currentUser) inspectConfig(snapshot.currentUser, new Set());
   try { assertJsonBounds(snapshot); }
@@ -541,6 +596,7 @@ export async function readNativeSnapshot(
   readStates: () => Promise<unknown>,
   /** Todo lists the draft names (`draftTodoIds`), read in addition to the chores pages' lists; the cap of 64 covers both. */
   extraTodoIds: ReadonlySet<string> = new Set(),
+  readTimeZone?: () => Promise<string | undefined>,
 ): Promise<NativeSnapshot> {
   if (signal.aborted) throw nativeHomeAbortError(signal);
   const session = new NativeReadSession(url, token, signal);
@@ -556,11 +612,13 @@ export async function readNativeSnapshot(
   };
   try {
     const houseConfig = await session.houseConfig();
-    const [rawStates, rawUser] = await Promise.all([
+    const [rawStates, rawUser, timeZone] = await Promise.all([
       readStates(),
       optional(async () => ({ value: await session.currentUser() }), 'Current user read unavailable'),
+      readTimeZone ? optional(readTimeZone, 'House time zone read unavailable; times use the browser time zone') : undefined,
     ]);
     const snapshot = nativeHomeSnapshot(houseConfig, rawStates, credentials, extraTodoIds);
+    if (isNativeTimeZone(timeZone)) snapshot.timeZone = timeZone;
     if (rawUser !== undefined) {
       snapshot.currentUser = await optional(async () => currentUser(rawUser.value, rawStates, credentials), 'Current user response was invalid or unsafe');
       if (!snapshot.currentUser) delete snapshot.currentUser;

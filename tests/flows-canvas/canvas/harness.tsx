@@ -13,6 +13,7 @@ import { observationFixture } from './observation-fixture';
 import { largeGraphFlow } from '../graph/fixtures/large-flow';
 import { indexGraph } from '../../../src/workspace2/canvas/graph-index';
 import { portLabel } from '../../../src/workspace2/canvas/blocks';
+import { groceryGraph, groceryObservations } from './grocery-fixture';
 
 const params = new URLSearchParams(location.search);
 const fixture = params.get('fixture');
@@ -43,6 +44,7 @@ function Harness() {
   }, false) : followed;
   const [closed, setClosed] = useState(false), [writes, setWrites] = useState(0);
   const graph = useMemo(() => {
+    if (fixture === 'w3') return groceryGraph();
     const graph = arrangeCanvas(lift(ast, { kind: fixture === 'large' ? 'flow' : fixture === 'summary' ? 'condition' : 'operand', anchor }).graph);
     return fixture !== 'warm' && fixture !== 'observations' ? graph : { ...graph, nodes: graph.nodes.map(node => {
       const position = warmPositions[node.origins[0]];
@@ -65,6 +67,7 @@ function Harness() {
       snapshot: () => snapshot, open: () => {}, openOutput: () => {}, compareConflict: () => {}, uses: () => [], preview: () => {},
       data: { sources: [{ id: 'light', name: 'Hallway Light' }] }, targetCapabilities: [...new Set([...supportedCompositionCapabilities, ...blockCatalog.flatMap(entry => entry.capabilities)])],
       ...(fixture === 'observations' ? { observations: observationFixture(graph) } : {}),
+      ...(fixture === 'w3' ? { observations: groceryObservations(graph) } : {}),
       apply: async transaction => {
         if (params.get('conflict')) return { status: 'conflict', remote: { document: ast, revision: 'remote-2' } };
         snapshot = { document: transaction.replacements[0].ast, revision: String(Number(snapshot.revision) + 1) };
@@ -75,6 +78,6 @@ function Harness() {
   }, []);
   if (closed) return <p>Canvas closed. Draft writes: {writes}</p>;
   return <>{lookup && <output hidden aria-label="Large canvas lookup performance" data-milliseconds={lookup.milliseconds} data-ports={lookup.ports} data-nodes={graph.nodes.length}/>}
-    <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'large' ? 'Large graph: 2,341 blocks' : fixture === 'summary' ? 'Hallway Light' : fixture === 'observations' ? 'Too Warm Warning (observation fixture)' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={[fixture === 'summary' ? 'Visible When' : 'Subtitle']} onClose={() => setClosed(true)}/></>;
+    <FlowCanvas host={host} graph={graph} theme={theme} title={fixture === 'w3' ? 'Grocery rows (host-observation fixture)' : fixture === 'large' ? 'Large graph: 2,341 blocks' : fixture === 'summary' ? 'Hallway Light' : fixture === 'observations' ? 'Too Warm Warning (observation fixture)' : fixture === 'warm' ? 'Too Warm Warning' : 'Temperature Offset'} outputNames={[fixture === 'summary' ? 'Visible When' : 'Subtitle']} onClose={() => setClosed(true)}/></>;
 }
 createRoot(document.getElementById('root')!).render(<Harness/>);

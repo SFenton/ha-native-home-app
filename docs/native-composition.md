@@ -31,6 +31,16 @@ upgraded.
 
 ## Integrated runtime boundary
 
+Studio's read-only `GET /api/native-home` snapshot optionally carries top-level
+`timeZone`, the validated IANA name from Home Assistant's core `GET /api/config`.
+The server caches only that field and refreshes it after reconnect; no other core
+configuration is forwarded. Live canvas values use it with the house simulation
+clock, including historical DST offsets. When absent (including unconfigured or
+sample mode), Studio uses the browser zone and says "Times shown in this browser's
+time zone". Frozen scenarios retain their captured wall time and offset. This
+optional Studio-only snapshot field changes neither the published composition
+grammar nor the native app contract.
+
 Sections, local tabs (including initially hidden panels), status rails and room
 sections participate in the same recursive validation, navigation reachability
 and pending-control retention as grids. Recursive container compilation is kept

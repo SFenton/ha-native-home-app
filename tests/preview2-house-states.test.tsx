@@ -21,6 +21,20 @@ beforeEach(() => { vi.resetAllMocks(); vi.mocked(request).mockResolvedValue(snap
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe('useHouseStates', () => {
+  it('exposes the snapshot zone on both houses, retains it across streams and removes it when absent', async () => {
+    vi.mocked(request).mockResolvedValue({ ...snapshot('off'), timeZone: 'America/Los_Angeles' });
+    const { result } = renderHook(() => useHouseStates(document));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.house.timeZone).toBe('America/Los_Angeles');
+    expect(result.current.live.timeZone).toBe('America/Los_Angeles');
+    expect(result.current.live.house.timeZone).toBe('America/Los_Angeles');
+    act(() => result.current.live.applyStream([{ entityId: toggle, state: 'on', name: 'Guest' }]));
+    expect(result.current.live.timeZone).toBe('America/Los_Angeles');
+    vi.mocked(request).mockResolvedValue(snapshot('on'));
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.house.timeZone).toBeUndefined());
+    expect(result.current.live.timeZone).toBeUndefined();
+  });
   it('reads /api/native-home once, exposes the house and viewer, and starts loading', async () => {
     const { result } = renderHook(() => useHouseStates(document));
     expect(result.current.status).toBe('loading');

@@ -1,0 +1,69 @@
+{
+  "id": "office-pc",
+  "title": "Office PC state and status",
+  "purpose": "Shows whether the Office PC is on, right on its Office tile.",
+  "where": "Office page, Computers group, PC tile binding and subtitle",
+  "construct": "binding",
+  "entities": [
+    { "id": "input_boolean.demo_power_2", "provenance": "synthetic-demo", "replaceWith": "The Office PC power helper used by the existing PC tile" },
+    { "id": "input_text.demo_power_1", "provenance": "synthetic-demo", "replaceWith": "The Office PC lifecycle or status text helper, separate from power" }
+  ],
+  "capabilities": [
+    "sh.actions.navigation@1", "sh.assets.publisher@1", "sh.backdrop@1", "sh.bindings@1",
+    "sh.chrome@1", "sh.composition@1", "sh.grid@1", "sh.page@1", "sh.power-toggle@1",
+    "sh.rules@1", "sh.sheet@1", "sh.shell@1", "sh.state-style@1", "sh.symbols@1",
+    "sh.text@1", "sh.tile-ink-default@1", "sh.tile-parts@1", "sh.tiles@1"
+  ],
+  "changes": [
+    {
+      "op": "add", "pointer": "/stateStyles",
+      "value": {
+        "type": "state-styles@1",
+        "styles": [{
+          "id": "pc-power-display", "name": "PC power display", "domain": "input_boolean",
+          "rules": [
+            { "states": ["on"], "class": "resting", "active": true, "text": "On" },
+            { "states": ["off"], "class": "resting", "active": false, "text": "Off" },
+            { "states": ["unknown", "unavailable"], "class": "unknown", "active": false, "text": "Unavailable" }
+          ],
+          "fallback": { "class": "unknown", "active": false, "text": "Unavailable" }
+        }]
+      }
+    },
+    {
+      "op": "add", "pointer": "/dataSources/-",
+      "value": { "id": "pc-status", "kind": "ha-entity", "entityId": { "type": "literal", "value": "input_text.demo_power_1" } }
+    },
+    {
+      "op": "add", "pointer": "/pages/0/components/0/children/-",
+      "value": {
+        "id": "office-pc", "title": "Office PC", "type": "state-tile", "layout": { "span": 1 },
+        "icon": { "type": "sf-symbol", "name": "desktopcomputer", "rendering": "canonical", "unavailable": "fallback" },
+        "binding": {
+          "entityId": "input_boolean.demo_power_2", "styleId": "pc-power-display"
+        },
+        "props": {
+          "subtitle": {
+            "type": "read", "from": { "type": "source", "sourceId": "pc-status", "path": ["state"] },
+            "as": "string", "missing": "unavailable", "fallback": "PC status unavailable"
+          }
+        }
+      }
+    }
+  ],
+  "simulation": [
+    { "name": "Power on with ready caption", "inputs": { "entities": { "input_boolean.demo_power_2": { "state": "on" }, "input_text.demo_power_1": { "state": "Demo ready" } } }, "expect": { "visible": true, "stateText": "On", "stateClass": "resting", "subtitle": { "status": "value", "value": "Demo ready" } } },
+    { "name": "Power off stays visible", "inputs": { "entities": { "input_boolean.demo_power_2": { "state": "off" }, "input_text.demo_power_1": { "state": "Demo ready" } } }, "expect": { "visible": true, "stateText": "Off", "stateClass": "resting", "subtitle": { "status": "value", "value": "Demo ready" } } },
+    { "name": "Changing helper does not change power", "inputs": { "entities": { "input_boolean.demo_power_2": { "state": "on" }, "input_text.demo_power_1": { "state": "Demo Busy..." } } }, "expect": { "visible": true, "stateText": "On", "stateClass": "resting", "subtitle": { "status": "value", "value": "Demo Busy..." } } },
+    { "name": "Unknown power is not Off", "inputs": { "entities": { "input_boolean.demo_power_2": { "state": "unknown" }, "input_text.demo_power_1": { "state": "Demo ready" } } }, "expect": { "visible": true, "stateText": "Unavailable", "stateClass": "unknown", "subtitle": { "status": "value", "value": "Demo ready" } } },
+    { "name": "Unavailable power is not Off", "inputs": { "entities": { "input_boolean.demo_power_2": { "state": "unavailable" } } }, "expect": { "visible": true, "stateText": "Unavailable", "stateClass": "unknown", "subtitle": { "status": "value", "value": "PC status unavailable" } } },
+    { "name": "Absent power is not Off", "inputs": { "entities": {} }, "expect": { "visible": true, "stateText": "Unavailable", "stateClass": "unknown", "subtitle": { "status": "value", "value": "PC status unavailable" } } }
+  ],
+  "notes": [
+    "Fixture: tests/fixtures/composition-first-slice.json, document only; the test labels its first page Office. Pointers are fixture-relative, not owner-document coordinates.",
+    "Compiler correction: builtIn switch requires domain switch and rejects the cited input_boolean helper. Use a display-only input_boolean state style with explicit On, Off and unavailable words instead; no entity substitution or compiler relaxation.",
+    "Includes the optional independent helper subtitle. No flow, visibility rule or authored service action is needed; preserve the owner's existing actions when mapping this tile.",
+    "The standalone fixture has no stateStyles. Append this style to a real draft's library, never overwrite existing styles.",
+    "Capabilities are the full compiler-derived fixture-plus-change manifest, not just incremental recipe capabilities."
+  ]
+}

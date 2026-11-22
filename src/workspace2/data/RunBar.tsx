@@ -5,6 +5,7 @@ import type { PipelineInputs } from '../../shared/composition/pipeline';
 import { SAMPLE_LIMIT, clearSample, keepSample, setHideValues } from './samples';
 import { requestKind } from './flow';
 import { useFlowData } from './useFlowData';
+import { emptyLiveHint, emptyLiveSummary, runNotice, type RunData } from './runSummary';
 
 /** The words of the run bar: its first line, its second, and a tone for the dot. */
 export interface RunWords { head: string; note: string; tone: 'live' | 'sample' | 'demo' | 'none' }
@@ -13,23 +14,29 @@ const size = (bytes: number) => bytes < 1024 ? `${bytes} B` : `${Math.round(byte
 const count = (items: number | undefined, noun = 'items') => items === undefined ? '' : ` · ${items} ${items === 1 ? noun.replace(/s$/, '') : noun}`;
 
 /**
- * What the run bar says (studio-ux2 L-data, "A Group of Entities, and Nothing"; studio-pipes D4). A group of entities, a live list and Nothing have no Run and
- * say why; a service and an attribute say where their data is from. A service and a live list ask Home Assistant, read only, through the Studio's server when it is connected; offline they draw made-up data and say so.
+ * A live empty output says what the request read and which step emptied it. A group and a live list follow Home Assistant without a Run button;
+ * only Nothing has no request to run. Offline samples and demo values keep their own labels.
  */
-export function runWords(inputs: PipelineInputs, data: { source: 'live' | 'sample' | 'demo' | 'none'; items?: number; /** What the flow gives, when it is a number. */ output?: Json; sample?: { at: string; bytes: number; trimmed?: { shown: number; of: number } };
-  /** The server's live run: when it answered, and whether another is on its way. */ run?: { at?: string; running: boolean } }): RunWords {
+export function runWords(inputs: PipelineInputs, data: RunData): RunWords {
   const kind = requestKind(inputs.request), items = data.items;
   const answered = data.source === 'live' && data.run?.at ? `Home Assistant answered at ${new Date(data.run.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.` : undefined;
   const asking = (note: string) => data.run?.running ? (answered ? 'Refreshing from Home Assistant…' : 'Asking Home Assistant…') : note;
   if (kind === 'none') return { head: 'Live', note: 'Worked out on the phone. Nothing to run.', tone: 'live' };
+  const notice = runNotice(inputs, data), empty = emptyLiveSummary(inputs, data);
+  if (notice && notice.state !== 'stale') return { head: notice.head, note: notice.note, tone: 'none' };
+  if (empty) return {
+    head: empty,
+    note: notice?.note ?? asking(answered ?? 'Follows Home Assistant. Changes show here as they happen.'),
+    tone: notice?.state === 'stale' ? 'none' : 'live',
+  };
   if (kind === 'group') {
     const total = inputs.request.type === 'entities' ? inputs.request.entityIds.length : 0;
-    return data.source === 'live' ? { head: typeof data.output === 'number' ? `Live · ${data.output}` : items === undefined ? 'Live' : `Live · ${items}`, note: `Follows ${total} ${total === 1 ? 'entity' : 'entities'}. Nothing to run.`, tone: 'live' }
-      : { head: `Demo Data${count(items)}`, note: 'Made-up values, not yours. Nothing to run.', tone: 'demo' };
+    return data.source === 'live' ? { head: typeof data.output === 'number' ? `Live · ${data.output}` : items === undefined ? 'Live' : `Live · ${items}`, note: notice?.note ?? `Follows ${total} ${total === 1 ? 'entity' : 'entities'}. Changes show here as they happen.`, tone: 'live' }
+      : { head: `Demo Data${count(items)}`, note: 'Made-up values, not yours. Follows the entities when Home Assistant is connected.', tone: 'demo' };
   }
-  if (kind === 'live-list' && data.source === 'live') return { head: `Live${count(items)}`, note: asking(`${answered ?? 'Follows Home Assistant.'} Changes show here as they happen.`), tone: 'live' };
+  if (kind === 'live-list' && data.source === 'live') return { head: `Live${count(items)}`, note: notice?.note ?? asking(`${answered ?? 'Follows Home Assistant.'} Changes show here as they happen.`), tone: 'live' };
   if (kind === 'live-list') return { head: `Demo Data${count(items)}`, note: 'Home Assistant sends changes as they happen. The Studio draws made-up items.', tone: 'demo' };
-  if (data.source === 'live') return { head: `Live${count(items)}`, note: kind === 'service' ? asking(answered ?? 'Home Assistant answered.') : 'Follows the entity.', tone: 'live' };
+  if (data.source === 'live') return { head: `Live${count(items)}`, note: notice?.note ?? (kind === 'service' ? asking(answered ?? 'Home Assistant answered.') : 'Follows the entity.'), tone: 'live' };
   if (data.source === 'sample' && data.sample) {
     const cut = data.sample.trimmed ? `First ${data.sample.trimmed.shown} of each list · ` : '';
     return { head: `Sample${data.sample.trimmed ? ` · ${data.sample.trimmed.shown} of ${data.sample.trimmed.of} items` : count(items)}`, note: `Kept on ${clock(data.sample.at)} · ${cut}${size(data.sample.bytes)}`, tone: 'sample' };
@@ -64,13 +71,16 @@ function PasteSample({ flowId, onPasted, onClose }: { flowId: string; onPasted: 
 export default function RunBar({ flowId, inputs, onSample }: { flowId: string; inputs: PipelineInputs; onSample: (json: Json) => void }) {
   const data = useFlowData(flowId, inputs);
   const [pasting, setPasting] = useState(false);
-  const words = runWords(inputs, { ...data, output: data.result?.status === 'ok' ? data.result.output : undefined, run: { at: data.run.answer?.at, running: data.run.running } });
+  const details = { ...data, output: data.result?.status === 'ok' ? data.result.output : undefined, run: { at: data.run.answer?.at, running: data.run.running, error: data.run.error } };
+  const words = runWords(inputs, details);
+  const empty = emptyLiveSummary(inputs, details);
   const kind = requestKind(inputs.request);
   const pastes = kind === 'service' || kind === 'attribute';
   return <div className="w2-data-run" data-tone={words.tone} data-testid="run-bar">
     <div className="w2-data-run-line" role="status" aria-live="polite" aria-label={`${words.head}. ${words.note}`}>
       <span className="w2-data-dot" aria-hidden/><span className="w2-data-run-text"><strong>{words.head}</strong><span>{words.note}</span></span>
     </div>
+    {empty && <p className="w2-caption" data-testid="empty-live-hint">{emptyLiveHint}</p>}
     {data.run.error && <p className="w2-error-text w2-data-run-error" role="alert" data-testid="run-error">{data.run.error}</p>}
     {pastes && !pasting && <div className="w2-data-run-actions">
       <button type="button" onClick={() => setPasting(true)}><ClipboardPaste size={14} aria-hidden/>Paste a Sample…</button>

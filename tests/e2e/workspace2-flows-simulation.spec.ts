@@ -143,6 +143,15 @@ async function open(page: Page) {
   expect(network[0].url).toMatch(/\/native\/api\/ha\/flow-run$/);
   return network;
 }
+async function loadFixtureScenarios(page: Page, network: readonly NetworkRead[]) {
+  // The fixture remounts in Live. Its allowed refresh must finish before measuring simulation traffic.
+  const initialReads = network.length;
+  const refreshed = page.waitForResponse(response => response.url().endsWith('/native/api/ha/flow-run') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  expect(await (await refreshed).finished()).toBeNull();
+  await expect(output(page, 'Chores count')).toHaveText('6');
+  expect(network).toHaveLength(initialReads + 1);
+}
 async function inspectBedroom(page: Page) {
   await page.getByRole('button', { name: 'Inspect Bedroom', exact: true }).click();
   return page.getByRole('region', { name: 'Where its value comes from' });
@@ -186,33 +195,34 @@ test('S-pins / S-trace: pin, Live, clock edge, actual drawers and no simulation 
   await page.getByLabel('Date', { exact: true }).fill('2026-11-19');
   await page.getByLabel('Pinned time', { exact: true }).fill('00:00');
   await closeInspector(page);
-  await expect(output(page, 'Today')).toHaveText('Nov 19, 2026');
-  expect(network).toHaveLength(1);
+  await expect(output(page, 'Today')).toHaveText('Today');
+  expect(network.length - initialReads, 'Pinning and using simulation must not start requests.').toBe(0);
   const simulationFetches = network.length - initialReads;
   await page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Live', exact: true }).click();
   await expect(output(page, 'Bedroom')).toHaveText('21.9 °C');
   await expect(output(page, 'Subtitle')).toHaveText('Comfortable');
-  await expect(output(page, 'Today')).toHaveText('Nov 18, 2026');
+  await expect(output(page, 'Today')).toHaveText('Today');
   await page.screenshot({ path: info.outputPath('live-restored.png'), animations: 'disabled' });
   await attachNetwork(info, { initialReads, simulationFetches, requestsIncludingExplicitReturnLive: network });
   expect(network.every(request => request.method === 'POST' && request.url.endsWith('/native/api/ha/flow-run'))).toBe(true);
 });
 test('S-scenarios: explicit results, capture review, save, reload and reopen Live without network', async ({ page }, info) => {
-  const network = await open(page), initialReads = network.length;
-  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  const network = await open(page);
+  await loadFixtureScenarios(page, network);
+  const initialReads = network.length;
   let drawer = await scenarios(page);
   await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
   await drawer.getByRole('button', { name: 'Run All', exact: true }).click();
   await expect(drawer.getByRole('cell', { name: 'Hot afternoon: Passed', exact: true })).toContainText('Matches');
   await expect(drawer.getByRole('cell', { name: 'Wrong expectation: Failed', exact: true })).toContainText('Expected');
   await expect(drawer.getByRole('cell', { name: 'Missing input: Incomplete', exact: true })).toHaveText('Incomplete');
-  expect(network).toHaveLength(1);
+  expect(network.length - initialReads, 'Entering a scenario and Run All must not start requests.').toBe(0);
   await drawer.getByRole('button', { name: 'Save Live Values as Scenario', exact: true }).click();
   await expect(drawer.getByRole('group', { name: 'Review scenario before saving', exact: true })).toBeVisible();
   await drawer.getByLabel('Scenario name', { exact: true }).fill('Captured acceptance');
   await drawer.getByRole('button', { name: 'Save scenario', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Scenarios saved in this browser.' })).toBeVisible();
-  expect(network).toHaveLength(1);
+  expect(network.length - initialReads, 'Capturing and saving in simulation must not start requests.').toBe(0);
   const simulationFetches = network.length - initialReads;
   await page.reload();
   await expect(output(page, 'Bedroom')).toHaveText('21.9 °C');
@@ -233,7 +243,8 @@ test('S-scenarios: explicit results, capture review, save, reload and reopen Liv
 test('design fidelity: Sensor offline in light/dark, phone sheets and contained sticky table', async ({ page }, info) => {
   if (info.project.name === 'desktop') await page.setViewportSize({ width: 1440, height: 1100 });
   const network = await open(page);
-  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  await loadFixtureScenarios(page, network);
+  const initialReads = network.length;
   const drawer = await scenarios(page);
   await drawer.getByRole('button', { name: 'Use scenario Sensor offline', exact: true }).click();
   await drawer.getByRole('button', { name: 'Run All', exact: true }).click();
@@ -266,12 +277,13 @@ test('design fidelity: Sensor offline in light/dark, phone sheets and contained 
   await expect(page.locator('select')).toHaveCount(0);
   const text = await page.getByRole('region', { name: 'Flow simulation', exact: true }).innerText();
   expect(text).not.toMatch(/\d{4}-\d\d-\d\dT\d\d:\d\d/);
-  expect(network).toHaveLength(1);
-  await attachNetwork(info, { initialReads: 1, simulationFetches: 0, requests: network });
+  expect(network.length - initialReads, 'Using an offline scenario must not start requests.').toBe(0);
+  await attachNetwork(info, { initialReads, simulationFetches: network.length - initialReads, requests: network });
 });
 test('scenario import and deletion preserve simulated mode and make no requests', async ({ page }, info) => {
   const network = await open(page);
-  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  await loadFixtureScenarios(page, network);
+  const initialReads = network.length;
   const drawer = await scenarios(page);
   await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
   await drawer.getByText('Import or export scenarios', { exact: true }).click();
@@ -291,17 +303,18 @@ test('scenario import and deletion preserve simulated mode and make no requests'
   await expect(output(page, 'Subtitle')).toHaveText('Too Warm');
   await expect(page.getByRole('group', { name: 'Simulation mode', exact: true }).getByRole('button', { name: 'Simulated', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.clock.runFor(1000);
-  expect(network).toHaveLength(1);
+  expect(network.length - initialReads, 'Entering simulation, importing and deleting scenarios must not start requests.').toBe(0);
   await exchange.fill(exported);
   await drawer.getByRole('button', { name: 'Import scenarios (replace browser list)', exact: true }).click();
   await page.clock.runFor(1000);
-  expect(network).toHaveLength(1);
-  await attachNetwork(info, { initialReads: 1, simulationFetches: 0, requests: network });
+  expect(network.length - initialReads, 'Reimporting after deletion must keep simulation request-free.').toBe(0);
+  await attachNetwork(info, { initialReads, simulationFetches: network.length - initialReads, requests: network });
 });
 for (const change of ['active', 'unchanged', 'inactive'] as const) {
   test(`import preserves the captured active scenario: ${change}`, async ({ page }, info) => {
     const network = await open(page);
-    await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+    await loadFixtureScenarios(page, network);
+    const initialReads = network.length;
     const drawer = await scenarios(page);
     await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
     await drawer.getByText('Import or export scenarios', { exact: true }).click();
@@ -332,13 +345,13 @@ for (const change of ['active', 'unchanged', 'inactive'] as const) {
       await scenarios(page);
     }
     await page.clock.runFor(1000);
-    expect(network).toHaveLength(1);
+    expect(network.length - initialReads, 'Entering simulation and importing must not start requests.').toBe(0);
     await drawer.getByRole('button', { name: `Use scenario ${changed.name}`, exact: true }).click();
     await expect(output(page, 'Bedroom')).toHaveText(change === 'unchanged' ? '25.0 °C' : '19.0 °C');
     await expect(page.getByRole('note').filter({ hasText: 'Saved version differs. Reselect to apply.' })).toHaveCount(0);
     await page.clock.runFor(1000);
-    expect(network).toHaveLength(1);
-    await attachNetwork(info, { change, activeCaptureUnchangedUntilSelection: true, persistedImport: true, simulationFetches: 0, requests: network });
+    expect(network.length - initialReads, 'Reselecting the imported scenario must not start requests.').toBe(0);
+    await attachNetwork(info, { change, initialReads, activeCaptureUnchangedUntilSelection: true, persistedImport: true, simulationFetches: network.length - initialReads, requests: network });
   });
 }
 for (const failure of ['SecurityError', 'QuotaExceededError']) for (const delayMs of [null, ...IMPORT_REQUEST_DELAYS_MS]) {
@@ -350,12 +363,8 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) for (const delayM
       await session.send('Emulation.setCPUThrottlingRate', { rate: cpuRate });
     }
     const network = await open(page);
-    // Loading fixtures remounts the host in Live; settle that refresh before entering simulation.
-    const refreshed = page.waitForResponse(response => response.url().endsWith('/native/api/ha/flow-run') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
-    expect(await (await refreshed).finished()).toBeNull();
-    await expect(output(page, 'Chores count')).toHaveText('6');
-    expect(network).toHaveLength(2);
+    await loadFixtureScenarios(page, network);
+    const initialReads = network.length;
     const drawer = await scenarios(page);
     await drawer.getByRole('button', { name: 'Use scenario Hot afternoon', exact: true }).click();
     const saved = await page.evaluate(() => {
@@ -379,7 +388,6 @@ for (const failure of ['SecurityError', 'QuotaExceededError']) for (const delayM
     }, { failure, key: saved.key, delayMs });
     await pauseImportClock(page);
     await observeImport(page);
-    const initialReads = network.length;
     await drawer.getByRole('button', { name: 'Import scenarios (replace browser list)', exact: true }).click();
     const warning = page.getByRole('status').filter({ hasText: 'Import not saved.' });
     await expect(warning).toContainText('The saved scenario list is unchanged.');
@@ -418,7 +426,7 @@ for (const timer of ['beyond bound', 'recurring', 'self-rescheduling'] as const)
 }
 test('AA contrast for every rendered simulation text/background pair in both appearances', async ({ page }, info) => {
   test.setTimeout(90_000);
-  await open(page);
+  const network = await open(page);
   const records: { theme: string; scene: string; text: string; foreground: Rgb; background: Rgb; ratio: number; classes: string }[] = [];
   const audit = async (scene: string) => {
     for (const theme of ['light', 'dark'] as const) {
@@ -434,7 +442,7 @@ test('AA contrast for every rendered simulation text/background pair in both app
     }
   };
   await audit('Live values and toolbar');
-  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  await loadFixtureScenarios(page, network);
   let drawer = await scenarios(page);
   await drawer.getByRole('button', { name: 'Use scenario Sensor offline', exact: true }).click();
   await drawer.getByRole('button', { name: 'Run All', exact: true }).click();
@@ -506,6 +514,7 @@ test('bounded step evidence raises the trace-wide warning without changing the a
 test('focus indicators exceed 3:1 for every simulation control type in both appearances', async ({ page }, info) => {
   test.setTimeout(90_000);
   const network = await open(page);
+  const beforeSimulation = network.length;
   const records: { theme: string; control: string; foreground: Rgb; background: Rgb; ratio: number; width: number; offset: number }[] = [];
   const audit = async (control: string, locator: Locator, screenshot?: string) => {
     for (const theme of ['light', 'dark'] as const) {
@@ -532,7 +541,9 @@ test('focus indicators exceed 3:1 for every simulation control type in both appe
   await audit('Tonal toolbar button', page.getByRole('button', { name: 'Scenarios', exact: true }));
   await audit('Values-ground link button', page.getByRole('button', { name: 'Inspect Bedroom', exact: true }));
   await audit('Values disclosure', page.getByText('Other blocks', { exact: true }));
-  await page.getByRole('button', { name: 'Load fixture scenarios', exact: true }).click();
+  expect(network.length - beforeSimulation, 'Entering and inspecting simulation must not start requests.').toBe(0);
+  await loadFixtureScenarios(page, network);
+  const initialReads = network.length;
   const drawer = await scenarios(page);
   const selectedRow = drawer.getByRole('button', { name: 'Use scenario Sensor offline', exact: true });
   await selectedRow.click();
@@ -575,5 +586,5 @@ test('focus indicators exceed 3:1 for every simulation control type in both appe
   writeFileSync(path, JSON.stringify({ samples: records.length, minimum: Math.min(...records.map(row => row.ratio)), pairs: records }, null, 2));
   await info.attach('focus-contrast.json', { path, contentType: 'application/json' });
   expect(records.filter(row => row.ratio < 3)).toEqual([]);
-  expect(network).toHaveLength(1);
+  expect(network.length - initialReads, 'Using simulation controls must not start requests.').toBe(0);
 });

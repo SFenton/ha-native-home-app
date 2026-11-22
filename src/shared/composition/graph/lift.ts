@@ -10,7 +10,8 @@ import { atPointer, copy, copyShape, fingerprint, record, segments, withoutCanva
 import { autoLayout } from './layout';
 import { expressionPort, expressionScope, inputType, outputPort, portType } from './ports';
 import { graphSourceSchema, typingSteps } from './capabilities';
-import type { GraphDestination, GraphDiagnostic, GraphEdge, GraphNode, GraphScope, GraphSourceLocation, LiftResult, LogicAnchor, LogicGraph, OpaqueRegion, PortType, StudioCanvasMetadata } from './types';
+import { canvasAnnotationSchema } from '../studio-logic/schemas';
+import type { GraphDestination, GraphDiagnostic, GraphEdge, GraphNode, GraphScope, GraphSourceLocation, LiftResult, LogicAnchor, LogicGraph, OpaqueRegion, PortType } from './types';
 
 export interface LiftOptions {
   readonly anchor?: LogicAnchor;
@@ -136,7 +137,10 @@ export function lift(ast: Json, options: LiftOptions = {}): LiftResult {
           return node;
         }
         used.add(matches[0].id);
-        return { ...node, position: { x: matches[0].x, y: matches[0].y } };
+        const { x, y, label, note } = matches[0];
+        return { ...node, position: { x, y },
+          ...(label || note ? { annotation: { ...(label ? { label } : {}), ...(note ? { note } : {}) } } : {}),
+        };
       }) };
       if (canvas?.nodes.some(saved => !used.has(saved.id))) warnings.push({ severity: 'warning', code: 'invalid_layout', message: 'Stale or ambiguous saved layout associations ignored.', anchor, pointer: '/studioCanvas' });
     }
@@ -152,7 +156,7 @@ function liftedId(pointer: string, value: Json): string {
   }
   return `lift-${(first >>> 0).toString(16)}-${(second >>> 0).toString(16)}`;
 }
-function isMetadata(value: unknown): value is StudioCanvasMetadata {
+function isMetadata(value: unknown): value is z.infer<typeof metadataSchema> {
   return metadataSchema.safeParse(value).success;
 }
 const pointerSchema = z.string().regex(/^(?:\/(?:[^~]|~[01])*)*$/);
@@ -167,7 +171,7 @@ const metadataSchema = z.strictObject({
   version: z.literal(1),
   canvases: z.array(z.strictObject({
     id: z.string().min(1), roots: z.array(anchorSchema),
-    nodes: z.array(z.strictObject({ id: z.string().min(1), origins: z.array(pointerSchema), x: z.number(), y: z.number() })),
+    nodes: z.array(z.strictObject({ id: z.string().min(1), origins: z.array(pointerSchema), x: z.number(), y: z.number(), ...canvasAnnotationSchema.shape })),
     viewport: z.strictObject({ x: z.number(), y: z.number(), zoom: z.number().positive() }).optional(),
     groups: z.array(z.strictObject({ id: z.string(), label: z.string(), nodeIds: z.array(z.string()) })).optional(),
   })),

@@ -8,16 +8,18 @@ import { Field, TextField } from '../../ui';
 import { Overlay, Tag, useNarrow } from '../kit';
 import { captureScenario, mergePins, runAll, runSimulation, type ScenarioResult } from './engine';
 import { anchorKey, caseSchema, parseScenarios, pinSchema, readKey, sourceKey, STORE_COUNT } from './contracts';
-import { pinProblems, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
+import { pinProblems, simulationInputs, simulationPort, sourceCaptureForNode, type SimulationProgram } from './program';
 import { loadScenarios, saveScenarios } from './storage';
 import { sharedFlowRequests, useSimulationSnapshot, type FlowState } from './live';
 import { SimulationFlowBridges } from './BridgeOwner';
 import { SimulationDrawers } from './Drawers';
 import { ClockInspector, SourceInspector, type PinChoice } from './Inspector';
 import { ScenariosDrawer } from './Scenarios';
-import { canvasObservations, type CanvasObservations } from './observations';
+import { canvasObservations, formatObservedValue, type CanvasObservations } from './observations';
 import { changedAgo, clockInstant, displayValue, type SimulationPresentation, type ValuePresentation } from './presentation';
 import './simulation.css';
+import { nodeValueOptions } from '../canvas/value-format';
+import { browserTimeZone } from '../../preview2/live-house';
 
 export interface SimulationHostProps {
   readonly program: SimulationProgram;
@@ -29,7 +31,7 @@ export interface SimulationHostProps {
   readonly onSelectBlock?: (blockId: string) => void;
   readonly onObservation?: (observations: CanvasObservations) => void;
   readonly liveClock?: SimulationClock;
-  /** IANA zone matching liveClock. Required for home-clock editing; device defaults to the browser's zone. */
+  /** House IANA zone matching liveClock; absent live values explicitly use the browser zone. */
   readonly clockTimeZone?: string;
   readonly previousText?: SimulationCase['base']['previousText'];
   /** The existing connection owner supplies freshness; LiveHouse alone cannot detect transport failures. */
@@ -41,7 +43,8 @@ export interface SimulationHostProps {
 export function SimulationHost(props: SimulationHostProps) {
   return <HostSession key={`${props.document.id}:${props.canvasId}`} {...props} />;
 }
-function HostSession({ program, document, canvasId, blockNames = {}, presentation, selectedBlockId, onSelectBlock, onObservation, liveClock, clockTimeZone, previousText, freshness, active = true }: SimulationHostProps) {
+function HostSession({ program, document, canvasId, blockNames = {}, presentation, selectedBlockId, onSelectBlock, onObservation, liveClock, clockTimeZone: suppliedTimeZone, previousText, freshness, active = true }: SimulationHostProps) {
+  const clockTimeZone = browserTimeZone(suppliedTimeZone);
   const narrow = useNarrow();
   const [loaded] = useState(() => loadScenarios(document.id, canvasId));
   const [scenarios, setScenarios] = useState<SimulationCase[]>(loaded.ok ? loaded.value : []);
@@ -73,10 +76,15 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const activePins = useMemo(() => mergePins(scenario?.pins ?? [], pins), [scenario, pins]);
   const snapshot = useSimulationSnapshot(program, document, flows, { clock: liveClock, previousText, ...freshness });
   const run = useMemo(() => runSimulation(program, snapshot, { scenario, pins, clock, liveClock: clockLive, liveBlocks: muted }), [program, snapshot, scenario, pins, clock, clockLive, muted]);
+  const liveTimeZone = clockTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const frozenClock = !clockLive && Boolean(clock || scenario);
+  const valueTimeZone = frozenClock ? undefined : liveTimeZone;
+  const valueClock = clockLive ? snapshot.base.clock : clock ?? scenario?.clock ?? scenario?.base.clock ?? snapshot.base.clock;
   const observation = useMemo(() => canvasObservations(program, run, {
     pins: activePins, localPins: pins, scenario, clockPinned: Boolean(!clockLive && (clock || scenario?.clock)), localClockPinned: Boolean(clock), liveClock: clockLive,
-    freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText,
-  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale]);
+    freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText, blockNames,
+    clock: valueClock, timeZone: valueTimeZone,
+  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale, blockNames, valueClock, valueTimeZone]);
   useEffect(() => onObservation?.(observation), [onObservation, observation]);
   const onRun = useCallback((ids: readonly string[], state: FlowState) => {
     setFlows(previous => {
@@ -93,12 +101,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     const source = sourceCaptureForNode(node, program);
     return node.payload.kind !== 'source-selection' && source && program.reads.some(read => sourceKey(read) === sourceKey(source));
   });
-  const inputMap = new Map<string, GraphNode>();
-  for (const node of inputNodes) {
-    const key = sourceKey(sourceCaptureForNode(node, program)!);
-    if (!inputMap.has(key)) inputMap.set(key, node);
-  }
-  const uniqueInputs = [...inputMap.values()];
+  const uniqueInputs = simulationInputs(program, nodes);
   const editingPin = nodes.find(node => node.id === (selectedBlockId ?? selection)) ?? inputNodes[0] ?? nodes[0];
   const blockLabel = (node: GraphNode): ValuePresentation => presentation?.blocks?.[node.id] ?? { name: blockNames[node.id] ?? 'Value' };
   const outputLabel = (index: number): ValuePresentation => presentation?.outputs?.[anchorKey(program.roots[index].anchor)]
@@ -185,8 +188,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       {narrow && <button type="button" className="w2-primary" onClick={() => setInspecting(false)}>Done</button>}
     </header>
     <SourceInspector name={blockLabel(editingPin).name} presentation={blockLabel(editingPin)} source={Boolean(source)} choice={choice}
-      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin)) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
-      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin)) : 'Captured live value' } : undefined}
+      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: snapshot.base.clock, timeZone: liveTimeZone }) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
+      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: scenario.clock ?? scenario.base.clock }) : 'Captured live value' } : undefined}
       onChoice={value => {
         setPinChoice(value);
         if (value !== 'live' && value !== 'scenario') return;
@@ -194,15 +197,15 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
         setMuted(previous => { const next = new Set(previous); if (value === 'live') next.add(editingPin.id); else next.delete(editingPin.id); return next; });
       }} numeric={numeric} onNumeric={setNumeric} state={state} onState={setState} typed={pinText} onTyped={setPinText} status={pinStatus} onStatus={setPinStatus} onApply={pin} />
     <ClockInspector live={snapshot.base.clock} clock={clockLive ? undefined : clock ?? scenario?.clock} zone={clockZone}
-      timeZone={clockTimeZone ?? (clockZone === 'device' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined)}
+      timeZone={clockTimeZone ?? (clockZone === 'device' ? liveTimeZone : undefined)}
       onClock={value => { setClock(value); setClockLive(!value); if (value) { setPaused(true); setSimulating(true); } }} onError={setMessage} />
     <section className="sec w2-group w2-sim-trace" aria-label="Evaluation trace">
       <h3 className="w2-group-title">Trace · in the order the app works it out</h3>
       <div className="w2-sim-trace-chips">{observation.order.map(id => {
         const block = observation.blocks[id], node = nodes.find(node => node.id === id);
         if (!node || !block?.observed || presentation?.traceBlocks && !presentation.traceBlocks.includes(id)) return null;
-        return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`}
-          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : block.state === 'cant-tell' ? "Can't tell" : displayValue(block.result, blockLabel(node))}</strong></button>;
+        return <button type="button" className={`w2-sim-trace-chip${block.pinned ? ' pinned' : ''}`} aria-description={formatObservedValue(block, false, true)}
+          key={id} onClick={() => selectBlock(node)}>{blockLabel(node).traceName ?? blockLabel(node).name} <strong>{block.kept ? 'kept' : node.payload.kind === 'operand' && node.payload.value.type === 'literal' ? formatObservedValue(block) : displayValue(block.result, blockLabel(node), block)}</strong></button>;
       })}</div>
       {observation.truncated && <p className="w2-caption">Trace truncated. Unrecorded values are not evidence.</p>}
       <div className="w2-sim-actions"><button type="button" onClick={() => { setInspecting(false); setDrawer('evidence'); }}>Each Run &amp; Items</button></div>
@@ -222,6 +225,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       </div>
     </header>
     {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Waiting for Home Assistant.{run.outputs.some(output => output.source === 'Held/stale') && ' Showing the last values.'}{snapshot.error && <> {snapshot.error}</>}</p>}
+    {!clockTimeZone && !frozenClock && <p role="note" className="w2-caption">Times shown in this browser's time zone</p>}
     {run.issues.length > 0 && <p role="alert" className="w2-sim-notice">{run.issues.map(issueText).join(' ')}</p>}
     <p role="status" aria-live="polite" className="w2-sim-status">{message}</p>
     {savedVersionDiffers && drawer !== 'scenarios' && <p role="note" className="w2-sim-notice">Saved version differs. Reselect to apply.</p>}
@@ -231,7 +235,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <h3 className="w2-group-title"><List size={15} aria-hidden />Just the Values</h3>
           <p className="w2-caption">The preview is a lens. These are the actual outputs, not device actions.{scenario ? ' Unpinned Live values are frozen at capture.' : ''}</p>
           <div className="w2-sim-values">{run.outputs.map((output, index) => <article className="kv2" key={anchorKey(output.output)} aria-label={`Output ${outputLabel(index).name}`}>
-            <span>{outputLabel(index).name}</span><output>{displayValue(output.result, outputLabel(index))}</output>
+            <span>{outputLabel(index).name}</span><output title={formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId], false, true)}>{program.roots[index].body.kind === 'operand' && program.roots[index].body.value.type === 'literal' ? formatObservedValue(observation.results?.[program.roots[index].graph.roots[0].nodeId]) : displayValue(output.result, outputLabel(index), observation.results?.[program.roots[index].graph.roots[0].nodeId])}</output>
             <Tag className={`tag ${output.source === 'Live' ? 'live' : output.source === 'Pinned' ? 'pinned' : ''}`} tone={output.source === 'Live' ? 'success' : 'neutral'} title={output.source === 'Scenario' ? 'Live at capture, not a fresh network read' : undefined}>{output.source === 'Scenario' ? 'Live' : output.source === 'Held/stale' ? 'Last value kept' : output.source === 'Sample' ? 'Demo' : output.source}</Tag>
             {output.issues.length > 0 && <p className="w2-caption">{output.issues.map(issueText).join(' ')}</p>}
           </article>)}</div>
@@ -241,7 +245,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
           <div className="w2-sim-values">{uniqueInputs.map(node => {
             const block = observation.blocks[node.id];
             return <div key={node.id} className="kv2"><button type="button" className="w2-link-button" aria-label={`Inspect ${blockLabel(node).name}`} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>
-              <span>{displayValue(block?.result, blockLabel(node))}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Last value kept' : block?.freshness === 'sample' ? 'Demo' : 'Live'}</Tag></div>;
+              <span>{displayValue(block?.result, blockLabel(node), block)}</span><Tag className={`tag ${block?.pinned ? 'pinned' : block?.freshness === 'live' ? 'live' : ''}`} tone={block?.freshness === 'live' && !block?.pinned ? 'success' : 'neutral'} title={block?.freshness === 'captured' && !block.pinned ? 'Live at capture' : undefined}>{block?.pinned ? 'Pinned' : block?.freshness === 'held' ? 'Last value kept' : block?.freshness === 'sample' ? 'Demo' : 'Live'}</Tag></div>;
           })}</div>
           <details className="w2-sim-details"><summary>Other blocks</summary><div className="w2-sim-block-list">{nodes.filter(node => !sourceCaptureForNode(node, program)).map(node => <button type="button" key={node.id} onClick={() => selectBlock(node)}>{blockLabel(node).name}</button>)}</div></details>
           <p className="w2-caption">Select a value to inspect its source, pin it, or try a scenario.</p>
@@ -251,7 +255,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       {!narrow && <aside className="w2-sim-inspector w2-form" aria-label="Simulation inspector">{inspector}</aside>}
     </div>
     {narrow && <Overlay narrow open={inspecting} onOpenChange={setInspecting} label="Simulation inspector" className="w2-simulation-surface w2-form">{inspector}</Overlay>}
-    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot}
+    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot} timeZone={liveTimeZone}
+      activeClock={valueClock} activeTimeZone={valueTimeZone}
       selectedId={scenarioId} savedVersionDiffers={savedVersionDiffers} run={run} results={results} inputNodes={uniqueInputs.filter(node => !presentation?.scenarioInputs || presentation.scenarioInputs.includes(node.id))} blockLabel={blockLabel} outputLabel={outputLabel}
       outputKeys={presentation?.scenarioOutputs}
       onSelect={selectScenario} onCapture={() => startCapture()} onCreate={() => startCapture(true)} blocked={stalePins.length > 0}
@@ -273,7 +278,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     </ScenariosDrawer>
     <Overlay narrow open={drawer === 'evidence'} onOpenChange={open => { if (!open) setDrawer(undefined); }} label="Run evidence" className="w2-simulation-surface">
       <header className="w2-sim-drawer-head"><h2>Run evidence</h2><button type="button" className="w2-icon-button" aria-label="Close Run evidence" onClick={() => setDrawer(undefined)}><X size={18} aria-hidden /></button></header>
-      <SimulationDrawers outputs={run.outputs} program={program} presentation={presentation} blockNames={blockNames} />
+      <SimulationDrawers outputs={run.outputs} program={program} presentation={presentation} blockNames={blockNames} clock={valueClock} timeZone={valueTimeZone} />
     </Overlay>
   </section>;
 }
