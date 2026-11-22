@@ -10,6 +10,22 @@ export const TIME_ZONE_KEY = '\u0000time-zone';
 /** The key a reader holds when it looked at every entity (a scan, a size or an iteration). */
 export const ALL_KEY = '\u0000all';
 
+const browserTimeZones = new Map<string, string | undefined>();
+/** The browser's time-zone database may lag behind the server's. */
+export function browserTimeZone(timeZone?: string): string | undefined {
+  if (!timeZone) return undefined;
+  if (!browserTimeZones.has(timeZone)) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone });
+      browserTimeZones.set(timeZone, timeZone);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      browserTimeZones.set(timeZone, undefined);
+    }
+  }
+  return browserTimeZones.get(timeZone);
+}
+
 /** A listener hears changed entity ids, readiness, viewer and time-zone keys in one commit. */
 export type LiveListener = (keys: readonly string[]) => void;
 

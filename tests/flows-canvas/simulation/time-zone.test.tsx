@@ -11,6 +11,8 @@ import { ScenariosDrawer } from '../../../src/workspace2/logic-simulation/Scenar
 import { simulationClock, useSimulationClock } from '../../../src/workspace2/logic-simulation/live';
 import { captureScenario, runAll, runSimulation, type HeldSnapshot } from '../../../src/workspace2/logic-simulation/engine';
 import { createSimulationProgram } from '../../../src/workspace2/logic-simulation/program';
+import { formatValue } from '../../../src/workspace2/canvas/value-format';
+import { editClock } from '../../../src/workspace2/logic-simulation/presentation';
 
 const timeZone = 'America/Los_Angeles';
 const clock = { now: '2026-11-21T12:00:00', utcOffsetMinutes: -480 };
@@ -32,7 +34,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
 });
 afterEach(() => {
-  cleanup(); vi.useRealTimers(); vi.unstubAllGlobals();
+  cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals();
   if (originalZone === undefined) delete process.env.TZ;
   else process.env.TZ = originalZone;
 });
@@ -51,6 +53,42 @@ describe('live house dates with a Tokyo browser', () => {
     act(() => live.applySnapshot([...live.states.values()], undefined, 'Asia/Tokyo'));
     expect(result.current.liveClock).toEqual({ now: '2026-11-22T05:00:00', utcOffsetMinutes: 540 });
     expect(simulationClock(new Date('2026-07-21T19:00:00Z'), timeZone)).toEqual({ now: '2026-07-21T12:00:00', utcOffsetMinutes: -420 });
+  });
+  it('caches a browser-rejected house zone and falls back consistently in clocks, values and drawers', async () => {
+    const rejectedZone = 'America/Coyhaique', DateTimeFormat = Intl.DateTimeFormat;
+    const intl = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (locales, options) {
+      if (options?.timeZone === rejectedZone) throw new RangeError('Unknown browser time zone');
+      return new DateTimeFormat(locales, options);
+    });
+    const live = liveHouse(rejectedZone);
+    const { result } = renderHook(() => useSimulationClock(document), { wrapper: ({ children }) =>
+      <WorkspaceDataProvider document={document} house={live.house} live={live}>{children}</WorkspaceDataProvider> });
+    const browserClock = { now: '2026-11-22T05:00:00', utcOffsetMinutes: 540 };
+    expect(result.current).toEqual({ liveClock: browserClock, clockTimeZone: undefined });
+    expect(simulationClock(new Date(held.at), rejectedZone)).toEqual(browserClock);
+    expect(editClock(browserClock, '2026-11-22', '06:00', rejectedZone)).toEqual({ ...browserClock, now: '2026-11-22T06:00:00' });
+    expect(formatValue(timestamp, { clock: browserClock, timeZone: rejectedZone })).toBe('Yesterday, 7:00 PM');
+    render(<WorkspaceDataProvider document={document} house={live.house} live={live}>
+      <SimulationHost document={document} canvasId="demo_rejected_zone" program={program} clockTimeZone={rejectedZone} />
+    </WorkspaceDataProvider>);
+    const output = screen.getByRole('region', { name: 'Just the Values' }).querySelector('output')!;
+    expect(output.textContent).toBe('Yesterday, 7:00 PM');
+    expect(screen.getByText("Times shown in this browser's time zone")).toBeTruthy();
+    fireEvent.click(within(screen.getByRole('region', { name: 'Evaluation trace' })).getByRole('button', { name: 'Each Run & Items' }));
+    const evidence = screen.getByRole('region', { name: 'Run evidence' });
+    expect(within(evidence).getByText('Yesterday, 7:00 PM').title).toContain(timestamp);
+    fireEvent.click(within(evidence).getByRole('button', { name: 'Trace' }));
+    expect(within(evidence).getByText('Yesterday, 7:00 PM').title).toContain(timestamp);
+    fireEvent.click(screen.getByRole('button', { name: 'Close Run evidence' }));
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    fireEvent.click(screen.getByRole('button', { name: 'Scenarios' }));
+    const row = screen.getByRole('row', { name: /Live now/ });
+    expect(within(row).getAllByRole('cell').slice(0, 2).map(cell => cell.textContent)).toEqual(['Yesterday, 7:00 PM', 'Yesterday, 7:00 PM']);
+    act(() => live.applySnapshot([...live.states.values()], undefined, timeZone));
+    expect(result.current).toEqual({ liveClock: clock, clockTimeZone: timeZone });
+    act(() => live.applySnapshot([...live.states.values()], undefined, rejectedZone));
+    expect(result.current).toEqual({ liveClock: browserClock, clockTimeZone: undefined });
+    expect(intl.mock.calls.filter(([, options]) => options?.timeZone === rejectedZone)).toHaveLength(1);
   });
   it.each([
     [timeZone, timestamp, 'Today, 2:00 AM'],

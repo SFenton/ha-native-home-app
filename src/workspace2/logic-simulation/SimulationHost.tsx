@@ -19,6 +19,7 @@ import { canvasObservations, formatObservedValue, type CanvasObservations } from
 import { changedAgo, clockInstant, displayValue, type SimulationPresentation, type ValuePresentation } from './presentation';
 import './simulation.css';
 import { nodeValueOptions } from '../canvas/value-format';
+import { browserTimeZone } from '../../preview2/live-house';
 
 export interface SimulationHostProps {
   readonly program: SimulationProgram;
@@ -42,7 +43,8 @@ export interface SimulationHostProps {
 export function SimulationHost(props: SimulationHostProps) {
   return <HostSession key={`${props.document.id}:${props.canvasId}`} {...props} />;
 }
-function HostSession({ program, document, canvasId, blockNames = {}, presentation, selectedBlockId, onSelectBlock, onObservation, liveClock, clockTimeZone, previousText, freshness, active = true }: SimulationHostProps) {
+function HostSession({ program, document, canvasId, blockNames = {}, presentation, selectedBlockId, onSelectBlock, onObservation, liveClock, clockTimeZone: suppliedTimeZone, previousText, freshness, active = true }: SimulationHostProps) {
+  const clockTimeZone = browserTimeZone(suppliedTimeZone);
   const narrow = useNarrow();
   const [loaded] = useState(() => loadScenarios(document.id, canvasId));
   const [scenarios, setScenarios] = useState<SimulationCase[]>(loaded.ok ? loaded.value : []);
@@ -195,7 +197,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
         setMuted(previous => { const next = new Set(previous); if (value === 'live') next.add(editingPin.id); else next.delete(editingPin.id); return next; });
       }} numeric={numeric} onNumeric={setNumeric} state={state} onState={setState} typed={pinText} onTyped={setPinText} status={pinStatus} onStatus={setPinStatus} onApply={pin} />
     <ClockInspector live={snapshot.base.clock} clock={clockLive ? undefined : clock ?? scenario?.clock} zone={clockZone}
-      timeZone={clockTimeZone ?? (clockZone === 'device' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined)}
+      timeZone={clockTimeZone ?? (clockZone === 'device' ? liveTimeZone : undefined)}
       onClock={value => { setClock(value); setClockLive(!value); if (value) { setPaused(true); setSimulating(true); } }} onError={setMessage} />
     <section className="sec w2-group w2-sim-trace" aria-label="Evaluation trace">
       <h3 className="w2-group-title">Trace · in the order the app works it out</h3>

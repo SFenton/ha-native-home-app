@@ -3,6 +3,7 @@ import type { PortObservation } from './observations';
 import { record } from '../../shared/composition/graph/json';
 import { isDateText, isDateTimeText, wallTime } from '../../shared/composition/pipeline/dates';
 import { noItemsText } from '../logic-simulation/per-item';
+import { browserTimeZone } from '../../preview2/live-house';
 
 export interface ValueFormatOptions {
   readonly rows?: boolean;
@@ -51,11 +52,12 @@ function dateText(value: string, options: ValueFormatOptions): string | undefine
   if (!dateOnly && (!isDateTimeText(value) || !typed && !isoDateTime.test(value))) return undefined;
   if (format && !typed) return undefined;
   const offset = options.clock?.utcOffsetMinutes ?? 0;
+  const timeZone = options.timeZone ? browserTimeZone(options.timeZone) ?? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined;
   // Zoned instants use the house's historical offset; offset-free typed values already name its wall time.
-  const time = !dateOnly && hasOffset.test(value) && options.timeZone ? zonedWallTime(value, options.timeZone) : wallTime(value, offset)!;
+  const time = !dateOnly && hasOffset.test(value) && timeZone ? zonedWallTime(value, timeZone) : wallTime(value, offset)!;
   const date = new Date((time.days * 86400 + time.seconds) * 1000);
   const now = options.clock ? wallTime(options.clock.now, offset)
-    : options.timeZone ? zonedWallTime(new Date().toISOString(), options.timeZone) : wallTime(new Date().toISOString(), offset);
+    : timeZone ? zonedWallTime(new Date().toISOString(), timeZone) : wallTime(new Date().toISOString(), offset);
   const currentYear = now && new Date(now.days * 86400_000).getUTCFullYear();
   const day = time.days === now?.days ? 'Today' : !dateOnly && time.days === (now?.days ?? NaN) - 1 ? 'Yesterday'
     : new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric',
