@@ -16,6 +16,7 @@ import { canvasReferences, editSubtrees, type CanvasProvenance } from '../editor
 import FlowCanvas, { arrangeCanvas, type CanvasLayoutHandoff } from '../canvas/FlowCanvas';
 import type { CanvasObservations } from '../canvas/observations';
 import { SimulationHost } from '../logic-simulation/SimulationHost';
+import { useSimulationClock } from '../logic-simulation/live';
 import { createSimulationProgram } from '../logic-simulation/program';
 import type { CanvasObservations as SimulationObservations } from '../logic-simulation/observations';
 import { flowSources } from '../data/flow';
@@ -173,6 +174,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
     setPreview({ collapsed, storageUnavailable });
   };
   const document = useDraftDocument(field.draft), data = useWorkspaceData();
+  const { liveClock, clockTimeZone } = useSimulationClock(document);
   const names = useNameContext(document);
   const entry = field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined;
   const nameContext = useMemo(() => entry ? { ...names, logic: { library: document.logicLibrary ?? [], settings: entry.params } } : names, [names, entry, document.logicLibrary]);
@@ -287,6 +289,8 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
             </button>
           </header>
           <ResultSummary graph={working} program={simulation.program} observations={lastObservation} blockNames={blockNames} error={simulation.error}/>
+          {!clockTimeZone && (!lastObservation || Object.values(lastObservation.results ?? {}).some(value => value.valueFormat?.timeZone))
+            && <p role="note" className="w2-caption">Times shown in this browser's time zone</p>}
           <LensChooser document={document} entry={field.path[0] === 'logicLibrary' ? document.logicLibrary?.[Number(field.path[1])] : undefined}
             lens={lens} onLens={setLens} onArguments={setTryWith}/>
           {lens.kind !== 'values' && <article className="w2-logic-field-preview" aria-label={lens.kind === 'stand-in' ? 'Stand-in field preview' : 'Use field preview'}>
@@ -295,7 +299,7 @@ function CanvasSession({ field, ws, theme, onClose }: { field: OpenField; ws: Wo
           </article>}
           <details><summary>Simulation · Studio only</summary>
           {ready && simulation.program ? <SimulationHost program={simulation.program} document={document} canvasId={canonicalOfBounded(field.graph.roots[0].anchor)}
-            blockNames={blockNames}
+            blockNames={blockNames} liveClock={liveClock} clockTimeZone={clockTimeZone}
             selectedBlockId={selected ?? undefined} onSelectBlock={setSelected} onObservation={observe} active={active}
             freshness={{ stale: !data.live || !ws.houseStates.streaming }}/>
             : <p className="w2-caption" role="status">{simulation.error}</p>}

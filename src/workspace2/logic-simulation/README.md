@@ -26,7 +26,8 @@ const program = useMemo(() => createSimulationProgram(graphs, {
   selectedBlockId={selectedBlock}
   onSelectBlock={selectBlock}
   onObservation={setCanvasObservations}
-  clockTimeZone={authoredClockIanaZone}
+  liveClock={liveHouseClock}
+  clockTimeZone={liveHouseTimeZone}
   freshness={{ stale: connectionIsStale, error: connectionError }}
   previousText={explicitKeepSeeds}
   active={canvasIsActive}
@@ -75,8 +76,13 @@ separate bottom drawer, never stacked with the inspector. Its comparison
 table scrolls inside the drawer and keeps scenario names sticky.
 
 For clock editing, supply an IANA `clockTimeZone` matching `liveClock` (for
-example the home's configured zone). Device clocks default to the browser's
-zone; home-clock editing is disabled if the host hasn't supplied its zone.
+example the home's configured zone). `useSimulationClock` reads the existing
+house snapshot zone and supplies its current wall clock and offset; live
+formatting uses historical offsets from that zone. Without it, live values
+use the browser zone with the note "Times shown in this browser's time zone".
+Frozen scenarios retain their own captured wall time and offset, independent
+of a subsequent house-zone change. Home-clock editing is disabled if the host
+hasn't supplied its zone.
 Date/time controls and the 24-hour slider resolve offsets locally using Intl,
 reject DST gaps and retain the captured offset at an ambiguous time.
 No clock lookup fetches data. Clock Live explicitly restores the held Live
@@ -92,7 +98,8 @@ first authored flow ID. Its bridge uses the existing `useLiveRun`, relative
 request helper, 600 ms debounce and response sequence guard. Mount **one**
 bridge owner per group; do not also mount independent live-run consumers for
 the other grouped IDs. Steps-only edits evaluate the held response locally.
-There is no canvas socket or polling timer.
+There is no canvas socket or network polling timer; the local clock ticks by
+minute, or by second when the authored logic reads `now-second`.
 
 **Retirement:** the host owns a two-phase bridge retire list. Removed or changed
 request identities stay mounted with undefined inputs until the shared hook's

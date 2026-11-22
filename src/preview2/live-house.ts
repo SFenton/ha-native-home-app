@@ -6,10 +6,11 @@ import type { House } from './projections';
 export const READY_KEY = '\u0000ready';
 /** The key a reader holds when it depends on the signed-in person. */
 export const VIEWER_KEY = '\u0000viewer';
+export const TIME_ZONE_KEY = '\u0000time-zone';
 /** The key a reader holds when it looked at every entity (a scan, a size or an iteration). */
 export const ALL_KEY = '\u0000all';
 
-/** A listener hears the keys that changed in one commit: entity ids, plus {@link READY_KEY} and {@link VIEWER_KEY}. */
+/** A listener hears changed entity ids, readiness, viewer and time-zone keys in one commit. */
 export type LiveListener = (keys: readonly string[]) => void;
 
 /** Fields the stream does not carry; they come from the slower snapshot read and survive a stream update. */
@@ -34,24 +35,26 @@ export class LiveHouse {
   /** Entities the stream has sent; their fields are the stream's. */
   private readonly streamed = new Set<string>();
   private viewerValue?: Viewer;
+  private timeZoneValue?: string;
   private isReady = false;
   private global = 0;
 
   constructor() {
     const store = this;
-    this.house = { get states() { return store.isReady ? store.states : undefined; }, get viewer() { return store.viewerValue; } };
+    this.house = { get states() { return store.isReady ? store.states : undefined; }, get viewer() { return store.viewerValue; }, get timeZone() { return store.timeZoneValue; } };
   }
   /** Whether the first house has arrived. */
   get ready() { return this.isReady; }
   /** The signed-in person, once known. */
   get viewer() { return this.viewerValue; }
+  get timeZone() { return this.timeZoneValue; }
   /** A number that rises whenever the key's value changes. {@link ALL_KEY} rises on every change. */
   versionOf(key: string): number { return key === ALL_KEY ? this.global : this.versions.get(key) ?? 0; }
   /** Listens to commits; returns the way to stop. */
   subscribe(listener: LiveListener): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 
-  /** Applies a snapshot read: every state the server returned, and the viewer. Entities the stream owns keep the stream's fields. */
-  applySnapshot(states: readonly NativeState[], viewer?: Viewer) {
+  /** Applies snapshot states, viewer and zone. Entities the stream owns keep the stream's fields. */
+  applySnapshot(states: readonly NativeState[], viewer?: Viewer, timeZone?: string) {
     const changed: string[] = [];
     const seen = new Set<string>();
     for (const incoming of states) {
@@ -65,6 +68,7 @@ export class LiveHouse {
       this.states.delete(id); changed.push(id);
     }
     if (JSON.stringify(viewer ?? null) !== JSON.stringify(this.viewerValue ?? null)) { this.viewerValue = viewer; changed.push(VIEWER_KEY); }
+    if (timeZone !== this.timeZoneValue) { this.timeZoneValue = timeZone; changed.push(TIME_ZONE_KEY); }
     if (!this.isReady) { this.isReady = true; changed.push(READY_KEY); }
     this.commit(changed);
   }

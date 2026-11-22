@@ -3,6 +3,7 @@ import { assertJsonBounds, DocumentValidationError, entityIdSchema, jsonSchema }
 import { nativeClimateRoomEntities } from '../src/shared/native-entities';
 import { nativeTodoItemSchema, nativeTodoReadSchema, choreRecord, choreRecords } from '../src/shared/native-chores';
 import type { NativeCurrentUser, NativeForecast, NativeSnapshot, NativeState } from '../src/shared/native-state';
+import { isNativeTimeZone } from '../src/shared/native-state';
 import type { Json } from '../src/shared/types';
 import { HttpError } from './store';
 
@@ -516,6 +517,7 @@ function projectFields(target: Record<string, unknown>, source: Record<string, u
 }
 
 function validateSnapshot(snapshot: NativeSnapshot, credentials: string[]): NativeSnapshot {
+  if (snapshot.timeZone !== undefined && !isNativeTimeZone(snapshot.timeZone)) throw new HttpError(502, 'Invalid native home time zone');
   inspectConfig(snapshot.states, new Set());
   if (snapshot.currentUser) inspectConfig(snapshot.currentUser, new Set());
   try { assertJsonBounds(snapshot); }
@@ -594,6 +596,7 @@ export async function readNativeSnapshot(
   readStates: () => Promise<unknown>,
   /** Todo lists the draft names (`draftTodoIds`), read in addition to the chores pages' lists; the cap of 64 covers both. */
   extraTodoIds: ReadonlySet<string> = new Set(),
+  readTimeZone?: () => Promise<string | undefined>,
 ): Promise<NativeSnapshot> {
   if (signal.aborted) throw nativeHomeAbortError(signal);
   const session = new NativeReadSession(url, token, signal);
@@ -609,11 +612,13 @@ export async function readNativeSnapshot(
   };
   try {
     const houseConfig = await session.houseConfig();
-    const [rawStates, rawUser] = await Promise.all([
+    const [rawStates, rawUser, timeZone] = await Promise.all([
       readStates(),
       optional(async () => ({ value: await session.currentUser() }), 'Current user read unavailable'),
+      readTimeZone ? optional(readTimeZone, 'House time zone read unavailable; times use the browser time zone') : undefined,
     ]);
     const snapshot = nativeHomeSnapshot(houseConfig, rawStates, credentials, extraTodoIds);
+    if (isNativeTimeZone(timeZone)) snapshot.timeZone = timeZone;
     if (rawUser !== undefined) {
       snapshot.currentUser = await optional(async () => currentUser(rawUser.value, rawStates, credentials), 'Current user response was invalid or unsafe');
       if (!snapshot.currentUser) delete snapshot.currentUser;
