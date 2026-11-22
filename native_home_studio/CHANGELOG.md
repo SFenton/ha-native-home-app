@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.27
+
+- Publishing a layout with sheet levels now works with an app that does not have them yet.
+
 ## 0.3.26
 
 - The Studio can show a sheet's level and edit its tiles, and the simulator's Back steps out of it while editing.
