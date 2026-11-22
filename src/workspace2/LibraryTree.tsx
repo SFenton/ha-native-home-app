@@ -371,7 +371,7 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
     const anchorRow = next ?? last;
     if (!anchorRow) return undefined;
     const box = anchorRow.getBoundingClientRect();
-    return { line: { left: box.left + 8, top: (next ? box.top : box.bottom) - 1, width: box.width - 16, height: 3 }, name: '', vertical: false };
+    return { line: { left: box.left + 8, top: (next ? box.top : box.bottom) - 1, width: box.width - 16, height: 3 }, name: '', vertical: false, anchor: anchorRow };
   };
   /** The line a refused drop or move says, shown under the list until the person's next action (and read out). */
   const refuse = (line: string) => { setRefusal(line); setSaid(line); };

@@ -147,6 +147,18 @@ const settledCentre = async (locator: ReturnType<Page['locator']>) => {
 const orderOf = async (request: APIRequestContext) => home(await draft(request)).components.map(item => item.id);
 const frame = (page: Page, id: string) => page.locator(`[data-preview-root] .sh-screen [data-sel="node:${id}"]`).first();
 
+/**
+ * The preview's pages have stopped scrolling: their offsets are the same across several frames. A pointer held in the drag layer's edge band scrolls the page by
+ * itself, frame after frame, until it reaches the top or bottom.
+ */
+async function scrollSettled(page: Page) {
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __scrollSeen?: { key: string; frames: number } };
+    const key = [...document.querySelectorAll('[data-preview-root] .sh-scroll')].map(element => element.scrollTop).join(',');
+    w.__scrollSeen = w.__scrollSeen?.key === key ? { key, frames: w.__scrollSeen.frames + 1 } : { key, frames: 0 };
+    return w.__scrollSeen.frames >= 6;
+  }, undefined, { polling: 'raf', timeout: 15_000 });
+}
 /** Drags the selected section's grip to `to` and drops it. */
 async function dragGrip(page: Page, grip: ReturnType<Page['locator']>, to: { x: number; y: number }) {
   const from = await settledCentre(grip);
@@ -154,6 +166,23 @@ async function dragGrip(page: Page, grip: ReturnType<Page['locator']>, to: { x: 
   await page.mouse.down();
   await page.mouse.move(from.x + 12, from.y + 12, { steps: 3 });
   await page.mouse.move(to.x, to.y, { steps: 10 });
+  await expect(page.getByTestId('drop-cue')).toBeVisible();
+  await page.mouse.up();
+}
+/**
+ * Drags the selected section's grip into the gap between two sections that the page has scrolled away from: the pointer goes into the top edge band, which scrolls the
+ * page up under it, and once the page has stopped it is taken to the gap, measured then, and the section is dropped.
+ */
+async function dragGripToGapAbove(page: Page, grip: ReturnType<Page['locator']>, above: string, below: string) {
+  const from = await settledCentre(grip), scroller = (await page.locator('[data-preview-root] .sh-scroll').first().boundingBox())!;
+  const gap = async () => { const upper = await settledCentre(frame(page, above)), lower = await settledCentre(frame(page, below)); return { x: lower.x, y: (upper.bottom + lower.top) / 2 }; };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 12, from.y + 12, { steps: 3 });
+  await page.mouse.move(from.x, scroller.y + 20, { steps: 10 });
+  await scrollSettled(page);
+  const to = await gap();
+  await page.mouse.move(to.x, to.y, { steps: 6 });
   await expect(page.getByTestId('drop-cue')).toBeVisible();
   await page.mouse.up();
 }
@@ -197,8 +226,7 @@ test.describe('Edit drag and drop on a page on two sides', () => {
     await selectSection(page, 'hc-home-cameras', 'Cameras');
     await chooseDuo(page);
     await page.getByTestId('simulator-rail').getByRole('button', { name: 'Partly Folded', exact: true }).click();
-    const strip = await settledCentre(frame(page, 'hc-status-rail')), weather = await settledCentre(frame(page, 'hc-weather-summary'));
-    await dragGrip(page, page.getByTestId('node-handle').getByRole('button', { name: 'Move' }), { x: weather.x, y: (strip.bottom + weather.top) / 2 });
+    await dragGripToGapAbove(page, page.getByTestId('node-handle').getByRole('button', { name: 'Move' }), 'hc-status-rail', 'hc-weather-summary');
     await expect.poll(() => orderOf(request)).toEqual(['hc-status-rail', 'hc-home-cameras', 'hc-weather-summary', 'hc-home-guests-visible']);
   });
 });

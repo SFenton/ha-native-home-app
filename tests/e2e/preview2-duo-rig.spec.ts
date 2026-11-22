@@ -405,6 +405,28 @@ async function steadyCue(page: Page) {
   await expect.poll(async () => { const now = JSON.stringify(rounded(await cue.boundingBox())); const same = now === last; last = now; return same; }).toBe(true);
   return rounded(await cue.boundingBox());
 }
+/**
+ * The flatten has finished: no half's transform transition is running, and the frame after its `transitionend` has drawn. The angle reaching
+ * "flat" (cosine above 0.9999) comes before that, while the ease-out's tail is still running, and the drag layer finds the drop again only on
+ * `transitionend`, so a cue or a box read at "flat" can still be the tilted one and then move.
+ */
+async function flattenSettled(page: Page) {
+  await page.waitForFunction(() => !document.getAnimations().some(animation => animation instanceof CSSTransition && animation.transitionProperty === 'transform' && animation.playState !== 'finished'), undefined, { timeout: 10_000 });
+  await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+}
+/**
+ * The preview's pages have stopped scrolling. A pointer held within the drag layer's edge band (56 px) scrolls the page by itself on every frame,
+ * and on a slow runner that runs for seconds after the flatten has ended; a box read meanwhile keeps moving. Settled means the scroll offsets are the
+ * same across several frames.
+ */
+async function scrollSettled(page: Page) {
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __scrollSeen?: { key: string; frames: number } };
+    const key = [...document.querySelectorAll('[data-preview-root] .sh-scroll')].map(element => element.scrollTop).join(',');
+    w.__scrollSeen = w.__scrollSeen?.key === key ? { key, frames: w.__scrollSeen.frames + 1 } : { key, frames: 0 };
+    return w.__scrollSeen.frames >= 6;
+  }, undefined, { polling: 'raf', timeout: 15_000 });
+}
 /** Stretches the flatten to 1.5 s where the rig reads it (the rig sets the variable inline), and says so by the computed duration. */
 async function stretchFlatten(page: Page) {
   await page.addStyleTag({ content: '.sh-rig { --sh-flatten-ms: 1500ms !important; }' });
@@ -424,6 +446,8 @@ test('the drop cue follows the rig as it finishes flattening under a pointer tha
   await page.mouse.down();
   await page.mouse.move(from.x + 12, from.y + 24, { steps: 3 });
   await expect.poll(() => flatNow(page)).toBeGreaterThan(0.9999);
+  await flattenSettled(page);
+  await scrollSettled(page);
   const tile = await settledBox(page, previewTile(page, 'Demo Guests 2'));
   const point = { x: tile.x + tile.width / 2, y: tile.y + tile.height / 2 };
   await page.mouse.move(point.x, point.y, { steps: 4 });
@@ -438,10 +462,11 @@ test('the drop cue follows the rig as it finishes flattening under a pointer tha
   await page.mouse.down();
   await page.mouse.move(again.x + 12, again.y + 24, { steps: 3 });
   // The flatten's own duration applies while the drag runs.
-  expect(await halfDuration(page)).toBe('1.5s');
+  await expect.poll(() => halfDuration(page), { message: 'the drag has begun, so the rig flattens on the stretched duration' }).toBe('1.5s');
   await page.mouse.move(point.x, point.y, { steps: 4 });
   expect(await flatNow(page), 'the rig is still flattening').toBeLessThan(0.9999);
   await expect.poll(() => flatNow(page), { timeout: 10_000 }).toBeGreaterThan(0.9999);
+  await flattenSettled(page);
   await expect.poll(async () => sameWithin1px(rounded(await page.getByTestId('drop-cue').boundingBox()), truth), { timeout: 3000, message: `the cue is within 1px of ${JSON.stringify(truth)}` }).toBe(true);
   await page.mouse.up();
 });
@@ -456,15 +481,33 @@ test('a cue drawn by an arrow key while the rig flattens is drawn again where th
   await grip.focus();
   await page.keyboard.press('Space');
   await page.keyboard.press('ArrowDown');
-  expect(await halfDuration(page)).toBe('1.5s');
+  await expect.poll(() => halfDuration(page), { message: 'the drag has begun, so the rig flattens on the stretched duration' }).toBe('1.5s');
   expect(await flatNow(page), 'the rig is still flattening').toBeLessThan(0.9999);
   await expect.poll(() => flatNow(page), { timeout: 10_000 }).toBeGreaterThan(0.9999);
+  await flattenSettled(page);
   // The cue now stands where the slot is: stepping away and back, on a flat rig, draws it in the same place.
   await expect(page.getByTestId('drop-cue')).toBeVisible();
-  const settled = await steadyCue(page);
+  // Where the cue stands on the page, not on the screen: stepping to another slot scrolls the page to show it, and stepping back scrolls it again.
+  const place = () => page.evaluate(() => {
+    const cue = document.querySelector('[data-testid=drop-cue]')!.getBoundingClientRect(), scroller = document.querySelector('[data-preview-root] .sh-scroll')!;
+    const view = scroller.getBoundingClientRect(), scale = view.height / scroller.clientHeight, style = getComputedStyle(scroller);
+    // The band a person can see: the scroller's box without the padding the navigation and tab bars cover.
+    const from = view.top + parseFloat(style.paddingTop) * scale, to = view.bottom - parseFloat(style.paddingBottom) * scale;
+    return { at: [cue.left, (cue.top - view.top) / scale + scroller.scrollTop, cue.width, cue.height].map(Math.round), inView: cue.top >= from - 1 && cue.bottom <= to + 1 };
+  });
+  let last = '';
+  await expect.poll(async () => { const now = JSON.stringify(await place()); const same = now === last; last = now; return same; }).toBe(true);
+  const settled = await place();
+  expect(settled.inView, 'the slot the key stepped to is shown inside the visible band').toBe(true);
   await page.keyboard.press('ArrowDown');
+  await expect.poll(async () => (await place()).inView, { message: 'one step down shows its slot inside the visible band' }).toBe(true);
   await page.keyboard.press('ArrowUp');
-  await expect.poll(async () => sameWithin1px(rounded(await page.getByTestId('drop-cue').boundingBox()), settled), { timeout: 3000, message: `the cue is within 1px of ${JSON.stringify(settled)}` }).toBe(true);
+  await expect.poll(async () => { const now = await place(); return now.inView && sameWithin1px(now.at, settled.at); }, { timeout: 3000, message: `the cue is on the page where the slot is, ${JSON.stringify(settled.at)} (left, top, width, height), and in view` }).toBe(true);
+  // One step up shows its slot inside the visible band, and one step down is the slot it left, where it was.
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(async () => (await place()).inView, { message: 'one step up shows its slot inside the visible band' }).toBe(true);
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(async () => { const now = await place(); return now.inView && sameWithin1px(now.at, settled.at); }, { timeout: 3000, message: 'stepping back down is the first slot again' }).toBe(true);
   await page.keyboard.press('Escape');
 });
 

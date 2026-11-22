@@ -64,7 +64,7 @@ export default function LevelList({ ws, level, rows, onEnter, onLeaf, onMoveTo, 
     const anchor = host.querySelector<HTMLElement>(`[data-row="${next?.key ?? rows.at(-1)?.key}"]`);
     if (!anchor) return undefined;
     const box = anchor.getBoundingClientRect();
-    return { line: { left: box.left + 8, top: (next ? box.top : box.bottom) - 1, width: box.width - 16, height: 3 }, name: '', vertical: false };
+    return { line: { left: box.left + 8, top: (next ? box.top : box.bottom) - 1, width: box.width - 16, height: 3 }, name: '', vertical: false, anchor: anchor };
   };
   const locate = (): Locator => (x, y) => {
     const host = list.current;

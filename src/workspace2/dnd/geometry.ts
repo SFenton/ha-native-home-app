@@ -15,6 +15,8 @@ export interface Cue {
   name: string;
   /** Whether the bar is vertical (siblings share a row). */
   vertical: boolean;
+  /** The element the bar is drawn against: the keyboard reveals the slot inside the scrollers that contain it, and in no others. */
+  anchor?: Element;
 }
 /** Where a pointer would drop: the destination and the cue that shows it. */
 export interface Hit { destination: Destination; cue: Cue }
@@ -104,7 +106,7 @@ export function locateOnCanvas(root: ParentNode, document: CompositionDocument, 
 export function cueFor(root: ParentNode, document: CompositionDocument, destination: Destination): Cue | undefined {
   const host = containerHosts(root).find(item => item.owner === destination.owner)?.host;
   if (!host) return undefined;
-  return cueAt(host, valueAt(document, destination.list) as unknown[], destination.index, ownerTitle(document, destination.owner));
+  return { ...cueAt(host, valueAt(document, destination.list) as unknown[], destination.index, ownerTitle(document, destination.owner)), anchor: host };
 }
 
 function draggedNodeType(document: CompositionDocument, key: SelectionKey): string | undefined {

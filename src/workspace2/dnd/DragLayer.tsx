@@ -70,6 +70,48 @@ function makeGhost(source: HTMLElement): { element: HTMLElement; width: number; 
   return { element: wrapper, width: rect.width, height: rect.height, scale };
 }
 
+/** The nearest ancestor of `anchor` (itself included, the page's body excluded) that scrolls along `axis`. */
+function scrollerOf(anchor: Element, axis: 'x' | 'y'): HTMLElement | undefined {
+  for (let at: Element | null = anchor; at && at !== window.document.body; at = at.parentElement) {
+    const style = getComputedStyle(at), overflow = axis === 'y' ? style.overflowY : style.overflowX;
+    if (/auto|scroll|overlay/.test(overflow) && (axis === 'y' ? at.scrollHeight > at.clientHeight : at.scrollWidth > at.clientWidth)) return at as HTMLElement;
+  }
+  return undefined;
+}
+/**
+ * How far a scroller must move, in its own pixels, to bring `start`..`end` (screen pixels along `axis`) into the band a person can see, and 0 when it is there.
+ * Vertically the band is the scroller's box inset by its padding, which is where the bars drawn over it end (the preview's navigation and tab bars are padding).
+ */
+function shortfall(scroller: HTMLElement, axis: 'x' | 'y', start: number, end: number): number {
+  const box = scroller.getBoundingClientRect(), size = axis === 'y' ? scroller.clientHeight : scroller.clientWidth;
+  if (!size) return 0;
+  const scale = (axis === 'y' ? box.height : box.width) / size, style = getComputedStyle(scroller);
+  const lead = axis === 'y' ? (parseFloat(style.paddingTop) || 0) * scale : 0, trail = axis === 'y' ? (parseFloat(style.paddingBottom) || 0) * scale : 0;
+  const from = (axis === 'y' ? box.top : box.left) + lead, to = (axis === 'y' ? box.bottom : box.right) - trail;
+  return (start < from ? start - from : end > to ? end - to : 0) / scale;
+}
+/**
+ * The cue of the slot the keyboard stands on, drawn where the slot is once it is in view. The scrollers that contain the slot (its cue's `anchor`: the nearest
+ * one each way) move first, by the least that puts the bar inside the band a person can see and not at all when it is there, and the cue is measured after that:
+ * a cue taken before it would be drawn at the old position. A cue with no anchor, or a slot in no scroller, scrolls nothing; no other scroller is ever moved for it.
+ */
+function revealSlot(destination: Destination, cueOf?: (destination: Destination) => Cue | undefined): Cue | undefined {
+  let cue = cueOf?.(destination);
+  if (!cue?.anchor) return cue;
+  const anchor = cue.anchor;
+  const down = scrollerOf(anchor, 'y');
+  if (down) {
+    const delta = shortfall(down, 'y', cue.line.top, cue.line.top + cue.line.height);
+    if (delta) { down.scrollTop += delta; cue = cueOf?.(destination) ?? cue; }
+  }
+  const across = scrollerOf(anchor, 'x');
+  if (across) {
+    const delta = shortfall(across, 'x', cue.line.left, cue.line.left + cue.line.width);
+    if (delta) { across.scrollLeft += delta; cue = cueOf?.(destination) ?? cue; }
+  }
+  return cue;
+}
+
 /**
  * Drag and drop for the canvas and "This Page" (spec section 6). Sources call `begin`; this layer finds the slot under the
  * pointer, draws the drop cue where the pointer is (an outline on the target container and a bar where the node lands), the
@@ -232,10 +274,9 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
         state.cursor = Math.max(0, Math.min(state.slots.length - 1, state.cursor));
         const destination = state.slots[state.cursor];
         if (!destination) return;
-        const hit = { destination, cue: state.cue?.(destination) ?? { line: { left: 0, top: 0, width: 0, height: 0 }, name: '', vertical: false } };
+        const hit = { destination, cue: revealSlot(destination, state.cue) ?? { line: { left: 0, top: 0, width: 0, height: 0 }, name: '', vertical: false } };
         update({ ...(live.current ?? session), hit });
         setAnnouncement(spoken.over(placementOf(document, session.key, destination)));
-        stage?.querySelector<HTMLElement>(`[data-add-for="${destination.owner}"]`)?.scrollIntoView({ block: 'nearest' });
       } else if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); finish(true); }
       else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(false); }
     };
@@ -306,7 +347,7 @@ export default function DragLayer({ ws, stage, narrow, onError, children }: { ws
       const current = live.current;
       if (event.propertyName !== 'transform' || !(event.target as Element).matches?.('.sh-half') || !current) return;
       if (current.mode !== 'keyboard') { find(current.point.x, current.point.y); return; }
-      const state = keyboard.current, destination = state && state.cursor >= 0 ? state.slots[state.cursor] : undefined, cue = destination && state?.cue?.(destination);
+      const state = keyboard.current, destination = state && state.cursor >= 0 ? state.slots[state.cursor] : undefined, cue = destination && revealSlot(destination, state?.cue);
       if (destination && cue) update({ ...current, hit: { destination, cue } });
     };
     stage.addEventListener('transitionend', settled);
