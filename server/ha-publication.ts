@@ -1,6 +1,8 @@
-import { publishedDocument } from '../src/shared/composition/logic-library';
+import { servedCapabilities, servedDocument, shippedCompositionCapabilities, unloweredWords } from '../src/shared/composition/publish-target';
 import type { CompositionPublication } from '../src/shared/composition/schema';
 import { canonicalCompositionJSON, CompositionValidationError } from '../src/shared/composition/json';
+import { INK_DEFAULT_CAPABILITY, legacyManifest } from '../src/shared/composition/compiler';
+import { SHEET_LEVELS_CAPABILITY } from '../src/shared/composition/global-chrome';
 import { HttpError } from './store';
 import { validateCompositionPublication } from './composition';
 
@@ -137,7 +139,27 @@ function entry(value: unknown): HaPublicationEntry {
 export class HaPublicationClient {
   private readonly shutdown = new AbortController();
   private queue: Promise<unknown> = Promise.resolve();
-  constructor(private readonly transport: Transport) {}
+  /** `target`: the capability ids of the app build served; the shipped list unless a test says otherwise. */
+  constructor(private readonly transport: Transport, private readonly target: readonly string[] = shippedCompositionCapabilities) {}
+
+  /**
+   * The served form of a draft's document, or the 422 a saved component that cannot be lowered earns (the lint's words). Called by the route before the Studio records a
+   * publication of its own, so a refusal leaves everything as it was.
+   */
+  refuse<T>(document: T): { document: T } {
+    const served = servedDocument(document, this.target);
+    if (served.unlowered.length) throw new HttpError(422, unloweredWords, { pointers: served.unlowered });
+    return { document: served.document };
+  }
+
+  /** The manifest of a lowered copy: what the copy needs, with the ink id only if the draft's own manifest declared it. */
+  private loweredManifest(declared: readonly string[], document: unknown): string[] {
+    const worked = servedCapabilities(document as never);
+    return declared.includes(INK_DEFAULT_CAPABILITY) ? worked : legacyManifest(worked);
+  }
+
+  /** What the app is served for a draft's document: logic worked out and, for a build without `sh.sheet-levels@1`, levels lowered. */
+  served<T>(document: T): T { return servedDocument(document, this.target).document; }
 
   get configured() { return Boolean(this.transport.base && this.transport.token && this.transport.websocketUrl); }
   close() { this.shutdown.abort(); }
@@ -171,7 +193,7 @@ export class HaPublicationClient {
     if (draft === undefined) return summary;
     // The app serves the draft's logic worked out, so that is what is compared; a draft whose logic does not work out is not comparable.
     let served: unknown;
-    try { served = publishedDocument(draft.document); }
+    try { served = this.served(draft.document); }
     catch (error) { if (!(error instanceof CompositionValidationError)) throw error; served = undefined; }
     const comparable = summary.current !== null && liveDocument !== undefined && served !== undefined;
     return { ...summary, draftRevision: draft.revision, draftIsLive: comparable ? canonicalCompositionJSON(liveDocument) === canonicalCompositionJSON(served) : null };
@@ -192,7 +214,11 @@ export class HaPublicationClient {
   publish(publication: CompositionPublication): Promise<HaPublishResult> {
     return this.serialize(async () => {
       if (!this.configured) throw new HttpError(503, 'Home Assistant is not configured');
-      const prepared = validateCompositionPublication({ ...publication, document: publishedDocument(publication.document) });
+      const { document } = this.refuse(publication.document);
+      // Lowering changes what the text needs (`sh.sheet-levels@1` goes), so the manifest is worked out again for the copy that is sent. It declares nothing the draft did not:
+      // a draft saved with the older manifest (no `sh.tile-ink-default@1`) keeps its muted ink.
+      const lowered = (publication.document as { levels?: unknown }).levels !== undefined && !this.target.includes(SHEET_LEVELS_CAPABILITY);
+      const prepared = validateCompositionPublication({ ...publication, document, ...(lowered ? { capabilities: this.loweredManifest(publication.capabilities, document) } : {}) });
       const result = await command(this.transport, 'publish', { envelope: prepared }, this.shutdown.signal);
       if (!isRecord(result) || typeof result.epoch !== 'string' || typeof result.revision !== 'number' || typeof result.envelopeSha256 !== 'string')
         throw new HttpError(502, 'Home Assistant returned an unreadable publish result');

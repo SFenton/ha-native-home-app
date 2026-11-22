@@ -44,6 +44,9 @@ export interface WarningOptions {
   target?: readonly string[];
 }
 
+/** The lint's words for a saved component that pushes from inside a sheet; a publication to a build without levels is refused with the same words. */
+export const unloweredWords = 'Needs a newer app. This saved component opens a page from inside a sheet, and the app build this publishes to would open it inside the sheet instead of closing the sheet first. Use it on a page, or write the link as Close Sheet, Then Open.';
+
 const newerApp = (what: string) => `Needs a newer app. The app build this publishes to ${what}, and it refuses a publication that uses the setting until it updates.`;
 
 /**
@@ -63,7 +66,7 @@ export function chromeCapabilityWarnings(document: CompositionDocument, target: 
   if (document.navigation.tabsVisibility !== undefined && lacks(TABS_VISIBILITY_CAPABILITY))
     warnings.push({ pointer: '/document/navigation/tabsVisibility', capability: TABS_VISIBILITY_CAPABILITY, message: newerApp('does not know when the tab bar shows') });
   for (const pointer of lowerSheetLevels(document, target).unlowered)
-    warnings.push({ pointer, message: 'Needs a newer app. This saved component opens a page from inside a sheet, and the app build this publishes to would open it inside the sheet instead of closing the sheet first. Use it on a page, or write the link as Close Sheet, Then Open.' });
+    warnings.push({ pointer, message: unloweredWords });
   return warnings;
 }
 

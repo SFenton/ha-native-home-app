@@ -189,7 +189,7 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     const withoutId = (document: unknown) => canonicalCompositionJSON(document !== null && typeof document === 'object' ? { ...(document as Record<string, unknown>), id: '' } : document);
     // The app serves the draft's logic worked out, so the draft is compared in that form.
     let served: unknown;
-    try { served = publishedDocument(draft.document); }
+    try { served = ha.publication.served(draft.document); }
     catch (error) { if (!(error instanceof CompositionValidationError)) throw error; answer('ask', 'invalid-draft', liveLayout.revision); return; }
     if (withoutId(liveLayout.document) === withoutId(served)) { answer('keep', 'already-published', liveLayout.revision); return; }
     const revision = liveLayout.revision;
@@ -197,7 +197,8 @@ export function createApp(store: StudioStore, config: ServerConfig) {
     // (the app changed elsewhere, a rollback) or it was never edited at all (a new data folder).
     let published: ReturnType<typeof store.native.getPublished> | undefined;
     try { published = store.native.getPublished(); } catch { published = undefined; }
-    const pristine = published ? canonicalCompositionJSON(published.document) === canonicalCompositionJSON(served) : draft.revision === 1;
+    // The store's own publication is the unlowered form.
+    const pristine = published ? canonicalCompositionJSON(published.document) === canonicalCompositionJSON(publishedDocument(draft.document)) : draft.revision === 1;
     answer(pristine ? 'start' : 'ask', pristine ? 'no-unpublished-edits' : 'unpublished-edits', revision);
   });
   // The Studio's own notes (row icons). Not part of the document: Publish, Export and the app never carry them.
@@ -211,6 +212,8 @@ export function createApp(store: StudioStore, config: ServerConfig) {
   });
   app.post('/native/api/ha/publish', async (req, res) => {
     const { expectedRevision } = publishSchema.parse(req.body);
+    // A refusal comes first: the Studio records no publication of its own for one Home Assistant will never get.
+    ha.publication.refuse(store.native.peekDraft().document);
     const published = await store.native.publish(expectedRevision);
     res.json(await ha.publication.publish(published));
   });
