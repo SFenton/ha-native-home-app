@@ -15,7 +15,7 @@ import { indexGraph } from './graph-index';
 import CanvasBlock, { type BlockActions } from './CanvasBlock';
 import { blockLayoutKey, presentBlocks, type BlockPresentation } from './presentation';
 import { canvasWindowAt, intersectsWindow, useCanvasWindow } from './windowing';
-import { countCrossings, tidyCanvas, type TidyMeasure } from './tidy';
+import { countCrossings, countOverlaps, tidyCanvas, type TidyMeasure } from './tidy';
 import Modal from './CanvasDialog';
 import AnnotationEditor, { annotationError, type AnnotationDraft } from './AnnotationEditor';
 import DataPeek from './DataPeek';
@@ -185,7 +185,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
   const wireGeometry = useMemo(() => ({ ports: new Map<string, { x: number; y: number }>(), measured: new Set<string>() }), [layoutKey, moving, view, zoom, phone, host.observations, entered, draft, sizes, offsetX, offsetY]);
   const measuredCards = useMemo(() => new WeakMap<HTMLElement, TidyMeasure>(), [layoutKey, zoom, view]);
   const measuredPortPoints = useMemo(() => new WeakMap<HTMLElement, { x: number; y: number }>(), [layoutKey, zoom, view]);
-  const readMeasurements = useCallback((cards: Iterable<HTMLElement> = board.current?.querySelectorAll<HTMLElement>('.w2-canvas-node') ?? [], cache?: WeakMap<HTMLElement, TidyMeasure>) => {
+  const readMeasurements = useCallback((cards: Iterable<HTMLElement> = board.current?.querySelectorAll<HTMLElement>('.w2-canvas-node') ?? [], cache?: WeakMap<HTMLElement, TidyMeasure>, reserveActions = false) => {
     const measured = new Map<string, TidyMeasure>();
     for (const card of cards) {
       const cached = cache?.get(card);
@@ -202,12 +202,14 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           measuredPortPoints.set(port, point);
         }
       }
-      const measurement = { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1), ports };
+      // Keep space for selecting any card later, not just the currently selected action row.
+      const actionReserve = !reserveActions || card.querySelector('.w2-canvas-node-actions') ? 0 : phone ? 55 : 45;
+      const measurement = { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1) + actionReserve, ports };
       measured.set(card.dataset.nodeId!, measurement);
       cache?.set(card, measurement);
     }
     return measured;
-  }, [zoom, view, measuredPortPoints]);
+  }, [zoom, view, phone, measuredPortPoints]);
   useLayoutEffect(() => {
     if (view !== 'graph') return;
     const measured = readMeasurements(undefined, measuredCards);
@@ -495,12 +497,14 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
           <button type="button" aria-label="Zoom out" disabled={zoom <= .25} onClick={() => setZoom(Math.max(.25, zoom - .25))}><Minus size={16}/></button><output aria-label="Zoom">{Math.round(zoom * 100)}%</output>
           <button type="button" aria-label="Zoom in" disabled={zoom >= 2} onClick={() => setZoom(Math.min(2, zoom + .25))}><Plus size={16}/></button>
           <button type="button" aria-label="Tidy Up" onClick={event => {
-            const measured = view === 'graph' ? readMeasurements() : new Map<string, TidyMeasure>(), measure = (id: string) => measured.get(id);
+            const measured = view === 'graph' ? readMeasurements(undefined, undefined, true) : new Map<string, TidyMeasure>(), measure = (id: string) => measured.get(id);
             const before = countCrossings(graph, measure), next = tidyCanvas(graph, measure), after = countCrossings(next, measure);
+            const remainingOverlaps = countOverlaps(next, measure);
             if (next !== graph) send({ type: 'layout', graph: next });
             restore.current = false;
             setFraming(value => value + 1);
-            setMessage(next === graph ? 'Already tidy' : `Tidied: wire crossings ${before} → ${after}`);
+            setMessage(next === graph ? remainingOverlaps ? 'Overlapping blocks remain: could not separate them without increasing wire crossings.' : 'Already tidy'
+              : `Tidied: wire crossings ${before} → ${after}`);
             event.currentTarget.focus();
           }}><WandSparkles size={14}/><span className="w2-canvas-toolbar-label">Tidy Up</span></button>
           <button type="button" className="w2-canvas-problems-pill" ref={problemsButton} onClick={() => setProblemsOpen(true)}>{problemCount ? <AlertTriangle size={14}/> : <CircleCheck size={14}/>} {problemCount ? `${problemCount} Problems` : 'No Problems'}</button>

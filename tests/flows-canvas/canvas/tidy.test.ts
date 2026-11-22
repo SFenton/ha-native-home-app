@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import { describe, expect, it } from 'vitest';
 import { portType, type GraphEdge, type GraphNode, type LogicGraph } from '../../../src/shared/composition/graph';
-import { countCrossings, tidyCanvas, type TidyMeasure } from '../../../src/workspace2/canvas/tidy';
+import { countCrossings, countOverlaps, tidyCanvas, type TidyMeasure } from '../../../src/workspace2/canvas/tidy';
 import { groceryGraph } from './grocery-fixture';
 
 const type = portType({ kind: 'string' });
@@ -70,6 +70,24 @@ function randomSource(seed: number) {
 }
 
 describe('port-aware Tidy Up', () => {
+  it('separates a persisted compact layout even with zero wire crossings, including measured annotation and selected chrome', () => {
+    const graph = graphFor([{ x: 24, y: 24 }, { x: 24, y: 168 }, { x: 500, y: 24 }], [[0, 2], [1, 2]]);
+    const measured = new Map<string, TidyMeasure>(graph.nodes.map(node => [node.id, {
+      width: 190, height: node.id === 'node-0' ? 256 : 180,
+      ports: Object.fromEntries([...node.inputs, ...node.outputs].map((port, i) => [port.id, {
+        direction: i < node.inputs.length ? 'input' as const : 'output' as const, y: 60 + i * 29,
+      }])),
+    }]));
+    const measure = (id: string) => measured.get(id);
+    expect(countCrossings(graph, measure)).toBe(0);
+    expect(countOverlaps(graph, measure)).toBe(1);
+    const tidy = tidyCanvas(graph, measure);
+    expect(tidy).not.toBe(graph);
+    expect(countCrossings(tidy, measure)).toBe(0);
+    expect(countOverlaps(tidy, measure)).toBe(0);
+    assertSeparated(tidy, measured);
+    expect(tidyCanvas(tidy, measure)).toBe(tidy);
+  });
   it('C1 removes crossings into the grocery Flow Inputs and Rows blocks', () => {
     const graph = groceryGraph(), before = countCrossings(graph), tidy = tidyCanvas(graph), after = countCrossings(tidy);
     expect(graph.nodes).toHaveLength(10);

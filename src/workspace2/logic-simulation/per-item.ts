@@ -29,11 +29,30 @@ export function noItemsText(context: ItemContext): string {
   return `Didn't run: no items reached ${context.step}`;
 }
 
+/** Expanded template descendants share the use's identity, but only its outer expressions complete the block. */
+export function blockResultPointers(root: SimulationRoot): ReadonlyMap<string, ReadonlySet<string>> {
+  const mapped = new Map<string, string[]>();
+  for (const location of root.sourceMap) {
+    if (location.portId !== 'value') continue;
+    const pointers = mapped.get(location.nodeId) ?? [];
+    pointers.push(location.pointer);
+    mapped.set(location.nodeId, pointers);
+  }
+  return new Map([...mapped].map(([id, pointers]) => {
+    const outer = new Set<string>();
+    for (const at of pointers.sort((a, b) => a.length - b.length)) {
+      if (![...outer].some(parent => at === parent || at.startsWith(`${parent}/`))) outer.add(at);
+    }
+    return [id, outer];
+  }));
+}
+
 export function observePerItem(root: SimulationRoot, inputs: PipelineInputs, flow: Extract<RunResult, { status: 'ok' }>, execution: ObservationReport,
   context: FlowContext, observation: { readonly report: ObservationReport; readonly evaluation: EvaluationObserver },
   originalPointer: (at: string) => string): PerItemObservations {
   const contexts: Record<string, ItemContext & { readonly stepId: string }> = {};
   const candidates: { expression: Record<string, unknown>; condition: boolean }[] = [];
+  const resultPointers = blockResultPointers(root);
   const scopes: { value: unknown; pointer: string; item: ItemContext & { readonly stepId: string } }[] = inputs.steps.flatMap((step, index) => {
     if (!perItemSteps.has(step.op)) return [];
     const block = nodeFor(root, originalPointer(`/steps/${index}`));
@@ -46,14 +65,22 @@ export function observePerItem(root: SimulationRoot, inputs: PipelineInputs, flo
     const block = nodeFor(root, '/output');
     if (block) scopes.push({ value: inputs.output, pointer: '/output', item: { stepId: block.id, step: nodeTitle(block, root.graph), count: Array.isArray(flow.value) ? flow.value.length : 0 } });
   }
-  for (const scope of scopes) walkJSON(scope.value, (expression, at) => {
-    if (typeof expression.type !== 'string') return;
-    const block = nodeFor(root, originalPointer(at));
-    if (!block || !['operand', 'condition', 'logic-ref'].includes(block.payload.kind)) return;
-    const dependent = dependsOnItem(expression);
-    if (dependent || scope.item.count > 0) contexts[block.id] = scope.item;
-    if (!dependent) candidates.push({ expression, condition: block.outputs[0]?.type.representation === 'condition' });
-  }, scope.pointer);
+  for (const scope of scopes) {
+    const fragments = new Map<string, { block: NonNullable<ReturnType<typeof nodeFor>>; expressions: Record<string, unknown>[] }>();
+    walkJSON(scope.value, (expression, at) => {
+      if (typeof expression.type !== 'string') return;
+      const pointer = originalPointer(at), block = nodeFor(root, pointer);
+      if (!block || !['operand', 'condition', 'logic-ref'].includes(block.payload.kind) || !resultPointers.get(block.id)?.has(pointer)) return;
+      const fragment = fragments.get(block.id) ?? { block, expressions: [] };
+      fragment.expressions.push(expression);
+      fragments.set(block.id, fragment);
+    }, scope.pointer);
+    for (const { block, expressions } of fragments.values()) {
+      const dependent = expressions.some(dependsOnItem);
+      if (dependent || scope.item.count > 0) contexts[block.id] = scope.item;
+      if (!dependent) candidates.push(...expressions.map(expression => ({ expression, condition: block.outputs[0]?.type.representation === 'condition' })));
+    }
+  }
   if (candidates.length) {
     // The native parameter evaluator and the same frozen capture are reused; diagnostic work never spends the flow's meter.
     const params = evaluateParameters(inputs, context, new Meter(PIPELINE_BUDGET)), observed = new WeakSet<object>();

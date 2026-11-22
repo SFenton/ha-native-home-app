@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { canvasPortObservations } from '../../../src/workspace2/logic-fields/observations';
 import { canvasObservations, formatObservedValue, itemContextText } from '../../../src/workspace2/logic-simulation/observations';
 import { captureScenario, runSimulation } from '../../../src/workspace2/logic-simulation/engine';
-import { nodeFor } from '../../../src/workspace2/logic-simulation/program';
+import { createSimulationProgram, nodeFor } from '../../../src/workspace2/logic-simulation/program';
+import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
+import { createCompositionDocument } from '../../../src/shared/composition/workspace';
+import { liftField } from '../../../src/workspace2/logic-fields/registry';
 import { todoFlowInputs, todoItemFixture } from './per-item-fixture';
 
 const todayAt = '/steps/1/where/of/2/left/to', itemAt = '/steps/1/where/of/0/left';
@@ -10,7 +13,7 @@ const items = [
   { uid: 'demo-first', summary: 'First task', status: 'needs_action', due: '2026-11-20' },
   { uid: 'demo-second', summary: 'Older task', status: 'needs_action', due: '2026-11-19' },
 ];
-function observe(fixture: ReturnType<typeof todoItemFixture>, options: Parameters<typeof runSimulation>[2] = {}) {
+function observe(fixture: Pick<ReturnType<typeof todoItemFixture>, 'program' | 'held'>, options: Parameters<typeof runSimulation>[2] = {}) {
   const run = runSimulation(fixture.program, fixture.held, options);
   const values = canvasObservations(fixture.program, run, {
     scenario: options.scenario, pins: [...options.scenario?.pins ?? [], ...options.pins ?? []], localPins: options.pins,
@@ -20,6 +23,56 @@ function observe(fixture: ReturnType<typeof todoItemFixture>, options: Parameter
   return { run, values, at, ports: canvasPortObservations(values) };
 }
 describe('per-item observations', () => {
+  function templateFixture(items: number[], dependent = true) {
+    const document = compileCompositionDocument({
+      ...createCompositionDocument('demo-template-items'),
+      logicLibrary: [{
+        id: 'demo-plus-100', name: 'Plus 100', kind: 'operand', params: [{ name: 'n', kind: 'operand', sample: { type: 'literal', value: 1 } }],
+        body: { type: 'math', op: 'add', args: [{ type: 'literal', value: 100 }, { type: 'hole', name: 'n' }] },
+      }],
+      dataSources: [{
+        id: 'demo-template-flow', kind: 'model', model: 'pipeline@1', inputs: {
+          title: 'Template items', parameters: [], request: { type: 'none', value: { type: 'literal', value: items } },
+          steps: [
+            { id: 'scores', op: 'map', fields: { score: { type: 'logic-ref', logicId: 'demo-plus-100', args: {
+              n: dependent ? { type: 'item', path: [] } : { type: 'literal', value: 1 },
+            } } } },
+            { id: 'total', op: 'sum', value: { type: 'item', path: ['score'] } },
+          ],
+          output: { kind: 'scalar' }, schema: { kind: 'union', of: [{ kind: 'number' }, { kind: 'null' }] },
+        },
+      }],
+    }).document;
+    const graph = liftField(document, ['dataSources', 0], 'flow').graph;
+    const held = todoItemFixture().held;
+    return { graph, program: createSimulationProgram([graph], { library: document.logicLibrary }), held: {
+      ...held, base: { ...held.base, flowResponses: [] },
+    } };
+  }
+  it.each([{ items: [1] }, { items: [1, 9] }])('shows a completed template result and inputs from the same first item ($items)', ({ items }) => {
+    const fixture = templateFixture(items), { run, at } = observe(fixture);
+    const template = at('/steps/0/fields/score');
+    expect(template).toMatchObject({ observed: true, value: 101, item: { count: items.length, index: 0 } });
+    expect(formatObservedValue(template)).toBe('101');
+    expect(itemContextText(template.item)).toBe(`Item 1 of ${items.length}`);
+    expect(template.ports.find(port => port.direction === 'input' && port.portId === '/args/n')).toMatchObject({
+      observed: true, value: 1, item: { count: items.length, index: 0 },
+    });
+    expect(run.outputs[0].flow).toEqual(runSimulation(fixture.program, fixture.held, { observe: false }).outputs[0].flow);
+  });
+  it('does not attribute internal constants to a dependent template on empty input', () => {
+    const { at, run, ports } = observe(templateFixture([]));
+    const template = at('/steps/0/fields/score');
+    expect(template).toMatchObject({ observed: false, item: { count: 0 } });
+    expect(formatObservedValue(template)).toMatch(/^Didn't run: no items reached/);
+    expect(ports[template.blockId].outputs?.value).toMatchObject({ state: 'no-items' });
+    expect(run.outputs[0].perItem?.trace.events.some(event => event.blockId === template.blockId)).toBe(false);
+  });
+  it('still observes the complete result of a truly independent template with zero items', () => {
+    const { at } = observe(templateFixture([], false));
+    expect(at('/steps/0/fields/score')).toMatchObject({ observed: true, value: 101 });
+    expect(at('/steps/0/fields/score').ports.find(port => port.portId === '/args/n')).toMatchObject({ observed: true, value: 1 });
+  });
   it('shows the real clock, constants and pure expressions on empty input without changing runtime answers, costs or execution evidence', () => {
     const inputs = todoFlowInputs();
     const filter = inputs.steps[1];
