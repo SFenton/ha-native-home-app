@@ -66,6 +66,14 @@ strings that merely contain a date (IDs) are left alone. The exact raw value is
 never lost: it stays in the accessible description and behind Raw in the full
 comparison.
 
+Time zone: live dates use the optional, validated `timeZone` that the Studio
+server reads from Home Assistant's `GET /api/config` and adds to the
+`GET /api/native-home` snapshot (no other config field is forwarded), with the
+effective live simulation clock and the zone's historical DST offset at each
+value's instant. If the zone is absent, dates use the browser zone and the
+Preview says "Times shown in this browser's time zone". Frozen scenarios keep
+their captured wall time and declared offset.
+
 ## Tidy Up (F6)
 
 `src/workspace2/canvas/tidy.ts` exports
