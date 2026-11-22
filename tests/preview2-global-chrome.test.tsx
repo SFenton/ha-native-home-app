@@ -67,6 +67,61 @@ describe('a push from a sheet in the preview', () => {
   });
 });
 
+describe('a level in Edit (sl-surface)', () => {
+  /** A shell that holds the surface the preview reports, as the workspace does. */
+  function Held({ surface: first, window: win = iphone }: { surface: PreviewSurface; window?: PreviewWindow }) {
+    const [surface, setSurface] = useState<PreviewSurface>(first);
+    const [overlay, setOverlay] = useState<Overlay>(emptyOverlay);
+    const document = demoDocument();
+    return <>
+      <output data-testid="surface">{JSON.stringify(surface)}</output>
+      <Preview2 document={document} mode="edit" surface={surface} onSurfaceChange={setSurface} onSelect={() => undefined} window={win} bezel={false}
+        house={demoHouse(document)} overlay={overlay} onOverlayChange={setOverlay}/>
+    </>;
+  }
+  const reported = (container: HTMLElement) => JSON.parse(container.querySelector('[data-testid="surface"]')!.textContent!);
+
+  it('draws the level in its sheet, with the Add slot of the level, and Back titled for where it goes', () => {
+    const { container } = render(<Held surface={{ kind: 'level', id: 'demo_level_b' }}/>);
+    const sheet = container.querySelector('.sh-sheet')!;
+    expect(sheet.getAttribute('aria-label')).toBe('Demo Level B');
+    expect(sheet.querySelector('.sh-add-slot[data-add-for="level:demo_level_b"]')).not.toBeNull();
+    expect(sheet.querySelector('button[aria-label="Back"]')!.getAttribute('title')).toBe('Back to Demo Level A');
+  });
+
+  it('Back steps out of a level in Edit, to the level beneath and then to the sheet, and the shell is told; Close does nothing', () => {
+    const { container } = render(<Held surface={{ kind: 'level', id: 'demo_level_b' }}/>);
+    act(() => { fireEvent.click(container.querySelector('.sh-sheet button[aria-label="Close"]')!); });
+    expect(container.querySelector('.sh-sheet')!.getAttribute('aria-label')).toBe('Demo Level B');
+    act(() => { fireEvent.click(container.querySelector('.sh-sheet button[aria-label="Back"]')!); });
+    expect(container.querySelector('.sh-sheet')!.getAttribute('aria-label')).toBe('Demo Level A');
+    expect(reported(container)).toEqual({ kind: 'level', id: 'demo_level_a', sheetId: 'demo_sheet' });
+    act(() => { fireEvent.click(container.querySelector('.sh-sheet button[aria-label="Back"]')!); });
+    expect(container.querySelector('.sh-sheet')!.getAttribute('aria-label')).toBe('Demo Sheet');
+    expect(reported(container)).toEqual({ kind: 'modal', id: 'demo_sheet' });
+    expect(container.querySelector('.sh-sheet button[aria-label="Back"]')).toBeNull();
+  });
+
+  it('puts Back in the rail on the folded Duo, live in Edit too', () => {
+    const { container } = render(<Held surface={{ kind: 'level', id: 'demo_level_a' }} window={duoWindow({ turn: 0, fold: 'closed' })}/>);
+    const back = container.querySelector('.sh-sheet-rail button[data-leading="back"]')!;
+    expect(back.getAttribute('title')).toBe('Back to Demo Sheet');
+    act(() => { fireEvent.click(back); });
+    expect(container.querySelector('.sh-sheet')!.getAttribute('aria-label')).toBe('Demo Sheet');
+  });
+
+  it('draws a level no sheet opens alone: over the empty page, with Close and no Back', () => {
+    const { container } = render(<Held surface={{ kind: 'level', id: 'demo_level_alone' }}/>);
+    const sheet = container.querySelector('.sh-sheet')!;
+    expect(sheet.getAttribute('aria-label')).toBe('Demo Level Alone');
+    expect(sheet.getAttribute('data-sel')).toBe('level:demo_level_alone');
+    expect(sheet.querySelector('button[aria-label="Back"]')).toBeNull();
+    expect(sheet.querySelector('button[aria-label="Close"]')).not.toBeNull();
+    expect(sheet.querySelector('.sh-add-slot[data-add-for="level:demo_level_alone"]')).not.toBeNull();
+    expect(container.querySelector('.sh-page')).toBeNull();
+  });
+});
+
 describe('the tab navigator follows the page on top', () => {
   const hidden = (document: CompositionDocument) => {
     const { container } = render(<Shell document={document}/>);

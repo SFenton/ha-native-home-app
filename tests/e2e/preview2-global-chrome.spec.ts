@@ -173,3 +173,64 @@ for (const scheme of ['light', 'dark'] as const) {
     });
   }
 }
+
+/**
+ * A level is a surface (`sl-surface`): in Edit it draws inside its sheet with the stack beneath it, a node in it selects, Back is live and Close is not, and a level no sheet
+ * opens is drawn alone. Every check is a key, an attribute or a count, so no font metric decides.
+ */
+for (const scheme of ['light', 'dark'] as const) {
+  test(`a level in Edit in ${scheme}: select, live Back, inert Close, and a level alone`, async ({ page }) => {
+    await mkdir(evidence, { recursive: true });
+    await page.emulateMedia({ colorScheme: scheme });
+    const shot = async (state: string) => { await settle(page); await host(page).screenshot({ path: `${evidence}/level-edit-${state}-${scheme}.png`, animations: 'disabled' }); };
+    const sheet = page.locator('.sh-sheet');
+    await page.goto('/?preview2=1&fixture=gcprev&mode=edit&panel=0&window=iPhone&surface=level:demo_level_b');
+    await expect(sheet).toHaveAttribute('aria-label', 'Demo Level B', { timeout: 20_000 });
+    // The stack beneath is real: the sheet is over Home, and Back is there with its destination in its title.
+    await expect(sheet.getByRole('button', { name: 'Back', exact: true })).toHaveAttribute('title', 'Back to Demo Level A');
+    await expect(sheet.locator('.sh-add-slot[data-add-for="level:demo_level_b"]')).toHaveCount(1);
+    await sheet.locator('[data-sel^="node:demo_level_b_to_"]').first().click();
+    await expect(sheet.locator('[data-sel^="node:demo_level_b_to_"][data-selected]')).toHaveCount(1);
+    await shot('1-level-selected');
+    // Close is inert in Edit; Back steps out one level, then to the sheet, then has nowhere to go.
+    await sheet.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(sheet).toHaveAttribute('aria-label', 'Demo Level B');
+    await sheet.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(sheet).toHaveAttribute('aria-label', 'Demo Level A');
+    await shot('2-back-to-level');
+    await sheet.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(sheet).toHaveAttribute('aria-label', 'Demo Sheet');
+    await expect(sheet.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+    await shot('3-back-to-sheet');
+    // A level no sheet opens: drawn alone over the empty page, Close and no Back.
+    await page.goto('/?preview2=1&fixture=gcprev&mode=edit&panel=0&window=iPhone&surface=level:demo_level_alone');
+    await expect(sheet).toHaveAttribute('aria-label', 'Demo Level Alone', { timeout: 20_000 });
+    await expect(sheet.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toHaveCount(1);
+    await expect(page.locator('.sh-page')).toHaveCount(0);
+    await shot('4-level-alone');
+  });
+}
+
+/** A level in Edit on the frames that put Back elsewhere: the folded Duo's rail, and the iPad's wide sheet. Back is live in the rail, titled for its parent, and Close is inert. */
+for (const scheme of ['light', 'dark'] as const) {
+  for (const frame of [{ name: 'Duo folded', slug: 'duo-folded', rail: true }, { name: 'iPad upright', slug: 'ipad-portrait', rail: false }]) {
+    test(`a level in Edit on ${frame.name} in ${scheme}: Back${frame.rail ? ' in the rail' : ''} is live, Close is not`, async ({ page }) => {
+      await mkdir(evidence, { recursive: true });
+      await page.emulateMedia({ colorScheme: scheme });
+      const sheet = page.locator('.sh-sheet');
+      const where = frame.rail ? page.locator('.sh-sheet-rail') : sheet;
+      await page.goto(`/?preview2=1&fixture=gcprev&mode=edit&panel=0&window=${encodeURIComponent(frame.name)}&surface=level:demo_level_b`);
+      await expect(sheet).toHaveAttribute('aria-label', 'Demo Level B', { timeout: 20_000 });
+      await expect(where.getByRole('button', { name: 'Back', exact: true })).toHaveAttribute('title', 'Back to Demo Level A');
+      await sheet.locator('[data-sel^="node:demo_level_b_to_"]').first().click();
+      await expect(sheet.locator('[data-selected]').first()).toBeVisible();
+      await settle(page);
+      await host(page).screenshot({ path: `${evidence}/level-edit-frame-${frame.slug}-${scheme}.png`, animations: 'disabled' });
+      await where.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(sheet).toHaveAttribute('aria-label', 'Demo Level B');
+      await where.getByRole('button', { name: 'Back', exact: true }).click();
+      await expect(sheet).toHaveAttribute('aria-label', 'Demo Level A');
+    });
+  }
+}

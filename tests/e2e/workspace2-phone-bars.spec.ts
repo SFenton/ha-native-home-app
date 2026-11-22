@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openWorkspace, seed, selectTile, snap } from './workspace2-helpers';
+import { documentWithLevels } from '../support/levels-document';
 
 /** The phone's two bars (studio-ux2 pick 3A): five top slots and three bottom ones, each where it always is. Phone project only. */
 test.skip(({ hasTouch }) => !hasTouch, 'The phone bars are the phone project');
@@ -161,3 +162,36 @@ test('every control of both bars is a 44 px target with a name', async ({ page }
     }
   }
 });
+
+/** In a level the middle button reads "This Level", and the sheet it opens is titled so, with no settings button that names the wrong thing. */
+for (const scheme of ['light', 'dark'] as const) for (const where of ['in a sheet', 'alone'] as const) {
+  test(`the middle button reads This Level ${where}, and its sheet is titled so (${scheme})`, async ({ page, request }) => {
+    await seed(request, documentWithLevels());
+    await page.emulateMedia({ colorScheme: scheme });
+    await openWorkspace(page);
+    if (where === 'in a sheet') {
+      await page.getByRole('button', { name: 'Use', exact: true }).click();
+      await page.locator('[data-sel="node:demo_home_to_sheet"]').first().click();
+      await page.locator('.sh-sheet [data-sel="node:demo_sheet_to_demo_level_a"]').first().click();
+      await expect(page.locator('.sh-sheet')).toHaveAttribute('aria-label', 'Demo Level A');
+      await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    } else {
+      await page.getByRole('button', { name: 'Project', exact: true }).click();
+      await page.getByRole('button', { name: 'Checks', exact: true }).click();
+      await page.getByRole('button', { name: /Demo Level Alone has no way in/ }).first().click();
+      await expect(page.locator('.sh-sheet')).toHaveAttribute('aria-label', 'Demo Level Alone');
+    }
+    // The alone level arrives selected (from its check) and a level has no inspector, so the bar stays; nothing to clear.
+    const middle = page.locator('.w2-bottom-page');
+    await expect(middle).toHaveAttribute('aria-label', 'This Level');
+    await expect(middle).toHaveText('This Level');
+    await middle.click();
+    const sheet = page.getByTestId('level-sheet');
+    await expect(sheet).toHaveAttribute('aria-label', 'This Level');
+    await expect(sheet.getByRole('heading', { name: 'This Level', exact: true })).toBeVisible();
+    await expect(sheet.getByRole('button', { name: 'Add Here' })).toBeVisible();
+    await expect(sheet.locator('.w2-level-settings')).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: /Settings/ })).toHaveCount(0);
+    await snap(page, `level-7-this-level-${where === 'alone' ? 'alone' : 'in-sheet'}-phone-${scheme}`);
+  });
+}

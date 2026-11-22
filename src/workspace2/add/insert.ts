@@ -27,11 +27,11 @@ export function ownerTitle(document: CompositionDocument, owner: SelectionKey): 
   return (valueAt(document, entry.path) as { title?: string } | undefined)?.title ?? '';
 }
 
-/** The destination at the end of a container's own children. */
+/** The destination at the end of a container's own children: a page, sheet or level's components, or a node's or area's children. */
 export function endOf(document: CompositionDocument, owner: SelectionKey): Destination | undefined {
   const entry = buildDocumentIndex(document).get(owner);
   if (!entry) return undefined;
-  const list = entry.kind === 'page' || entry.kind === 'modal' ? [...entry.path, 'components'] : entry.kind === 'node' || entry.kind === 'local-tab' ? [...(entry.bodyPath ?? entry.path), 'children'] : undefined;
+  const list = entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'level' ? [...entry.path, 'components'] : entry.kind === 'node' || entry.kind === 'local-tab' ? [...(entry.bodyPath ?? entry.path), 'children'] : undefined;
   const items = list ? valueAt(document, list) : undefined;
   return list && Array.isArray(items) ? { list, index: items.length, owner } : undefined;
 }

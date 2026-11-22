@@ -11,6 +11,7 @@ import { openedNodes } from './opened-row';
 import { PageView } from './PageView';
 import { RenderCtx, useRender } from './render-context';
 import { SheetView } from './Sheet';
+import { aloneSheet } from './level-sheet';
 import { wallpaperImage } from './wallpaper';
 import { sheetFrame, scalesBackBehindSheet } from './sheet-frame';
 import { inVerticalBar, splitGeometry, tabsAtTop } from './split';
@@ -138,19 +139,24 @@ export function Screen({ document, nav, window: win }: ScreenProps) {
       : hasTabs && <TabBarSlot document={document} tabId={nav.tabId} hidden={tabsHidden}/>}
     {hasTabs && !vertical && !topTabs && (flyoutOpen || lingering) && <Flyout document={document} tabId={nav.tabId} open={flyoutOpen} onClose={() => setFlyoutOpen(false)}/>}
     {nav.sheets.map((frame, at) => {
-      const modal = document.modals.find(item => item.id === frame.modalId);
+      const alone = frame.alone ? document.levels?.find(item => item.id === frame.modalId) : undefined;
+      const modal = alone ? aloneSheet(alone) : document.modals.find(item => item.id === frame.modalId);
       if (!modal) return null;
-      const inside = frame.pages.at(-1), level = document.levels?.find(item => item.id === inside);
+      // A level drawn alone follows the levels pushed inside it: the one on top is drawn, and Back returns to the one beneath.
+      const inside = frame.pages.at(-1), level = document.levels?.find(item => item.id === (inside ?? (alone ? alone.id : undefined)));
+      // Back returns to the level beneath, else to the sheet; the bar and the rail both name it.
+      const beneath = frame.pages.at(-2), backTo = (beneath === undefined ? modal : document.levels?.find(item => item.id === beneath) ?? document.pages.find(item => item.id === beneath))?.title;
       const placed = sheetFrame(win, modal.presentation);
+      const pushed = frame.pages.length;
       // The folded Duo's sheet fills the height, so its Close sits in the rail like any sheet's (`DuoSheetPolicy`, `UKHassModal`): under the camera's keep-clear region and the status items, never beside the title.
       const rail = win.camera && win.rail !== undefined && placed.placement === 'bottom' ? (() => {
-        const buttons = frame.pages.length ? 2 : 1;
+        const buttons = pushed ? 2 : 1;
         const laid = railLayout({ width: win.width, length: win.height, side: railSideOf(win), camera: { end: win.camera.corner.vertical, reach: win.camera.reach }, tabs: 0,
           groups: [{ id: 'sheet', shared: false, items: Array.from({ length: buttons }, (_, key) => ({ key: String(key), priority: 'required' as const })) }] });
-        return { centre: laid.centre, top: laid.header?.top ?? RAIL.openTop, side: railSideOf(win), back: frame.pages.length > 0 };
+        return { centre: laid.centre, top: laid.header?.top ?? RAIL.openTop, side: railSideOf(win), back: pushed > 0 };
       })() : undefined;
-      return <SheetView key={`${at}:${frame.modalId}`} modal={modal} frame={placed} rail={rail} page={level ?? document.pages.find(item => item.id === inside)} closeAlways={level !== undefined} top={at === nav.sheets.length - 1}
-        onClose={() => ctx.run({ type: 'dismiss', scope: 'current-modal' })} onBack={() => ctx.run({ type: 'back' })}/>;
+      return <SheetView key={`${at}:${frame.modalId}`} modal={modal} frame={placed} rail={rail} alone={alone !== undefined} back={pushed > 0} backTo={backTo} page={level ?? document.pages.find(item => item.id === inside)} closeAlways={level !== undefined} top={at === nav.sheets.length - 1}
+        onClose={() => ctx.run({ type: 'dismiss', scope: 'current-modal' })} onBack={() => ctx.navigate?.({ type: 'back' })}/>;
     })}
     {win.camera
       // The closed Duo has no status bar across the top: at the portrait turns the time and the connection mark stack on the rail's centre line, in the region kept clear around the camera (HIG, Designing for iPhone Duo, Vertical controls); at 90 and 270 native shows neither.

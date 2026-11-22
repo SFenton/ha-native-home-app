@@ -91,7 +91,7 @@ export function runChecks(document: CompositionDocument): Checks {
     // A level some link reaches (a page's, say) has a way in; the error names that link, so the suggestion would be untrue.
     if (links.some(link => link.to.kind === 'page' && link.to.id === id)) continue;
     const title = (document.levels ?? []).find(item => item.id === id)?.title ?? id;
-    suggestions.push({ id: `no-way-in-level-${id}`, sentence: `${title} has no way in.`, place: title });
+    suggestions.push({ id: `no-way-in-level-${id}`, sentence: `${title} has no way in.`, place: title, select: `level:${id}` });
   }
   for (const page of document.pages) {
     if (page.navigation.type === 'navigation-columns' && !links.some(link => link.from.kind === 'page' && link.from.id === page.id && link.to.kind === 'page'))

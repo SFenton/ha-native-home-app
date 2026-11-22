@@ -10,6 +10,7 @@ import { useAdd } from '../add/AddHost';
 import type { TopBarProps } from '../TopBar';
 import type { Workspace2 } from '../useWorkspace2';
 import { surfaceWordOf } from '../levels';
+import { listedSurface } from '../selection';
 
 const DRAFT = 'Draft · ';
 /** Below this width the top bar drops Redo (it stays in the Project sheet) so every slot keeps its size. */
@@ -32,7 +33,7 @@ export function phoneStatus(ws: Workspace2): { text: string; tone: 'neutral' | '
  */
 export function PhoneTopBar({ ws, window: current, onWindow, pagesOpen, onPagesOpen, projectOpen, onProjectOpen, dialog, onDialog, onPanel, onError, onGo }: TopBarProps) {
   const document = ws.document!, surface = ws.surface;
-  const title = surface ? (surface.kind === 'page' ? document.pages : document.modals).find(item => item.id === surface.id) : undefined;
+  const title = surface ? (surface.kind === 'page' ? document.pages : surface.kind === 'level' ? document.levels ?? [] : document.modals).find(item => item.id === surface.id) : undefined;
   const tight = useMedia(`(max-width: ${NO_REDO_BELOW - 1}px)`);
   const status = phoneStatus(ws);
   const undo = useUndo(ws);
@@ -41,7 +42,7 @@ export function PhoneTopBar({ ws, window: current, onWindow, pagesOpen, onPagesO
     <div className="w2-page-slot">
       <Overlay narrow open={pagesOpen} onOpenChange={onPagesOpen} trigger={pageTrigger} label="Pages" popupWidth={320} fullHeight className="w2-pages-pop">
         <PushStack rootTitle="Pages" rootHeader={<div className="w2-sheet-bar"><h2 className="w2-sheet-title">Pages</h2><button type="button" onClick={() => onPagesOpen(false)}>Done</button></div>}
-          root={<PagesPanel ws={ws} document={document} current={surface} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}
+          root={<PagesPanel ws={ws} document={document} current={listedSurface(surface, document)} onPick={next => { ws.setSurface(next); ws.select(undefined); onPagesOpen(false); }}
             actions={{ onDismiss: () => onPagesOpen(false), onSettings: next => ws.selectAnywhere(`${next.kind}:${next.id}`), onTabs: () => onPanel('tabs'), onChange: ws.studio.apply, onShow: next => { ws.setSurface(next); ws.select(undefined); } }}/>}/>
       </Overlay>
       <span className="w2-page-status" role="status" data-testid="status-tag" data-tone={status.tone}>{status.text}</span>
@@ -68,7 +69,7 @@ function BottomAdd({ disabled }: { disabled: boolean }) {
  */
 export function PhoneBottomBar({ ws, onThisPage }: { ws: Workspace2; onThisPage: () => void }) {
   const edit = ws.mode === 'edit';
-  const sheet = ws.surface?.kind === 'modal' ? `This ${ws.document && ws.index ? surfaceWordOf(ws.document, ws.index, `modal:${ws.surface.id}`) || 'Sheet' : 'Sheet'}` : 'This Page';
+  const sheet = ws.surface && ws.surface.kind !== 'page' ? `This ${ws.document && ws.index ? surfaceWordOf(ws.document, ws.index, `${ws.surface.kind}:${ws.surface.id}`) || 'Sheet' : 'Sheet'}` : 'This Page';
   return <nav className="w2-bottombar" aria-label="Mode">
     <ModeSegment mode={ws.mode} onChange={ws.setMode}/>
     <button type="button" className="w2-bottom-page" aria-label={sheet} disabled={!edit} onClick={onThisPage}><List size={18} aria-hidden/><span className="w2-bottom-label">{sheet}</span></button>

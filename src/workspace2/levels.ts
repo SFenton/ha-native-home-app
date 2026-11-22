@@ -95,7 +95,7 @@ export function areaWords(document: CompositionDocument, index: DocumentIndex, k
 export function isLevel(index: DocumentIndex, key: SelectionKey): boolean {
   const entry = index.get(key);
   if (!entry) return false;
-  if (entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'local-tab') return true;
+  if (entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'level' || entry.kind === 'local-tab') return true;
   return Boolean(entry.node && childSlots(entry.node).length);
 }
 
@@ -138,10 +138,10 @@ export function levelRows(document: CompositionDocument, index: DocumentIndex, l
   return rows;
 }
 
-/** The page or sheet a key sits on. */
+/** The page, sheet or level a key sits on. */
 const surfaceOf = (index: DocumentIndex, key: SelectionKey): SelectionKey | undefined => {
   const entry = index.get(key);
-  return entry?.kind === 'page' || entry?.kind === 'modal' ? key : entry?.surface;
+  return entry?.kind === 'page' || entry?.kind === 'modal' || entry?.kind === 'level' ? key : entry?.surface;
 };
 
 /**
@@ -181,16 +181,17 @@ export function openingLevel(index: DocumentIndex, root: SelectionKey, selection
   return entry.parent;
 }
 
-/** The word for a surface in copy: "Page", "Sheet" or "Modal" (see {@link surfaceWord}); empty for a node. */
+/** The word for a surface in copy: "Page", "Sheet", "Modal" or "Level" (see {@link surfaceWord}); empty for a node. */
 export function surfaceWordOf(document: CompositionDocument, index: DocumentIndex, key: SelectionKey): string {
   const entry = index.get(key);
   if (entry?.kind === 'page') return 'Page';
+  if (entry?.kind === 'level') return 'Level';
   if (entry?.kind !== 'modal') return '';
   const modal = document.modals[Number(entry.path[1])];
   return modal ? surfaceWord(modal) : 'Sheet';
 }
 
-/** The text a level's title shows: "This Page", "This Sheet" or "This Modal" at the root, else the name of the container. */
+/** The text a level's title shows: "This Page", "This Sheet", "This Modal" or "This Level" at the root, else the name of the container. */
 export function levelTitle(document: CompositionDocument, index: DocumentIndex, level: SelectionKey): string {
   const word = surfaceWordOf(document, index, level);
   return word ? `This ${word}` : levelName(document, index, level);

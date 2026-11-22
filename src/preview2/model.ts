@@ -17,7 +17,7 @@ export type PlainNode = Exclude<CompositionNode, ComponentRefNode>;
  */
 export type SelectionKind = 'node' | 'page' | 'modal' | 'level' | 'tab' | 'local-tab' | 'chrome-group' | 'chrome-item' | 'source';
 /**
- * A selection key such as `node:hc-lights` or `page:home`. `level:<id>` names an entry of `levels[]` in the library only: the index does not hold levels yet, so nothing else selects one.
+ * A selection key such as `node:hc-lights` or `page:home`. `level:<id>` names an entry of `levels[]` (`sh.sheet-levels@1`): a surface of its own, so a node inside a level has it as its `surface`.
  */
 export type SelectionKey = `${SelectionKind}:${string}`;
 
@@ -30,7 +30,7 @@ export interface IndexEntry {
   path: EditorPath;
   /** The key of the enclosing node, local tab or surface; undefined for a surface, tab or source. */
   parent?: SelectionKey;
-  /** The key of the page or modal that holds a node, local tab or surface chrome item. */
+  /** The key of the page, modal or level that holds a node, local tab or surface chrome item. */
   surface?: SelectionKey;
   /**
    * The node itself, for `node` entries. For a place that uses a saved component (a `component-ref`) and for everything inside one it is the
@@ -91,7 +91,7 @@ export const hiddenNodeTypes: readonly string[] = staticallyHiddenTypes;
 export const isHiddenNode = (node: { type: string }): boolean => hiddenNodeTypes.includes(node.type);
 
 /**
- * Indexes `document`: pages, modals, every node at any depth (including paged-row and pinned-actions children and each
+ * Indexes `document`: pages, modals, levels (`levels[]`), every node at any depth (including paged-row and pinned-actions children and each
  * local tab), navigation tabs, chrome groups and items (root and per-surface toolbars) and data sources.
  * A repeated id within one kind keeps its first entry, so a document the compiler would reject still indexes.
  */
@@ -186,6 +186,14 @@ function indexDocument(document: CompositionDocument): DocumentIndex {
       nodes(surface.components, [...base, 'components'], key, key);
     });
   }
+  // A level is a surface like a page or a sheet: its nodes select and edit the same way, with the level's key as their surface.
+  document.levels?.forEach((surface, index) => {
+    const base: EditorPath = ['levels', index];
+    const key = add({ kind: 'level', id: surface.id, path: base });
+    if (!key) return;
+    if (surface.toolbar.type === 'replace') chrome(surface.toolbar.groups, [...base, 'toolbar', 'groups'], key);
+    nodes(surface.components, [...base, 'components'], key, key);
+  });
   document.navigation.tabs.forEach((tab, index) => add({ kind: 'tab', id: tab.id, path: ['navigation', 'tabs', index] }));
   chrome(document.navigation.chrome.groups, ['navigation', 'chrome', 'groups']);
   document.dataSources.forEach((source, index) => add({ kind: 'source', id: source.id, path: ['dataSources', index] }));

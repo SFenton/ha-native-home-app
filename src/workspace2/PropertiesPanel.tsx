@@ -295,7 +295,7 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
   const selectedTemplate = target?.kind === 'node' ? index?.get(target.key)?.component : undefined;
   useEffect(() => { if (choosingId !== undefined && (ws.mode !== 'edit' || selectedTemplate !== choosingId)) setChoosing(undefined); }, [choosingId, ws.mode, selectedTemplate]);
   if (!document || !ctx || !target || !index) return null;
-  const surfaceTitle = (key?: string) => { const [kind, ...id] = (key ?? '').split(':'); return (kind === 'page' ? document.pages : document.modals).find(item => item.id === id.join(':'))?.title ?? ''; };
+  const surfaceTitle = (key?: string) => { const [kind, ...id] = (key ?? '').split(':'); return (kind === 'page' ? document.pages : kind === 'level' ? document.levels ?? [] : document.modals).find(item => item.id === id.join(':'))?.title ?? ''; };
   let header: ReactNode, body: ReactNode, title = '';
   if (target.kind === 'node') {
     const entry = index.get(target.key)!, node = entry.node!;

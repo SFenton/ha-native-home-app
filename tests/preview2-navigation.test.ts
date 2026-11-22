@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import type { CompositionDocument } from '../src/shared/composition/schema';
 import { basePageId, currentSurface, initialNav, isNavAction, navigateTo, presenterOf, reduceNavigation, tabStack, type NavAction, type NavState } from '../src/preview2/navigation';
+import { sameSurface } from '../src/preview2/navigation';
 import fixture from '../src/preview2/fixtures/home-domains.json';
+import { demoDocument } from './preview2-gc-fixture';
 
 const document: CompositionDocument = compileCompositionDocument(structuredClone(fixture.document)).document;
 const push = (pageId: string) => ({ type: 'push' as const, pageId, arguments: {}, origin: 'sender' as const, duplicate: 'reuse-nearest' as const });
@@ -111,5 +113,72 @@ describe('preview 2 navigation', () => {
     expect(sheet.tabId).toBe('hc-tab-home');
     expect(currentSurface(document, sheet)).toEqual({ kind: 'modal', id: 'hc-overview-lights' });
     expect(navigateTo(document, start, { kind: 'page', id: 'nowhere' })).toBe(start);
+  });
+});
+
+describe('showing a level (sh.sheet-levels@1)', () => {
+  /** The demo document, with a second sheet that opens `demo_level_a` and a level nothing opens. */
+  const levels = (() => {
+    const base = demoDocument();
+    const sheet = { ...structuredClone(base.modals.find(modal => modal.id === 'demo_sheet')!), id: 'demo_sheet_2', title: 'Demo Sheet 2' };
+    const level = { ...structuredClone(base.levels![0]), id: 'demo_loose', title: 'Demo Loose', components: [] };
+    return { ...base, modals: [...base.modals, sheet], levels: [...base.levels!, level] } as CompositionDocument;
+  })();
+  const go = (state: NavState, surface: Parameters<typeof navigateTo>[2]) => navigateTo(levels, state, surface);
+  const first = initialNav(levels);
+
+  it('opens the sheet over the page that presents it with the level pushed inside', () => {
+    const state = go(first, { kind: 'level', id: 'demo_level_a' });
+    expect(state.sheets).toEqual([{ modalId: 'demo_sheet', pages: ['demo_level_a'] }]);
+    expect(tabStack(levels, state)).toEqual(['page-home']);
+    expect(currentSurface(levels, state)).toEqual({ kind: 'level', id: 'demo_level_a', sheetId: 'demo_sheet' });
+  });
+
+  it('builds the chain from the sheet to a level it reaches only through another', () => {
+    expect(go(first, { kind: 'level', id: 'demo_level_b' }).sheets).toEqual([{ modalId: 'demo_sheet', pages: ['demo_level_a', 'demo_level_b'] }]);
+  });
+
+  it('keeps the way the person came, and cuts back to a level already on the stack', () => {
+    const inside = go(first, { kind: 'level', id: 'demo_level_b' });
+    expect(go(inside, { kind: 'level', id: 'demo_level_a' }).sheets[0].pages).toEqual(['demo_level_a']);
+    expect(go(go(first, { kind: 'modal', id: 'demo_sheet' }), { kind: 'level', id: 'demo_level_b' }).sheets[0].pages).toEqual(['demo_level_a', 'demo_level_b']);
+    // The page under the sheet is not rebuilt: the sheet that is open stays over where the person was.
+    const away = { ...inside, stacks: { ...inside.stacks, 'hc-tab-home': ['page-home', 'demo_plain'] } };
+    expect(tabStack(levels, go(away, { kind: 'level', id: 'demo_level_a' }))).toEqual(['page-home', 'demo_plain']);
+  });
+
+  it('shows a level two sheets open in the sheet named, else the one on top, else the first', () => {
+    expect(go(first, { kind: 'level', id: 'demo_level_a', sheetId: 'demo_sheet_2' }).sheets[0].modalId).toBe('demo_sheet_2');
+    const second = go(first, { kind: 'modal', id: 'demo_sheet_2' });
+    expect(go(second, { kind: 'level', id: 'demo_level_a' }).sheets[0].modalId).toBe('demo_sheet_2');
+    expect(go(first, { kind: 'level', id: 'demo_level_a' }).sheets[0].modalId).toBe('demo_sheet');
+    // A sheet that does not reach it is not used, whatever the surface names.
+    expect(go(first, { kind: 'level', id: 'demo_level_a', sheetId: 'hc-overview-lights' }).sheets[0].modalId).toBe('demo_sheet');
+  });
+
+  it('draws a level no sheet opens alone, over the empty page, with no Back to go to', () => {
+    const alone = go(first, { kind: 'level', id: 'demo_loose' });
+    expect(alone.sheets).toEqual([{ modalId: 'demo_loose', pages: [], alone: true }]);
+    expect(alone.emptyBase).toBe(true);
+    expect(currentSurface(levels, alone)).toEqual({ kind: 'level', id: 'demo_loose' });
+    expect(reduceNavigation(levels, alone, { type: 'back' })).toBe(alone);
+    expect(reduceNavigation(levels, alone, { type: 'dismiss', scope: 'current-modal' }).sheets).toEqual([]);
+    // Showing a page afterwards leaves the sheet behind.
+    expect(go(alone, { kind: 'page', id: 'page-home' }).sheets).toEqual([]);
+  });
+
+  it('steps out of a level with Back: to the level beneath, then to the sheet', () => {
+    const deep = go(first, { kind: 'level', id: 'demo_level_b' });
+    const up = reduceNavigation(levels, deep, { type: 'back' });
+    expect(currentSurface(levels, up)).toEqual({ kind: 'level', id: 'demo_level_a', sheetId: 'demo_sheet' });
+    expect(up.motion).toBe('pop');
+    expect(currentSurface(levels, reduceNavigation(levels, up, { type: 'back' }))).toEqual({ kind: 'modal', id: 'demo_sheet' });
+  });
+
+  it('ignores a level the document does not hold, and compares a level by its sheet only when both name one', () => {
+    expect(go(first, { kind: 'level', id: 'nowhere' })).toBe(first);
+    expect(sameSurface({ kind: 'level', id: 'a' }, { kind: 'level', id: 'a', sheetId: 's' })).toBe(true);
+    expect(sameSurface({ kind: 'level', id: 'a', sheetId: 't' }, { kind: 'level', id: 'a', sheetId: 's' })).toBe(false);
+    expect(sameSurface({ kind: 'level', id: 'a' }, { kind: 'modal', id: 'a' })).toBe(false);
   });
 });

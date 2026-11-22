@@ -8,7 +8,7 @@ import { DeviceFrame, STAGE_PADDING, useAutoFit } from './DeviceFrame';
 import { usePreviewClock, useReadsSecondClock } from './clock';
 import { createEnvironment, localValue, type House, type Overlay } from './projections';
 import { buildDocumentIndex, type SelectionKey } from './model';
-import { currentSurface, initialNav, navigateTo, reduceNavigation, sameSurface, type NavState } from './navigation';
+import { currentSurface, initialNav, navigateTo, reduceNavigation, sameSurface, type NavAction, type NavState, type NavSurface } from './navigation';
 import { deliverCall } from './live-calls';
 import type { LiveHouse } from './live-house';
 import { RenderCtx, type RenderContext, type StatePreview } from './render-context';
@@ -34,8 +34,8 @@ import './text-size.css';
 const LARGEST_TEXT = 1.42;
 
 export { previewWindows, type PreviewWindow };
-/** A page or a presented sheet. */
-export type PreviewSurface = { kind: 'page' | 'modal'; id: string };
+/** A page, a presented sheet, or a level shown in its sheet (`sheetId`). */
+export type PreviewSurface = NavSurface;
 
 /** Props of {@link Preview2}. See `build/design/studio-ux/preview2-contract.md`. */
 export interface Preview2Props {
@@ -138,6 +138,8 @@ export default function Preview2(props: Preview2Props) {
     if (plan.simulated) now.onSimulatedCall?.(plan.simulated);
     if (plan.nav) commit(reduceNavigation(now.document, latest.current.nav, plan.nav, sender));
   }, [commit]);
+  /** Navigation that Edit keeps live: Back in the sheet's bar and rail steps out of a level. Everything else in Edit selects. */
+  const navigate = useCallback((action: NavAction) => commit(reduceNavigation(latest.current.document, latest.current.nav, action)), [commit]);
   const run = useCallback((action: CompositionActionSlot, control?: Json, scope?: ItemScope, controlValues?: Record<string, Json>, sender?: string) => execute(action, control, false, scope, controlValues, sender), [execute]);
   const answer = (confirmed: boolean) => { const held = pending; setPending(undefined); if (confirmed && held) { if (held.then) held.then(); else if (held.action) execute(held.action, held.control, true, held.scope, held.controlValues); } };
   const ask = useCallback((alert: AlertSpec, then: () => void) => { if (latest.current.mode === 'use') setPending({ alert, then }); }, []);
@@ -158,11 +160,11 @@ export default function Preview2(props: Preview2Props) {
   const stateStyles = document.stateStyles;
   const library = useMemo(() => libraryById(document), [document.componentLibrary]);
   const context = useMemo<RenderContext>(() => ({
-    mode, env, house: resolvedHouse, overlay, run, store, previous, kept, stateStyles, sources: document.dataSources, ask, note, statePreview: mode === 'edit' ? props.statePreview : undefined, mapPicture: props.mapPicture, appearance: props.appearance, largeText: (props.textScale ?? 1) >= LARGEST_TEXT, textScale: props.textScale, records: props.records ? { sources: dataSources, use: props.records } : undefined,
+    mode, env, house: resolvedHouse, overlay, run, navigate, store, previous, kept, stateStyles, sources: document.dataSources, ask, note, statePreview: mode === 'edit' ? props.statePreview : undefined, mapPicture: props.mapPicture, appearance: props.appearance, largeText: (props.textScale ?? 1) >= LARGEST_TEXT, textScale: props.textScale, records: props.records ? { sources: dataSources, use: props.records } : undefined,
     live: live ? { store: live, dataSources } : undefined,
     field: id => localState?.find(item => item.id === id),
     local: id => localValue({ localState }, overlay, id),
-  }), [mode, env, resolvedHouse, overlay, run, store, previous, kept, localState, stateStyles, ask, note, props.statePreview, props.mapPicture, props.appearance, props.textScale, props.records, live, dataSources, document.dataSources]);
+  }), [mode, env, resolvedHouse, overlay, run, navigate, store, previous, kept, localState, stateStyles, ask, note, props.statePreview, props.mapPicture, props.appearance, props.textScale, props.records, live, dataSources, document.dataSources]);
 
   // Selection lives in the store; a local tab that holds the selection or the reveal target must show it.
   const tabs = useMemo(() => {
