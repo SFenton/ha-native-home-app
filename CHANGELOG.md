@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.25
+
+- The Studio library lists a sheet's levels, moves pages and levels between Pages and Sheets, and groups the Goes to picker.
+
 ## 0.3.24
 
 - The preview now shows sheet-to-page pushes, hidden tabs and buttons, the iPad's top tab bar, wide-window opening and the Duo rail's Back and Close as the app does.
