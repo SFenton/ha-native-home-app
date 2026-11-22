@@ -49,6 +49,12 @@ export interface CanvasLayoutHandoff {
   readonly annotations: Readonly<Record<string, NonNullable<GraphNode['annotation']>>>;
   readonly sourceMap: GraphSourceMap;
 }
+/** Deferred focus lands on Label only if the owner has not already moved into the editor, so a fast click into Description keeps its typing. */
+function focusAnnotationStart(root: ParentNode | null | undefined) {
+  const form = root?.querySelector<HTMLElement>('.w2-canvas-annotation');
+  if (!form || form.contains(document.activeElement)) return;
+  form.querySelector<HTMLInputElement>('input')?.focus();
+}
 export default function FlowCanvas({ host, graph: initialGraph, title, theme, onClose, returnFocus, outputNames, onGraphChange, selectedNodeId, onSelectionChange, onApply }: FlowCanvasProps) {
   const [state, setState] = useState(() => initialEditState(initialGraph));
   const [view, setView] = useState<'graph' | 'outline'>('graph'), [panel, setPanel] = useState<'palette' | 'inspector' | null>('palette');
@@ -405,7 +411,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       // Re-activating Rename keeps an unsubmitted draft for the same block instead of discarding it.
       if (draftRef.current?.nodeId === node.id && draftRef.current.location === 'inline') {
         requestAnimationFrame(() => {
-          if (draftRef.current?.nodeId === node.id) elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus();
+          if (draftRef.current?.nodeId === node.id) focusAnnotationStart(elementFor({ nodeId: node.id })?.closest('li'));
         });
         return;
       }
@@ -413,7 +419,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       const current: AnnotationDraft = { nodeId: node.id, label: node.annotation?.label ?? '', note: node.annotation?.note ?? '', location: 'inline' };
       setDraft(current); draftRef.current = current;
       requestAnimationFrame(() => {
-        if (draftRef.current === current) elementFor({ nodeId: node.id })?.closest('li')?.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus();
+        if (draftRef.current === current) focusAnnotationStart(elementFor({ nodeId: node.id })?.closest('li'));
       });
     },
     headerKeys, nodeKeys, move: beginMove,
@@ -533,7 +539,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
       <button type="button" onClick={() => { setLeaving(false); if (selected) locate(selected.id); }}>Stay</button><button type="button" aria-disabled={!result.ok || !!detached.length || busy} onClick={apply}>Apply valid edits</button><button type="button" onClick={close}>Discard canvas edits</button>
       {message && <p role="status">{message}</p>}</Modal>}
     {(pendingSelection || pendingClose) && <Modal title="Unsubmitted block details" theme={theme} close={() => {
-      setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus());
+      setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => focusAnnotationStart(document));
     }}>
       <p>Apply or discard the block details before {pendingClose ? 'closing the canvas' : 'changing selection'}.</p>
       <button type="button" onClick={() => { if (applyDraft(false)) {
@@ -544,7 +550,7 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
         cancelDraft(false); const target = pendingSelection; setPendingSelection(undefined); setPendingClose(false);
         if (target) focus(target); else if (dirty) setLeaving(true); else close();
       }}>Discard</button>
-      <button type="button" onClick={() => { setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.w2-canvas-annotation input')?.focus()); }}>Stay</button>
+      <button type="button" onClick={() => { setPendingSelection(undefined); setPendingClose(false); requestAnimationFrame(() => focusAnnotationStart(document)); }}>Stay</button>
       {draft?.error && <p role="alert">{draft.error}</p>}
     </Modal>}
   </div>;

@@ -307,3 +307,21 @@ it('review: re-activating Rename keeps the unsubmitted annotation draft', () => 
   fireEvent.click(screen.getByRole('button', { name: 'Rename or describe Rows' }));
   expect((screen.getByRole('textbox', { name: 'Label' }) as HTMLInputElement).value).toBe('Shopping list');
 });
+it('review: opening Rename does not pull focus out of Description once the owner is typing there', () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: /^Select Rows / }));
+  frames.splice(0).forEach(frame => frame(0));
+  fireEvent.click(screen.getByRole('button', { name: 'Rename or describe Rows' }));
+  const description = screen.getByRole('textbox', { name: 'Description' });
+  description.focus();
+  act(() => { frames.splice(0).forEach(frame => frame(0)); });
+  expect(document.activeElement).toBe(description);
+  // Untouched, the deferred focus still starts at Label.
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  act(() => { frames.splice(0).forEach(frame => frame(0)); });
+  fireEvent.click(screen.getByRole('button', { name: 'Rename or describe Rows' }));
+  act(() => { frames.splice(0).forEach(frame => frame(0)); });
+  expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Label' }));
+});
