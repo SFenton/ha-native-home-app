@@ -1,6 +1,7 @@
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { EditorPath } from '../../composition-editor';
 import { levelOwners, surfaceWord } from '../outline';
+import type { NavSurface } from '../../preview2/navigation';
 
 /**
  * The "Goes to" picker's choices (proposal `build/design/global-chrome/proposal.md`, section 3): Pages, Levels, Sheets and Modals, in that order. A tile inside a sheet
@@ -62,4 +63,30 @@ export function goesToChoices(document: CompositionDocument, path: EditorPath, c
   }
   for (const modal of document.modals) out.push({ id: `modal:${modal.id}`, label: modal.title, group: surfaceWord(modal) === 'Modal' ? 'Modals' : 'Sheets', kind: 'modal', target: modal.id });
   return goesToGroups.flatMap(group => out.filter(choice => choice.group === group));
+}
+
+// MARK: Show
+
+/** The title of what a picker value opens, for the closed row and the "Show" button: a page's, a level's or a sheet's title, never its id. Empty when the value names nothing the document has. */
+export function goesToTitle(document: CompositionDocument, value: string): string {
+  if (!value) return '';
+  const { kind, target } = parseGoesTo(value);
+  if (kind === 'page') return document.pages.find(page => page.id === target)?.title ?? '';
+  if (kind === 'level') return (document.levels ?? []).find(level => level.id === target)?.title ?? '';
+  return document.modals.find(modal => modal.id === target)?.title ?? '';
+}
+
+/**
+ * The surface "Show `<Name>`" puts on the simulator for the action at `path`, or undefined when the value names nothing the document has. A level is shown inside the tile's own sheet
+ * (the one on show, when it holds the tile too), so Back returns to the tile; a tile on a page, which no sheet holds, leaves the sheet to the preview.
+ */
+export function showTarget(document: CompositionDocument, path: EditorPath, value: string, held?: { kind: string; id: string; sheetId?: string }): NavSurface | undefined {
+  if (!goesToTitle(document, value)) return undefined;
+  const { kind, target } = parseGoesTo(value);
+  if (kind === 'page') return { kind: 'page', id: target };
+  if (kind === 'modal') return { kind: 'modal', id: target };
+  const sheets = sheetsAt(document, path);
+  const open = held?.kind === 'modal' ? held.id : held?.kind === 'level' ? held.sheetId : undefined;
+  const sheetId = open !== undefined && sheets.includes(open) ? open : sheets[0];
+  return { kind: 'level', id: target, ...(sheetId ? { sheetId } : {}) };
 }

@@ -23,6 +23,7 @@ import type { CanvasObservations as SimulationObservations } from '../logic-simu
 import { flowSources } from '../data/flow';
 import { sourceName } from '../dialogs/sources';
 import { useWorkspaceData } from '../pickers/WorkspaceData';
+import { focusShownSurface, SurfaceActionsContext } from '../editors/surfaceActions';
 import type { Workspace2 } from '../useWorkspace2';
 import type { DerivedTheme } from '../theme';
 import { fieldAdapters, fieldAnchor, fieldPointer, pointerPath, type LogicFieldKind } from './registry';
@@ -241,7 +242,9 @@ export function LogicFieldsProvider({ ws, theme, children }: { ws: Workspace2; t
   }, []);
   const suspended = Boolean(opened) || retiring;
   const api = useMemo(() => ({ open, suspended }), [open, suspended]);
-  return <Fields.Provider value={api}>{children}
+  // The editors reach the simulator through here: this host is the one place under the workspace that holds it and wraps every editor.
+  const surfaceActions = useMemo(() => ({ current: ws.surface, show: (surface: Parameters<Workspace2['setSurface']>[0]) => { ws.setSurface(surface); ws.select(undefined); requestAnimationFrame(() => focusShownSurface()); } }), [ws.surface, ws.setSurface, ws.select]);
+  return <Fields.Provider value={api}><SurfaceActionsContext.Provider value={surfaceActions}>{children}</SurfaceActionsContext.Provider>
     {suspended && ws.document && <RetireWorkspaceFlows ids={flowSources(ws.document).map(source => source.id)}/>}
     {error && <div className="w2-logic-error" role="alert">{error}<button type="button" onClick={() => setError('')}>Dismiss</button></div>}
     {opened && <CanvasSession key={canonicalOfBounded(opened.graph.roots[0].anchor)} field={opened} ws={ws} theme={theme} onClose={() => { setRetiring(true); setOpened(undefined); }}/>}

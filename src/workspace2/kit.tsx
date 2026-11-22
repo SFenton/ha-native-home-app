@@ -51,7 +51,7 @@ export function Tag({ tone = 'neutral', children, className = '', ...rest }: { t
 
 /** A pushed page inside one surface: depth is a push with Back, never a second sheet (spec principle 4). */
 export interface PushedPage { title: string; body: ReactNode; done?: ReactNode; /** Called by Back; returning false keeps the page (an editor with changes asks first). */ guard?: () => boolean }
-interface PushApi { push(page: PushedPage): void; pop(): void; depth: number }
+interface PushApi { push(page: PushedPage): void; pop(): void; /** Pops every page above `depth`. */ popTo(depth: number): void; depth: number }
 const PushContext = createContext<PushApi | undefined>(undefined);
 export const usePush = () => useContext(PushContext);
 
@@ -63,9 +63,10 @@ export function PushStack({ root, rootTitle, rootHeader, onBackAtRoot }: { root:
   const [stack, setStack] = useState<PushedPage[]>([]);
   const push = useCallback((page: PushedPage) => setStack(list => [...list, page]), []);
   const pop = useCallback(() => setStack(list => list.slice(0, -1)), []);
+  const popTo = useCallback((depth: number) => setStack(list => list.length > depth ? list.slice(0, depth) : list), []);
   const top = stack.at(-1);
   const parent = stack.length > 1 ? stack[stack.length - 2].title : rootTitle;
-  return <PushContext.Provider value={{ push, pop, depth: stack.length }}>
+  return <PushContext.Provider value={{ push, pop, popTo, depth: stack.length }}>
     {top ? <div className="w2-pushed">
       <header className="w2-pushed-head">
         <button type="button" className="w2-back" onClick={() => { if (top.guard?.() !== false) pop(); }}><ChevronLeft size={16} aria-hidden/>{parent}</button>

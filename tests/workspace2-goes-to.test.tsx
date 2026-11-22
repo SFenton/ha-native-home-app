@@ -8,7 +8,10 @@ import { valueAt, type EditorPath } from '../src/composition-editor';
 import { PushStack } from '../src/workspace2/kit';
 import { RowsProvider, schemaAt } from '../src/workspace2/rows';
 import { ActionRow } from '../src/workspace2/editors/ActionEditor';
-import { goesToChoices, goesToValue, parseGoesTo } from '../src/workspace2/editors/goesTo';
+import { goesToChoices, goesToTitle, goesToValue, parseGoesTo, showTarget } from '../src/workspace2/editors/goesTo';
+import { SurfaceActionsContext } from '../src/workspace2/editors/surfaceActions';
+import { summarize } from '../src/workspace2/rows';
+import type { NavSurface } from '../src/preview2/navigation';
 
 afterEach(cleanup);
 
@@ -42,14 +45,16 @@ function fixture(): { document: CompositionDocument; paths: Record<'page' | 'pal
 }
 
 /** The "When tapped" row for the action at `path`, with the document live so each Done shows in the next render. */
-function Surface({ document: first, path }: { document: CompositionDocument; path: EditorPath }) {
+function Surface({ document: first, path, current, shown, applied }: { document: CompositionDocument; path: EditorPath; current?: NavSurface; shown?: NavSurface[]; applied?: CompositionDocument[] }) {
   const [document, setDocument] = useState(first);
-  return <RowsProvider value={{ document, onChange: setDocument, onError: () => {} }}>
-    <PushStack rootTitle="Tile" root={<>
-      <ActionRow label="When tapped" path={path} schema={schemaAt(document, path)} optional itemName="Tile"/>
-      <output data-testid="doc">{JSON.stringify(valueAt(document, path))}</output>
-    </>}/>
-  </RowsProvider>;
+  return <SurfaceActionsContext.Provider value={shown ? { current, show: surface => shown.push(surface) } : undefined}>
+    <RowsProvider value={{ document, onChange: next => { applied?.push(next); setDocument(next); }, onError: () => {} }}>
+      <PushStack rootTitle="Tile" root={<>
+        <ActionRow label="When tapped" path={path} schema={schemaAt(document, path)} optional itemName="Tile"/>
+        <output data-testid="doc">{JSON.stringify(valueAt(document, path))}</output>
+      </>}/>
+    </RowsProvider>
+  </SurfaceActionsContext.Provider>;
 }
 const saved = () => JSON.parse(screen.getByTestId('doc').textContent!);
 const open = () => { fireEvent.click(screen.getByRole('button', { name: /When tapped/ })); fireEvent.click(screen.getByRole('button', { name: 'Goes to' })); };
@@ -146,5 +151,141 @@ describe('the Goes to row', () => {
     expect(screen.getByRole('note').textContent).toBe('Opens Demo Modal full screen.');
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(saved()).toMatchObject({ type: 'present', modalId: 'demo_modal' });
+  });
+});
+
+describe('Show on Goes to', () => {
+  const edit = () => fireEvent.click(screen.getByRole('button', { name: /When tapped/ }));
+
+  it('names a level by its title in the closed row, not its id', () => {
+    const { document, paths } = fixture();
+    expect(summarize(document, 'action', push('demo_level_a'))).toBe('Opens Demo Level A');
+    render(<Surface document={document} path={paths.palette}/>);
+    expect(screen.getByRole('button', { name: /When tapped/ }).textContent).toContain('Opens Demo Level A');
+    expect(screen.getByRole('button', { name: /When tapped/ }).textContent).not.toContain('demo_level_a');
+  });
+
+  it('is offered for a page, a level, a sheet and a modal, worded with the destination\'s name', () => {
+    const { document, paths } = fixture();
+    for (const [pick, name] of [['Canvas', 'Show Canvas'], ['Demo Level B', 'Show Demo Level B'], ['Gallery', 'Show Gallery'], ['Demo Modal', 'Show Demo Modal']]) {
+      render(<Surface document={document} path={paths.palette} shown={[]}/>);
+      open();
+      fireEvent.click(screen.getByRole('option', { name: pick }));
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it('is not drawn when the link names nothing, or outside the workspace', () => {
+    const { document, paths } = fixture();
+    const nothing = structuredClone(document) as CompositionDocument;
+    (nothing.modals[0].components[0] as J).action = push('');
+    render(<Surface document={nothing} path={paths.palette} shown={[]}/>);
+    edit();
+    expect(screen.queryByRole('button', { name: /^Show / })).toBeNull();
+    cleanup();
+    render(<Surface document={document} path={paths.palette}/>);
+    edit();
+    expect(screen.queryByRole('button', { name: /^Show / })).toBeNull();
+  });
+
+  it('applies an unsaved pick as one change, then shows the level inside the tile\'s sheet', () => {
+    const { document, paths } = fixture();
+    const shown: NavSurface[] = [], applied: CompositionDocument[] = [];
+    render(<Surface document={document} path={paths.palette} shown={shown} applied={applied}/>);
+    open();
+    fireEvent.click(screen.getByRole('option', { name: 'Demo Level B' }));
+    expect(applied).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Show Demo Level B' }));
+    expect(saved()).toMatchObject({ type: 'push', pageId: 'demo_level_b' });
+    expect(applied).toHaveLength(1);
+    expect(shown).toEqual([{ kind: 'level', id: 'demo_level_b', sheetId: document.modals[0].id }]);
+    expect(screen.queryByRole('button', { name: /^Show / })).toBeNull();
+  });
+
+  it('shows a link nothing changed without applying anything', () => {
+    const { document, paths } = fixture();
+    const shown: NavSurface[] = [], applied: CompositionDocument[] = [];
+    render(<Surface document={document} path={paths.palette} shown={shown} applied={applied}/>);
+    edit();
+    fireEvent.click(screen.getByRole('button', { name: 'Show Demo Level A' }));
+    expect(applied).toHaveLength(0);
+    expect(shown).toEqual([{ kind: 'level', id: 'demo_level_a', sheetId: document.modals[0].id }]);
+  });
+
+  it('shows a page and a sheet with no sheet attached', () => {
+    const { document, paths } = fixture();
+    expect(showTarget(document, paths.page, 'page:page-echo')).toEqual({ kind: 'page', id: 'page-echo' });
+    expect(showTarget(document, paths.page, 'modal:demo_gallery')).toEqual({ kind: 'modal', id: 'demo_gallery' });
+    expect(showTarget(document, paths.page, 'page:nowhere')).toBeUndefined();
+    expect(showTarget(document, paths.page, '')).toBeUndefined();
+  });
+
+  it('passes the tile\'s sheet for a level: from a level, the sheet on show when it holds the tile, else the first that does', () => {
+    const { document, paths } = fixture();
+    expect(showTarget(document, paths.levelA, 'level:demo_level_b')).toEqual({ kind: 'level', id: 'demo_level_b', sheetId: document.modals[0].id });
+    expect(showTarget(document, paths.levelA, 'level:demo_level_b', { kind: 'level', id: 'demo_level_a', sheetId: document.modals[0].id })).toMatchObject({ sheetId: document.modals[0].id });
+    expect(showTarget(document, paths.gallery, 'level:demo_level_g', { kind: 'modal', id: document.modals[0].id })).toMatchObject({ sheetId: 'demo_gallery' });
+    expect(showTarget(document, paths.page, 'level:demo_level_c')).toEqual({ kind: 'level', id: 'demo_level_c' });
+  });
+
+  it('titles what a value opens, and nothing for an unknown one', () => {
+    const { document } = fixture();
+    expect(goesToTitle(document, 'level:demo_level_a')).toBe('Demo Level A');
+    expect(goesToTitle(document, 'modal:demo_gallery')).toBe('Gallery');
+    expect(goesToTitle(document, 'page:page-echo')).toBe('Sample Detail');
+    expect(goesToTitle(document, 'level:missing')).toBe('');
+  });
+
+  it('works from the wide dialog too: Done and show', () => {
+    const { document, paths } = fixture();
+    const shown: NavSurface[] = [], applied: CompositionDocument[] = [];
+    render(<SurfaceActionsContext.Provider value={{ show: surface => shown.push(surface) }}>
+      <RowsProvider value={{ document, onChange: next => applied.push(next), onError: () => {} }}>
+        <ActionRow label="When tapped" path={paths.palette} schema={schemaAt(document, paths.palette)} optional itemName="Tile"/>
+      </RowsProvider>
+    </SurfaceActionsContext.Provider>);
+    edit();
+    fireEvent.click(screen.getByRole('button', { name: 'Goes to' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Demo Level B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show Demo Level B' }));
+    expect(applied).toHaveLength(1);
+    expect(shown).toEqual([{ kind: 'level', id: 'demo_level_b', sheetId: document.modals[0].id }]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  describe('by rule', () => {
+    const lit = (value: unknown) => ({ type: 'literal', value });
+    const byRule = (when?: J) => {
+      const { document, paths } = fixture();
+      (document.modals[0].components[0] as J).action = { type: 'conditional', cases: [{ ...(when ? { when } : {}), then: push('demo_level_b') }], otherwise: { type: 'none' } };
+      return { document, paths };
+    };
+    const openRule = () => { edit(); fireEvent.click(screen.getByRole('button', { name: /^Rule 1 of 1/ })); };
+
+    it('is disabled with Done\'s reason while a rule has no condition, and a click applies and shows nothing', () => {
+      const { document, paths } = byRule();
+      const shown: NavSurface[] = [], applied: CompositionDocument[] = [];
+      render(<Surface document={document} path={paths.palette} shown={shown} applied={applied}/>);
+      openRule();
+      const show = screen.getByRole('button', { name: 'Show Demo Level B' }) as HTMLButtonElement;
+      expect(show.disabled).toBe(true);
+      expect(show.title).toBe('Every rule needs a condition.');
+      fireEvent.click(show);
+      expect(applied).toHaveLength(0);
+      expect(shown).toHaveLength(0);
+    });
+
+    it('is enabled once the condition is set, and shows', () => {
+      const { document, paths } = byRule({ type: 'compare', op: 'above', left: lit(1), right: lit(0) });
+      const shown: NavSurface[] = [];
+      render(<Surface document={document} path={paths.palette} shown={shown}/>);
+      openRule();
+      const show = screen.getByRole('button', { name: 'Show Demo Level B' }) as HTMLButtonElement;
+      expect(show.disabled).toBe(false);
+      expect(show.title).toBe('');
+      fireEvent.click(show);
+      expect(shown).toEqual([{ kind: 'level', id: 'demo_level_b', sheetId: document.modals[0].id }]);
+    });
   });
 });
