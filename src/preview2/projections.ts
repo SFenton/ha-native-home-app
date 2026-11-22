@@ -22,6 +22,7 @@ import { evaluateOperand, finiteNumber, loading, scalarText, unavailable, value,
 export interface House {
   states?: ReadonlyMap<string, NativeState>;
   viewer?: Viewer;
+  timeZone?: string;
 }
 /** Simulated changes laid over the house. A call updates this, never a device. */
 export interface Overlay {
@@ -36,11 +37,12 @@ export type Phase = 'loading' | 'unavailable' | 'ready';
 export interface Projection { model: string; phase: Phase; fields: Readonly<Record<string, Json>> }
 
 /** Builds a house from a `/api/native-home` snapshot. */
-export function houseFrom(snapshot: { states: NativeState[]; currentUser?: NativeCurrentUser }): House {
+export function houseFrom(snapshot: { states: NativeState[]; currentUser?: NativeCurrentUser; timeZone?: string }): House {
   const user = snapshot.currentUser;
   return {
     states: new Map(snapshot.states.map(state => [state.entityId, state])),
     viewer: user ? { userId: user.id, isAdmin: user.isAdmin, personEntityId: user.personEntityId } : undefined,
+    timeZone: snapshot.timeZone,
   };
 }
 

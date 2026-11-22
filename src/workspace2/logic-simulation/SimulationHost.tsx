@@ -30,7 +30,7 @@ export interface SimulationHostProps {
   readonly onSelectBlock?: (blockId: string) => void;
   readonly onObservation?: (observations: CanvasObservations) => void;
   readonly liveClock?: SimulationClock;
-  /** IANA zone matching liveClock. Required for home-clock editing; device defaults to the browser's zone. */
+  /** House IANA zone matching liveClock; absent live values explicitly use the browser zone. */
   readonly clockTimeZone?: string;
   readonly previousText?: SimulationCase['base']['previousText'];
   /** The existing connection owner supplies freshness; LiveHouse alone cannot detect transport failures. */
@@ -74,11 +74,15 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
   const activePins = useMemo(() => mergePins(scenario?.pins ?? [], pins), [scenario, pins]);
   const snapshot = useSimulationSnapshot(program, document, flows, { clock: liveClock, previousText, ...freshness });
   const run = useMemo(() => runSimulation(program, snapshot, { scenario, pins, clock, liveClock: clockLive, liveBlocks: muted }), [program, snapshot, scenario, pins, clock, clockLive, muted]);
+  const liveTimeZone = clockTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const frozenClock = !clockLive && Boolean(clock || scenario);
+  const valueTimeZone = frozenClock ? undefined : liveTimeZone;
+  const valueClock = clockLive ? snapshot.base.clock : clock ?? scenario?.clock ?? scenario?.base.clock ?? snapshot.base.clock;
   const observation = useMemo(() => canvasObservations(program, run, {
     pins: activePins, localPins: pins, scenario, clockPinned: Boolean(!clockLive && (clock || scenario?.clock)), localClockPinned: Boolean(clock), liveClock: clockLive,
     freshness: snapshot.origin === 'sample' ? 'sample' : snapshot.stale ? 'held' : 'live', liveBlocks: muted, previousText: scenario?.base.previousText ?? snapshot.base.previousText, blockNames,
-    clock: clockLive ? snapshot.base.clock : clock ?? scenario?.clock ?? scenario?.base.clock ?? snapshot.base.clock, timeZone: clockTimeZone,
-  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.clock, snapshot.base.previousText, snapshot.origin, snapshot.stale, blockNames, clockTimeZone]);
+    clock: valueClock, timeZone: valueTimeZone,
+  }), [program, run, activePins, pins, scenario, clock, clockLive, muted, snapshot.base.previousText, snapshot.origin, snapshot.stale, blockNames, valueClock, valueTimeZone]);
   useEffect(() => onObservation?.(observation), [onObservation, observation]);
   const onRun = useCallback((ids: readonly string[], state: FlowState) => {
     setFlows(previous => {
@@ -182,8 +186,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       {narrow && <button type="button" className="w2-primary" onClick={() => setInspecting(false)}>Done</button>}
     </header>
     <SourceInspector name={blockLabel(editingPin).name} presentation={blockLabel(editingPin)} source={Boolean(source)} choice={choice}
-      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: snapshot.base.clock, timeZone: clockTimeZone }) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
-      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: scenario.clock ?? scenario.base.clock, timeZone: clockTimeZone }) : 'Captured live value' } : undefined}
+      live={`${sourceCapture ? displayValue({ kind: 'operand', answer: sourceCapture.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: snapshot.base.clock, timeZone: liveTimeZone }) : 'Not observed'} · ${changedAgo(blockLabel(editingPin).changedAt, clockInstant(snapshot.base.clock))}`}
+      scenario={scenario ? { name: scenario.name, value: inherited?.kind === 'source' ? displayValue({ kind: 'operand', answer: inherited.answer }, blockLabel(editingPin), undefined, { ...nodeValueOptions(editingPin), clock: scenario.clock ?? scenario.base.clock }) : 'Captured live value' } : undefined}
       onChoice={value => {
         setPinChoice(value);
         if (value !== 'live' && value !== 'scenario') return;
@@ -219,6 +223,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       </div>
     </header>
     {(snapshot.stale || snapshot.error) && <p role="note" className="w2-sim-notice">Waiting for Home Assistant.{run.outputs.some(output => output.source === 'Held/stale') && ' Showing the last values.'}{snapshot.error && <> {snapshot.error}</>}</p>}
+    {!clockTimeZone && !frozenClock && <p role="note" className="w2-caption">Times shown in this browser's time zone</p>}
     {run.issues.length > 0 && <p role="alert" className="w2-sim-notice">{run.issues.map(issueText).join(' ')}</p>}
     <p role="status" aria-live="polite" className="w2-sim-status">{message}</p>
     {savedVersionDiffers && drawer !== 'scenarios' && <p role="note" className="w2-sim-notice">Saved version differs. Reselect to apply.</p>}
@@ -248,7 +253,8 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
       {!narrow && <aside className="w2-sim-inspector w2-form" aria-label="Simulation inspector">{inspector}</aside>}
     </div>
     {narrow && <Overlay narrow open={inspecting} onOpenChange={setInspecting} label="Simulation inspector" className="w2-simulation-surface w2-form">{inspector}</Overlay>}
-    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot} timeZone={clockTimeZone}
+    <ScenariosDrawer open={drawer === 'scenarios'} onClose={() => setDrawer(undefined)} program={program} scenarios={scenarios} snapshot={snapshot} timeZone={liveTimeZone}
+      activeClock={valueClock} activeTimeZone={valueTimeZone}
       selectedId={scenarioId} savedVersionDiffers={savedVersionDiffers} run={run} results={results} inputNodes={uniqueInputs.filter(node => !presentation?.scenarioInputs || presentation.scenarioInputs.includes(node.id))} blockLabel={blockLabel} outputLabel={outputLabel}
       outputKeys={presentation?.scenarioOutputs}
       onSelect={selectScenario} onCapture={() => startCapture()} onCreate={() => startCapture(true)} blocked={stalePins.length > 0}
@@ -270,7 +276,7 @@ function HostSession({ program, document, canvasId, blockNames = {}, presentatio
     </ScenariosDrawer>
     <Overlay narrow open={drawer === 'evidence'} onOpenChange={open => { if (!open) setDrawer(undefined); }} label="Run evidence" className="w2-simulation-surface">
       <header className="w2-sim-drawer-head"><h2>Run evidence</h2><button type="button" className="w2-icon-button" aria-label="Close Run evidence" onClick={() => setDrawer(undefined)}><X size={18} aria-hidden /></button></header>
-      <SimulationDrawers outputs={run.outputs} program={program} presentation={presentation} blockNames={blockNames} />
+      <SimulationDrawers outputs={run.outputs} program={program} presentation={presentation} blockNames={blockNames} clock={valueClock} timeZone={valueTimeZone} />
     </Overlay>
   </section>;
 }

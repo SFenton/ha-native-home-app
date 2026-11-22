@@ -1,7 +1,7 @@
 import type { SimulationClock, SimulationResult } from '../../shared/composition/graph/types';
 import { formatObservedValue, type ObservedValue } from './observations';
 import { resultText } from './words';
-import { formatValue, type ValueFormatOptions } from '../canvas/value-format';
+import { describeValue, formatValue, type ValueFormatOptions } from '../canvas/value-format';
 
 export interface ValuePresentation {
   readonly name: string;
@@ -32,11 +32,14 @@ export function displayValue(result: SimulationResult | undefined, presentation?
     if (presentation?.unit && (typeof value === 'number' || typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))) {
       return `${Number(value).toFixed(1)} ${presentation.unit}`;
     }
-    if (!observation && value === 'unavailable') return 'Unavailable';
-    if (!observation && value === 'unknown') return "Can't tell";
+    if (!observation && !valueOptions.literal && value === 'unavailable') return 'Unavailable';
+    if (!observation && !valueOptions.literal && value === 'unknown') return "Can't tell";
     return formatValue(value, valueOptions);
   }
   return resultText(result);
+}
+export function describeResult(result: SimulationResult | undefined, options: ValueFormatOptions = {}): string {
+  return result?.kind === 'operand' && result.answer.status === 'value' ? describeValue(result.answer.value, options) : resultText(result);
 }
 export function localTime(iso: string): string {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })

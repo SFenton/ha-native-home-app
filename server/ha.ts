@@ -4,6 +4,7 @@ import { LiveEntityHub } from './ha-live';
 import { HttpError } from './store';
 import { HaPublicationClient, command } from './ha-publication';
 import { entityExists, entityStates, listEntities, type HaReads } from './ha-entities';
+import { isNativeTimeZone } from '../src/shared/native-state';
 
 /** The entities the picture proxy serves: `image.<name>` and `camera.<name>` only. */
 export const PICTURE_ENTITY = /^(image|camera)\.[a-z0-9_]{1,120}$/;
@@ -34,7 +35,15 @@ export class HomeAssistantClient {
     this.token = direct ? config.haToken : config.supervisorToken;
     this.websocketUrl = direct ? new URL('/api/websocket', config.haUrl).href.replace(/^http/, 'ws') : (config.supervisorToken ? 'ws://supervisor/core/websocket' : undefined);
     this.publication = new HaPublicationClient({ base: this.base, token: this.token, websocketUrl: this.websocketUrl });
-    if (this.websocketUrl && this.token) this.live = new LiveEntityHub({ url: this.websocketUrl, token: this.token });
+    if (this.websocketUrl && this.token) {
+      this.live = new LiveEntityHub({ url: this.websocketUrl, token: this.token });
+      const subscribe = this.live.subscribe.bind(this.live);
+      // Observe existing listeners without opening a second connection or keeping an idle hub alive.
+      this.live.subscribe = listener => subscribe(event => {
+        if (event.type === 'status' && event.connected) this.timeZoneRead = undefined;
+        listener(event);
+      });
+    }
   }
   /** The live entity stream (one websocket, opened on the first listener); undefined when Home Assistant is not configured. */
   readonly live?: LiveEntityHub;
@@ -82,6 +91,18 @@ export class HomeAssistantClient {
   };
   get configured() { return Boolean(this.base && this.token); }
   get haConnected() { return this.connected; }
+  private timeZoneRead?: Promise<string | undefined>;
+  private houseTimeZone(signal: AbortSignal): Promise<string | undefined> {
+    if (!this.timeZoneRead) {
+      const read = this.request('/api/config', 'GET', undefined, signal).then(raw => {
+        const zone = record(raw).time_zone;
+        return isNativeTimeZone(zone) ? zone : undefined;
+      });
+      this.timeZoneRead = read;
+      void read.catch(() => { if (this.timeZoneRead === read) this.timeZoneRead = undefined; });
+    }
+    return this.timeZoneRead;
+  }
   private async request(endpoint: string, method: 'GET' | 'POST' = 'GET', body?: unknown, signal = AbortSignal.timeout(8000), maxBytes = 1024 * 1024): Promise<unknown> {
     if (!this.configured) throw new HttpError(503, 'Home Assistant is not configured');
     let response: Response;
@@ -93,10 +114,12 @@ export class HomeAssistantClient {
       });
     } catch {
       this.connected = false;
+      this.timeZoneRead = undefined;
       throw new HttpError(502, 'Home Assistant request failed or timed out');
     }
     if (!response.ok) {
       this.connected = false;
+      this.timeZoneRead = undefined;
       throw new HttpError(502, `Home Assistant returned HTTP ${response.status}`);
     }
     // Read a bounded response, never return upstream errors, headers or credentials.
@@ -117,6 +140,7 @@ export class HomeAssistantClient {
       return parsed;
     } catch (error) {
       this.connected = false;
+      this.timeZoneRead = undefined;
       if (error instanceof HttpError) throw error;
       throw new HttpError(502, 'Home Assistant returned invalid JSON');
     } finally { reader.releaseLock(); }
@@ -180,11 +204,13 @@ export class HomeAssistantClient {
       const snapshot = await readNativeSnapshot(
         this.websocketUrl, this.token, signal, [this.config.haToken ?? '', this.config.supervisorToken ?? '', this.config.authToken ?? ''],
         () => this.request('/api/states', 'GET', undefined, signal, 4 * 1024 * 1024), draftTodoLists,
+        () => this.houseTimeZone(signal),
       );
       this.connected = true;
       return snapshot;
     } catch (error) {
       this.connected = false;
+      this.timeZoneRead = undefined;
       if (signal.aborted) throw nativeHomeAbortError(signal);
       throw error;
     } finally { clearTimeout(timer); }

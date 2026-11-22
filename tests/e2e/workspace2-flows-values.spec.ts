@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { effectiveAwayDocument, effectiveAwaySnapshot } from '../flows-canvas/integration/fixture';
 import { isPhone, openLibrary, seed, waitForWorkspace } from './workspace2-helpers';
 
-async function openAway(page: Page) {
+async function openAway(page: Page, name = 'Effective Away') {
   let panel;
   if (isPhone(page)) {
     await page.getByRole('button', { name: 'Project', exact: true }).click();
@@ -14,7 +14,7 @@ async function openAway(page: Page) {
   }
   const templates = panel.getByRole('button', { name: /^Templates, \d+$/ });
   if (await templates.count() && await templates.getAttribute('aria-expanded') === 'false') await templates.click();
-  await panel.getByRole('button', { name: /^Effective Away/ }).first().click();
+  await panel.getByRole('button', { name: new RegExp(`^${name}`) }).first().click();
   await page.getByTestId('logic-editor').getByRole('button', { name: 'Edit in Canvas', exact: true }).first().click();
   const close = page.getByRole('button', { name: 'Close block palette', exact: true });
   if (await close.isVisible()) await close.click();
@@ -83,4 +83,32 @@ test('held Effective Away values are visible on open, literals are known, and th
   if (await discard.isVisible()) await discard.click();
   expect((await (await request.get('/native/api/draft')).json()).document).toEqual(before);
   expect(errors).toEqual([]);
+});
+
+test.describe('house time zone', () => {
+  test.use({ timezoneId: 'Asia/Tokyo' });
+  test('formats canvas Result against the Los Angeles live clock and announces browser fallback', async ({ page, request }) => {
+    const document = effectiveAwayDocument();
+    document.logicLibrary!.push({ id: 'demo_house_date', name: 'House date', kind: 'operand', params: [],
+      body: { type: 'last-changed', sourceId: 'demo_mode' } });
+    await seed(request, document);
+    let zone: string | undefined = 'America/Los_Angeles';
+    await page.route('**/api/native-home', route => route.fulfill({ json: { ...effectiveAwaySnapshot, timeZone: zone,
+      states: effectiveAwaySnapshot.states.map(state => state.entityId === 'input_select.demo_mode'
+        ? { ...state, lastChanged: '2026-11-21T10:00:00Z' } : state),
+    } }));
+    await page.clock.install({ time: new Date('2026-11-21T20:00:00Z') });
+    await page.goto('/'); await waitForWorkspace(page);
+    await openAway(page, 'House date');
+    const preview = page.getByRole('complementary', { name: 'Canvas preview', exact: true });
+    const result = preview.getByLabel('Result value', { exact: true });
+    await expect(result).toHaveText('Today, 2:00 AM');
+    await expect(result).toHaveAttribute('aria-description', /2026-11-21T10:00:00Z/);
+    await expect(preview.getByText("Times shown in this browser's time zone", { exact: true })).toHaveCount(0);
+    zone = undefined;
+    await page.reload(); await waitForWorkspace(page);
+    await openAway(page, 'House date');
+    await expect(result).toHaveText('Yesterday, 7:00 PM');
+    await expect(preview.getByText("Times shown in this browser's time zone", { exact: true }).first()).toBeVisible();
+  });
 });

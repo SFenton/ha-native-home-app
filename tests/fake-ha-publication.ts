@@ -18,6 +18,8 @@ export interface FakeHaOptions {
   denyCommands?: boolean;
   /** The `config` part answered to `fenton_home/house_config`; the other schema-2 sections are filled with empty objects. */
   houseConfig?: Record<string, unknown>;
+  /** Core config for the read-only Studio time zone projection. */
+  coreConfig?: Record<string, unknown>;
   /** Assets the integration already holds. */
   storedAssets?: string[];
   /** What `get_services` answers (domain, then service). Without it the command is unknown. */
@@ -60,6 +62,12 @@ export async function fakeHomeAssistant(options: FakeHaOptions) {
   };
   const upstream = http.createServer((req, res) => {
     authorizations.push(req.headers.authorization);
+    if (req.method === 'GET' && req.url === '/api/config') {
+      log.push('http /api/config');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.headers.authorization !== `Bearer ${options.token}`) { res.statusCode = 401; res.end('{}'); return; }
+      res.end(JSON.stringify(options.coreConfig ?? {})); return;
+    }
     if (req.method === 'GET' && (req.url === '/api/states' || req.url === '/api/')) {
       res.setHeader('Content-Type', 'application/json');
       if (req.headers.authorization !== `Bearer ${options.token}`) { res.statusCode = 401; res.end('{}'); return; }

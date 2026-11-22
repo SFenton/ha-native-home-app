@@ -2,11 +2,13 @@ import { useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { IterationRow } from '../../shared/composition/graph-observation';
 import type { OutputAnswer } from './engine';
-import { resultText } from './words';
 import { SelectMenu } from '../SelectMenu';
 import type { SimulationProgram } from './program';
 import { anchorKey } from './contracts';
-import type { SimulationPresentation } from './presentation';
+import { describeResult, type SimulationPresentation } from './presentation';
+import { formatValue, nodeValueOptions } from '../canvas/value-format';
+import { resultText } from './words';
+import type { SimulationClock, SimulationResult } from '../../shared/composition/graph/types';
 
 function Iterations({ rows, label, entities }: { rows: readonly IterationRow[]; label: string; entities?: Readonly<Record<string, string>> }) {
   const scroller = useRef<HTMLDivElement>(null), [selected, setSelected] = useState<IterationRow>();
@@ -37,11 +39,18 @@ function Iterations({ rows, label, entities }: { rows: readonly IterationRow[]; 
     </section>}
   </>;
 }
-export function SimulationDrawers({ outputs, program, presentation, blockNames }: { outputs: readonly OutputAnswer[]; program: SimulationProgram; presentation?: SimulationPresentation; blockNames: Readonly<Record<string, string>> }) {
+export function SimulationDrawers({ outputs, program, presentation, blockNames, clock, timeZone }: { outputs: readonly OutputAnswer[]; program: SimulationProgram; presentation?: SimulationPresentation; blockNames: Readonly<Record<string, string>>; clock?: SimulationClock; timeZone?: string }) {
   const [drawer, setDrawer] = useState<'each' | 'items' | 'trace'>('each');
   const [filter, setFilter] = useState('all');
   const name = (id: string) => presentation?.blocks?.[id]?.name ?? blockNames[id] ?? 'Value';
   const stepName = (op: string) => ({ filter: 'Keep Where', sort: 'Sort', limit: 'First Few', count: 'How Many', get: 'Items', map: 'Map', group: 'Group' })[op] ?? 'Step';
+  const value = (result: SimulationResult | undefined, blockId: string, observedClock = clock) => {
+    const node = program.roots.flatMap(root => root.graph.nodes).find(node => node.id === blockId);
+    const options = { clock: observedClock, timeZone, ...(node ? nodeValueOptions(node) : {}) };
+    const exact = describeResult(result, options);
+    const text = result?.kind === 'operand' && result.answer.status === 'value' ? formatValue(result.answer.value, options) : resultText(result);
+    return <span title={exact} aria-description={exact}>{text}</span>;
+  };
   return <section className="w2-sim-drawers" aria-label="Run evidence">
     <div className="w2-segment-pill" aria-label="Evidence drawers">
       <button type="button" aria-pressed={drawer === 'each'} onClick={() => setDrawer('each')}>Each Run</button>
@@ -56,14 +65,14 @@ export function SimulationDrawers({ outputs, program, presentation, blockNames }
         <h3>{outputName}</h3>
         {trace.truncated && <p role="note">Trace truncated. Unrecorded values and iterations are not evidence.</p>}
         {drawer === 'each' && <>
-          <p>Actual output: {resultText(output.result)}</p>
+          <p>Actual output: {value(output.result, program.roots[index].graph.roots[0].nodeId)}</p>
           {[...new Set(trace.iterations.map(row => row.blockId))].map(blockId => {
             const rows = trace.iterations.filter(row => row.blockId === blockId), step = trace.steps.find(step => step.blockId === blockId);
             const actual = step ? { kind: 'operand' as const, answer: { status: 'value' as const, value: step.output } }
               : trace.events.filter(event => event.blockId === blockId).slice(-1)[0]?.output;
             return <section key={blockId} aria-label={`${step ? stepName(step.op) : outputName} reducer`}>
               <h4>{step ? stepName(step.op) : name(blockId)}</h4>
-              <p>Observed rows: {rows.length}. Included: {rows.filter(row => row.included).length}. Actual result: {resultText(actual)}</p>
+              <p>Observed rows: {rows.length}. Included: {rows.filter(row => row.included).length}. Actual result: {value(actual, blockId)}</p>
               <Iterations rows={rows} label={`${outputName}${step ? ` ${stepName(step.op)}` : ''} iterations`} entities={presentation?.entities} />
             </section>;
           })}
@@ -85,7 +94,7 @@ export function SimulationDrawers({ outputs, program, presentation, blockNames }
         </>}
         {drawer === 'trace' && <ol>{trace.events.slice(0, 100).map((event, at) => <li key={at}>
           <strong>{name(event.blockId)}</strong> - {event.state} - {event.provenance === 'pin' ? 'Pinned' : event.provenance === 'live' ? 'Live' : event.provenance}
-          <p>{event.output ? resultText(event.output) : 'No value observed.'} {event.reason}</p>
+          <p>{event.output ? value(event.output, event.blockId, event.clock) : 'No value observed.'} {event.reason}</p>
           {event.item && <p>Iteration {event.item.index + 1}</p>}
           <details><summary>Inputs and frozen clock</summary><pre>{JSON.stringify({ inputs: event.inputs, clock: event.clock }, null, 2)}</pre></details>
           <small>{event.cost.used} {event.cost.limit ? `/ ${event.cost.limit} budget` : 'node visits (no document runtime cap)'}</small>

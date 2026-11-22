@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ALL_KEY, READY_KEY, VIEWER_KEY } from '../../preview2/live-house';
+import { ALL_KEY, READY_KEY, TIME_ZONE_KEY, VIEWER_KEY } from '../../preview2/live-house';
+import { usePreviewClock, useReadsSecondClock } from '../../preview2/clock';
 import { createEnvironment, emptyOverlay } from '../../preview2/projections';
 import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Environment } from '../../shared/composition/evaluator';
@@ -9,11 +10,33 @@ import { valueAt } from '../../shared/composition/evaluator';
 import { useWorkspaceData } from '../pickers/WorkspaceData';
 import { heldEntity } from '../data/samples';
 import { needsServer, useLiveRun, type LiveRun } from '../data/liveRun';
-import { studioClock } from '../data/useFlowData';
+import { clockInstant } from './presentation';
 import { flowFingerprint, type SimulationProgram } from './program';
 import type { HeldSnapshot } from './engine';
 
 export interface FlowState { readonly fingerprint: string; readonly run: LiveRun }
+
+/** A live house clock includes the zone's offset at this instant, not the browser's offset. */
+export function simulationClock(date: Date, timeZone: string): SimulationCase['base']['clock'] {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date).map(part => [part.type, part.value]));
+  const now = `${parts.year.padStart(4, '0')}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+  return { now, utcOffsetMinutes: (Date.parse(`${now}Z`) - Math.floor(date.getTime() / 1000) * 1000) / 60_000 };
+}
+
+export function useSimulationClock(document: unknown) {
+  const { live, house } = useWorkspaceData();
+  const subscribe = useCallback((listener: () => void) => live ? live.subscribe(keys => {
+    if (keys.includes(TIME_ZONE_KEY)) listener();
+  }) : () => {}, [live]);
+  const clockTimeZone = useSyncExternalStore(subscribe, () => live ? live.timeZone : house?.timeZone);
+  const browserClock = usePreviewClock(useReadsSecondClock(document));
+  const liveClock = useMemo(() => clockTimeZone ? simulationClock(new Date(clockInstant(browserClock)), clockTimeZone) : browserClock,
+    [browserClock, clockTimeZone]);
+  return { liveClock, clockTimeZone };
+}
 /** Group identical requests onto the existing run store, using the first authored flow ID. */
 export function sharedFlowRequests(program: SimulationProgram): readonly { readonly id: string; readonly ids: readonly string[]; readonly inputs: PipelineInputs }[] {
   const grouped = new Map<string, { id: string; ids: string[]; inputs: PipelineInputs }>();
@@ -63,7 +86,8 @@ export function useSimulationSnapshot(program: SimulationProgram, document: Pick
     if (broad || keys.some(changed => changed === READY_KEY || changed === VIEWER_KEY || entityIds.includes(changed))) listener();
   }) : () => {}, [live, key, broad]); // eslint-disable-line react-hooks/exhaustive-deps
   const versions = useSyncExternalStore(subscribe, () => live ? `${live.ready}|${live.versionOf(VIEWER_KEY)}|${broad ? live.versionOf(ALL_KEY) : entityIds.map(id => live.versionOf(id)).join(',')}` : '');
-  const now = options.clock ?? studioClock();
+  const { liveClock } = useSimulationClock(program.roots.map(root => root.body));
+  const now = options.clock ?? liveClock;
   return useMemo(() => {
     const environment: Environment = createEnvironment(document, house ?? {}, emptyOverlay, undefined, now);
     const reads: SimulationCase['base']['reads'] = program.reads.filter(read => !program.flows.has(read.sourceId)).map(read => ({

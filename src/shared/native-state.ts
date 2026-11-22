@@ -1,5 +1,15 @@
 import type { Json } from './types';
 
+/** Studio-only HA core time zone; offset strings are not IANA names. */
+export function isNativeTimeZone(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 128 || !/^[A-Za-z][A-Za-z0-9_+/-]*$/.test(value)) return false;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: value }); return true; }
+  catch (error) {
+    if (error instanceof RangeError) return false;
+    throw error;
+  }
+}
+
 export type NativeCurrentUser = {
   id: string;
   name: string;
@@ -123,6 +133,8 @@ export type NativeState = {
 
 export type NativeSnapshot = {
   mode: 'live';
+  /** Validated HA core IANA zone, for Studio time presentation only. */
+  timeZone?: string;
   houseConfig: { schema: 2; hash: string; config: Record<string, Json> };
   states: NativeState[];
   currentUser?: NativeCurrentUser;

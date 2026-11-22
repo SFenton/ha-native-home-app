@@ -55,6 +55,7 @@ function houseConfig(cameraIds = ['camera.demo_entry', 'camera.demo_side']) {
 
 async function mockNativeHome(options: {
   house?: unknown; states?: unknown;
+  coreConfig?: unknown;
   command?: (send: (value: unknown) => void, socket: Duplex) => void;
   authentication?: boolean;
   stallStates?: boolean;
@@ -68,6 +69,7 @@ async function mockNativeHome(options: {
     paths.push(req.url!);
     if (options.stallStates) return;
     res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/api/config') { res.end(JSON.stringify(options.coreConfig ?? {})); return; }
     res.end(JSON.stringify(options.states ?? [
       { entity_id: 'sensor.demo_outside', state: '0', attributes: { friendly_name: 'Outside', unit_of_measurement: 'C', icon: 'mdi:thermometer', device_class: 'temperature', token: 'discard-this-attribute', push_url: 'http://private-relay/', entity_picture: '/api/camera_proxy/camera.demo_front?token=discard-this-attribute' } },
       { entity_id: 'climate.demo_hall', state: 'off', attributes: { current_temperature: 0, temperature: 0, hvac_action: 'idle' } },
@@ -291,10 +293,25 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       const serialized = JSON.stringify(body);
       for (const forbidden of [authoringToken, haToken, 'discard-this-attribute', 'push_url', 'entity_picture', 'private-unrelated-state']) expect(serialized).not.toContain(forbidden);
       expect(upstream.messages).toEqual([{ type: 'auth', access_token: haToken }, { id: 1, type: 'fenton_home/house_config' }, { id: 2, type: 'auth/current_user' }]);
-      expect(upstream.paths).toEqual(['/api/websocket', '/api/states']);
+      expect(upstream.paths).toEqual(['/api/websocket', '/api/states', '/api/config']);
       await upstream.connections[0].closed;
       expect(JSON.stringify(store.native.getDraft())).toBe(before);
-      expect(upstream.paths).toEqual(['/api/websocket', '/api/states']);
+      expect(upstream.paths).toEqual(['/api/websocket', '/api/states', '/api/config']);
+    });
+
+    it.each(['America/Los_Angeles', 'Not/A_Zone', undefined, 42, '+09:00'])('forwards only a validated core time zone (%s)', async time_zone => {
+      const upstream = await mockNativeHome({ coreConfig: { time_zone, latitude: 34, longitude: -118, location_name: 'private house name', api_key: haToken } });
+      const { request } = await fixture({ authToken: authoringToken, haUrl: upstream.url, haToken });
+      const response = await request('/api/native-home', 'GET', undefined, headers);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      if (time_zone === 'America/Los_Angeles') expect(body.timeZone).toBe(time_zone);
+      else expect(Object.hasOwn(body, 'timeZone')).toBe(false);
+      expect(Object.keys(body).sort()).toEqual(['currentUser', 'houseConfig', 'mode', 'states', ...(time_zone === 'America/Los_Angeles' ? ['timeZone'] : [])].sort());
+      const serialized = JSON.stringify(body);
+      for (const forbidden of ['latitude', 'longitude', 'location_name', 'private house name', 'api_key', haToken]) expect(serialized).not.toContain(forbidden);
+      await request('/api/native-home', 'GET', undefined, headers);
+      expect(upstream.paths.filter(path => path === '/api/config')).toHaveLength(1);
     });
 
     it('does not inherit the sample-demo bypass once a token is set, and fails explicitly without HA configuration', async () => {
@@ -376,7 +393,7 @@ describe('authentication, origin checks, and safe HA boundary', () => {
       expect(response.status).toBe(504);
       expect(await response.json()).toEqual({ error: 'Native home snapshot timed out' });
       expect(performance.now() - start).toBeLessThan(10000);
-      expect(upstream.paths).toEqual(['/api/websocket', '/api/states']);
+      expect(upstream.paths).toEqual(['/api/websocket', '/api/states', '/api/config']);
       await upstream.connections[0].closed;
     }, 12000);
 
