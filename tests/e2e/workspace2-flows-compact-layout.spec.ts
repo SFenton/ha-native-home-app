@@ -84,17 +84,48 @@ test('persisted compact cards keep neighbouring headers clickable and Tidy Up se
     const boxes = cards.map(card => {
       const rect = card.getBoundingClientRect();
       const scale = rect.width / (card as HTMLElement).offsetWidth;
-      const reserve = card.querySelector('.w2-canvas-node-actions') ? 0 : innerWidth < 600 ? 55 : 45;
+      const reserve = card.querySelector('.w2-canvas-node-actions') ? 0 : matchMedia('(max-width: 599px), (pointer: coarse)').matches ? 55 : 45;
       return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom + reserve * scale };
     });
     return boxes.some((a, i) => boxes.slice(i + 1).some(b => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom));
   });
   expect(overlaps).toBe(false);
+  const expectActionsClearHeaders = async () => {
+    expect(await page.locator('.w2-canvas-node').evaluateAll(cards => {
+      const selected = cards.find(card => card.hasAttribute('data-selected'));
+      const actions = selected?.querySelector('.w2-canvas-node-actions')?.getBoundingClientRect();
+      if (!actions) throw new Error('The selected card must have visible actions.');
+      return cards.filter(card => card !== selected).some(card => {
+        const header = card.querySelector('.w2-canvas-node-header')!.getBoundingClientRect();
+        return actions.left < header.right && header.left < actions.right && actions.top < header.bottom && header.top < actions.bottom;
+      });
+    })).toBe(false);
+  };
   await annotated.click();
   await closePeek();
+  await expectActionsClearHeaders();
   await page.getByRole('button', { name: 'Rename or describe My entities, Many Entities', exact: true }).click();
   await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Read only the configured demo entities.');
   await page.getByRole('button', { name: 'Apply details', exact: true }).click();
+  await filter.click();
+  await closePeek();
+  await expect(filter).toHaveAttribute('aria-pressed', 'true');
+  await expectActionsClearHeaders();
+  const tidyPositions = await page.locator('.w2-canvas-node').evaluateAll(cards =>
+    Object.fromEntries(cards.map(card => [card.getAttribute('data-node-id'), { x: (card as HTMLElement).style.left, y: (card as HTMLElement).style.top }])));
+  const before = (await (await request.get('/native/api/draft')).json()).revision;
+  await page.getByRole('button', { name: 'Apply to draft', exact: true }).click();
+  await expect(page.locator('.w2-canvas-footer [role=status]')).toHaveText('Edits applied to the draft. Not published.');
+  await expect.poll(async () => (await (await request.get('/native/api/draft')).json()).revision).toBeGreaterThan(before);
+  await page.reload();
+  await waitForWorkspace(page);
+  await openCanvas(page);
+  expect(await page.locator('.w2-canvas-node').evaluateAll(cards =>
+    Object.fromEntries(cards.map(card => [card.getAttribute('data-node-id'), { x: (card as HTMLElement).style.left, y: (card as HTMLElement).style.top }])))).toEqual(tidyPositions);
+  await expect(annotated.locator('xpath=ancestor::li[1]').locator('.w2-canvas-node-note')).toHaveText('Read only the configured demo entities.');
+  await annotated.click();
+  await closePeek();
+  await expectActionsClearHeaders();
   await filter.click();
   await closePeek();
   await expect(filter).toHaveAttribute('aria-pressed', 'true');

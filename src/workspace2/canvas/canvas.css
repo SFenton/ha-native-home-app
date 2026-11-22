@@ -121,7 +121,7 @@
 .w2-canvas-annotation .w2-canvas-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .w2-canvas .w2-canvas-annotation button { min-width: 0; padding-inline: 4px; font-size: 10px; }
 .w2-canvas .w2-canvas-annotation textarea, .w2-canvas-dialog .w2-canvas-annotation textarea { min-height: 80px; resize: vertical; font: inherit; }
-.w2-canvas-tooltip { position: fixed; z-index: 120; pointer-events: none; width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 12px; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: var(--w2-shadow); font: 12px/1.5 var(--w2-font); overflow-wrap: anywhere; }
+.w2-canvas-tooltip { position: fixed; z-index: 120; width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 12px; border: 1px solid var(--w2-line); border-radius: 10px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: var(--w2-shadow); font: 12px/1.5 var(--w2-font); overflow-wrap: anywhere; }
 .w2-canvas-peek { position: absolute; z-index: 5; display: flex; flex-direction: column; border: 1px solid var(--w2-line); border-radius: 12px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: var(--w2-shadow); overflow: hidden; }
 .w2-canvas-peek .w2-canvas-panel-head { flex: none; }
 .w2-canvas-peek-body { display: grid; gap: 20px; padding: 12px; overflow: auto; min-height: 0; }

@@ -4,6 +4,9 @@ import { canvasObservations, formatObservedValue, itemContextText } from '../../
 import { captureScenario, runSimulation } from '../../../src/workspace2/logic-simulation/engine';
 import { createSimulationProgram, nodeFor } from '../../../src/workspace2/logic-simulation/program';
 import { compileCompositionDocument } from '../../../src/shared/composition/compiler';
+import type { Operand } from '../../../src/shared/composition/expression';
+import { lift } from '../../../src/shared/composition/graph';
+import type { LogicEntry } from '../../../src/shared/composition/studio-logic/library-schema';
 import { createCompositionDocument } from '../../../src/shared/composition/workspace';
 import { liftField } from '../../../src/workspace2/logic-fields/registry';
 import { todoFlowInputs, todoItemFixture } from './per-item-fixture';
@@ -23,19 +26,21 @@ function observe(fixture: Pick<ReturnType<typeof todoItemFixture>, 'program' | '
   return { run, values, at, ports: canvasPortObservations(values) };
 }
 describe('per-item observations', () => {
-  function templateFixture(items: number[], dependent = true) {
+  function templateFixture(items: number[], binding: Operand = { type: 'item', path: [] }, body: unknown = {
+    type: 'math', op: 'add', args: [{ type: 'literal', value: 100 }, { type: 'hole', name: 'n' }],
+  }) {
     const document = compileCompositionDocument({
       ...createCompositionDocument('demo-template-items'),
       logicLibrary: [{
         id: 'demo-plus-100', name: 'Plus 100', kind: 'operand', params: [{ name: 'n', kind: 'operand', sample: { type: 'literal', value: 1 } }],
-        body: { type: 'math', op: 'add', args: [{ type: 'literal', value: 100 }, { type: 'hole', name: 'n' }] },
+        body,
       }],
       dataSources: [{
         id: 'demo-template-flow', kind: 'model', model: 'pipeline@1', inputs: {
           title: 'Template items', parameters: [], request: { type: 'none', value: { type: 'literal', value: items } },
           steps: [
             { id: 'scores', op: 'map', fields: { score: { type: 'logic-ref', logicId: 'demo-plus-100', args: {
-              n: dependent ? { type: 'item', path: [] } : { type: 'literal', value: 1 },
+              n: binding,
             } } } },
             { id: 'total', op: 'sum', value: { type: 'item', path: ['score'] } },
           ],
@@ -58,6 +63,7 @@ describe('per-item observations', () => {
     expect(template.ports.find(port => port.direction === 'input' && port.portId === '/args/n')).toMatchObject({
       observed: true, value: 1, item: { count: items.length, index: 0 },
     });
+    expect(run.outputs[0].flow).toMatchObject({ status: 'ok', output: items.reduce((total, n) => total + 100 + n, 0) });
     expect(run.outputs[0].flow).toEqual(runSimulation(fixture.program, fixture.held, { observe: false }).outputs[0].flow);
   });
   it('does not attribute internal constants to a dependent template on empty input', () => {
@@ -69,9 +75,44 @@ describe('per-item observations', () => {
     expect(run.outputs[0].perItem?.trace.events.some(event => event.blockId === template.blockId)).toBe(false);
   });
   it('still observes the complete result of a truly independent template with zero items', () => {
-    const { at } = observe(templateFixture([], false));
+    const { at } = observe(templateFixture([], { type: 'literal', value: 1 }));
     expect(at('/steps/0/fields/score')).toMatchObject({ observed: true, value: 101 });
     expect(at('/steps/0/fields/score').ports.find(port => port.portId === '/args/n')).toMatchObject({ observed: true, value: 1 });
+  });
+  it.each([
+    { type: 'math', op: 'add', args: [{ type: 'literal', value: 0 }, { type: 'item', path: [] }] },
+    { type: 'choose', cases: [{ when: { type: 'compare', op: 'eq', left: { type: 'literal', value: 1 }, right: { type: 'literal', value: 1 } },
+      then: { type: 'literal', value: 1 } }], otherwise: { type: 'index' } },
+  ] satisfies Operand[])('treats a dependency anywhere in a template binding as item-dependent (%j)', binding => {
+    const { at } = observe(templateFixture([], binding));
+    expect(at('/steps/0/fields/score')).toMatchObject({ observed: false, item: { count: 0 } });
+    expect(formatObservedValue(at('/steps/0/fields/score'))).toMatch(/^Didn't run:/);
+  });
+  it.each([
+    { items: [], binding: { type: 'item', path: [] }, expected: { observed: false, item: { count: 0 } } },
+    { items: [1, 9], binding: { type: 'item', path: [] }, expected: { observed: true, value: 1, item: { count: 2, index: 0 } } },
+    { items: [], binding: { type: 'literal', value: 1 }, expected: { observed: true, value: 1 } },
+  ] satisfies { items: number[]; binding: Operand; expected: object }[])('observes a template that returns its binding directly without losing the use identity ($items, $binding.type)', ({ items, binding, expected }) => {
+    const fixture = templateFixture(items, binding, { type: 'hole', name: 'n' });
+    const { values } = observe(fixture);
+    const use = fixture.graph.nodes.find(node => node.payload.kind === 'logic-ref')!;
+    expect(values.blocks[use.id]).toMatchObject(expected);
+    expect(values.blocks[use.id].ports.find(port => port.portId === '/args/n')).toMatchObject(expected);
+  });
+  it.each([true, false])('reads only evaluated template bindings, not similarly named internal inputs (binding used: %s)', used => {
+    const library: LogicEntry[] = [{
+      id: 'demo-format-binding', name: 'Format binding', kind: 'operand',
+      params: [{ name: 'n', kind: 'operand', sample: { type: 'literal', value: 1 } }],
+      body: { type: 'format', pattern: '{n}:{bound}', args: {
+        n: { type: 'literal', value: 100 }, bound: used ? { type: 'hole', name: 'n' } : { type: 'literal', value: 0 },
+      } },
+    }];
+    const graph = lift({ type: 'logic-ref', logicId: library[0].id, args: { n: { type: 'literal', value: 1 } } }, { kind: 'operand' }).graph;
+    const program = createSimulationProgram([graph], { library });
+    const { values } = observe({ program, held: todoItemFixture().held });
+    const use = graph.nodes.find(node => node.payload.kind === 'logic-ref')!;
+    expect(values.blocks[use.id]).toMatchObject({ observed: true, value: used ? '100:1' : '100:0' });
+    expect(values.blocks[use.id].ports.find(port => port.portId === '/args/n')).toMatchObject(used ? { observed: true, value: 1 } : { observed: false });
   });
   it('shows the real clock, constants and pure expressions on empty input without changing runtime answers, costs or execution evidence', () => {
     const inputs = todoFlowInputs();

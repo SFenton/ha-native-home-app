@@ -1,6 +1,7 @@
 import { evaluateOperand, evaluatePredicate, type EvaluationObserver } from '../../shared/composition/evaluator';
 import type { Operand, Predicate } from '../../shared/composition/expression';
 import type { ObservationReport } from '../../shared/composition/graph-observation';
+import type { GraphNode } from '../../shared/composition/graph/types';
 import { evaluateParameters, PIPELINE_BUDGET, type PipelineInputs, type RunResult } from '../../shared/composition/pipeline';
 import { Meter, type FlowContext } from '../../shared/composition/pipeline/operands';
 import { nodeTitle } from '../canvas/blocks';
@@ -32,11 +33,24 @@ export function noItemsText(context: ItemContext): string {
 /** Expanded template descendants share the use's identity, but only its outer expressions complete the block. */
 export function blockResultPointers(root: SimulationRoot): ReadonlyMap<string, ReadonlySet<string>> {
   const mapped = new Map<string, string[]>();
+  const templates = new Set(root.graph.nodes.filter(node => node.payload.kind === 'logic-ref').map(node => node.id));
+  const uses = root.sourceMap.filter(location => location.stage !== 'expanded' && templates.has(location.nodeId));
+  const expandedUses = new Set(root.sourceMap.flatMap(location => location.usePointer === undefined ? [] : [location.usePointer]));
+  const add = (id: string, at: string) => {
+    const pointers = mapped.get(id) ?? [];
+    pointers.push(at);
+    mapped.set(id, pointers);
+  };
   for (const location of root.sourceMap) {
     if (location.portId !== 'value') continue;
-    const pointers = mapped.get(location.nodeId) ?? [];
-    pointers.push(location.pointer);
-    mapped.set(location.nodeId, pointers);
+    // Authored argument paths are stale after expansion, including arguments that were never used.
+    if (location.stage !== 'expanded' && [...expandedUses].some(at => location.pointer === at || location.pointer.startsWith(`${at}/`))) continue;
+    add(location.nodeId, location.pointer);
+    if (location.stage === 'expanded') for (const use of uses) {
+      const original = location.authoredPointer;
+      // An identity template can complete with its argument's callback rather than its own block ID.
+      if (original === use.pointer || original?.startsWith(`${use.pointer}/`)) add(use.nodeId, location.pointer);
+    }
   }
   return new Map([...mapped].map(([id, pointers]) => {
     const outer = new Set<string>();
@@ -53,6 +67,10 @@ export function observePerItem(root: SimulationRoot, inputs: PipelineInputs, flo
   const contexts: Record<string, ItemContext & { readonly stepId: string }> = {};
   const candidates: { expression: Record<string, unknown>; condition: boolean }[] = [];
   const resultPointers = blockResultPointers(root);
+  const resultBlocks = new Map<string, GraphNode[]>();
+  for (const block of root.graph.nodes) for (const at of resultPointers.get(block.id) ?? []) {
+    resultBlocks.set(at, [...resultBlocks.get(at) ?? [], block]);
+  }
   const scopes: { value: unknown; pointer: string; item: ItemContext & { readonly stepId: string } }[] = inputs.steps.flatMap((step, index) => {
     if (!perItemSteps.has(step.op)) return [];
     const block = nodeFor(root, originalPointer(`/steps/${index}`));
@@ -66,14 +84,15 @@ export function observePerItem(root: SimulationRoot, inputs: PipelineInputs, flo
     if (block) scopes.push({ value: inputs.output, pointer: '/output', item: { stepId: block.id, step: nodeTitle(block, root.graph), count: Array.isArray(flow.value) ? flow.value.length : 0 } });
   }
   for (const scope of scopes) {
-    const fragments = new Map<string, { block: NonNullable<ReturnType<typeof nodeFor>>; expressions: Record<string, unknown>[] }>();
+    const fragments = new Map<string, { block: GraphNode; expressions: Record<string, unknown>[] }>();
     walkJSON(scope.value, (expression, at) => {
       if (typeof expression.type !== 'string') return;
-      const pointer = originalPointer(at), block = nodeFor(root, pointer);
-      if (!block || !['operand', 'condition', 'logic-ref'].includes(block.payload.kind) || !resultPointers.get(block.id)?.has(pointer)) return;
-      const fragment = fragments.get(block.id) ?? { block, expressions: [] };
-      fragment.expressions.push(expression);
-      fragments.set(block.id, fragment);
+      for (const block of resultBlocks.get(originalPointer(at)) ?? []) {
+        if (!['operand', 'condition', 'logic-ref'].includes(block.payload.kind)) continue;
+        const fragment = fragments.get(block.id) ?? { block, expressions: [] };
+        fragment.expressions.push(expression);
+        fragments.set(block.id, fragment);
+      }
     }, scope.pointer);
     for (const { block, expressions } of fragments.values()) {
       const dependent = expressions.some(dependsOnItem);

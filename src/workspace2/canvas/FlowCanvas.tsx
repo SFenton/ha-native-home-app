@@ -203,13 +203,14 @@ export default function FlowCanvas({ host, graph: initialGraph, title, theme, on
         }
       }
       // Keep space for selecting any card later, not just the currently selected action row.
-      const actionReserve = !reserveActions || card.querySelector('.w2-canvas-node-actions') ? 0 : phone ? 55 : 45;
+      const actionReserve = !reserveActions || card.querySelector('.w2-canvas-node-actions') ? 0
+        : window.matchMedia?.('(max-width: 599px), (pointer: coarse)').matches ? 55 : 45;
       const measurement = { width: rect.width / (view === 'graph' ? zoom : 1), height: rect.height / (view === 'graph' ? zoom : 1) + actionReserve, ports };
       measured.set(card.dataset.nodeId!, measurement);
       cache?.set(card, measurement);
     }
     return measured;
-  }, [zoom, view, phone, measuredPortPoints]);
+  }, [zoom, view, measuredPortPoints]);
   useLayoutEffect(() => {
     if (view !== 'graph') return;
     const measured = readMeasurements(undefined, measuredCards);

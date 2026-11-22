@@ -98,7 +98,7 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
     const output = run.outputs.find(output => anchorKey(output.output) === anchorKey(root.anchor));
     const resultPointers = blockResultPointers(root);
     const completed = (blockId: string, events: readonly TraceEvent[] = []) =>
-      events.filter(event => event.blockId === blockId && event.output && resultPointers.get(blockId)?.has(event.pointer));
+      events.filter(event => event.output && resultPointers.get(blockId)?.has(event.pointer));
     const readingFor = (blockId: string, item?: TraceEvent['item']) => {
       const events = completed(blockId, output?.trace.events);
       return (item ? events.find(event => event.item?.index === item.index && event.item.identity === item.identity) : events.find(event => event.item) ?? events.at(-1))
@@ -145,7 +145,8 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
           const contextualInput = node.payload.kind === 'step' || node.catalogKey === 'output.rows';
           const reading = upstream && (context?.count === 0 || contextualInput || node.payload.kind === 'logic-ref')
             ? readingFor(upstream.id, event?.item) : undefined;
-          const recorded = event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result;
+          const recorded = node.payload.kind === 'logic-ref' ? undefined
+            : event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result;
           const result = recorded ?? reading?.output;
           const inputItem = !recorded && upstream && contextualInput ? itemReading(upstream.id, reading) : item;
           return { portId: port.id, direction: 'input' as const, ...(upstream ? provenance(upstream) : common),
