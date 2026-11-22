@@ -128,6 +128,22 @@ export function countCrossings(graph: LogicGraph, measure?: Measure): number {
   return crossings(graph, boxesFor(graph, measure));
 }
 
+function overlaps(graph: LogicGraph, boxes: ReadonlyMap<string, Box>): number {
+  let count = 0;
+  for (let i = 0; i < graph.nodes.length; i++) {
+    const a = graph.nodes[i].position ?? { x: margin, y: margin }, boxA = boxes.get(graph.nodes[i].id)!;
+    for (let j = i + 1; j < graph.nodes.length; j++) {
+      const b = graph.nodes[j].position ?? { x: margin, y: margin }, boxB = boxes.get(graph.nodes[j].id)!;
+      if (a.x < b.x + boxB.width && b.x < a.x + boxA.width && a.y < b.y + boxB.height && b.y < a.y + boxA.height) count++;
+    }
+  }
+  return count;
+}
+
+export function countOverlaps(graph: LogicGraph, measure?: Measure): number {
+  return overlaps(graph, boxesFor(graph, measure));
+}
+
 function scopePaths(graph: LogicGraph): ReadonlyMap<string, readonly string[]> {
   const scopes = new Map(graph.scopes.map(scope => [scope.id, scope])), paths = new Map<string, readonly string[]>();
   const path = (id: string, active = new Set<string>()): readonly string[] => {
@@ -254,8 +270,8 @@ function transpose(layer: Vertex[]): void {
 export function tidyCanvas(graph: LogicGraph, measure?: Measure): LogicGraph {
   if (!graph.nodes.length) return graph;
   const boxes = boxesFor(graph, measure);
-  let best = graph, bestCount = crossings(graph, boxes);
-  if (!bestCount) return graph;
+  let best = graph, bestCount = crossings(graph, boxes), bestOverlaps = overlaps(graph, boxes);
+  if (!bestCount && !bestOverlaps) return graph;
   const layers = layered(graph, boxes), stride = Math.max(...[...boxes.values()].map(box => box.width)) + columnGap;
   for (let i = 0; i < layers.length; i++) {
     layers[i] = groupedOrder(layers[i], new Map(layers[i].map(vertex => [vertex, vertex.index])));
@@ -269,10 +285,13 @@ export function tidyCanvas(graph: LogicGraph, measure?: Measure): LogicGraph {
     }));
     const candidate: LogicGraph = { ...graph, nodes: graph.nodes.map(node => ({ ...node, position: positions.get(node.id)! })) };
     const count = crossings(candidate, boxes);
-    if (count < bestCount) { best = candidate; bestCount = count; }
+    const overlapCount = overlaps(candidate, boxes);
+    if (count < bestCount || count === bestCount && overlapCount < bestOverlaps) {
+      best = candidate; bestCount = count; bestOverlaps = overlapCount;
+    }
   };
   retain();
-  for (let pass = 0; pass < 8 && bestCount; pass++) {
+  for (let pass = 0; pass < 8 && (bestCount || bestOverlaps); pass++) {
     const downstream = pass % 2 === 1, sequence = downstream ? layers : [...layers].reverse();
     for (const layer of sequence) {
       const scores = new Map(layer.map(vertex => {

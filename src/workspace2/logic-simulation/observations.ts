@@ -5,7 +5,7 @@ import { anchorKey } from './contracts';
 import { blockMode, blockSources, sourceCaptureForNode, type SimulationProgram } from './program';
 import { sourceKey } from './contracts';
 import { describeValue, formatValue, nodeValueOptions, type ValueFormatOptions } from '../canvas/value-format';
-import { itemContextText, noItemsText, type ItemContext } from './per-item';
+import { blockResultPointers, itemContextText, noItemsText, type ItemContext } from './per-item';
 import { generatedName } from '../canvas/blocks';
 
 export interface ObservedValue {
@@ -96,6 +96,14 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
   };
   for (const root of program.roots) {
     const output = run.outputs.find(output => anchorKey(output.output) === anchorKey(root.anchor));
+    const resultPointers = blockResultPointers(root);
+    const completed = (blockId: string, events: readonly TraceEvent[] = []) =>
+      events.filter(event => event.output && resultPointers.get(blockId)?.has(event.pointer));
+    const readingFor = (blockId: string, item?: TraceEvent['item']) => {
+      const events = completed(blockId, output?.trace.events);
+      return (item ? events.find(event => event.item?.index === item.index && event.item.identity === item.identity) : events.find(event => event.item) ?? events.at(-1))
+        ?? completed(blockId, output?.perItem?.trace.events).at(-1);
+    };
     const itemReading = (blockId: string, event?: TraceEvent): { item?: ItemContext } => {
       const context = output?.perItem?.contexts[blockId];
       if (!context) return {};
@@ -107,9 +115,7 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
     };
     for (const node of root.graph.nodes) {
       const events = output?.trace.events.filter(event => event.blockId === node.id) ?? [];
-      const executed = events.filter(event => event.output);
-      const event = executed.find(event => event.item) ?? executed.at(-1)
-        ?? output?.perItem?.trace.events.filter(event => event.blockId === node.id && event.output).at(-1);
+      const event = readingFor(node.id);
       const context = output?.perItem?.contexts[node.id];
       const item = itemReading(node.id, event);
       const sourceRead = readsSource(node);
@@ -137,10 +143,10 @@ export function canvasObservations(program: SimulationProgram, run: SimulationRu
           const edge = root.graph.edges.find(edge => edge.to.nodeId === node.id && edge.to.portId === port.id);
           const upstream = edge && root.graph.nodes.find(candidate => candidate.id === edge.from.nodeId);
           const contextualInput = node.payload.kind === 'step' || node.catalogKey === 'output.rows';
-          const upstreamEvents = upstream && output?.trace.events.filter(event => event.blockId === upstream.id && event.output);
-          const reading = upstream && (context?.count === 0 || contextualInput)
-            ? upstreamEvents?.find(event => event.item) ?? output?.perItem?.trace.events.find(event => event.blockId === upstream.id && event.output) : undefined;
-          const recorded = event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result;
+          const reading = upstream && (context?.count === 0 || contextualInput || node.payload.kind === 'logic-ref')
+            ? readingFor(upstream.id, event?.item) : undefined;
+          const recorded = node.payload.kind === 'logic-ref' ? undefined
+            : event?.inputs.find(input => input.portId === port.id || `/${input.portId}` === port.id)?.result;
           const result = recorded ?? reading?.output;
           const inputItem = !recorded && upstream && contextualInput ? itemReading(upstream.id, reading) : item;
           return { portId: port.id, direction: 'input' as const, ...(upstream ? provenance(upstream) : common),

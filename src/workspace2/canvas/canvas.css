@@ -67,7 +67,7 @@
 .w2-canvas-graph { position: absolute; transform-origin: 0 0; }
 .w2-canvas-node { border: 1px solid var(--w2-line); border-radius: 11px; background: var(--w2-card); color: var(--w2-ink-card); box-shadow: 0 2px 6px #0000000b; overflow: visible; }
 .w2-canvas-graph > .w2-canvas-node { position: absolute; width: 190px; }
-.w2-canvas-node[data-selected] { z-index: 1; border-color: var(--w2-canvas-focus); box-shadow: 0 0 0 2px var(--w2-selected); }
+.w2-canvas-node[data-selected] { border-color: var(--w2-canvas-focus); box-shadow: 0 0 0 2px var(--w2-selected); }
 .w2-canvas-node[data-result]:not([data-selected]) { border-color: var(--w2-link); }
 .w2-canvas-node-head .w2-canvas-result-badge { display: inline-block; width: max-content; margin-block-start: 3px; padding: 1px 5px; border: 1px solid var(--w2-line); border-radius: 4px; color: var(--w2-ink-card); background: var(--w2-field); font-weight: 600; }
 .w2-canvas-node[data-setting] .w2-canvas-node-title strong { white-space: normal; overflow-wrap: anywhere; }
@@ -110,14 +110,14 @@
 [data-wire-type=record] { --w2-wire: var(--w2-wire-record); }
 .w2-canvas-node-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px; gap: 4px; border-top: 1px solid var(--w2-line); }
 .w2-canvas .w2-canvas-node-actions button { min-width: 0; min-height: 32px; padding: 4px; }
-.w2-canvas-node-header { display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; gap: 2px; padding-inline-end: 6px; min-height: 48px; }
+.w2-canvas-node-header { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; gap: 2px; padding-inline-end: 6px; min-height: 48px; border-radius: 11px 11px 0 0; background: var(--w2-card); }
 .w2-canvas .w2-canvas-node-head { min-width: 0; padding: 6px 8px; }
 .w2-canvas-node-title { min-width: 0; flex: 1; }
 .w2-canvas-node-title strong, .w2-canvas-node-title small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .w2-canvas .w2-canvas-eye { width: 32px; min-width: 0; padding: 4px; border-color: transparent; background: transparent; }
 .w2-canvas .w2-canvas-node-note { padding: 0 10px; margin: 0 0 8px; font-size: 11px; line-height: 16px; color: var(--w2-muted); }
 .w2-canvas-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.w2-canvas-annotation { padding: 10px; border-top: 1px solid var(--w2-line); font-size: 11px; }
+.w2-canvas-annotation { position: relative; z-index: 3; padding: 10px; border-top: 1px solid var(--w2-line); background: var(--w2-card); font-size: 11px; }
 .w2-canvas-annotation .w2-canvas-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .w2-canvas .w2-canvas-annotation button { min-width: 0; padding-inline: 4px; font-size: 10px; }
 .w2-canvas .w2-canvas-annotation textarea, .w2-canvas-dialog .w2-canvas-annotation textarea { min-height: 80px; resize: vertical; font: inherit; }
