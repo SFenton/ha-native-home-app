@@ -45,6 +45,26 @@ const house = () => ({
   },
 });
 
+const lightHouse = () => ({
+  rooms: {
+    items: [],
+    lightGroups: [{
+      room: 'Den', entityId: 'light.demo_den',
+      items: [
+        { title: 'Back Right', entityId: 'light.demo_den_back_right', contactCount: 1 },
+        { title: 'Front Left', entityId: 'light.demo_den_front_left', contactCount: 1 },
+      ],
+    }],
+    pages: [{
+      id: 'den', title: 'Den', overviewCards: [{
+        kind: 'light', entityId: 'light.demo_den', title: 'Lights', icon: 'mdi:lightbulb-group', sheet: 'lights-den',
+        showState: true, activeStates: [], disabledStates: [], stateLabels: {}, subtitleEntityIds: [], modalItems: [],
+        stateColors: {}, isFullWidth: false,
+      }], sections: [],
+    }],
+  },
+});
+
 function draft(): CompositionDocument {
   const document = createCompositionDocument('house-import');
   document.dataSources.push({
@@ -97,6 +117,98 @@ describe('importing house-config layout into the draft', () => {
     expect(navigation.items[0]).toMatchObject({ id: 'den', fill: { red: 51, green: 102, blue: 153 } });
     expect(navigation.items[0].visitKey).toBeUndefined();
     expect(result.dropped.map(note => note.path)).toContain('rooms.items[0].accessKey');
+  });
+
+  it('imports an exact light-group sheet, preserving the configured group and member order, and compiles', () => {
+    const result = importHouseLayout(draft(), lightHouse());
+    expect(result.added).toEqual(expect.arrayContaining(['room-den', 'lights-den']));
+    const room = result.document.pages.find(page => page.id === 'room-den') as any;
+    const card = room.components[0].children[0];
+    expect(card.props.action).toEqual({
+      type: 'present', modalId: 'lights-den', arguments: {}, ifPresented: 'reject',
+    });
+    const modal = result.document.modals.find(item => item.id === 'lights-den') as any;
+    expect(modal).toMatchObject({
+      title: 'Den Lights',
+      layout: { maxWidth: { type: 'points', value: 720 } },
+      presentation: { type: 'sheet', height: { type: 'full' } },
+    });
+    const section = modal.components[0];
+    const group = section.children[0];
+    const memberGrid = section.children[1];
+    expect(memberGrid.children.map((child: any) => child.title)).toEqual(['Back Right', 'Front Left']);
+    const groupSource = result.document.dataSources.find(source => source.id === group.props.sourceId) as any;
+    expect(groupSource).toMatchObject({
+      kind: 'model', model: 'home-light@1',
+      inputs: {
+        entityId: { type: 'literal', value: 'light.demo_den' },
+        memberEntityIds: [
+          { type: 'literal', value: 'light.demo_den_back_right' },
+          { type: 'literal', value: 'light.demo_den_front_left' },
+        ],
+      },
+    });
+    expect(memberGrid.children.map((child: any) => (
+      result.document.dataSources.find(source => source.id === child.props.sourceId) as any
+    ).inputs.entityId.value)).toEqual(['light.demo_den_back_right', 'light.demo_den_front_left']);
+    expect(result.dropped.map(note => note.path)).not.toContain('rooms.pages[0].overviewCards[0].sheet');
+    expect(() => compileCompositionDocument(result.document)).not.toThrow();
+  });
+
+  it('imports a single light without duplicating it through a group control', () => {
+    const config = lightHouse();
+    const card = config.rooms.pages[0].overviewCards[0];
+    card.title = 'Light';
+    const group = config.rooms.lightGroups[0];
+    group.items = [{ ...group.items[0], title: 'Reading Light', entityId: group.entityId }];
+    const { document, dropped } = importHouseLayout(draft(), config);
+    expect(dropped.map(note => note.path)).not.toContain('rooms.pages[0].overviewCards[0].sheet');
+    expect(document.modals.find(modal => modal.id === 'lights-den')).toMatchObject({
+      title: 'Den Light',
+      components: [{
+        props: { header: 'Light' },
+        children: [{ type: 'tile-grid', children: [{ title: 'Reading Light', type: 'light-group-tile' }] }],
+      }],
+    });
+  });
+
+  it('does not guess a light sheet from a room name, mismatched group, or incomplete members', () => {
+    const variants = [
+      (config: any) => { config.rooms.lightGroups[0].room = 'Other Den'; },
+      (config: any) => { config.rooms.lightGroups.push({ ...config.rooms.lightGroups[0] }); },
+      (config: any) => { config.rooms.lightGroups[0].entityId = 'light.demo_other'; },
+      (config: any) => { delete config.rooms.lightGroups[0].items[1].entityId; },
+      (config: any) => { config.rooms.lightGroups[0].items[1].resident = { key: 'alex' }; },
+      (config: any) => { delete config.rooms.pages[0].overviewCards[0].title; },
+      (config: any) => { config.rooms.pages[0].overviewCards[0].modalItems = [{
+        title: 'Custom', entityId: 'switch.demo_custom', icon: 'mdi:power',
+      }]; },
+    ];
+    variants.forEach(change => {
+      const config = lightHouse();
+      change(config);
+      const result = importHouseLayout(draft(), config);
+      const room = result.document.pages.find(page => page.id === 'room-den') as any;
+      expect(result.document.modals.find(modal => modal.id === 'lights-den')).toBeUndefined();
+      expect(room.components[0].children[0].props.action).toBeUndefined();
+      expect(result.dropped.map(note => note.path)).toContain('rooms.pages[0].overviewCards[0].sheet');
+      expect(() => compileCompositionDocument(result.document)).not.toThrow();
+    });
+  });
+
+  it('does not overwrite an authored surface when the generated light sheet id collides', () => {
+    const generated = importHouseLayout(draft(), lightHouse()).document;
+    const authored = draft();
+    authored.modals.push(structuredClone(generated.modals.find(modal => modal.id === 'lights-den')!));
+    authored.modals[0].title = 'Authored Lights';
+    generated.dataSources.filter(source => source.kind === 'model' && (source as any).model === 'home-light@1')
+      .forEach(source => authored.dataSources.push(structuredClone(source)));
+    expect(() => compileCompositionDocument(authored)).not.toThrow();
+    const before = structuredClone(authored);
+    const result = importHouseLayout(authored, lightHouse());
+    expect(result.document).toEqual(before);
+    expect(result.added).not.toContain('room-den');
+    expect(result.document.modals[0].title).toBe('Authored Lights');
   });
 
   it('never overwrites what the draft already authors', () => {
@@ -170,6 +282,17 @@ describe('importing house-config layout into the draft', () => {
     expect(() => compileCompositionDocument(second.document)).not.toThrow();
   });
 
+  it('keeps an imported light sheet unchanged and leaves its authored edits on a later import', () => {
+    const first = importHouseLayout(draft(), lightHouse());
+    const edited = structuredClone(first.document);
+    edited.modals[0].title = 'My Authored Lights';
+    const second = importHouseLayout(edited, lightHouse());
+    expect(second.added).toEqual([]);
+    expect(second.kept).toContain('room-den');
+    expect(second.document).toEqual(edited);
+    expect(() => compileCompositionDocument(second.document)).not.toThrow();
+  });
+
   it('carries state colours and the symbols the app already maps, and reports only an unknown icon', () => {
     const result = importHouseLayout(draft(), { rooms: { items: [], pages: [{ ...twoRooms().rooms.pages[0], id: 'den' }, { id: 'hall', title: 'Hall',
       overviewCards: [{ kind: 'light', entityId: 'light.demo_hall', title: 'Lamp', icon: 'mdi:demo-unmapped', showState: true, activeStates: [], disabledStates: [], stateLabels: {}, subtitleEntityIds: [] }], sections: [] }] } });
@@ -226,6 +349,20 @@ describe('POST /native/api/import-house-config', () => {
     const second = await (await f.request('/native/api/import-house-config', 'POST', { expectedRevision: after.revision })).json() as typeof body;
     expect(second.added).toEqual([]);
     expect(second.revision).toBe(after.revision);
+  });
+
+  it('saves an accepted light sheet as one compile-checked draft revision', async () => {
+    const f = await studio(lightHouse());
+    const before = await f.draft();
+    const response = await f.request('/native/api/import-house-config', 'POST', { expectedRevision: before.revision });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { revision: number; added: string[]; dropped: { path: string }[] };
+    expect(body.added).toEqual(expect.arrayContaining(['room-den', 'lights-den']));
+    expect(body.dropped.map(note => note.path)).not.toContain('rooms.pages[0].overviewCards[0].sheet');
+    const after = await f.draft();
+    expect(after.revision).toBe(before.revision + 1);
+    expect(after.document.modals.find(modal => modal.id === 'lights-den')).toBeDefined();
+    expect(() => compileCompositionDocument(after.document)).not.toThrow();
   });
 
   it('refuses a stale revision without touching the draft', async () => {

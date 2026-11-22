@@ -24,6 +24,28 @@ Beside it:
 | `GET api/health` | None | `{status,mode,haConnected,draftRevision}`; `draftRevision` is the composition draft's |
 | `GET api/native-home` | Authenticated session, bearer or verified admin Ingress | `NativeSnapshot`: `{mode:'live',houseConfig:{schema:2,hash,config},states,currentUser?}`; the house configuration `fenton_home` serves plus the projected states it references. Read-only; feeds the preview |
 
+## House layout import
+
+`POST /native/api/import-house-config` merges the room and chores layout into an
+existing composition draft without publishing it. It never replaces a room,
+source or sheet the draft already authors. Every added room is compiled as one
+transaction with its sources, generated sheets and card actions; a compiler
+rejection leaves the room absent and appears in the dropped-field report.
+
+The importer recognizes a room light sheet only where the native room dispatch
+is exact and unambiguous: one `rooms.lightGroups` entry has the exact room title,
+its group entity equals the light card's entity, the member list is complete,
+and no item-modal, personalized title or device-specific card dispatch takes
+precedence. The generated sheet uses `home-light@1` and `light-group-tile`
+controls, retaining configured member order. As in the compiled app, only a
+group with multiple members and a `light` group entity gets a separate
+whole-room control. The room card receives a `present` action to the sheet.
+
+Unsupported, ambiguous or incomplete references remain explicit dropped fields.
+They do not create a link to a guessed group, an invented entity or a partially
+authored sheet. A sheet-id collision with an authored surface rolls the whole
+room transaction back rather than overwriting it.
+
 Unknown `/api/*` and `/native/api/*` paths answer `404`. The schema-1 routes
 (`api/draft`, `api/validate`, `api/export`, `api/schema`, `api/data/:id`,
 `api/read-endpoints`, `api/actions/execute`, `api/feedback`, `api/cameras/*`,

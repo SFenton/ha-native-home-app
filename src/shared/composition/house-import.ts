@@ -11,7 +11,7 @@ export interface HouseImportNote { path: string; reason: string }
 /** What an import did to the draft. `document` is the draft with the missing layout parts added. */
 export interface HouseImportResult {
   document: CompositionDocument;
-  /** Ids of the sources and pages the import added. */
+  /** Ids of the sources and surfaces the import added. */
   added: string[];
   /** Ids the draft already authors; the import left them untouched. */
   kept: string[];
@@ -46,8 +46,9 @@ const solidRgb = (color: J) => ({ type: 'solid-rgb', red: channel(color.red), gr
 
 /**
  * Adds the layout house configuration used to carry to `draft`: chores pages as `todo-collection@1` sources and the rooms the
- * draft does not yet author as pages of room cards. Nothing the draft already authors is changed: a source or page whose id
- * (or, for a room, whose room id) is present is left alone and listed in `kept`. A part the publication cannot express is
+ * draft does not yet author as pages of room cards. An exact generic light-group sheet is composed from its authored group and
+ * member entities; other sheet references remain unlinked. Nothing the draft already authors is changed: a source or page whose
+ * id (or, for a room, whose room id) is present is left alone and listed in `kept`. A part the publication cannot express is
  * left out and listed in `dropped` by its house-config field path. Each added part is compiled on its own, and one that the
  * compiler refuses is rolled back and reported rather than failing the import.
  */
@@ -145,6 +146,7 @@ function authorsRoom(document: CompositionDocument, roomId: string): boolean {
 
 function importRooms(result: HouseImportResult, rooms: J) {
   const items = list(rooms.items);
+  const lightGroups = list(rooms.lightGroups);
   if (list(rooms.quickLinks).length > 0) result.dropped.push({ path: 'rooms.quickLinks', reason: 'Quick links are authored as navigation tiles on a page.' });
   if (isRecord(rooms.grid) && Object.keys(rooms.grid).length > 0) result.dropped.push({ path: 'rooms.grid', reason: 'The grid is authored as a room-navigation grid.' });
   list(rooms.pages).forEach((room, index) => {
@@ -159,6 +161,8 @@ function importRooms(result: HouseImportResult, rooms: J) {
     if (authorsRoom(result.document, roomId)) { result.kept.push(`room-${roomId}`); return; }
     const notes: HouseImportNote[] = [];
     const sources: J[] = [];
+    const modals: J[] = [];
+    const importedSheets = new Map<string, { entityId: string; title: string; icon: string }>();
     const entity = (entityId: unknown, label: string): string | undefined => {
       if (typeof entityId !== 'string') return undefined;
       const existing = ([...result.document.dataSources, ...sources] as J[]).find(source => source.kind === 'ha-entity' && source.entityId?.value === entityId);
@@ -166,6 +170,146 @@ function importRooms(result: HouseImportResult, rooms: J) {
       const id = `room-${roomId}-${label}`;
       sources.push({ id, kind: 'ha-entity', entityId: literal(entityId) });
       return id;
+    };
+    const lightSource = (entityId: string, memberEntityIds: string[], label: string): string => {
+      const sameInputs = (source: J) => source.kind === 'model' && source.model === 'home-light@1'
+        && source.inputs?.entityId?.value === entityId
+        && JSON.stringify(source.inputs?.memberEntityIds ?? []) === JSON.stringify(memberEntityIds.map(literal));
+      const existing = ([...result.document.dataSources, ...sources] as J[]).find(sameInputs);
+      if (existing) return existing.id;
+      const id = `room-${roomId}-${label}`;
+      sources.push({
+        id, kind: 'model', model: 'home-light@1',
+        inputs: { entityId: literal(entityId), ...(memberEntityIds.length > 0 ? { memberEntityIds: memberEntityIds.map(literal) } : {}) },
+      });
+      return id;
+    };
+    const lightEntity = (value: unknown): value is string => typeof value === 'string'
+      && /^(light|switch|input_boolean)\.[a-z0-9_]+$/.test(value);
+    const lightSheet = (card: J, cardPath: string, position: string): string | undefined => {
+      const path = `${cardPath}.sheet`;
+      const unsupported = (reason: string) => {
+        notes.push({ path, reason });
+        return undefined;
+      };
+      if (typeof card.sheet !== 'string' || !identifier.test(card.sheet)) {
+        return unsupported('The detail sheet id cannot name a publication surface; the card is not linked.');
+      }
+      if (card.kind !== 'light') return unsupported('This detail sheet is not part of the supported generic light-group composition; the card is not linked.');
+      if (list(card.modalItems).length > 0) return unsupported('Items take precedence over the native light-group route; the card is not linked.');
+      if (card.control !== undefined || card.action !== undefined || card.semantics !== undefined) {
+        return unsupported('The card has device-specific or custom sheet dispatch; the card is not linked.');
+      }
+      if (typeof room.title !== 'string' || room.title.length === 0) {
+        return unsupported('The room has no exact authored title for the light-group lookup; the card is not linked.');
+      }
+      const matches = lightGroups.map((group, index) => ({ group, index })).filter(({ group }) => group.room === room.title);
+      if (matches.length !== 1) {
+        return unsupported(matches.length === 0
+          ? 'No light group has this exact room title; the card is not linked.'
+          : 'More than one light group has this room title; the supported route is ambiguous and the card is not linked.');
+      }
+      const { group, index: groupIndex } = matches[0];
+      if (!lightEntity(group.entityId) || group.entityId !== card.entityId) {
+        notes.push({
+          path: `rooms.lightGroups[${groupIndex}].entityId`,
+          reason: 'The group entity does not exactly match the light card; the detail sheet is not linked.',
+        });
+        return unsupported('The exact room light group does not match this card entity; the card is not linked.');
+      }
+      if (!Array.isArray(group.items) || group.items.length === 0 || group.items.length !== list(group.items).length) {
+        return unsupported('The room light group has no complete member list; the card is not linked.');
+      }
+      const members = list(group.items);
+      if (members.some(member => typeof member.title !== 'string' || member.title.length === 0
+        || !lightEntity(member.entityId) || member.resident !== undefined)) {
+        return unsupported('The light group members are incomplete or contain personalised titles the generic composition cannot preserve; the card is not linked.');
+      }
+      const memberEntityIds = members.map(member => member.entityId);
+      const hasGroupControl = members.length > 1 && group.entityId.startsWith('light.');
+      if (new Set(memberEntityIds).size !== memberEntityIds.length || (hasGroupControl && memberEntityIds.includes(group.entityId))) {
+        return unsupported('The light group repeats an entity; the card is not linked.');
+      }
+      const sheetTitle = card.modalTitle ?? card.title;
+      if (typeof sheetTitle !== 'string' || sheetTitle.length === 0) {
+        return unsupported('The light sheet has no valid authored title; the card is not linked.');
+      }
+      const title = `${room.title} ${sheetTitle}`;
+      const icon = symbols[String(card.icon)] ?? 'square.grid.2x2';
+      const existing = importedSheets.get(card.sheet);
+      if (existing) {
+        if (existing.entityId !== group.entityId || existing.title !== title || existing.icon !== icon) {
+          return unsupported('One sheet id resolves to more than one light sheet composition; the card is not linked.');
+        }
+        return card.sheet;
+      }
+      const heading = members.length === 1 ? 'Light' : 'Lights';
+      const groupTile = hasGroupControl ? [{
+        id: `room-${roomId}-card-${position}-light-group`,
+        title: `${room.title} Lights`,
+        layout: { span: 1 },
+        type: 'light-group-tile',
+        props: { sourceId: lightSource(group.entityId, memberEntityIds, `${position}-light-group`) },
+      }] : [];
+      const memberNodes = members.map((member, memberIndex) => ({
+        id: `room-${roomId}-card-${position}-light-${memberIndex + 1}`,
+        title: member.title,
+        layout: { span: 1 },
+        type: 'light-group-tile',
+        props: { sourceId: lightSource(member.entityId, [], `${position}-light-${memberIndex + 1}`) },
+      }));
+      modals.push({
+        id: card.sheet,
+        title,
+        icon: compositionSymbol(icon),
+        parameters: {},
+        toolbar: { type: 'replace', groups: [] },
+        layout: {
+          type: 'column',
+          padding: {
+            top: { type: 'token', name: 'l' }, leading: { type: 'token', name: 'l' },
+            bottom: { type: 'token', name: 'l' }, trailing: { type: 'token', name: 'l' },
+          },
+          spacing: { type: 'token', name: 'l' },
+          maxWidth: { type: 'points', value: 720 },
+          scroll: 'content-fit@1', chrome: 'canonical-page@1', ground: 'host',
+        },
+        presentation: {
+          type: 'sheet', width: 'page', height: { type: 'full' }, appearance: 'dark',
+          placement: 'canonical-sheet@1', grabber: 'canonical', navigation: 'local-stack@1',
+          close: {
+            type: 'close', visibility: 'all-depths', placement: 'trailing', rail: 'automatic',
+            guard: { type: 'none' },
+          },
+        },
+        components: [{
+          id: `room-${roomId}-card-${position}-lights`,
+          title: heading,
+          layout: { span: 1 },
+          type: 'section',
+          props: {
+            header: heading, footer: '', style: 'plain', density: 'thin', hasGlyphs: true,
+            spacing: { type: 'token', name: 'm' },
+          },
+          children: [
+            ...groupTile,
+            {
+              id: `room-${roomId}-card-${position}-light-members`,
+              title: heading,
+              layout: { span: 1 },
+              type: 'tile-grid',
+              props: {
+                minimum: 'tile-dynamic-type@1', maxColumns: 4,
+                spacing: { type: 'token', name: 'm' }, equalRowHeights: true,
+                shortRow: 'share', fold: 'container',
+              },
+              children: memberNodes,
+            },
+          ],
+        }],
+      });
+      importedSheets.set(card.sheet, { entityId: group.entityId, title, icon });
+      return card.sheet;
     };
     // `scope` is the card group's position in the room ('o' for the overview, 's<n>' for section n); with the card's index it
     // names every generated id, so ids stay unique and stable however the labels repeat.
@@ -175,7 +319,7 @@ function importRooms(result: HouseImportResult, rooms: J) {
       if (!roomKinds.has(card.kind)) { notes.push({ path: `${cardPath}.kind`, reason: `Card kind "${card.kind}" has no room card; the card was not imported.` }); return []; }
       const sourceId = entity(card.entityId, position);
       if (!sourceId) { notes.push({ path: `${cardPath}.entityId`, reason: 'The card has no entity; it was not imported.' }); return []; }
-      if (card.sheet) notes.push({ path: `${cardPath}.sheet`, reason: 'The detail sheet is not carried; author the card action.' });
+      const sheetId = card.sheet ? lightSheet(card, cardPath, position) : undefined;
       if (list(card.modalItems).length > 0) notes.push({ path: `${cardPath}.modalItems`, reason: 'Modal items are not carried.' });
       if (card.isFullWidth) notes.push({ path: `${cardPath}.isFullWidth`, reason: 'Card width follows the section arrangement.' });
       const symbolName = symbols[String(card.icon)];
@@ -187,6 +331,7 @@ function importRooms(result: HouseImportResult, rooms: J) {
         activeStates: card.activeStates ?? [], disabledStates: card.disabledStates ?? [],
         stateLabels: Object.entries(isRecord(card.stateLabels) ? card.stateLabels : {}).map(([state, label]) => ({ state, label })),
       };
+      if (sheetId) props.action = { type: 'present', modalId: sheetId, arguments: {}, ifPresented: 'reject' };
       if (card.climateActionTone) props.climateActionTone = true;
       const stateColors = Object.entries(isRecord(card.stateColors) ? card.stateColors : {}).filter(([, color]) => isRecord(color));
       if (stateColors.length > 0) props.stateColors = stateColors.map(([state, color]) => ({ state, fill: solidRgb(color as J) }));
@@ -208,11 +353,12 @@ function importRooms(result: HouseImportResult, rooms: J) {
     const pageId = `room-${roomId}`;
     const added = attempt(result, path, document => {
       document.dataSources.push(...(sources as unknown as CompositionDocument['dataSources']));
+      document.modals.push(...(modals as unknown as CompositionDocument['modals']));
       const page = { ...structuredClone(document.pages[0]), id: pageId, title: String(room.title ?? roomId), icon: compositionSymbol('house'), components: sections };
       document.pages.push(page as unknown as CompositionDocument['pages'][number]);
     });
     if (!added) return;
-    result.added.push(pageId);
+    result.added.push(pageId, ...modals.map(modal => modal.id as string));
     result.dropped.push(...notes);
     // The room's entry in the navigation grid, only where the draft already has a room-navigation source to hold it.
     const item = items.find(entry => entry.path === roomId);

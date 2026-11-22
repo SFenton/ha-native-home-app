@@ -8,7 +8,9 @@
  * saves what the draft does not yet author as a new draft revision. Nothing the draft already authors is changed, so the
  * script can be run again. It never publishes. The token is read from the environment and never printed.
  *
- * The result lists every house-config behaviour the publication cannot express, by field path.
+ * Exact room light groups become generic group and member light controls in a composed sheet; ambiguous, incomplete or
+ * device-specific sheet references stay unlinked and are listed as dropped. The result lists every house-config behaviour the
+ * publication cannot express, by field path.
  */
 const base = process.env.STUDIO_URL ?? 'http://127.0.0.1:4801';
 const token = process.env.STUDIO_AUTH_TOKEN;
