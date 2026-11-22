@@ -1,0 +1,22 @@
+Demo Level A
+Level settings · Demo Sheet
+Title
+Icon
+House
+Title from
+None
+Header buttons
+Same as sheet
+Custom
+Leading
+Add Button
+Trailing
+Add Button
+Opened from
+Demo Room 1
+Demo Sheet
+Advanced
+
+[names]
+Close
+Add Title from

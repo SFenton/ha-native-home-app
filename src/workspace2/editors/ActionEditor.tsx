@@ -27,6 +27,9 @@ import { AskFirstRow } from './AskFirst';
 import ActionRules, { ActionModeSwitch } from '../expr/ActionRules';
 import { useLogicFields } from '../logic-fields/LogicFields';
 import { DraftField } from '../logic-fields/AddressedField';
+import { linkResult } from '../navigation/chromeRules';
+import { goesToChoices, goesToTitle, goesToValue, parseGoesTo, showTarget } from './goesTo';
+import { useFinishEditor, useSurfaceActions } from './surfaceActions';
 
 // MARK: Value rows
 
@@ -145,6 +148,26 @@ function CallBody({ draft, path, itemName }: { draft: Draft; path: EditorPath; i
 
 // MARK: The editor
 
+/** What a link to a page, level, sheet or modal does, under its "Goes to" row (proposal section 3, the Result rows): a bold lead, then the rest. The link has no setting of its own. */
+function ResultLine({ doc, path, kind, id }: { doc: CompositionDocument; path: EditorPath; kind: 'page' | 'modal'; id: string | undefined }) {
+  const result = id ? linkResult(doc, path, { kind, id }) : undefined;
+  if (!result) return null;
+  return <p className="w2-caption w2-link-result" data-link-result role="note"><strong>{result.lead}</strong>{result.rest && ` ${result.rest}`}</p>;
+}
+
+/**
+ * "Show `<Name>`" under a link's result line (proposal `build/design/studio-levels/proposal.md`, "Goes to"): it applies the editor's change as Done does, then shows the destination in the
+ * simulator and the library with nothing selected. Not drawn while the pick names nothing the document has, or outside the workspace where there is no simulator.
+ */
+function ShowButton({ doc, path, value }: { doc: CompositionDocument; path: EditorPath; value: string }) {
+  const surfaces = useSurfaceActions(), finish = useFinishEditor();
+  // Done's own answer for the live draft: while it refuses, so does this button, with the same reason.
+  const problem = finish?.blocked?.(doc);
+  const name = goesToTitle(doc, value), target = showTarget(doc, path, value, surfaces?.current);
+  if (!surfaces || !finish || !target) return null;
+  return <button type="button" className="w2-show-destination" data-show-destination disabled={Boolean(problem)} title={problem} onClick={() => finish.run(() => surfaces.show(target))}>{`Show ${name}`}</button>;
+}
+
 /** Props shared by the action editor's body and its row. */
 export interface ActionEditorProps {
   /** The path of the action field in the document. */
@@ -182,6 +205,15 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId, itemN
     done(made.id);
   });
   const withDraftValue = (patch: Record<string, unknown>) => set({ ...action, ...patch });
+  /** "Goes to": a page or a level is a push, a sheet or a modal a present. A pick of the other kind starts the other action, keeping nothing of the first. */
+  const pickGoesTo = (value: string) => {
+    const picked = parseGoesTo(value);
+    if (picked.kind === 'modal') withKind('present', { modalId: picked.target }); else withKind('push', { pageId: picked.target });
+  };
+  const withKind = (type: 'push' | 'present', patch: Record<string, unknown>) => {
+    if (action?.type === type) { withDraftValue(patch); return; }
+    set(type === 'push' ? { type, pageId: '', arguments: {}, origin: 'sender', duplicate: 'reuse-nearest', ...patch } : { type, modalId: '', arguments: {}, ifPresented: 'reject', ...patch });
+  };
   const localField = doc.localState?.find(field => field.id === action?.stateId);
   const rules = acceptsRules(schema), byRule = kind === ('conditional' as ActionKind);
   const inner = (d: Draft, at: EditorPath, sub: SchemaField, name: string) => <ActionBody draft={d} path={at} schema={sub} optional={false} boundSourceId={boundSourceId} itemName={name}/>;
@@ -191,10 +223,16 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId, itemN
     <div className="w2-kind-chips" role="group" aria-label="Kind">{kinds.map(item => <button type="button" key={item} className="w2-chip" aria-pressed={item === kind} disabled={disabled(item)}
       onClick={() => item !== kind && set(defaultAction(item, doc, boundSourceId))}>{kindWords[item]}</button>)}</div>
     {kind === 'call-service' && action && <CallBody draft={draft} path={path} itemName={itemName}/>}
-    {kind === 'push' && action && <ChoiceField label="Page" choices={pages} value={action.pageId} onPick={id => withDraftValue({ pageId: id })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
+    {(kind === 'push' || kind === 'present') && action && <>
+      <ChoiceField label="Goes to" choices={goesToChoices(doc, path, goesToValue(doc, action)).map(choice => ({ id: choice.id, label: choice.label, group: choice.group }))} value={goesToValue(doc, action)} onPick={pickGoesTo}
+        creates={[...(onCreatePage ? [{ label: 'New Page…', run: (done: (id: string) => void) => adopt(onCreatePage, 'pages')(id => done(`page:${id}`)) }] : []), ...(onCreateSheet ? [{ label: 'New Sheet…', run: (done: (id: string) => void) => adopt(onCreateSheet, 'modals')(id => done(`modal:${id}`)) }] : [])]}/>
+      <ResultLine doc={doc} path={path} kind={kind === 'push' ? 'page' : 'modal'} id={kind === 'push' ? action.pageId : action.modalId}/>
+      <ShowButton doc={doc} path={path} value={goesToValue(doc, action)}/>
+    </>}
     {kind === 'dismiss-then-push' && action && <ChoiceField label="Page" choices={pages} value={action.destination?.pageId} onPick={id => withDraftValue({ destination: { ...action.destination, pageId: id } })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
+    {kind === 'dismiss-then-push' && action && <ResultLine doc={doc} path={path} kind="page" id={action.destination?.pageId}/>}
+    {kind === 'dismiss-then-push' && action && action.destination?.pageId && <ShowButton doc={doc} path={path} value={`page:${action.destination.pageId}`}/>}
     {kind === 'present' && action && <>
-      <ChoiceField label="Sheet" choices={doc.modals.map(modal => ({ id: modal.id, label: modal.title }))} value={action.modalId} onPick={id => withDraftValue({ modalId: id })} create={onCreateSheet ? { label: 'New Sheet…', run: adopt(onCreateSheet, 'modals') } : undefined}/>
       {present && <div className="w2-field-row"><span className="w2-field-label">If a sheet is already open</span><div className="w2-segment w2-field-control" role="group" aria-label="If a sheet is already open">
         {(['reject', 'replace'] as const).map(value => <button type="button" key={value} aria-pressed={action.ifPresented === value} onClick={() => withDraftValue({ ifPresented: value })}>{value === 'reject' ? 'Do nothing' : 'Replace it'}</button>)}</div></div>}
     </>}

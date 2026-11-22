@@ -135,13 +135,13 @@ test('Page settings: the split switch turns two panes on at iPad sideways and of
   const panel = await openPageSettings(page, 'Home');
   await expect(panel.getByText('Open pages beside this one')).toBeVisible();
   await panel.getByRole('switch', { name: 'Open pages beside this one' }).check();
-  await expect(panel.getByText('Used when the window is wide enough for two.')).toBeVisible();
+  await expect(panel.getByText('Used when the window is wide enough for two.', { exact: true })).toBeVisible();
   await expect(panel.getByLabel('Empty side text')).toBeVisible();
   await snap(page, `${tag(page)}-page-settings-split`);
   // On a phone the sheet opens at half height, so the Advanced row can sit below the screen: activate it without scrolling the page.
   await panel.getByRole('button', { name: 'Advanced' }).dispatchEvent('click');
   await expect(panel.getByText('Start with one pane')).toBeVisible();
-  await expect(panel.getByText('Start a new column set here')).toBeVisible();
+  await expect(panel.getByText('Start a new column set here')).toHaveCount(0);
   // iPad sideways: two panes and the read-out says on.
   await chooseWindow(page, 'iPad sideways');
   await expect(previewRoot(page).locator('.sh-pane')).toHaveCount(2);
@@ -166,8 +166,9 @@ test('the Window menu lists the devices by name, and the rail turns and folds th
   const rail = page.getByTestId('simulator-rail');
   await expect(rail.getByRole('button', { name: 'Folded', exact: true })).toHaveCount(0);
   await rail.getByRole('button', { name: 'Rotate Right' }).click();
-  await expect(previewRoot(page).locator('.sh-tabbar')).toHaveCount(0);
-  await expect(previewRoot(page).locator('.sh-flyout-layer')).toHaveCount(1);
+  // The iPad draws the tabs at the top and no flyout.
+  await expect(previewRoot(page).locator('.sh-screen[data-tabs-top] .sh-tabbar')).toHaveCount(1);
+  await expect(previewRoot(page).locator('.sh-flyout-layer')).toHaveCount(0);
   await page.getByRole('button', { name: 'Window' }).click();
   await page.getByRole('menuitemradio', { name: 'iPhone Duo', exact: true }).click();
   // Opened the Duo is flat and sideways with no band; Partly Folded draws one down the page, and turning it keeps the pose as a book.
@@ -334,19 +335,14 @@ for (const pose of poses) {
   });
 }
 
-test('the iPad flyout is a full-height drawer flush to the leading edge, with the dim over the status strip', async ({ page }) => {
+test('the iPad draws the tabs at the top, centred in the header row, with no menu button', async ({ page }) => {
   test.skip(isPhone(page), 'The window menu is a desk control');
   await openWorkspace(page);
   await chooseWindow(page, 'iPad sideways');
-  await previewRoot(page).getByRole('button', { name: 'Menu' }).click();
-  await expect(previewRoot(page).locator('.sh-flyout-layer')).toHaveAttribute('data-open', '');
-  await page.waitForTimeout(500);
-  const screen = (await previewRoot(page).locator('.sh-screen').boundingBox())!;
-  const drawer = (await previewRoot(page).locator('.sh-flyout').boundingBox())!;
-  expect(Math.abs(drawer.x - screen.x)).toBeLessThan(1.5);
-  expect(Math.abs(drawer.y - screen.y)).toBeLessThan(1.5);
-  expect(Math.abs(drawer.height - screen.height)).toBeLessThan(1.5);
-  const scrim = (await previewRoot(page).locator('.sh-flyout-scrim').boundingBox())!;
-  expect(Math.abs(scrim.height - screen.height)).toBeLessThan(1.5);
-  await expect(previewRoot(page).getByRole('heading', { name: 'Navigation' })).toBeVisible();
+  const root = previewRoot(page);
+  await expect(root.getByRole('button', { name: 'Menu' })).toHaveCount(0);
+  const boxes = async () => ({ screen: (await root.locator('.sh-screen').boundingBox())!, bar: (await root.locator('.sh-tabbar').boundingBox())! });
+  await expect.poll(async () => { const { screen, bar } = await boxes(); return (bar.y - screen.y) / screen.height; }).toBeLessThan(0.1);
+  const { screen, bar } = await boxes();
+  expect(Math.abs(bar.x + bar.width / 2 - (screen.x + screen.width / 2))).toBeLessThan(2);
 });

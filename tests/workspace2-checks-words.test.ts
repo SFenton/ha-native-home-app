@@ -39,11 +39,13 @@ function expectNamed(document: CompositionDocument, issue: CompositionIssue, lab
   const row = sentenceFor(document, issue);
   const target = targetOf(document, pointerPath(issue.pointer));
   expect(row.place.trim().length, label).toBeGreaterThan(0);
-  expect(row.sentence.startsWith(`${row.place}: `), label).toBe(true);
+  // A page that opens a level reads "<Page> links to <Name>, a level." (proposal section 3), the one sentence that starts with the place and no colon.
+  expect(row.sentence.startsWith(`${row.place}: `) || row.sentence.startsWith(`${row.place} links to `), label).toBe(true);
   // The field is named by its label whenever the path ends in one; a path that ends at the item itself says what to do with the item.
   // Three wordings are about the whole project or its tab bar, not one field, and say so.
   const wholeProject = ['unsupported_schema', 'capability_manifest_mismatch'].includes(issue.code) || issue.capability === 'sh.extended-tabs@1';
   if (wholeProject) expect(row.sentence, label).toMatch(/^[^:]+: (This project|The list|The tab bar)/);
+  else if (row.sentence.startsWith(`${row.place} links to `)) expect(row.sentence, label).toMatch(/, a level\. A page cannot open a level\. Move .+ to Pages, or open it from a sheet\.$/);
   else if (target.field) expect(row.sentence, label).toContain(target.field);
   else expect(row.sentence, label).toMatch(/^[^:]+: (This|It|The|A|An|Project)/);
   expect(row.sentence, label).not.toMatch(/work together|\/document|\.json|invalid_|pointer/i);

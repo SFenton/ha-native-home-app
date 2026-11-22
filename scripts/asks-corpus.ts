@@ -146,7 +146,7 @@ reject('text-fallback-blank-primary', 'A row title is never blank, so neither is
 reject('text-fallback-too-long', 'A fallback keeps the slot\'s own length limit.', ['rules'],
   [node('t', 'text', { props: { value: { type: 'expr', value: read('temp', ['state']), fallback: 'x'.repeat(16385) }, style: 'body', unavailableText: 'None' } })]);
 
-// MARK: Text retention (`sh.text-keep@1`, pending)
+// MARK: Text retention (`sh.text-keep@1`, shipped)
 for (const kind of ['read', 'expr']) {
   const content = kind === 'read' ? read('temp', ['state']) : { type: 'expr', value: read('temp', ['state']) };
   const textSlot = (settings: J): J[] => [node('t', 'text', { props: { value: { ...content, ...settings }, style: 'body', unavailableText: 'None' } })];

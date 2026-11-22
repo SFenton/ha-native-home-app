@@ -4,7 +4,7 @@ import type { PipelineInputs, PipelineStep } from '../../shared/composition/pipe
 import EditorRow from '../editors/EditorRow';
 import { MoreMenu } from '../expr/ui';
 import { useRows } from '../rowsContext';
-import { addStepAt, countWords, defaultFieldFor, flowLimits, flowShapes, moveStep, newStep, stepId, stepNames, stepSummary, stepsThatFit, updateFlow, withoutStep } from './flow';
+import { addStepAt, countWords, defaultFieldFor, flowLimits, flowShapes, moveFlowStep, newStep, stepId, stepNames, stepSummary, stepsThatFit, updateFlow, withoutStep } from './flow';
 import { setFlowFocus } from './focus';
 import StepPage from './StepPage';
 import { useWorkspaceFlowData } from '../logic-fields/live';
@@ -47,8 +47,8 @@ export default function StepList({ flowId, inputs }: { flowId: string; inputs: P
           {draft => <StepPage ctx={{ draft, flowId, stepId: step.id, arriving, params: inputs.parameters.map(item => ({ name: item.name, type: item.type })) }}/>}
         </EditorRow>
         <MoreMenu label={`More for step ${index + 1}, ${name}`} commands={[
-          { label: 'Move Up', disabled: index === 0, run: () => apply(value => ({ ...value, steps: moveStep(value.steps, index, -1) })) },
-          { label: 'Move Down', disabled: index >= inputs.steps.length - 1, run: () => apply(value => ({ ...value, steps: moveStep(value.steps, index, 1) })) },
+          { label: 'Move Up', disabled: index === 0, run: () => onChange(moveFlowStep(document, flowId, index, -1)) },
+          { label: 'Move Down', disabled: index >= inputs.steps.length - 1, run: () => onChange(moveFlowStep(document, flowId, index, 1)) },
           { label: 'Remove Step', danger: true, separatorBefore: true, run: () => apply(value => ({ ...value, steps: withoutStep(value.steps, index) })) },
         ]}/>
       </li>;
@@ -57,7 +57,7 @@ export default function StepList({ flowId, inputs }: { flowId: string; inputs: P
     <Menu.Root>
       <Menu.Trigger className="w2-expr-add w2-data-addstep" disabled={full || fit.length === 0} aria-describedby={full ? 'w2-step-limit' : undefined}><Plus size={14} aria-hidden/>Add Step</Menu.Trigger>
       <Menu.Portal><Menu.Positioner sideOffset={4} align="start" className="w2-positioner"><Menu.Popup className="w2-scope w2-menu" aria-label="Add a step">
-        {fit.map(op => <Menu.Item key={op} className="w2-menu-item" onClick={() => add(op)}>{stepNames[op]}{op === 'average' ? ' · Needs a newer app' : ''}</Menu.Item>)}
+        {fit.map(op => <Menu.Item key={op} className="w2-menu-item" onClick={() => add(op)}>{stepNames[op]}</Menu.Item>)}
       </Menu.Popup></Menu.Positioner></Menu.Portal>
     </Menu.Root>
     {full && <p id="w2-step-limit" className="w2-caption">{flowLimits.steps.words}</p>}

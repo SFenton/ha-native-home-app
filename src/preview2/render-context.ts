@@ -11,6 +11,7 @@ import { useLiveRender } from './live-binding';
 import type { LiveHouse } from './live-house';
 import type { WindowFold } from './fold';
 import type { ItemScope, UseRecords } from './flow-records';
+import type { NavAction } from './navigation';
 
 /** A state the Studio forces on one state tile while it is selected: a state of the style, or a phase of the tap that follows. */
 export interface StatePreview { nodeId: string; state: string; phase?: 'sending' | 'failed' }
@@ -25,8 +26,10 @@ export interface RenderContext {
   field(stateId: string): LocalField | undefined;
   /** The current value of a local field: the overlay's write, else its initial value. */
   local(stateId: string): LocalValue | undefined;
-  /** Runs an action in Use mode; a no-op in Edit. `control` is the new value of the control that sent it; `scope` is the cell of a repeat the action is in. */
-  run(action: CompositionActionSlot, control?: Json, scope?: ItemScope, controlValues?: Record<string, Json>): void;
+  /** Runs an action in Use mode; a no-op in Edit. `control` is the new value of the control that sent it; `scope` is the cell of a repeat the action is in; `sender` is the leading column of a split, so a push from it cuts the trailing column first. */
+  run(action: CompositionActionSlot, control?: Json, scope?: ItemScope, controlValues?: Record<string, Json>, sender?: string): void;
+  /** Applies a navigation action in either mode. Edit uses it for the one step it keeps live, Back out of a level; `run` stays a no-op there. */
+  navigate?(action: NavAction): void;
   store: SelectionStore;
   /** The document's state style library, which `state-tile` nodes apply by id. */
   stateStyles?: StateStyleLibrary;
@@ -44,8 +47,8 @@ export interface RenderContext {
   kept?: Map<string, unknown>;
   /** The Studio's Appearance setting when the author chose Light or Dark: the scheme a `system` sheet is drawn in. Absent when the Studio follows the system (the browser decides). */
   appearance?: 'light' | 'dark';
-  /** Set when the window shows the iPad flyout instead of the tab bar; the header's menu button toggles it. */
-  flyout?: { open: boolean; toggle(): void };
+  /** Set when the window draws the tabs at the top, in the navigation bar's row (the iPad): the app draws no menu button there. */
+  topTabs?: boolean;
   /** The navigation flyout in a window that keeps its tab bar (the iPhone): the header's `shell-menu` button toggles it. */
   menu?: { open: boolean; toggle(): void };
   /**

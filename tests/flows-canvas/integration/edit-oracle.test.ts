@@ -11,12 +11,18 @@
  * objects of earlier revisions placed back, ID changes, `logicUseBindings` and component binding edits, canvas metadata
  * edits (with and without `layout`), `discardLayouts`, renames, reapplying an earlier revision, malformed owners in every
  * owner list (see `malformed`), links restored to a draft that had none, and resubmitting a refused candidate after
- * mutating it in place.
+ * mutating it in place, and adopting accepted content as a revision that never passed the boundary. Some keep every
+ * owner and node object but change a read across them (owner lists reordered, owners or node IDs repeated, the logic
+ * library rebuilt): the index build memoizes per owner, node and root by identity, and these are the reads such a memo
+ * must still check.
  *
- * Documented deviation: where the oracle throws (a field with no unambiguous owner, such as duplicate IDs; or an owner it
- * cannot walk or read, such as a page without `components`), the scoped implementation refuses (and keeps `before`)
- * instead. That pair counts as agreement; `EDIT_ORACLE_REPORT=1` tallies each such oracle error by message and site. Any
- * other error must be the same error from both, and the scoped implementation must never accept where the oracle throws.
+ * Documented deviations (see the contract in docs/flows-canvas.md): where the oracle throws (a field with no unambiguous
+ * owner, such as duplicate IDs; or an owner it cannot walk or read, such as a page without `components`), the scoped
+ * implementation refuses (and keeps `before`) instead; and it may refuse a schema-forbidden shape the oracle accepts (see
+ * `schemaInvalid`). Each counts as agreement and is tallied apart; `EDIT_ORACLE_REPORT=1` prints the tallies by site. Any
+ * other error must be the same error from both, the scoped implementation must never accept where the oracle throws, and
+ * it must never accept a non-JSON array the revision did not hold. Every document generated is a JSON value apart from
+ * such arrays: no method-shadowing, symbol, non-enumerable or accessor properties, which the contract leaves out.
  *
  * CI runs seeds 1-256 (14 steps each, a few seconds). Each bug class reviews 5 and 6 found is caught within that range
  * when its fix is reverted. For a longer local run: `EDIT_ORACLE_SEEDS=2000 npx vitest run <this file>` (optionally
@@ -31,8 +37,9 @@ import { resolveLogicAnchor } from '../../../src/shared/composition/studio-logic
 import { encodeStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../../src/shared/composition/studio-logic/schemas';
 import type { CompositionDocument } from '../../../src/shared/composition/schema';
-import { documentEdit, type EditReferences } from '../../../src/workspace2/editors/documentEdit';
-import { fieldPointer, liftField, pointerPath } from '../../../src/workspace2/logic-fields/registry';
+import { documentEdit, walkableDocument, type EditReferences } from '../../../src/workspace2/editors/documentEdit';
+import { editSubtrees } from '../../../src/workspace2/editors/provenance';
+import { fieldPointer, jsonList, liftField, pointerPath } from '../../../src/workspace2/logic-fields/registry';
 import { toastManager } from '../../../src/workspace2/toasts';
 import { sameJson } from '../../../src/sameJson';
 import { componentDocument, draftDocument, tile } from '../draft/fixtures';
@@ -55,6 +62,9 @@ function random(seed: number): Rng {
 const pick = <T,>(rng: Rng, items: readonly T[]): T => items[Math.floor(rng() * items.length)];
 
 // MARK: - Fixtures
+
+/** Whether the compiler accepts `document` (as a reload would, before installing it as authored). */
+const compiles = (document: Doc) => { try { compileCompositionDocument(document); return true; } catch { return false; } };
 
 const slot = (at: number): EditorPath => ['pages', 0, 'components', at, 'props', 'subtitle'];
 const compiled = () => compileCompositionDocument(draftDocument()).document;
@@ -91,6 +101,37 @@ function storedVariant(mode: string): Doc {
   }
   if (mode === 'reversed nodes') stored = { ...stored, canvases: [{ ...canvas, nodes: [...canvas.nodes].reverse() }] };
   return { ...document, studioCanvas: stored };
+}
+/**
+ * A raw draft whose component binding fills an argument of a use in the body that its logic never reads: expansion re-points
+ * such a binding to every place the argument lands, here none, so the compiler never sees it and accepts the draft with
+ * whatever `param` it names. Installed as is (as a reload installs authored content), never through this boundary.
+ */
+function hiddenBindingDraft(param: string): Doc {
+  const raw = componentDocument(), entry = raw.componentLibrary[0];
+  const constant = { id: 'constant', name: 'Constant', kind: 'operand', params: [{ name: 'source', kind: 'source-id' }], body: { type: 'literal', value: 'Fixed' } };
+  const node = { ...entry.node, props: { ...entry.node.props, subtitle: { type: 'expr', value: { type: 'logic-ref', logicId: 'constant', args: { source: 'source-a' } } } } };
+  const document = { ...raw, logicUseBindings: [], logicLibrary: [...raw.logicLibrary, constant],
+    componentLibrary: [{ ...entry, node, bindings: [...entry.bindings, { param, nodeId: 'inner-tile', field: 'props/subtitle/value/args/source' }] }] } as unknown as Doc;
+  if (!compiles(document)) throw new Error('The hidden-binding draft no longer compiles.');
+  return document;
+}
+/**
+ * A raw draft whose component body is a `local-tabs` node holding the bound tile in its first tab. Both addresses of the
+ * tile's field compile; the reconciliation derives the tile's own (`inner-tile`), so a binding stored through the tabs
+ * node is re-addressed by every edit, while one stored at the tile is a fixed point. `node` lets two drafts share a body.
+ */
+function tabbedComponentDraft(through: 'tile' | 'tabs', node?: unknown): Doc {
+  const raw = componentDocument(), entry = raw.componentLibrary[0];
+  const choice = [{ id: 'first', label: 'First' }, { id: 'second', label: 'Second' }];
+  const body = node ?? { id: 'tab-container', title: 'Tabs', type: 'local-tabs', layout: { span: 1 }, props: { stateId: 'selected-tab', transition: 'canonical-swap@1' },
+    tabs: [{ ...choice[0], children: [entry.node] }, { ...choice[1], children: [] }] };
+  const binding = through === 'tile' ? { param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }
+    : { param: 'source', nodeId: 'tab-container', field: 'tabs/0/children/0/props/titleProviderId' };
+  const document = { ...raw, logicUseBindings: [], localState: [{ id: 'selected-tab', type: 'choice', initial: 'first', options: choice }],
+    componentLibrary: [{ ...entry, node: body, bindings: [binding] }] } as unknown as Doc;
+  if (!compiles(document)) throw new Error('The tabbed component draft no longer compiles.');
+  return document;
 }
 const fixtures: Record<string, () => Doc> = {
   'page tile with canvas': () => { const { document, slot } = meaningFixture('page tile'); return withMeaningCanvas(document, slot); },
@@ -135,6 +176,11 @@ const fixtures: Record<string, () => Doc> = {
       pages: raw.pages.map(page => ({ ...page, components: page.components.map(node => ({ ...node, args: { entity: 'sensor.example' } })) })),
     } as unknown as Doc).document;
   },
+  // Compiler-accepted raw drafts, installed without passing the boundary.
+  'raw component draft': () => { const document = componentDocument() as unknown as Doc; if (!compiles(document)) throw new Error('The raw component draft no longer compiles.'); return document; },
+  'raw draft, hidden binding with an unknown parameter': () => hiddenBindingDraft('missing'),
+  'raw draft, hidden binding': () => hiddenBindingDraft('source'),
+  'raw draft, binding addressed through its tabs node': () => tabbedComponentDraft('tabs'),
   'shared frame': () => storedVariant('normal'),
   'shared frame, stale lifted ID': () => storedVariant('stale lifted ID'),
   'shared frame, missing origin': () => storedVariant('missing origin'),
@@ -165,7 +211,7 @@ function survey(document: Doc) {
     if (value === null || typeof value !== 'object') return;
     counts.set(value, (counts.get(value) ?? 0) + 1);
     if (path.length) all.push({ path, value });
-    for (const [key, child] of Object.entries(value)) visit(child, [...path, Array.isArray(value) ? Number(key) : key]);
+    for (const [key, child] of Object.entries(value)) visit(child, [...path, Array.isArray(value) && /^\d+$/.test(key) ? Number(key) : key]);
   };
   visit(document, []);
   const semantic = all.filter(({ path }) => path[0] !== 'studioCanvas' && path[0] !== 'logicUseBindings');
@@ -415,6 +461,48 @@ const edits: Record<string, { weight: number; apply(document: Doc, rng: Rng, his
     return { document: replaceAt(document, parent, copy), references: declare ? { deleted: [path] } : {}, label: `${declare ? 'declared ' : ''}delete shared ${fieldPointer(path)}` };
   } },
   'malformed owner': { weight: 4, apply: malformed },
+  // Edits that keep every owner (and so every memoized owner and node) as it is but change what is read across them: an
+  // owner list reordered (every owner's pointer moves), an owner repeated by object or by ID (the owner list ID scan no
+  // longer finds one), or a new node taking an existing node's ID (inside the same owner, its node scan no longer does).
+  'owner list edit': { weight: 4, apply(document, rng) {
+    const list = pick(rng, ['pages', 'modals', 'componentLibrary'] as const), owners: unknown = Reflect.get(document, list);
+    if (!Array.isArray(owners) || !owners.length) return undefined;
+    const items = [...owners], at = Math.floor(rng() * items.length), owner = items[at] as { id?: unknown } | null;
+    const kind = pick(rng, ['swap', 'reverse', 'repeat the object', 'repeat the ID', 'move to the front'] as const);
+    if (kind === 'swap' && items.length > 1) {
+      const other = (at + 1 + Math.floor(rng() * (items.length - 1))) % items.length;
+      [items[at], items[other]] = [items[other], items[at]];
+    } else if (kind === 'reverse' || kind === 'swap') items.reverse();
+    else if (kind === 'repeat the object') items.splice(Math.floor(rng() * (items.length + 1)), 0, owner);
+    else if (kind === 'repeat the ID') {
+      if (!owner || typeof owner !== 'object') return undefined;
+      const twin = list === 'componentLibrary' ? { id: owner.id, name: 'Twin', node: tile(fresh('twin'), 'source-a') } : { id: owner.id, title: 'Twin', components: [tile(fresh('twin'), 'source-a')] };
+      items.splice(Math.floor(rng() * (items.length + 1)), 0, twin);
+    } else items.unshift(...items.splice(at, 1));
+    return { document: { ...document, [list]: items } as Doc, references: {}, label: `${kind} ${list}/${at}` };
+  } },
+  'repeat a node ID': { weight: 3, apply(document, rng) {
+    const lists = nodeLists(document), nodes = lists.flatMap(({ path, value }) => (value as { id: string }[]).map(node => ({ path, id: node.id })));
+    if (!nodes.length) return undefined;
+    const { path, id } = pick(rng, nodes);
+    // Mostly the same owner (its node scan), sometimes another one (which must not matter).
+    const same = lists.filter(list => list.path[0] === path[0] && list.path[1] === path[1]), target = pick(rng, rng() < 0.75 && same.length ? same : lists);
+    const items = [...target.value as object[]];
+    items.splice(Math.floor(rng() * (items.length + 1)), 0, { ...tile(fresh('twin'), 'source-a'), id });
+    return { document: replaceAt(document, target.path, items), references: {}, label: `repeat node ID ${id} in ${fieldPointer(target.path)}` };
+  } },
+  // The bindings' library, rebuilt equal (another object) or with a parameter's kind changed.
+  'logic library edit': { weight: 2, apply(document, rng) {
+    const library: unknown = document.logicLibrary;
+    if (!Array.isArray(library) || !library.length) return undefined;
+    const at = Math.floor(rng() * library.length), entry = library[at] as { params?: { kind?: string }[] } | null;
+    const kind = pick(rng, ['clone the library', 'clone an entry', 'change a parameter kind'] as const);
+    if (kind === 'clone the library') return { document: { ...document, logicLibrary: structuredClone(library) } as Doc, references: {}, label: kind };
+    if (kind === 'clone an entry' || !entry?.params?.length) return { document: replaceAt(document, ['logicLibrary', at], structuredClone(entry)), references: {}, label: `clone logicLibrary/${at}` };
+    const param = Math.floor(rng() * entry.params.length), old = entry.params[param]?.kind;
+    return { document: replaceAt(document, ['logicLibrary', at, 'params', param, 'kind'], old === 'source-id' ? 'text' : 'source-id'), references: {},
+      label: `logicLibrary/${at} parameter ${param} kind ${old} -> other` };
+  } },
   // Links put back (bindings, layout metadata or both), so a revision accepted while nothing was linked gets linked.
   'relink': { weight: 2, apply(document, rng) {
     const what = pick(rng, ['bindings', 'layout', 'both'] as const), next = { ...document };
@@ -501,9 +589,43 @@ type OwnerList = keyof typeof brokenOwners;
 function malformed(document: Doc, rng: Rng): Step | undefined {
   const list = pick(rng, Object.keys(brokenOwners) as OwnerList[]), owners = (document as unknown as Record<string, unknown>)[list];
   const items = Array.isArray(owners) ? owners as unknown[] : [];
-  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list'] as const);
+  const mode = pick(rng, ['add', 'add', 'replace', 'nest', 'list', 'bindings', 'field', 'field', 'array', 'array'] as const);
+  // A list that is not JSON: one with a hole (inside or at its end), or with an extra own key holding an object of the
+  // document or a scalar.
+  if (mode === 'array') {
+    const lists = survey(document).all.filter(({ value }) => Array.isArray(value));
+    if (!lists.length) return undefined;
+    const { path, value } = pick(rng, lists), copy = [...value as unknown[]] as unknown[] & Record<string, unknown>;
+    const kind = pick(rng, ['a hole at the end', 'a hole inside', 'an extra object key', 'an extra scalar key'] as const);
+    if (kind === 'a hole at the end') copy.length += 1;
+    else if (kind === 'a hole inside') { if (copy.length) delete copy[Math.floor(rng() * copy.length)]; else copy.length = 1; }
+    else copy.alias = kind === 'an extra object key' ? pick(rng, survey(document).all).value : 'alias';
+    return { document: replaceAt(document, path, copy), references: {}, label: `malformed ${fieldPointer(path)}: ${kind}` };
+  }
+  // A list field of an owner or node (a surface's components, an entry's bindings, params, sources or flows, any node list)
+  // given a string, a number or an object.
+  if (mode === 'field') {
+    const fields = [...nodeLists(document).map(({ path }) => path),
+      ...(document.componentLibrary ?? []).flatMap((_, at) => ['bindings', 'params', 'sources', 'flows'].map(key => ['componentLibrary', at, key]))];
+    if (!fields.length) return undefined;
+    const path = pick(rng, fields), value = pick(rng, ['', 'list', 0, 5, {}, { 0: null }] as const);
+    return { document: replaceAt(document, path, value), references: {}, label: `malformed ${fieldPointer(path)}: ${JSON.stringify(value)} for the list` };
+  }
+  // The bindings list given something that is not a list, or a malformed entry appended: a missing one, scalars (one, or two,
+  // which the duplicate check compares with each other), or a copy of a binding without `from` (which it compares with the
+  // original). The second draw happens only for an appended entry, so it leaves every other seed's sequence as it was.
+  if (mode === 'bindings') {
+    const value = pick(rng, [{}, 'list', 5, '', null, 'a missing entry'] as const);
+    const held = Array.isArray(document.logicUseBindings) ? document.logicUseBindings : [];
+    if (value !== 'a missing entry') return { document: { ...document, logicUseBindings: value } as unknown as Doc, references: {}, label: `malformed logicUseBindings: ${JSON.stringify(value)}` };
+    const kind = pick(rng, ['a missing entry', 'a scalar entry', 'two scalar entries', 'a duplicate without from'] as const);
+    const { from: _, ...unsourced } = held[0] ?? {};
+    const added = kind === 'a missing entry' ? [null] : kind === 'a scalar entry' ? [pick(rng, ['l', 5, true] as const)]
+      : kind === 'two scalar entries' ? ['l', 'i'] : [held.length ? unsourced : 'l'];
+    return { document: { ...document, logicUseBindings: [...held, ...added] } as unknown as Doc, references: {}, label: `malformed logicUseBindings: ${kind} appended` };
+  }
   if (mode === 'list') {
-    const value = pick(rng, [undefined, {}, 'list'] as const);
+    const value = pick(rng, [undefined, {}, 'list', '', 5] as const);
     const next = { ...document } as Record<string, unknown>;
     if (value === undefined) delete next[list]; else next[list] = value;
     return { document: next as unknown as Doc, references: {}, label: `malformed ${list}: ${value === undefined ? 'removed' : `${JSON.stringify(value)} for the list`}` };
@@ -581,10 +703,119 @@ const describeOutcome = (outcome: Outcome, before: Doc, candidate: Doc) => outco
   : outcome.document === before ? 'refuses' : outcome.document === candidate ? 'accepts as proposed' : 'accepts with reconciled metadata';
 /** Each time the oracle threw and the scoped implementation refused instead (the documented deviation), by oracle message and site. */
 const deviations = new Map<string, number>();
+/** Where `document` holds an array that is not JSON (a hole, or an own enumerable key other than an index), as a pattern. */
+function nonJsonArray(document: unknown): string | undefined {
+  const seen = new Set<object>();
+  const visit = (value: unknown, at: string): string | undefined => {
+    if (value === null || typeof value !== 'object' || seen.has(value)) return undefined;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index++) if (!Object.hasOwn(value, index)) return `${at || '(root)'}: a list with a hole`;
+      if (Object.keys(value).length !== value.length) return `${at || '(root)'}: a list with an own non-index key`;
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const found = visit(child, `${at}/${Array.isArray(value) ? '*' : key}`);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  return visit(document, '');
+}
+/**
+ * How `value` fails to be a JSON list (its length, missing indices and own enumerable non-index keys), or undefined for a
+ * JSON list or anything else. The same two defects as `nonJsonArray` (and `jsonList`), and no others.
+ */
+function listDefect(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const holes: number[] = [];
+  for (let index = 0; index < value.length; index++) if (!Object.hasOwn(value, index)) holes.push(index);
+  const extra = Object.keys(value).filter(key => !(/^(0|[1-9]\d*)$/.test(key) && Number(key) < value.length));
+  return holes.length || extra.length ? JSON.stringify({ length: value.length, holes, extra: extra.sort() }) : undefined;
+}
+/**
+ * The first non-JSON array in `after` that `before` did not already hold, or undefined. An array is held when `before`
+ * holds that same object anywhere, or holds at the same path an array with the same defects. Every placement of a fresh
+ * object is checked against its own path (an alias placed twice is judged at each place); an object `before` holds, and
+ * so everything under it, is held wherever it is placed.
+ */
+function newNonJsonArray(before: unknown, after: unknown): string | undefined {
+  const held = new Set<object>(), open = new Set<object>();
+  const collect = (value: unknown) => {
+    if (value === null || typeof value !== 'object' || held.has(value)) return;
+    held.add(value);
+    for (const child of Object.values(value)) collect(child);
+  };
+  collect(before);
+  const visit = (value: unknown, path: EditorPath): string | undefined => {
+    if (value === null || typeof value !== 'object' || held.has(value) || open.has(value)) return undefined;
+    const defect = listDefect(value);
+    if (defect && listDefect(valueAt(before, path)) !== defect) return `${fieldPointer(path) || '(root)'}: ${defect}`;
+    open.add(value);
+    try {
+      for (const [key, child] of Object.entries(value)) {
+        const found = visit(child, [...path, Array.isArray(value) && /^(0|[1-9]\d*)$/.test(key) ? Number(key) : key]);
+        if (found) return found;
+      }
+    } finally { open.delete(value); }
+    return undefined;
+  };
+  return visit(after, []);
+}
+/**
+ * Where `document` holds a value of a type its schema forbids at a place the boundaries read (as a pattern, `*` for each
+ * index), or undefined: a root that is not a plain object, or a value other than a list where the schema requires one (the
+ * owner lists and the bindings list, a surface's components, a component entry's bindings, params, sources and flows, a
+ * node's children, a `local-tabs` node's tabs and blocks, and each tab's or block's children). Absent is allowed. And,
+ * anywhere in the document, an array that is not JSON: one with a hole, or with an own enumerable key other than an index.
+ */
+function schemaInvalid(document: unknown): string | undefined {
+  const plain = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (!plain(document) || ![Object.prototype, null].includes(Object.getPrototypeOf(document))) return '(root)';
+  const array = nonJsonArray(document);
+  if (array) return array;
+  const list = (holder: Record<string, unknown>, key: string, at: string) => holder[key] !== undefined && !Array.isArray(holder[key]) ? `${at}/${key}` : undefined;
+  const node = (value: unknown, at: string): string | undefined => {
+    if (!plain(value)) return undefined;
+    const areas = value.type === 'local-tabs' ? ['tabs', 'blocks'] : [];
+    for (const key of areas) {
+      const found = list(value, key, at);
+      if (found) return found;
+      for (const area of (value[key] ?? []) as unknown[]) {
+        if (!plain(area)) continue;
+        const inner = list(area, 'children', `${at}/${key}/*`) ?? children(area.children, `${at}/${key}/*/children`);
+        if (inner) return inner;
+      }
+    }
+    if (areas.length) return undefined;
+    return list(value, 'children', at) ?? children(value.children, `${at}/children`);
+  };
+  const children = (value: unknown, at: string) => Array.isArray(value) ? value.reduce<string | undefined>((found, child) => found ?? node(child, `${at}/*`), undefined) : undefined;
+  for (const key of ['pages', 'modals', 'componentLibrary', 'logicLibrary', 'dataSources', 'logicUseBindings']) {
+    const found = list(document, key, '');
+    if (found) return found;
+  }
+  for (const key of ['pages', 'modals']) for (const owner of (document[key] ?? []) as unknown[]) {
+    if (!plain(owner)) continue;
+    const found = list(owner, 'components', `/${key}/*`) ?? children(owner.components, `/${key}/*/components`);
+    if (found) return found;
+  }
+  for (const entry of (document.componentLibrary ?? []) as unknown[]) {
+    if (!plain(entry)) continue;
+    for (const key of ['bindings', 'params', 'sources', 'flows']) {
+      const found = list(entry, key, '/componentLibrary/*');
+      if (found) return found;
+    }
+    const found = node(entry.node, '/componentLibrary/*/node');
+    if (found) return found;
+  }
+  return undefined;
+}
+/** Each time the scoped implementation refused where the oracle accepted a schema-invalid document (the narrowed contract). */
+const schemaRefusals = new Map<string, number>();
 /** Agreement, or a description of the disagreement. */
 function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome): string | undefined {
   if (oracle.kind === 'error') {
-    if (scoped.kind === 'error' && String(scoped.error) === String(oracle.error)) return undefined;
+    // The one deviation: where the oracle throws, the scoped boundary refuses. A matching raw error is not agreement.
     if (scoped.kind === 'result' && scoped.document === before) {
       const key = `${String(oracle.error)} at ${site(oracle.error)}`;
       deviations.set(key, (deviations.get(key) ?? 0) + 1);
@@ -592,7 +823,17 @@ function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome):
     }
   } else if (scoped.kind === 'result') {
     const refused = scoped.document === before, oracleRefused = oracle.document === before;
+    // Whatever the oracle does, the scoped boundary never accepts a non-JSON array the revision did not already hold (each
+    // array on its own: a different non-JSON array elsewhere in the revision exempts nothing).
+    const fresh = refused ? undefined : newNonJsonArray(before, scoped.document);
+    if (fresh) return `scoped accepts a non-JSON array (${fresh})`;
     if (refused === oracleRefused && sameJson(scoped.document, oracle.document)) return undefined;
+    // The narrowed contract: the scoped boundary may also refuse a candidate or revision holding a schema-invalid type.
+    const invalid = refused && !oracleRefused ? schemaInvalid(candidate) ?? schemaInvalid(before) : undefined;
+    if (invalid) {
+      schemaRefusals.set(invalid, (schemaRefusals.get(invalid) ?? 0) + 1);
+      return undefined;
+    }
     if (refused === oracleRefused) {
       const canvas = sameJson(scoped.document.studioCanvas, oracle.document.studioCanvas) ? 'same studioCanvas' : 'different studioCanvas';
       return `both ${refused ? 'refuse' : 'accept'} but outputs differ (${canvas})`;
@@ -601,9 +842,10 @@ function compare(before: Doc, candidate: Doc, scoped: Outcome, oracle: Outcome):
   return `scoped ${describeOutcome(scoped, before, candidate)}, oracle ${describeOutcome(oracle, before, candidate)}`;
 }
 
+const adoptions = { compiled: 0, copied: 0 };
 interface Disagreement { readonly seed: number; readonly fixture: string; readonly step: number; readonly edit: string; readonly detail: string }
-function sequence(seed: number, steps: number): { disagreement?: Disagreement; accepted: number; refused: number } {
-  const rng = random(seed), names = Object.keys(fixtures), fixture = names[seed % names.length];
+function sequence(seed: number, steps: number, fixture = Object.keys(fixtures)[seed % Object.keys(fixtures).length]): { disagreement?: Disagreement; accepted: number; refused: number } {
+  const rng = random(seed);
   counter = 0;
   let before = fixtures[fixture]();
   links = fixture.startsWith('unlinked draft') ? fixtures['automatic with canvas']()
@@ -629,12 +871,40 @@ function sequence(seed: number, steps: number): { disagreement?: Disagreement; a
       }
       if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: ${label} -> ${describeOutcome(scoped, before, candidate)}\n`);
       if (scoped.kind === 'result' && scoped.document !== before) {
+        // Both accepted with the same JSON. Where each built its own result, the sequence carries on with the scoped one;
+        // the oracle records it as the descendant of its own result (an edit that changes nothing), so its history of
+        // validated revisions (which lets an edit back to a descendant through) matches the one the scoped boundary keeps.
+        if (oracle.kind === 'result' && oracle.document !== scoped.document && oracleEdit(oracle.document, scoped.document) !== scoped.document) {
+          throw new Error('The oracle did not take an identical revision as its own result.');
+        }
         accepted++; before = scoped.document; history.push(before); break;
       }
       refused++;
-      // A refused candidate is the caller's to change and offer again.
+      // A refused candidate is the caller's to change and offer again; not one the oracle accepted (a schema-invalid shape),
+      // which its history now holds as a descendant of `before`.
+      if (oracle.kind === 'result' && oracle.document !== before) break;
       if (rng() >= 0.35 || !retry(before, candidate, rng, history)) break;
       label = `${label} (refused, then mutated in place and resubmitted)`;
+    }
+    // Sometimes the caller installs a revision that never passed this boundary. A reload compiles the stored authored draft
+    // and installs it as is, so any candidate the compiler accepts can become `before`, refused here or not. Otherwise it is
+    // a copy of the current revision sharing its objects, sometimes with one owner list rebuilt around the same elements.
+    // Neither implementation has indexed either, while both have seen their objects. (A `before` the compiler rejects is
+    // not covered by the contract.)
+    if (rng() < 0.04) {
+      if (candidate !== before && compiles(candidate)) {
+        if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: install the candidate, which compiles\n`);
+        adoptions.compiled++;
+        before = candidate; history.push(before);
+      } else {
+        const copy: Record<string, unknown> = { ...before }, lists = ['pages', 'modals', 'componentLibrary', 'logicUseBindings', 'logicLibrary']
+          .filter(key => Array.isArray(copy[key]));
+        const rebuilt = lists.length && rng() < 0.5 ? pick(rng, lists) : undefined;
+        if (rebuilt) copy[rebuilt] = [...copy[rebuilt] as unknown[]];
+        if (process.env.EDIT_ORACLE_TRACE) process.stdout.write(`Edit oracle trace: seed ${seed} step ${index}: adopt a copy of the revision${rebuilt ? ` with ${rebuilt} rebuilt` : ''}\n`);
+        adoptions.copied++;
+        before = copy as unknown as CompositionDocument; history.push(before);
+      }
     }
   }
   return { accepted, refused };
@@ -659,11 +929,264 @@ describe('scoped documentEdit agrees with the whole-document oracle on seeded ra
       accepted += result.accepted; refused += result.refused;
       if (result.disagreement) disagreements.push(result.disagreement);
     }
-    process.stdout.write(`Edit oracle: ${seeds} seeds from ${from}, ${steps} steps; ${accepted} accepted and ${refused} refused submissions; ${disagreements.length} disagreeing seeds.\n`);
+    process.stdout.write(`Edit oracle: ${seeds} seeds from ${from}, ${steps} steps; ${accepted} accepted and ${refused} refused submissions; ${adoptions.compiled} compiled candidates and ${adoptions.copied} copies installed; deviations: ${[...deviations.values()].reduce((sum, count) => sum + count, 0)} oracle throws (scoped refuses), ${[...schemaRefusals.values()].reduce((sum, count) => sum + count, 0)} schema-invalid shapes refused (oracle accepts); ${disagreements.length} disagreeing seeds.\n`);
     if (process.env.EDIT_ORACLE_REPORT) {
       for (const found of disagreements) process.stdout.write(`Edit oracle disagreement: ${JSON.stringify(found)}\n`);
       for (const [error, count] of [...deviations].sort(([, left], [, right]) => right - left)) process.stdout.write(`Edit oracle deviation (oracle throws, scoped refuses) x${count}: ${error}\n`);
+      for (const [shape, count] of [...schemaRefusals].sort(([, left], [, right]) => right - left)) process.stdout.write(`Edit oracle deviation (schema-invalid shape refused, oracle accepts) x${count}: ${shape}\n`);
     }
     expect(disagreements).toEqual([]);
   }, Math.max(120_000, seeds * steps * 50));
+});
+
+/**
+ * A component body whose bound node sits in a `local-tabs` node's `children`: `resolveLogicAnchor` walks those, the authored
+ * walk (`fieldAnchor`) does not, so the whole-document reconciliation re-addresses the component binding to the tabs node
+ * on any edit. (The draft does not compile; a revision like it reached the boundary through a resubmitted candidate in seed
+ * 2000862.)
+ */
+function untabbedBindings(): Doc {
+  const document = compileCompositionDocument(componentDocument()).document;
+  return { ...document, logicUseBindings: [], componentLibrary: document.componentLibrary!.map(entry => ({ ...entry,
+    node: { id: 'tabs-1', type: 'local-tabs', tabs: [{ children: [] }], children: [entry.node] } as unknown as typeof entry.node })) };
+}
+/** The same for an automatic binding: its use's tile sits in a page's `local-tabs` node's `children`. */
+function untabbedUse(): Doc {
+  const document = compiled(), [first, second] = document.pages[0].components;
+  return replaceAt(document, ['pages', 0, 'components'], [{ id: 'tabs-1', type: 'local-tabs', tabs: [{ children: [] }], children: [first] }, second]);
+}
+const rename = (document: Doc): Doc => ({ ...document, name: `${document.name} again` });
+const retitle = (document: Doc): Doc => replaceAt(document, ['pages', 0, 'title'], 'Retitled');
+
+describe('edit oracle regressions', () => {
+  let toast: ReturnType<typeof vi.spyOn>;
+  beforeAll(() => { toast = vi.spyOn(toastManager, 'add').mockImplementation(() => ''); });
+  afterAll(() => toast.mockRestore());
+
+  // Found by long runs; pinned with their fixtures, since adding fixtures moves each seed to another one.
+  it.each([
+    // The scoped boundary carried its own rebuilt result forward; the oracle had never validated that object, so it did not
+    // let a later edit back through the redo shortcut that the scoped boundary (rightly) took.
+    ['already-aliased component parameter', 2000803, 40],
+    // A revision whose component binding the whole-document reconciliation re-addresses on every edit.
+    ['nested operand', 2000862, 40],
+    // A compiler-accepted draft whose hidden binding names an unknown parameter: declaring its target deleted removes it.
+    ['raw draft, hidden binding with an unknown parameter', 277, 14],
+    // Bindings set to a string, then a binding reversed: the candidate spreads the string into scalar entries, which the
+    // duplicate check compared through `from.field` (both boundaries threw; the scoped one must refuse).
+    ['already-aliased use', 10902105, 14],
+  ] as const)('%s, seed %i, %i steps', (fixture, seed, steps) => {
+    expect(sequence(seed, steps, fixture).disagreement).toBeUndefined();
+  });
+
+  it('reconciles, on every edit, a binding whose stored address is not the one derived for its location', () => {
+    const before = untabbedBindings(), edit = rename(before);
+    // Each on its own copy, so neither sees what the other built.
+    const oracle = oracleEdit(before, edit), own = untabbedBindings(), scoped = documentEdit(own, rename(own));
+    expect(oracle).not.toBe(before);
+    expect(oracle.componentLibrary![0].bindings).toEqual([{ param: 'source', nodeId: 'tabs-1', field: 'children/0/props/titleProviderId' }]);
+    expect(scoped).toEqual(oracle);
+  });
+
+  it('reconciles, on every edit, a use whose stored address is not the one derived for its location', () => {
+    // Re-addressed to the tabs node, the use would run through `children`, which the resolution rejects: every edit refuses.
+    const before = untabbedUse(), own = untabbedUse();
+    expect(oracleEdit(before, rename(before))).toBe(before);
+    expect(documentEdit(own, rename(own))).toBe(own);
+  });
+
+  it('certifies a binding by its own address, not only by its target', () => {
+    // The same body object first under a binding at its fixed point, then under one through the tabs node at the same
+    // target: the certification remembered for the first must not answer for the second.
+    const settled = tabbedComponentDraft('tile'), body = settled.componentLibrary![0].node;
+    expect(documentEdit(settled, rename(settled)).componentLibrary![0].bindings).toEqual(settled.componentLibrary![0].bindings);
+    const before = tabbedComponentDraft('tabs', body), own = tabbedComponentDraft('tabs', body);
+    const oracle = oracleEdit(before, rename(before));
+    expect(oracle.componentLibrary![0].bindings).toEqual([{ param: 'source', nodeId: 'inner-tile', field: 'props/titleProviderId' }]);
+    expect(documentEdit(own, rename(own))).toEqual(oracle);
+  });
+
+  it('removes a binding naming an unknown parameter when its target is declared deleted', () => {
+    const before = hiddenBindingDraft('missing'), own = hiddenBindingDraft('missing'), subtitle = ['componentLibrary', 0, 'node', 'props', 'subtitle'];
+    // A rename declaring the slot that holds the binding's target deleted (as seed 277 does).
+    const edit = rename;
+    const references = { relocated: new Map([[fieldPointer(subtitle), []]]) };
+    const oracle = oracleEdit(before, edit(before), references), scoped = documentEdit(own, edit(own), references);
+    expect(oracle).not.toBe(before);
+    expect(oracle.componentLibrary![0].bindings!.map(binding => binding.param)).toEqual(['source']);
+    expect(scoped).toEqual(oracle);
+  });
+
+  // The one deviation: where the oracle throws on a shape it cannot read, the scoped boundary refuses (and never throws).
+  const unreadable = (before: Doc, edit: Doc) => {
+    expect(() => oracleEdit(before, edit)).toThrow(TypeError);
+    expect(documentEdit(before, edit)).toBe(before);
+  };
+
+  it('refuses a candidate whose component library cannot be read for links, before anything reads it', () => {
+    const before = { ...compiled(), logicUseBindings: [] };
+    expect(compiles(before)).toBe(true);
+    for (const componentLibrary of [[null], {}, 'list']) unreadable(before, { ...before, componentLibrary } as unknown as Doc);
+  });
+
+  it('refuses a candidate whose bindings list cannot be read where the revision holds bindings', () => {
+    const before = compiled();
+    for (const logicUseBindings of [{}, 'list', 5, [...before.logicUseBindings!, null]]) unreadable(before, { ...before, logicUseBindings } as unknown as Doc);
+  });
+
+  // Arrays that are not JSON (a hole, or an own non-index key) are schema-forbidden: refused wherever the edit reaches them.
+  it('refuses a rebuilt list with an extra own key, which the placement scan would otherwise not see', () => {
+    // `changedPaths` scans a resized list's elements, the candidate's object index also sees `alias`: the shortcut that
+    // locates retained objects without that index over-accepted here.
+    const before = compiled(), components = Object.assign([...before.pages[0].components, tile('extra', 'source-a')], { alias: before.pages[0].components[0] });
+    const candidate = replaceAt(before, ['pages', 0, 'components'], components);
+    const references = { discardLayouts: [['pages', 0, 'components', 0, 'props', 'subtitle', 'value']] };
+    expect(oracleEdit(before, candidate, references)).toBe(before);
+    expect(documentEdit(before, candidate, references)).toBe(before);
+    expect(schemaInvalid(candidate)).toBe('/pages/*/components: a list with an own non-index key');
+  });
+
+  it('refuses sparse tabs, blocks and component libraries through documentEdit and editSubtrees, never throwing', () => {
+    const before = compiled(), tabs = (fields: object) => replaceAt(before, ['pages', 0, 'components', 0], { ...before.pages[0].components[0], type: 'local-tabs', ...fields });
+    const candidates = [tabs({ tabs: Array(2) }), tabs({ tabs: [], blocks: Array(1) }), { ...before, componentLibrary: Array(1) },
+      tabs({ tabs: [{ id: 'a', label: 'A', children: Array(1) }] })];
+    for (const candidate of candidates) {
+      expect(walkableDocument(candidate)).toBe(false);
+      expect(documentEdit(before, candidate)).toBe(before);
+      expect(editSubtrees(before, candidate)).toBe(before);
+    }
+  });
+
+  it('refuses a non-JSON list on the paths that skip reconciliation too', () => {
+    // An unlinked revision (nothing to reconcile) and an edit equal to the revision as JSON (an extra key is not JSON).
+    const unlinked = { ...compiled(), logicUseBindings: [] }, linked = compiled();
+    const keyed = { ...linked, pages: Object.assign([...linked.pages], { alias: 'alias' }) };
+    expect(sameJson(keyed, linked)).toBe(true);
+    for (const [from, edit] of [[unlinked, { ...unlinked, pages: Object.assign(new Array(unlinked.pages.length + 1), unlinked.pages) }], [linked, keyed]] as const) {
+      expect(oracleEdit(from, edit)).toBe(edit);
+      expect(documentEdit(from, edit)).toBe(from);
+    }
+  });
+
+  it('refuses an edit that is not a plain object, before reading it', () => {
+    const before = compiled(), unlinked = { ...before, logicUseBindings: [] };
+    for (const edit of [null, undefined, 5, 'document', [], new Map()]) {
+      expect(documentEdit(before, edit as unknown as Doc)).toBe(before);
+      expect(documentEdit(unlinked, edit as unknown as Doc)).toBe(unlinked);
+    }
+  });
+
+  it('decides, in editSubtrees, a candidate the authored walk cannot take without walking it', () => {
+    const before = compiled(), page = before.pages[0];
+    const candidates = [{ ...before, componentLibrary: [null] }, { ...before, componentLibrary: {} }, { ...before, pages: [null] }, { ...before, pages: 'list' },
+      { ...before, pages: [{ ...page, components: 5 }] }, { ...before, pages: [{ ...page, components: [{ ...page.components[0], children: 5 }] }] }, null];
+    for (const candidate of candidates) expect(editSubtrees(before, candidate as unknown as Doc)).toBe(before);
+  });
+
+  it('counts a refusal of a schema-invalid shape the oracle accepts as the narrowed deviation, and nothing else', () => {
+    // A component entry whose bindings are a string: the oracle's `for...of` takes it as empty, the scoped boundary refuses.
+    const before = compiled(), entry = { ...compileCompositionDocument(componentDocument()).document.componentLibrary![0], bindings: '' };
+    const invalid = { ...before, componentLibrary: [entry] } as unknown as Doc, tallied = () => [...schemaRefusals.values()].reduce((sum, count) => sum + count, 0);
+    for (const [from, edit] of [[before, invalid], [invalid, rename(invalid)]] as const) {
+      const scoped = run(() => documentEdit(from, edit)), oracle = run(() => oracleEdit(from, edit)), count = tallied();
+      expect(scoped).toEqual({ kind: 'result', document: from });
+      expect(oracle.kind === 'result' && oracle.document !== from).toBe(true);
+      expect(compare(from, edit, scoped, oracle)).toBeUndefined();
+      expect(tallied()).toBe(count + 1);
+    }
+    // The same divergence over schema-valid documents stays a disagreement.
+    const valid = rename(before);
+    expect(compare(before, valid, { kind: 'result', document: before }, { kind: 'result', document: valid })).toBeDefined();
+  });
+
+  it('refuses malformed binding entries before the duplicate check reads them', () => {
+    // Two scalar entries share a key (no `use`, no `argument`, the same missing `logicId`), so the whole-document check
+    // reads the first one's `from.field`; a copy of a binding without `from` is compared with the original the same way.
+    const before = compiled(), [first] = before.logicUseBindings!, { from: _, ...unsourced } = first;
+    for (const added of [['l', 'i'], [unsourced], [5, 5], [true, 'l']]) {
+      const candidate = { ...before, logicUseBindings: [...before.logicUseBindings!, ...added] } as unknown as Doc;
+      expect(() => oracleEdit(before, candidate)).toThrow(TypeError);
+      expect(documentEdit(before, candidate)).toBe(before);
+      expect(editSubtrees(before, candidate)).toBe(before);
+    }
+    // One scalar entry has nothing to be compared with; both refuse it.
+    for (const added of ['l', 5, true]) {
+      const candidate = { ...before, logicUseBindings: [...before.logicUseBindings!, added] } as unknown as Doc;
+      expect(run(() => oracleEdit(before, candidate))).toEqual({ kind: 'result', document: before });
+      expect(documentEdit(before, candidate)).toBe(before);
+    }
+  });
+
+  it('fails a scoped acceptance of each new non-JSON array, whatever else the revision holds', () => {
+    // The revision holds one non-JSON array (the canvases); the candidate adds another (the assets).
+    const base = fixtures['shared frame'](), at = ['studioCanvas', 'canvases'];
+    const defective = (extra: Record<string, string>) => {
+      const list = Object.assign([...valueAt(base, at) as unknown[]], extra);
+      list.length++;
+      return list;
+    };
+    const canvases = defective({ alias: 'held' });
+    const before = replaceAt(base, at, canvases);
+    expect(compiles(before)).toBe(true);
+    const candidate = { ...before, assets: Object.assign([...before.assets ?? []], { alias: 'new' }) };
+    const oracle = run(() => oracleEdit(before, candidate));
+    expect(compare(before, candidate, { kind: 'result', document: candidate }, oracle)).toMatch(/^scoped accepts a non-JSON array \(\/assets: /);
+    expect(compare(before, candidate, run(() => documentEdit(before, candidate)), oracle)).toBeUndefined();
+    // The held array (the same object, or a copy at the same path with the same defects) exempts only itself.
+    const renamed = rename(before), copied = replaceAt(renamed, at, defective({ alias: 'held' }));
+    for (const edit of [renamed, copied]) expect(compare(before, edit, { kind: 'result', document: edit }, run(() => oracleEdit(before, edit)))).toBeUndefined();
+    const worse = replaceAt(renamed, at, defective({ alias: 'held', other: 'new' }));
+    expect(compare(before, worse, { kind: 'result', document: worse }, run(() => oracleEdit(before, worse)))).toMatch(/^scoped accepts a non-JSON array \(\/studioCanvas\/canvases: /);
+    // A fresh copy with the held defects, placed both at the held path (where it is exempt) and at a new one: each placement
+    // is judged at its own path, whichever is visited first.
+    const fresh = defective({ alias: 'held' }), { studioCanvas: held, assets: _assets, ...rest } = before, studioCanvas = held as object;
+    for (const aliased of [{ studioCanvas: { ...studioCanvas, canvases: fresh }, ...rest, assets: fresh }, { assets: fresh, ...rest, studioCanvas: { ...studioCanvas, canvases: fresh } }] as unknown as Doc[]) {
+      const oracleOutcome = run(() => oracleEdit(before, aliased));
+      expect(compare(before, aliased, { kind: 'result', document: aliased }, oracleOutcome)).toMatch(/^scoped accepts a non-JSON array \(\/assets: /);
+      expect(compare(before, aliased, run(() => documentEdit(before, aliased)), oracleOutcome)).toBeUndefined();
+    }
+  });
+
+  it('agrees with jsonList on which lists are JSON: holes and extra enumerable keys, nothing more', () => {
+    const shapes: [string, unknown[]][] = [['dense', [1, 2]], ['empty', []], ['a hole at the end', Object.assign(new Array(2), [1])],
+      ['a hole inside', [1, , 3]], ['an extra key', Object.assign([1], { alias: 'a' })], ['a negative key', Object.assign([1], { '-1': 'a' })],
+      ['a hole and an extra key', Object.assign([1, , 3], { alias: 'a' })]];
+    for (const [name, list] of shapes) {
+      const json = !name.startsWith('a');
+      expect([name, jsonList(list)]).toEqual([name, json]);
+      expect([name, nonJsonArray({ list }) === undefined, listDefect(list) === undefined]).toEqual([name, json, json]);
+    }
+  });
+
+  it('refuses every edit to a revision whose bindings value is not a list', () => {
+    // Installed by an edit both accept (no bindings before, and no length to check); the oracle then throws on every edit.
+    const empty = { ...compiled(), logicUseBindings: [] }, linked = framed(empty, [lifted(empty, slot(0))]);
+    for (const logicUseBindings of [{}, 5]) {
+      const before = { ...linked, logicUseBindings } as unknown as Doc;
+      expect(oracleEdit(linked, before)).toBe(before);
+      unreadable(before, retitle(before));
+    }
+  });
+
+  it('reads a bindings value that is not a list as the oracle does where the revision holds none', () => {
+    // Nothing reads the list for links here: one with a length is checked whole (and refused), one without passes.
+    const before = framed({ ...compiled(), logicUseBindings: [] }, [lifted({ ...compiled(), logicUseBindings: [] }, slot(0))]);
+    for (const logicUseBindings of [{}, 'list', 5]) {
+      const edit = { ...before, logicUseBindings } as unknown as Doc, oracle = oracleEdit(before, edit);
+      expect(documentEdit(before, edit)).toBe(oracle === before ? before : edit);
+      expect(oracle === before || oracle === edit).toBe(true);
+    }
+  });
+
+  it('lets an edit back to a descendant through on each implementation\'s own history, across a rebuilt result', () => {
+    for (const edit of [documentEdit, oracleEdit]) {
+      const first = untabbedBindings(), proposed = rename(first), rebuilt = edit(first, proposed);
+      expect(rebuilt).not.toBe(proposed);
+      expect(rebuilt).not.toBe(first);
+      const later = retitle(rebuilt);
+      expect(edit(rebuilt, later)).toBe(later);
+      // Back to `first`, then forward again to `later` in one step: `later` descends from `first` through validated edits.
+      expect(edit(first, later)).toBe(later);
+    }
+  });
 });

@@ -118,10 +118,10 @@ test('at 320 wide the subtitle folds to "Home › … › <parent>" on a four-le
   await toGrid(page);
   const path = sheet(page).getByRole('navigation', { name: 'Path' });
   await expect(path.getByRole('button')).toHaveText(['Home', '…', 'Guests Staying Over']);
-  await expect(path.getByRole('button', { name: 'Hidden levels' })).toBeVisible();
+  await expect(path.getByRole('button', { name: 'More of the path' })).toBeVisible();
   await snap(page, 'phone-this-page-level-320');
   // The "…" opens the levels it hid.
-  await path.getByRole('button', { name: 'Hidden levels' }).click();
+  await path.getByRole('button', { name: 'More of the path' }).click();
   await expect(page.getByRole('menuitem', { name: 'Conditional content' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Conditional content' }).click();
   await expect(sheet(page).getByRole('heading', { level: 2 })).toHaveText('Conditional content');

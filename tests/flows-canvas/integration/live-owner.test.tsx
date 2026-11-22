@@ -15,6 +15,7 @@ import { createDraft } from '../../../src/workspace2/editors/draft';
 import { replaceAt, valueAt } from '../../../src/composition-editor';
 import { operandSlot } from '../../../src/workspace2/expr/tokens';
 import { readStudioCanvas } from '../../../src/shared/composition/studio-logic/layout';
+import { studioCanvasMetadataSchema } from '../../../src/shared/composition/studio-logic/schemas';
 import { liftField } from '../../../src/workspace2/logic-fields/registry';
 import { prepareDraft } from '../../../server/studio-logic/prepare';
 
@@ -62,11 +63,12 @@ it('ticks the house clock each second when unapplied canvas edits add second-res
   expect(fetch).not.toHaveBeenCalled();
 });
 
-it('cleanly refuses a bound template body slot-view edit and retains its canonical owner on reopen', async () => {
+it('applies a template body slot-view edit where the slot view holds it and keeps its canonical owner on reopen', async () => {
   const path = ['logicLibrary', 1, 'body'];
   const body = { type: 'choose' as const, cases: [{ when: { type: 'viewer' as const, isAdmin: true }, then: { type: 'literal' as const, value: 'Owner' } }], otherwise: { type: 'literal' as const, value: 'Guest' } };
   const document = replaceAt(integrationDocument(), path, body);
   const draft = createDraft(replaceAt(document, path, operandSlot(body)));
+  const opened = draft.get();
   const prepare = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
     expect(url).toBe('./native/api/draft/prepare');
     return Response.json(prepareDraft(JSON.parse(String(init?.body)).document));
@@ -81,16 +83,25 @@ it('cleanly refuses a bound template body slot-view edit and retains its canonic
   fireEvent.click(screen.getByRole('button', { name: 'Open template rule' }));
   expect(screen.queryByRole('alert')).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' })));
-  expect(screen.getAllByText(/This change can't keep its linked values/).length).toBeGreaterThan(0);
-  const saved = operandBodyDraft(draft, path).get();
+  expect(screen.queryAllByText(/This change can't keep its linked values/)).toEqual([]);
+  expect(screen.getAllByText('Edits applied to the draft. Not published.').length).toBeGreaterThan(0);
   expect(prepare).toHaveBeenCalledOnce();
-  expect(valueAt(saved, path)).toEqual(body);
-  expect(draft.canUndo()).toBe(false);
+  // One step in the slot view's draft: the condition combined where the slot view holds the operand, with its layout anchored there.
+  const combined = { type: 'all', of: [body.cases[0].when, body.cases[0].when] };
+  expect(valueAt(draft.get(), [...path, 'value', 'cases', 0, 'when'])).toEqual(combined);
+  expect(draft.canUndo()).toBe(true);
+  expect(readStudioCanvas(draft.get()).warnings).toEqual([]);
+  expect(studioCanvasMetadataSchema.parse(draft.get().studioCanvas).canvases.map(canvas => canvas.roots.map(root => root.anchor))).toEqual([[{ kind: 'logic', id: 'samples', field: '/body/value' }]]);
+  const saved = operandBodyDraft(draft, path).get();
+  expect(valueAt(saved, [...path, 'cases', 0, 'when'])).toEqual(combined);
   expect(saved.logicUseBindings).toEqual(document.logicUseBindings);
   const reopened = JSON.parse(JSON.stringify(saved)) as CompositionDocument;
   expect(readStudioCanvas(reopened).warnings).toEqual([]);
-  expect(saved.studioCanvas).toEqual(document.studioCanvas);
+  expect(studioCanvasMetadataSchema.parse(reopened.studioCanvas).canvases.map(canvas => canvas.roots.map(root => root.anchor))).toEqual([[{ kind: 'logic', id: 'samples', field: '/body' }]]);
   expect(liftField(reopened, path, 'operand').graph.roots[0].anchor).toEqual({ kind: 'logic', id: 'samples', field: '/body' });
+  const applied = draft.get();
+  act(() => draft.undo()); expect(draft.get()).toBe(opened);
+  act(() => draft.redo()); expect(draft.get()).toBe(applied);
 });
 
 it('hands legacy readers to one grouped canvas owner, makes simulation fetch-free, and rejects late close responses', async () => {

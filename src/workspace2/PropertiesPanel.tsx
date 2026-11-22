@@ -6,6 +6,7 @@ import { useTemplateActions } from './templateActions';
 import { renameComponent, usesText } from './linked';
 import { LabeledRow, TextInput } from './editors/controls';
 import { buildDocumentIndex, type IndexEntry, type SelectionKey } from '../preview2/model';
+import { CRUMB_SEPARATOR, levelCrumbs } from './levels';
 import { Menu } from '@base-ui/react/menu';
 import { ChangeListIconItem } from './ListIconPicker';
 import { ChevronRight, EyeOff, Link2, MoreHorizontal, Plus, Search, X } from 'lucide-react';
@@ -69,7 +70,7 @@ import { logicWords } from './data/logic/logicWords';
 function Header({ icon, title, line, tags, more, onClose, grab }: { icon: string; title: string; line: string; tags?: ReactNode; more?: ReactNode; onClose: () => void; grab?: boolean }) {
   return <header className="w2-props-head" data-grab={grab || undefined}>
     <span className="w2-props-icon"><GlyphByName name={icon} size={20}/></span>
-    <div className="w2-props-titles"><h2>{title}</h2><p>{line}</p>{tags && <div className="w2-props-tags">{tags}</div>}</div>
+    <div className="w2-props-titles"><h2>{title}</h2><p title={line}>{line}</p>{tags && <div className="w2-props-tags">{tags}</div>}</div>
     {more}
     <button type="button" className="w2-icon-button" aria-label="Close" onClick={onClose}><X size={18} aria-hidden/></button>
   </header>;
@@ -295,7 +296,12 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
   const selectedTemplate = target?.kind === 'node' ? index?.get(target.key)?.component : undefined;
   useEffect(() => { if (choosingId !== undefined && (ws.mode !== 'edit' || selectedTemplate !== choosingId)) setChoosing(undefined); }, [choosingId, ws.mode, selectedTemplate]);
   if (!document || !ctx || !target || !index) return null;
-  const surfaceTitle = (key?: string) => { const [kind, ...id] = (key ?? '').split(':'); return (kind === 'page' ? document.pages : document.modals).find(item => item.id === id.join(':'))?.title ?? ''; };
+  /** The words for the surface a node sits on. A level reads through its sheet ("Lights › Demo Room 1"), so the line says where it is; the full text is the line's title. */
+  const surfaceTitle = (key?: string) => {
+    const [kind, ...rest] = (key ?? '').split(':'), id = rest.join(':');
+    const title = (kind === 'page' ? document.pages : kind === 'level' ? document.levels ?? [] : document.modals).find(item => item.id === id)?.title ?? '';
+    return kind === 'level' ? [...levelCrumbs(document, ws.surface, id).map(crumb => crumb.title), title].join(` ${CRUMB_SEPARATOR} `) : title;
+  };
   let header: ReactNode, body: ReactNode, title = '';
   if (target.kind === 'node') {
     const entry = index.get(target.key)!, node = entry.node!;
@@ -313,11 +319,12 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     const root = entry.bodyPath !== undefined;
     const view: TemplateView | undefined = component ? { ws, component, entry, root, edit: ws.mode === 'edit', onError } : undefined;
     body = <>{component && !root && <><LinkedLine document={document} entry={entry} session={ws.linked.session}/><ComponentParams ws={ws} document={document} entry={entry} onError={onError}/></>}<NodeBody path={entry.bodyPath ?? entry.path} placePath={entry.bodyPath ? entry.path : undefined} template={view}/></>;
-  } else if (target.kind === 'page' || target.kind === 'modal') {
+  } else if (target.kind === 'page' || target.kind === 'modal' || target.kind === 'level') {
     const entry = index.get(target.key)!;
     const surface = valueAt(document, entry.path) as { title: string; icon: { name: string } };
     title = surface.title;
-    header = <Header onClose={onClose} icon={surface.icon.name} title={surface.title} line={target.kind === 'page' ? 'Page settings' : 'Sheet settings'}/>;
+    const where = target.kind === 'level' ? levelCrumbs(document, ws.surface, entry.id).map(crumb => crumb.title) : [];
+    header = <Header onClose={onClose} icon={surface.icon.name} title={surface.title} line={target.kind === 'page' ? 'Page settings' : target.kind === 'level' ? ['Level settings', ...(where.length ? [where.join(` ${CRUMB_SEPARATOR} `)] : [])].join(' · ') : 'Sheet settings'}/>;
     body = <SurfaceSettings ws={ws} kind={target.kind} path={entry.path} onGo={ws.selectAnywhere}/>;
   } else if (target.kind === 'tabs') {
     title = 'Tabs';
@@ -360,9 +367,9 @@ export default function PropertiesPanel({ ws, onClose, onOpenProject, notice, on
     header = <Header onClose={onClose} icon="grid" title={title} line={cls ? repeatedText(cls.places.length) : ''}/>;
     body = <RepeatProposal ws={ws} onError={onError}/>;
   } else if (target.kind === 'header') {
-    title = 'Header Buttons';
-    header = <Header onClose={onClose} icon="sliders" title="Header Buttons" line="Used on every page"/>;
-    body = <HeaderPanel/>;
+    title = 'Tabs and header buttons';
+    header = <Header onClose={onClose} icon="sliders" title="Tabs and header buttons" line="Used on every page"/>;
+    body = <HeaderPanel onGo={ws.selectAnywhere}/>;
   } else if (target.kind === 'styles') {
     title = 'State Styles';
     header = <Header onClose={onClose} icon="sliders" title="State Styles" line="Used by state tiles"/>;

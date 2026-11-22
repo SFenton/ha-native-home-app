@@ -8,7 +8,6 @@ import { fillTabGroups, groupWithRoom, tabGroups, type TabGroup } from './capaci
 import { ObjectRows, useRows } from './rows';
 import { useDeepRows } from './editors/overrides';
 import { Disclosure } from './Disclosure';
-import { ChromeGroups } from './ChromeGroups';
 import { PushStack, Tag, usePush } from './kit';
 import { toastManager } from './toasts';
 import { createPage, createTab } from './navigation/controller';
@@ -84,10 +83,7 @@ function TabFields({ index }: { index: number }) {
   </>;
 }
 
-/** The app-wide header buttons (spec 5.2): leading and trailing, each button a row. */
-export function HeaderPanel() {
-  return <div className="w2-form"><ChromeGroups path={['navigation', 'chrome', 'groups']}/></div>;
-}
+export { HeaderPanel } from './navigation/HeaderPanel';
 
 /** Wallpaper (spec 5.2): a read-only thumbnail of the current image, "No Image", and the blur and scrim rows. No hash, byte count or "immutable" wording. */
 export function WallpaperPanel() {

@@ -1096,48 +1096,24 @@
       }
     },
     {
-      "file": "reject/pending-state-style-glyph-tint-per-state.json",
-      "outcome": "reject",
-      "note": "Each resting or in-progress rule carries its own icon colour; the unknown rule carries none.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true
+      "file": "accept/state-style-glyph-tint-per-state.json",
+      "outcome": "accept",
+      "note": "Each resting or in-progress rule carries its own icon colour; the unknown rule carries none."
     },
     {
-      "file": "reject/pending-state-style-glyph-tint-pair.json",
-      "outcome": "reject",
-      "note": "A light and dark pair resolves with the trait collection; it needs sh.solid-appearance@1 too.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/12",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true
+      "file": "accept/state-style-glyph-tint-pair.json",
+      "outcome": "accept",
+      "note": "A light and dark pair resolves with the trait collection; it needs sh.solid-appearance@1 too."
     },
     {
-      "file": "reject/pending-state-style-glyph-tint-fallback.json",
-      "outcome": "reject",
-      "note": "The style fallback may carry the icon colour: a resting fallback state is tinted.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true
+      "file": "accept/state-style-glyph-tint-fallback.json",
+      "outcome": "accept",
+      "note": "The style fallback may carry the icon colour: a resting fallback state is tinted."
     },
     {
-      "file": "reject/pending-state-style-glyph-tint-with-static-tint.json",
-      "outcome": "reject",
-      "note": "A rule's colour beside the tile's static glyphTint: the rule wins in its state, the static tint draws in the others.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true
+      "file": "accept/state-style-glyph-tint-with-static-tint.json",
+      "outcome": "accept",
+      "note": "A rule's colour beside the tile's static glyphTint: the rule wins in its state, the static tint draws in the others."
     },
     {
       "file": "accept/state-style-glyph-tint-absent-needs-no-capability.json",
@@ -1149,12 +1125,6 @@
       "outcome": "reject",
       "note": "An error rule keeps the error ink: it refuses an icon colour.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/stateStyles/styles/0/rules/1/glyphTint"
       }
@@ -1164,12 +1134,6 @@
       "outcome": "reject",
       "note": "A warning rule keeps its warning ink: it refuses an icon colour.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/stateStyles/styles/0/rules/1/glyphTint"
       }
@@ -1179,12 +1143,6 @@
       "outcome": "reject",
       "note": "An unavailable or unknown state keeps the muted grey: it refuses an icon colour.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/stateStyles/styles/0/rules/1/glyphTint"
       }
@@ -1194,12 +1152,6 @@
       "outcome": "reject",
       "note": "A rule with a fill keeps the fill's fixed icon ink: the icon colour is refused beside it.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/stateStyles/styles/0/rules/0/glyphTint"
       }
@@ -1209,12 +1161,6 @@
       "outcome": "reject",
       "note": "The fallback is a state too: an unknown-class fallback refuses an icon colour.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/stateStyles/styles/0/fallback/glyphTint"
       }
@@ -1233,12 +1179,6 @@
       "outcome": "reject",
       "note": "A tint colour has red, green and blue.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "missing_required",
         "pointer": "/document/stateStyles/styles/0/rules/0/glyphTint/blue"
       }
@@ -1248,12 +1188,6 @@
       "outcome": "reject",
       "note": "A colour is the solid-rgb object, never a string.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_value",
         "pointer": "/document/stateStyles/styles/0/rules/0/glyphTint"
       }
@@ -1263,12 +1197,6 @@
       "outcome": "reject",
       "note": "A tint is not an entity's colour: bound-color is refused.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_variant",
         "pointer": "/document/stateStyles/styles/0/rules/0/glyphTint/type"
       }
@@ -1278,12 +1206,6 @@
       "outcome": "reject",
       "note": "A channel is 0 to 255.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/11",
-        "capability": "sh.state-style-glyph-tint@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "limit_exceeded",
         "pointer": "/document/stateStyles/styles/0/rules/0/glyphTint/red"
       }
@@ -3874,103 +3796,49 @@
       }
     },
     {
-      "file": "reject/pending-fold-sides-auto-strip-and-four-sections.json",
-      "outcome": "reject",
-      "note": "The page switch on, a status strip and four sections: the strip spans, the sections lead and trail in turn.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-auto-strip-and-four-sections.json",
+      "outcome": "accept",
+      "note": "The page switch on, a status strip and four sections: the strip spans, the sections lead and trail in turn."
     },
     {
-      "file": "reject/pending-fold-sides-auto-one-override.json",
-      "outcome": "reject",
-      "note": "The page switch on with the third section pinned to the trailing side: the rest keep their turns.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-auto-one-override.json",
+      "outcome": "accept",
+      "note": "The page switch on with the third section pinned to the trailing side: the rest keep their turns."
     },
     {
-      "file": "reject/pending-fold-sides-explicit-sides-no-switch.json",
-      "outcome": "reject",
-      "note": "Two sections pinned to sides and no page switch: a placed component alone turns the two sides on.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-explicit-sides-no-switch.json",
+      "outcome": "accept",
+      "note": "Two sections pinned to sides and no page switch: a placed component alone turns the two sides on."
     },
     {
-      "file": "reject/pending-fold-sides-one-side-only.json",
-      "outcome": "reject",
-      "note": "Every section pinned leading: the trailing side stays empty.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-one-side-only.json",
+      "outcome": "accept",
+      "note": "Every section pinned leading: the trailing side stays empty."
     },
     {
-      "file": "reject/pending-fold-sides-switch-alone.json",
-      "outcome": "reject",
-      "note": "The page switch on a page of one section: the section leads and the trailing side stays empty.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-switch-alone.json",
+      "outcome": "accept",
+      "note": "The page switch on a page of one section: the section leads and the trailing side stays empty."
     },
     {
-      "file": "reject/pending-fold-sides-span-across-the-top.json",
-      "outcome": "reject",
-      "note": "Across the Top on the first components, before any section takes a side.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-span-across-the-top.json",
+      "outcome": "accept",
+      "note": "Across the Top on the first components, before any section takes a side."
     },
     {
-      "file": "reject/pending-fold-sides-hidden-keeps-its-slot.json",
-      "outcome": "reject",
-      "note": "A section a rule hides at run time keeps its slot, so the sections after it keep their sides.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-hidden-keeps-its-slot.json",
+      "outcome": "accept",
+      "note": "A section a rule hides at run time keeps its slot, so the sections after it keep their sides."
     },
     {
-      "file": "reject/pending-fold-sides-component-ref-carries-a-side.json",
-      "outcome": "reject",
-      "note": "A use of a saved component says its own side: the place says where it sits, the body does not.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/7",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-component-ref-carries-a-side.json",
+      "outcome": "accept",
+      "note": "A use of a saved component says its own side: the place says where it sits, the body does not."
     },
     {
-      "file": "reject/pending-fold-sides-component-ref-without-a-side.json",
-      "outcome": "reject",
-      "note": "A use of a saved component with no side takes the automatic one.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/7",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true
+      "file": "accept/fold-sides-component-ref-without-a-side.json",
+      "outcome": "accept",
+      "note": "A use of a saved component with no side takes the automatic one."
     },
     {
       "file": "accept/fold-sides-no-fields-needs-no-id.json",
@@ -3982,12 +3850,6 @@
       "outcome": "reject",
       "note": "Only a page's top-level components take a side: a tile grid's child does not.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/0/children/0/layout/foldSide"
       }
@@ -3997,12 +3859,6 @@
       "outcome": "reject",
       "note": "A section's own child is nested too.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/0/children/0/layout/foldSide"
       }
@@ -4012,12 +3868,6 @@
       "outcome": "reject",
       "note": "A sheet's components take no side: the sides belong to a page.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/modals/0/components/0/layout/foldSide"
       }
@@ -4027,12 +3877,6 @@
       "outcome": "reject",
       "note": "Across the Top has to come before the first section that takes a side.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/1/layout/foldSide"
       }
@@ -4042,12 +3886,6 @@
       "outcome": "reject",
       "note": "A section pinned to a side ends the top: a later Across the Top is refused.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/1/layout/foldSide"
       }
@@ -4057,12 +3895,6 @@
       "outcome": "reject",
       "note": "A plain section ends the top, as a placed one does.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/pages/2/components/2/layout/foldSide"
       }
@@ -4072,12 +3904,6 @@
       "outcome": "reject",
       "note": "The sides are span, leading and trailing.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_variant",
         "pointer": "/document/pages/2/components/0/layout/foldSide"
       }
@@ -4087,12 +3913,6 @@
       "outcome": "reject",
       "note": "The page switch has one word, auto.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_variant",
         "pointer": "/document/pages/2/layout/foldSides"
       }
@@ -4102,12 +3922,6 @@
       "outcome": "reject",
       "note": "A sheet has no page switch.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_field",
         "pointer": "/document/modals/0/layout/foldSides"
       }
@@ -4117,12 +3931,6 @@
       "outcome": "reject",
       "note": "A saved component's body does not say where it sits: each use does.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.fold-sides@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "invalid_combination",
         "pointer": "/document/componentLibrary/0/node/layout/foldSide"
       }
@@ -5444,49 +5252,25 @@
       }
     },
     {
-      "file": "reject/pending-text-keep-read-fallback.json",
-      "outcome": "reject",
-      "note": "A read text slot explicitly chooses fallback while unavailable.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/14",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true
+      "file": "accept/text-keep-read-fallback.json",
+      "outcome": "accept",
+      "note": "A read text slot explicitly chooses fallback while unavailable."
     },
     {
-      "file": "reject/pending-text-keep-read-keep.json",
-      "outcome": "reject",
-      "note": "A read text slot explicitly chooses keep while unavailable.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/14",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true
+      "file": "accept/text-keep-read-keep.json",
+      "outcome": "accept",
+      "note": "A read text slot explicitly chooses keep while unavailable."
     },
     {
-      "file": "reject/pending-text-keep-read-without-fallback.json",
-      "outcome": "reject",
-      "note": "A read slot may retain text without authored fallback text.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/13",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true
+      "file": "accept/text-keep-read-without-fallback.json",
+      "outcome": "accept",
+      "note": "A read slot may retain text without authored fallback text."
     },
     {
       "file": "reject/text-keep-read-invalid-policy.json",
       "outcome": "reject",
       "note": "An unknown unavailable policy is refused, never repaired to fallback.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/13",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_variant",
         "pointer": "/document/pages/2/components/0/props/value/whenUnavailable"
       }
@@ -5501,49 +5285,25 @@
       }
     },
     {
-      "file": "reject/pending-text-keep-expr-fallback.json",
-      "outcome": "reject",
-      "note": "A expr text slot explicitly chooses fallback while unavailable.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/15",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true
+      "file": "accept/text-keep-expr-fallback.json",
+      "outcome": "accept",
+      "note": "A expr text slot explicitly chooses fallback while unavailable."
     },
     {
-      "file": "reject/pending-text-keep-expr-keep.json",
-      "outcome": "reject",
-      "note": "A expr text slot explicitly chooses keep while unavailable.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/15",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true
+      "file": "accept/text-keep-expr-keep.json",
+      "outcome": "accept",
+      "note": "A expr text slot explicitly chooses keep while unavailable."
     },
     {
-      "file": "reject/pending-text-keep-expr-without-fallback.json",
-      "outcome": "reject",
-      "note": "A expr slot may retain text without authored fallback text.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/15",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true
+      "file": "accept/text-keep-expr-without-fallback.json",
+      "outcome": "accept",
+      "note": "A expr slot may retain text without authored fallback text."
     },
     {
       "file": "reject/text-keep-expr-invalid-policy.json",
       "outcome": "reject",
       "note": "An unknown unavailable policy is refused, never repaired to fallback.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/13",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_variant",
         "pointer": "/document/pages/2/components/0/props/value/whenUnavailable"
       }
@@ -5562,12 +5322,6 @@
       "outcome": "reject",
       "note": "A literal has no unavailable state and refuses whenUnavailable.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/12",
-        "capability": "sh.text-keep@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_field",
         "pointer": "/document/pages/2/components/0/props/value/whenUnavailable"
       }
@@ -9001,27 +8755,15 @@
       }
     },
     {
-      "file": "reject/pending-flow-average-numbers.json",
-      "outcome": "reject",
-      "note": "average takes the mean of the finite numbers in a list; gaps are skipped.",
-      "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.flow-average@1"
-      },
-      "pending": true
+      "file": "accept/flow-average-numbers.json",
+      "outcome": "accept",
+      "note": "average takes the mean of the finite numbers in a list; gaps are skipped."
     },
     {
       "file": "reject/flow-average-typed-text.json",
       "outcome": "reject",
       "note": "average refuses a value typed as text, exactly as min and max do.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.flow-average@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "binding_type",
         "pointer": "/document/dataSources/5/inputs/steps/1/value"
       }
@@ -9031,12 +8773,6 @@
       "outcome": "reject",
       "note": "average requires its value operand.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.flow-average@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "missing_required",
         "pointer": "/document/dataSources/5/inputs/steps/1/value"
       }
@@ -9046,12 +8782,6 @@
       "outcome": "reject",
       "note": "average has only id, op and value; it cannot round the answer.",
       "issue": {
-        "code": "unsupported_capability",
-        "pointer": "/capabilities/6",
-        "capability": "sh.flow-average@1"
-      },
-      "pending": true,
-      "studioIssue": {
         "code": "unknown_field",
         "pointer": "/document/dataSources/5/inputs/steps/1/round"
       }

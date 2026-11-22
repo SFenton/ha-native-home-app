@@ -48,11 +48,12 @@ export function moveTargets(document: CompositionDocument, id: string): MoveTarg
   const targets: MoveTarget[] = [
     ...document.pages.map(page => ({ label: 'The page itself', where: page.title, group: `${page.title} · Page`, trail: [], parent: { kind: 'surface' as const, id: page.id } })),
     ...document.modals.map(modal => ({ label: 'The sheet itself', where: modal.title, group: `${modal.title} · Sheet`, trail: [], parent: { kind: 'surface' as const, id: modal.id } })),
+    ...(document.levels ?? []).map(level => ({ label: 'The level itself', where: level.title, group: `${level.title} · Level`, trail: [], parent: { kind: 'surface' as const, id: level.id } })),
   ];
   for (const { node, path } of locations) {
     if (node.id === id || inside(path)) continue;
-    const surface = (path[0] === 'pages' ? document.pages : document.modals)[Number(path[1])];
-    const where = surface?.title ?? '', group = `${where} · ${path[0] === 'pages' ? 'Page' : 'Sheet'}`;
+    const surface = (path[0] === 'pages' ? document.pages : path[0] === 'levels' ? document.levels ?? [] : document.modals)[Number(path[1])];
+    const where = surface?.title ?? '', group = `${where} · ${path[0] === 'pages' ? 'Page' : path[0] === 'levels' ? 'Level' : 'Sheet'}`;
     const trail = locations.filter(other => other.node.id !== node.id && path.length > other.path.length && path.slice(0, other.path.length).join('/') === other.path.join('/'))
       .sort((a, b) => a.path.length - b.path.length).map(other => nodeTitle(other.node, document));
     if (node.type === 'tile-grid') targets.push({ label: node.title, where, group, trail, parent: { kind: 'grid', id: node.id } });
@@ -76,6 +77,7 @@ export function moveNodeTo(document: CompositionDocument, id: string, parent: Mo
   const moved = moveCompositionNode(document, id, parent);
   const source = componentLocations(document, true).find(location => location.node.id === id);
   return editSubtrees(document, { ...document, pages: moved.pages, modals: moved.modals,
+    ...(document.levels ? { levels: moved.levels } : {}),
     ...(source?.path[0] === 'componentLibrary' ? { componentLibrary: moved.componentLibrary } : {}),
   });
 }

@@ -2,11 +2,11 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import type { Json } from '../../shared/types';
 import { lift, type ASTReplacement, type GraphNode, type LogicAnchor } from '../../shared/composition/graph';
 import { canonicalOfBounded, CompositionValidationError } from '../../shared/composition/json';
-import { resolveLogicAnchor } from '../../shared/composition/studio-logic/anchors';
+import { resolveLogicAnchor, type ResolvedLogicAnchor } from '../../shared/composition/studio-logic/anchors';
 import { encodeStudioCanvas, normalizeAnnotation, readStudioCanvas, type CanvasLayoutInput } from '../../shared/composition/studio-logic/layout';
 import { studioCanvasMetadataSchema, type StoredStudioCanvasMetadata } from '../../shared/composition/studio-logic/schemas';
 import type { CanvasLayoutHandoff } from '../canvas/FlowCanvas';
-import { authoredNodes, fieldAnchor, fieldPointer, pointerPath, type AuthoredNode } from './registry';
+import { AnchorResolver, authoredNodes, fieldAnchor, fieldPointer, pointerPath, type AuthoredNode } from './registry';
 import { valueAt, type EditorPath } from '../../composition-editor';
 import { sameJson } from '../../sameJson';
 import { documentEdit, LINKED_EDIT_REFUSAL } from '../editors/documentEdit';
@@ -22,8 +22,55 @@ export interface CanvasRebase {
   /** `before`'s parsed metadata and that it is usable, when the caller already knows (both per revision). */
   readonly stored?: StoredStudioCanvasMetadata;
   readonly usable?: boolean;
+  /** Shared with the certification of the result, and which objects are committed (see {@link CanvasWalk}). */
+  readonly walk?: CanvasWalk;
   deleted(pointer: string): boolean;
   refuse(): never;
+}
+
+/** One value's lifted nodes (IDs and origins: all a rebase reads of a lift, and a function of the value alone), by origin. */
+interface Lifted {
+  readonly nodes: readonly { readonly id: string; readonly origins: readonly string[] }[];
+  /** Indices of the nodes with each origin, and of those with none (which every saved node's origins cover). */
+  readonly byOrigin: ReadonlyMap<string, readonly number[]>;
+  readonly bare: readonly number[];
+}
+/**
+ * What one transaction's rebase and the certification of its result share, and which objects are committed (immutable,
+ * so lifts of them are kept across revisions; a candidate's own objects are kept only for the transaction). The result
+ * holds the same owners as the rebased candidate, so the authored-node walk is shared too, checked by those owners.
+ */
+export interface CanvasWalk {
+  readonly committed: (value: object) => boolean;
+  readonly lifts: Map<object, Lifted>;
+  authored?: { readonly owners: readonly unknown[]; readonly nodes: readonly AuthoredNode[] };
+}
+export const canvasWalk = (committed: (value: object) => boolean): CanvasWalk => ({ committed, lifts: new Map() });
+const liftedValues = new WeakMap<object, Lifted>();
+function liftedNodes(value: unknown, anchor: LogicAnchor, semantic: CompositionDocument, base: string, walk: CanvasWalk): Lifted {
+  const object = value !== null && typeof value === 'object' ? value : undefined;
+  const known = object && (walk.lifts.get(object) ?? liftedValues.get(object));
+  if (known) return known;
+  const graph = lift(value as Json, { anchor, context: { document: semantic as unknown as Json, pointer: base } }).graph;
+  const byOrigin = new Map<string, number[]>(), bare: number[] = [];
+  graph.nodes.forEach((node, index) => {
+    if (!node.origins.length) bare.push(index);
+    for (const origin of new Set(node.origins)) {
+      const same = byOrigin.get(origin);
+      if (same) same.push(index); else byOrigin.set(origin, [index]);
+    }
+  });
+  const result: Lifted = { nodes: graph.nodes.map(node => ({ id: node.id, origins: node.origins })), byOrigin, bare };
+  if (object) { walk.lifts.set(object, result); if (walk.committed(object)) liftedValues.set(object, result); }
+  return result;
+}
+/** `authoredNodes(semantic)`, once per transaction for the same owners. */
+export function walkedNodes(semantic: CompositionDocument, walk: CanvasWalk): () => readonly AuthoredNode[] {
+  const owners = [semantic.pages, semantic.modals, semantic.componentLibrary];
+  return () => {
+    if (!walk.authored || walk.authored.owners.some((owner, at) => owner !== owners[at])) walk.authored = { owners, nodes: authoredNodes(semantic) };
+    return walk.authored.nodes;
+  };
 }
 
 type StoredCanvas = StoredStudioCanvasMetadata['canvases'][number];
@@ -58,8 +105,8 @@ function normalCanvas(canvas: StoredCanvas, byRoot: ReadonlyMap<string, readonly
 }
 
 /** A field's anchor; a field that no longer has one owner (duplicate IDs, a removed owner) refuses the edit. */
-function anchorAt(document: CompositionDocument, path: EditorPath, nodes: () => readonly AuthoredNode[], refuse: () => never): LogicAnchor {
-  try { return fieldAnchor(document, path, nodes); } catch { return refuse(); }
+function anchorAt(document: CompositionDocument, path: EditorPath, nodes: () => readonly AuthoredNode[], refuse: () => never, resolver: AnchorResolver): LogicAnchor {
+  try { return fieldAnchor(document, path, nodes, anchor => resolver.resolve(anchor)); } catch { return refuse(); }
 }
 
 /**
@@ -67,14 +114,19 @@ function anchorAt(document: CompositionDocument, path: EditorPath, nodes: () => 
  * node to the lifted nodes whose origins it still covers.
  */
 function associate(semantic: CompositionDocument, pointer: string, path: EditorPath, own: readonly StoredNode[],
-  locate: (pointer: string) => EditorPath[], changes: Pick<CanvasRebase, 'deleted' | 'refuse'>, nodes: () => readonly AuthoredNode[]): Associated {
-  const anchor = anchorAt(semantic, path, nodes, changes.refuse), base = fieldPointer(path);
-  const graph = lift(valueAt(semantic, path) as Json, { anchor, context: { document: semantic as unknown as Json, pointer: base } }).graph;
+  locate: (pointer: string) => EditorPath[], changes: Pick<CanvasRebase, 'deleted' | 'refuse'>, nodes: () => readonly AuthoredNode[],
+  resolver: AnchorResolver, walk: CanvasWalk): Associated {
+  const anchor = anchorAt(semantic, path, nodes, changes.refuse, resolver), base = fieldPointer(path);
+  const graph = liftedNodes(valueAt(semantic, path), anchor, semantic, base, walk);
   const carried = new Map<string, LayoutNode>(), associations: { old: string; node: string }[] = [];
   for (const old of own) {
     const origins = new Set(old.origins.flatMap(origin => locate(`${pointer}${origin}`))
       .map(fieldPointer).filter(at => at === base || at.startsWith(`${base}/`)).map(at => at.slice(base.length)));
-    const matches = graph.nodes.filter(node => node.origins.every(origin => origins.has(origin)));
+    // The lifted nodes whose origins `origins` all cover, in lifted order: those with one of them, or with none.
+    const reached = new Set(graph.bare);
+    for (const origin of origins) for (const index of graph.byOrigin.get(origin) ?? []) reached.add(index);
+    const matches = [...reached].sort((left, right) => left - right).map(index => graph.nodes[index])
+      .filter(node => node.origins.every(origin => origins.has(origin)));
     if (!matches.length && !old.origins.every(origin => changes.deleted(`${pointer}${origin}`))) changes.refuse();
     for (const node of matches) {
       const previous = carried.get(node.id);
@@ -90,34 +142,123 @@ const rootPointer = (document: CompositionDocument, root: StoredRoot) =>
   root.anchor.kind === 'document' && root.anchor.field === '' ? '' : resolveLogicAnchor(document, root.anchor)?.pointer;
 
 /**
+ * A stored root's own content (anchor, then each node's lifted ID, origins and position, in order), as text that tells
+ * apart every two values `sameJson` does. Kept per parsed root object while it has the same node objects.
+ */
+const rootKeys = new WeakMap<StoredRoot, { readonly own: readonly StoredNode[]; readonly key: string }>();
+function rootKey(root: StoredRoot, own: readonly StoredNode[]): string {
+  const known = rootKeys.get(root);
+  if (known && known.own.length === own.length && known.own.every((node, at) => node === own[at])) return known.key;
+  const key = JSON.stringify([root.anchor, own.map(node => [node.nodeId, node.origins, node.x, node.y])],
+    (_key, value: unknown) => value === undefined ? '\u0000undefined' : typeof value === 'number' ? `\u0000${String(value)}` : value);
+  rootKeys.set(root, { own, key });
+  return key;
+}
+/**
+ * Certification results by the committed object a root's check reads (see `uncertifiedCanvasRoots`), then by the root's
+ * own content. Only filled from committed documents, so identity keeps each answer. The content is the root's stored
+ * layout, which every layout edit changes while the object stays, so each object keeps only its most recently used
+ * {@link CERTIFIED_PER_HOLDER} answers (a root moved again and again does not pile up keys while its node lives).
+ */
+const certified = new WeakMap<object, Map<string, boolean>>();
+export const CERTIFIED_PER_HOLDER = 4;
+function certifiedAnswer(memo: Map<string, boolean>, key: string): boolean | undefined {
+  const known = memo.get(key);
+  if (known !== undefined) { memo.delete(key); memo.set(key, known); }
+  return known;
+}
+function certify(holder: object, memo: Map<string, boolean>, key: string, ok: boolean): void {
+  memo.delete(key);
+  memo.set(key, ok);
+  for (const oldest of memo.keys()) { if (memo.size <= CERTIFIED_PER_HOLDER) break; memo.delete(oldest); }
+  certified.set(holder, memo);
+}
+/** How many certification answers are kept for `holder` (for tests). */
+export const certifiedAnswers = (holder: object): number => certified.get(holder)?.size ?? 0;
+
+/**
  * Roots that a full rebase of this unedited document would not give back exactly as stored: an association it cannot
  * carry, a lifted ID or anchor it would rewrite, or a canvas it would re-normalize. Such roots must be rebased by every
  * edit; any other root may be kept as stored while nothing it reads changes. `only` limits the check to those roots (and
  * every root of a canvas that needs re-normalizing).
+ *
+ * `document` must be committed (an indexed revision or an accepted result). Each root's check is memoized by the object
+ * it reads, given that its anchor resolves (which is checked afresh, owner and node uniqueness included, on every call):
+ * the resolved node, or for an owner-level anchor the owner. Given that resolution, the check reads nothing else:
+ * `fieldAnchor` finds the deepest authored node on the root's path, which is that node or one inside it, and its round
+ * trip resolves the same owner (the same ID) and, when it names the same node, that node; one inside it with another ID
+ * already fails the comparison. `lift` and the origin checks read only the field's value, below the node. A document
+ * anchor reads only its value (its ID and fingerprint are part of resolving it); one over the whole document is not
+ * memoized. The answer for an unwalkable document may differ (the full check throws, so it would fail every root), but
+ * such a revision is reconciled whole, so certification is not consulted.
  */
-export function uncertifiedCanvasRoots(document: CompositionDocument, stored: StoredStudioCanvasMetadata, only?: ReadonlySet<string>): Set<string> {
+export function uncertifiedCanvasRoots(document: CompositionDocument, stored: StoredStudioCanvasMetadata, only?: ReadonlySet<string>,
+  walk: CanvasWalk = canvasWalk(() => true)): Set<string> {
   const { studioCanvas: _layout, ...rest } = document, semantic = rest as CompositionDocument;
-  let authored: AuthoredNode[] | undefined;
-  const nodes = () => authored ??= authoredNodes(semantic);
+  const nodes = walkedNodes(semantic, walk);
   const failed = new Set<string>(), unproven = (): never => { throw failed; };
   const identity = (pointer: string) => valueAt(semantic, pointerPath(pointer)) === undefined ? [] : [pointerPath(pointer)];
+  const resolver = new AnchorResolver(semantic);
   for (const canvas of stored.canvases) {
     if (only && !canvas.roots.some(root => only.has(root.id))) continue;
     const byRoot = nodesByRoot(canvas.nodes);
     if (!normalCanvas(canvas, byRoot)) { for (const root of canvas.roots) failed.add(root.id); continue; }
     for (const root of canvas.roots) {
       if (only && !only.has(root.id)) continue;
-      const own = byRoot.get(root.id) ?? [], pointer = rootPointer(semantic, root);
+      const own = byRoot.get(root.id) ?? [];
+      const whole = root.anchor.kind === 'document' && root.anchor.field === '';
+      const resolved = whole ? undefined : resolver.resolve(root.anchor);
+      if (!whole && !resolved) { failed.add(root.id); continue; }
+      const holder = resolved && (root.anchor.kind === 'document' ? resolved.value : (resolved.node ?? resolved.owner).value);
+      const memo = holder !== null && typeof holder === 'object' ? certified.get(holder) ?? new Map<string, boolean>() : undefined;
+      const key = memo && rootKey(root, own), known = key === undefined ? undefined : certifiedAnswer(memo!, key);
+      if (known !== undefined) { if (!known) failed.add(root.id); continue; }
+      let ok = true, pure = true;
       try {
-        if (pointer === undefined) unproven();
-        const result = associate(semantic, pointer!, pointerPath(pointer!), own, identity, { deleted: () => false, refuse: unproven }, nodes);
-        if (!sameJson({ anchor: result.anchor, nodes: result.nodes }, { anchor: root.anchor, nodes: asInput(own) })) failed.add(root.id);
-      } catch {
-        failed.add(root.id);
+        const pointer = whole ? '' : resolved!.pointer;
+        const result = associate(semantic, pointer, pointerPath(pointer), own, identity, { deleted: () => false, refuse: unproven }, nodes, resolver, walk);
+        ok = sameJson({ anchor: result.anchor, nodes: result.nodes }, { anchor: root.anchor, nodes: asInput(own) });
+      } catch (error) {
+        // An owner the walk cannot read throws outside the root's own reads: not remembered.
+        ok = false; pure = error === failed || error instanceof CompositionValidationError;
       }
+      if (!ok) failed.add(root.id);
+      if (memo && pure) certify(holder as object, memo, key!, ok);
     }
   }
   return failed;
+}
+
+/**
+ * Whether `readStudioCanvas(document).metadata` is defined, where `stored` is the parse of `document.studioCanvas` and
+ * `resolve` is `resolveLogicAnchor` over `document`. That check reads the document only through each root's resolution:
+ * the value the root resolves to (each origin is looked up in it) and its owner's ID; the rest is the metadata itself. So
+ * a committed revision known to have usable metadata in the same `studioCanvas` object answers for any other whose every
+ * root resolves to the same value (the same object, or an equal primitive) on an owner with the same ID. A root over the
+ * whole document (its fingerprint reads everything) is always checked in full.
+ */
+const usableRevisions = new WeakMap<object, CompositionDocument>();
+/** Record that committed `document`'s layout metadata is usable. */
+export function knownUsable(document: CompositionDocument): void {
+  const raw: unknown = document.studioCanvas;
+  if (raw !== null && typeof raw === 'object') usableRevisions.set(raw, document);
+}
+export function usableLayout(document: CompositionDocument, stored: StoredStudioCanvasMetadata, resolve: (anchor: LogicAnchor) => ResolvedLogicAnchor | undefined): boolean {
+  const raw: unknown = document.studioCanvas, known = raw !== null && typeof raw === 'object' ? usableRevisions.get(raw) : undefined;
+  if (known === document) return true;
+  const roots = stored.canvases.flatMap(canvas => canvas.roots);
+  if (known && !roots.some(root => root.anchor.kind === 'document' && root.anchor.field === '')) {
+    const other = new AnchorResolver(known);
+    const same = roots.every(root => {
+      const here = resolve(root.anchor), there = other.resolve(root.anchor);
+      return here !== undefined && there !== undefined && Object.is(here.value, there.value)
+        && Reflect.get(here.owner.value as object, 'id') === Reflect.get(there.owner.value as object, 'id');
+    });
+    if (same) return true;
+  }
+  const usable = readStudioCanvas(document).metadata !== undefined;
+  if (usable) knownUsable(document);
+  return usable;
 }
 
 interface Rebased {
@@ -135,8 +276,7 @@ export function rebaseCanvasLayout(before: CompositionDocument, after: Compositi
   if (!before.studioCanvas || !sameJson(before.studioCanvas, after.studioCanvas) || !(changes.usable ?? readStudioCanvas(before).metadata)) return after;
   const stored = changes.stored ?? studioCanvasMetadataSchema.parse(before.studioCanvas);
   const { studioCanvas: _layout, ...rest } = after, semantic = rest as CompositionDocument;
-  let authored: AuthoredNode[] | undefined;
-  const nodes = () => authored ??= authoredNodes(semantic);
+  const walk = changes.walk ?? canvasWalk(() => false), nodes = walkedNodes(semantic, walk), resolver = new AnchorResolver(semantic, walk.committed);
   let changed = false;
   const rebased = stored.canvases.map((canvas): Rebased => {
     const byRoot = nodesByRoot(canvas.nodes);
@@ -156,7 +296,7 @@ export function rebaseCanvasLayout(before: CompositionDocument, after: Compositi
       if (!destinations.length && !changes.deleted(pointer)) changes.refuse();
       if (destinations.length !== 1) changed = true;
       for (const path of destinations) {
-        const result = associate(semantic, pointer, path, own, locate, changes, nodes);
+        const result = associate(semantic, pointer, path, own, locate, changes, nodes, resolver, walk);
         for (const association of result.associations) associations.push({ ...association, root: roots.length });
         const next = { anchor: result.anchor, nodes: result.nodes };
         if (!sameJson(next, { anchor: root.anchor, nodes: asInput(own) })) changed = true;

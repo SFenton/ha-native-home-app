@@ -263,7 +263,7 @@ test('While unavailable preserves Keep last and fallback through text and token 
   await expect(policy).toHaveText('Show fallback');
   await policy.click();
   await page.getByRole('option', { name: 'Keep last', exact: true }).click();
-  await expect(panel.getByText('Keep last needs a newer app. Until the first answer, the fallback is shown.')).toBeVisible();
+  await expect(panel.getByText('Until the first answer, the fallback is shown.')).toBeVisible();
   await line.click();
   await line.press('End');
   await page.keyboard.type(' now');

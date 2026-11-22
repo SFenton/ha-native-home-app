@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { compositionSourceText, importCompositionText } from '../composition-editor';
+import { compositionSourceText } from '../composition-editor';
+import { importCompositionText } from './editors/importDocument';
 import { CompositionValidationError } from '../shared/composition/json';
 import { formatCompositionIssue } from '../shared/composition/workspace';
 import { TextField } from '../ui';
@@ -18,6 +19,7 @@ import { DialogFrame, useProjectRows } from './dialogs/parts';
 import { LinksList } from './navigation/Links';
 import { LinkPrefixes } from './navigation/LinkPrefixes';
 import { useRows } from './rows';
+import { replaceDocument } from './editors/provenance';
 import type { Workspace2 } from './useWorkspace2';
 
 /** Every dialog the Project menu opens (spec 5.7). Tabs, Header Buttons and Wallpaper open the properties surface instead. */
@@ -50,7 +52,11 @@ function JsonEditor({ close }: { close: () => void }) {
     <div className="w2-actions">
       <button type="button" onClick={close}>Cancel</button>
       <button type="button" className="w2-primary" onClick={() => {
-        try { onChange(importCompositionText(text, document.id)); close(); }
+        try {
+          // The text is the whole document: Apply replaces it, taking the text's links as written.
+          const next = replaceDocument(document, importCompositionText(text, document.id));
+          if (next !== document) { onChange(next); close(); }
+        }
         catch (reason) { setError(reason instanceof CompositionValidationError ? reason.issues.map(formatCompositionIssue).join('\n') : reason instanceof Error ? reason.message : String(reason)); }
       }}>Apply</button>
     </div>

@@ -12,9 +12,10 @@ import { useWorkspaceData } from '../../pickers/WorkspaceData';
 import { entityOfSource, operandName, sentence } from '../../expr/condition';
 import { useNameContext } from '../../expr/useExpr';
 import { SettingRow } from './LogicUse';
-import { addSetting, canAddSetting, entryOf, removeSetting, settingKindOf, settingKinds, settingUsed, updateSetting, type LogicParam, type SettingKind } from './logicModel';
+import { addSetting, canAddSetting, entryOf, removeSettingPlan, settingKindOf, settingKinds, settingUsed, updateSetting, type LogicParam, type SettingKind } from './logicModel';
 import { minutesWords } from './logicNames';
 import { logicWords } from './logicWords';
+import { LinkLossQuestion } from '../../LinkLossQuestion';
 
 /** "Value · tried with 3": what a setting takes and what it is tried with. */
 function triedLine(param: LogicParam, document: CompositionDocument, ctx: ReturnType<typeof useNameContext>): string {
@@ -33,6 +34,7 @@ function triedLine(param: LogicParam, document: CompositionDocument, ctx: Return
 export default function LogicSettings({ draft, document, id, onError, apply }: { draft: Draft; document: CompositionDocument; id: string; onError: (message: string) => void; apply: (next: CompositionDocument) => void }) {
   const entry = entryOf(document, id), ctx = useNameContext(document), { entities } = useWorkspaceData();
   const [open, setOpen] = useState<string>();
+  const [removing, setRemoving] = useState<{ name: string; label: string; tiles: number }>();
   if (!entry) return null;
   const run = (operation: () => CompositionDocument) => { try { apply(operation()); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
   const add = (kind: SettingKind) => {
@@ -50,6 +52,16 @@ export default function LogicSettings({ draft, document, id, onError, apply }: {
       }
       const made = addSetting(base, id, kind, sourceId);
       apply(made.document); setOpen(made.name);
+    } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
+  };
+  /** Remove Setting asks first when tiles fill the setting in: they lose that value. */
+  const remove = (param: LogicParam) => {
+    try {
+      const plan = removeSettingPlan(document, id, param.name);
+      if (plan.document === document) return;
+      setOpen(undefined);
+      if (plan.tiles > 0) setRemoving({ name: param.name, label: param.label ?? param.name, tiles: plan.tiles });
+      else apply(plan.document);
     } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   };
   const room = canAddSetting(entry);
@@ -73,7 +85,7 @@ export default function LogicSettings({ draft, document, id, onError, apply }: {
             <SettingRow draft={draft} param={{ ...param, label: logicWords.tryWith }} arg={param.sample} path={['logicLibrary', document.logicLibrary!.findIndex(entry => entry.id === id), 'params', entry.params.findIndex(item => item.name === param.name), 'sample']}
               onArg={(next: Json, base?: CompositionDocument) => run(() => updateSetting(base ?? document, id, param.name, { sample: next }))}/>
             {!used && <p className="w2-caption" data-testid="setting-unused">{logicWords.settingNotUsed}</p>}
-            <button type="button" className="w2-expr-remove" onClick={() => { setOpen(undefined); run(() => removeSetting(document, id, param.name)); }}>{logicWords.removeSetting}</button>
+            <button type="button" className="w2-expr-remove" onClick={() => remove(param)}>{logicWords.removeSetting}</button>
           </div>}
         </li>;
       })}
@@ -85,5 +97,7 @@ export default function LogicSettings({ draft, document, id, onError, apply }: {
       </Menu.Popup></Menu.Positioner></Menu.Portal>
     </Menu.Root>
     {!room && <p id="w2-logic-settings-limit" className="w2-caption" role="note">{logicWords.limitSettings}</p>}
+    <LinkLossQuestion asking={removing && { title: logicWords.removeSettingTitle(removing.label), text: logicWords.removeSettingText(removing.tiles), confirm: logicWords.removeSetting }}
+      onCancel={() => setRemoving(undefined)} onConfirm={() => { const held = removing; setRemoving(undefined); if (held) run(() => removeSettingPlan(document, id, held.name).document); }}/>
   </section>;
 }

@@ -8,14 +8,25 @@ None
 Header buttons
 Same as app
 Custom
-Open pages beside this one
-Used when the window is wide enough for two.
+Hide on this page
+Tabs
+Hidden on this page only. Other pages follow the app.
+Needs a newer app. Publishing it waits for an app update.
 Partly Folded
 Two Sides
 One Column
 Sections take a side of the fold when iPhone Duo is partly folded sideways.
-The app can’t show this yet. Publishing it waits for an app update.
 Reset Sides
+Use Two Sides on Every Page
+In a wide window
+Open pages beside this one
+Used when the window is wide enough for two.
+Opens
+Automatic
+Full width
+Beside
+Beside the page it came from when that page opens pages beside it, otherwise full width. Used when the window is wide enough for two.
+Needs a newer app. Publishing it waits for an app update.
 Opens from outside the app
 0
 Opened from

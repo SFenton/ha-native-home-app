@@ -54,8 +54,8 @@ function compile(components: J[], styles: J = library(rules({ glyphTint: warm })
 const parsed = (styles: J): StateStyleDefinition => stateStyleSchema.parse(styles.styles[0]) as StateStyleDefinition;
 
 describe('the capability', () => {
-  it('is pending until the app ships it', () => {
-    expect(pendingCompositionCapabilities).toContain(TINT);
+  it('is shipped: the app lists it, so it is not pending', () => {
+    expect(pendingCompositionCapabilities).not.toContain(TINT);
   });
   it('is required by an icon colour on a rule or on the fallback, and by nothing else', () => {
     expect(compile([tile()]).capabilities).toContain(TINT);

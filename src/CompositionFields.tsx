@@ -1,6 +1,6 @@
 import type { CompositionDocument } from './shared/composition/schema';
 import type { Json } from './shared/types';
-import { changeFieldVariant, defaultField, fieldVariants, removeCompositionItem, reorderCompositionItem, replaceAt, resolveField, selectedVariant, valueAt, variantName, type EditorPath, type SchemaField } from './composition-editor';
+import { defaultField, fieldVariants, removeCompositionItem, reorderCompositionItem, replaceAt, resolveField, selectedVariant, valueAt, variantName, type EditorPath, type SchemaField } from './composition-editor';
 import { Field, NumberField, SelectField, TextField } from './ui';
 import { useContext, useState, type ReactElement } from 'react';
 import { Rows } from './workspace2/rowsContext';
@@ -13,6 +13,8 @@ import InkField, { type InkValue } from './workspace2/pickers/InkField';
 import { AddressedField } from './workspace2/logic-fields/AddressedField';
 import { ActionRow } from './workspace2/editors/ActionEditor';
 import { useLogicFields } from './workspace2/logic-fields/LogicFields';
+import { changeFieldType } from './workspace2/editors/provenance';
+import { fieldTypeWords, LinkLossQuestion, type LinkLoss } from './workspace2/LinkLossQuestion';
 
 /**
  * Opt-in behaviour for the workspace. Without it the form renders its plain default: generated labels, "Include"
@@ -93,6 +95,7 @@ export default function CompositionFields(props: Props) {
   const { value, path, label, document, onChange, onError, options } = props;
   const problem = useContext(Rows)?.problems?.get(path.join('/'));
   const canvas = useLogicFields();
+  const [changing, setChanging] = useState<{ choice: number; loss: LinkLoss }>();
   const leaf = (element: ReactElement) => options?.fieldPath ? <div className="field-leaf" data-field-path={path.join('/')}>{element}{problem && <p className="w2-error-text w2-field-problem" data-field-problem={path.join('/')}>{problem}</p>}</div> : element;
   const schema = resolveField(props.schema), key = fieldKey(path);
   const set = (next: Json) => onChange(replaceAt(document, path, next));
@@ -142,15 +145,29 @@ export default function CompositionFields(props: Props) {
   }
   if (variants.length > 1) {
     const selected = selectedVariant(schema, value), index = variants.indexOf(selected);
+    const typeName = (variant: SchemaField) => options?.variantLabel?.(path, variantName(variant)) ?? variantName(variant);
+    // A type change rebuilds the value: linked values and saved canvas layouts inside it are declared removed, so it asks first when there are any.
+    const pick = (choice: string) => {
+      try {
+        const variant = variants[Number(choice)], change = changeFieldType(document, path, variant, key);
+        if (change.document === document) return;
+        if (!change.bindings && !change.layouts) { onChange(change.document); return; }
+        setChanging({ choice: Number(choice), loss: { title: fieldTypeWords.title(label, typeName(variant)), text: fieldTypeWords.text(change.bindings, change.layouts, typeName(variant)), confirm: fieldTypeWords.confirm } });
+      } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
+    };
+    const question = <LinkLossQuestion asking={changing?.loss} onCancel={() => setChanging(undefined)}
+      onConfirm={() => { const held = changing; setChanging(undefined); if (held) run(() => changeFieldType(document, path, variants[held.choice], key).document); }}/>;
     if (options?.rows) return <Group label="">
-      <ChoiceRow label={label} value={String(index)} options={variants.map((variant, i) => ({ value: String(i), label: options.variantLabel?.(path, variantName(variant)) ?? variantName(variant) }))}
-        onChange={choice => set(changeFieldVariant(variants[Number(choice)], value, document, key))}/>
+      <ChoiceRow label={label} value={String(index)} options={variants.map((variant, i) => ({ value: String(i), label: typeName(variant) }))}
+        onChange={pick}/>
       <CompositionFields {...props} schema={selected} nested={false}/>
+      {question}
     </Group>;
     return <fieldset className="composition-fieldset"><legend>{label}</legend>
-      <SelectField label={`${label} type`} value={String(index)} options={variants.map((variant, i) => ({ value: String(i), label: options?.variantLabel?.(path, variantName(variant)) ?? variantName(variant) }))}
-        onChange={choice => set(changeFieldVariant(variants[Number(choice)], value, document, key))}/>
+      <SelectField label={`${label} type`} value={String(index)} options={variants.map((variant, i) => ({ value: String(i), label: typeName(variant) }))}
+        onChange={pick}/>
       <CompositionFields {...props} schema={selected}/>
+      {question}
     </fieldset>;
   }
   if (options?.rows && (schema.const !== undefined || schema.enum?.length === 1)) return null;

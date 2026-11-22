@@ -1,6 +1,6 @@
 {
   "name": "native-home-studio",
-  "version": "0.3.21",
+  "version": "0.3.26",
   "private": true,
   "type": "module",
   "description": "A Home Assistant app for designing and publishing native server-driven experiences.",

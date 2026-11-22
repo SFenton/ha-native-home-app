@@ -1,16 +1,17 @@
 import { overlaysWithStackedControls, tabsWithCutTitles } from './layout/tabBarRules';
 import type { CompositionDocument } from '../shared/composition/schema';
-import { compilerIssuesOf } from '../composition-editor';
+import { compilerIssuesOf, valueAt } from '../composition-editor';
 import type { CompositionIssue } from '../shared/composition/json';
 import { compositionWarnings } from '../shared/composition/lints';
 import { targetOf, wordsFor, type Destination } from './checkWords';
 import type { DialogKey } from './projectDialogs';
 import type { PanelKind } from './useWorkspace2';
 import { buildDocumentIndex, type SelectionKey } from '../preview2/model';
-import { buildOutline, collectLinks } from './outline';
+import { buildOutline, collectLinks, levelOwners } from './outline';
 import { tabGroups } from './capacity';
 import { labelFor } from './labels';
 import { pendingUseWords } from './pendingUse';
+import { customWithoutQuickLinks, quickLinksFirstPageOnly, tabsHiddenOnFirstPage, type ChromeCheck } from './navigation/chromeRules';
 
 /** One row of the Checks popover: a sentence, where it is, and what choosing it selects. */
 export interface CheckRow { id: string; sentence: string; place: string; select?: SelectionKey; /** Where choosing the row goes; every problem has one. */ go?: Destination;
@@ -58,7 +59,21 @@ export function compilerIssues(document: CompositionDocument): CompositionIssue[
 export function sentenceFor(document: CompositionDocument, issue: CompositionIssue): { sentence: string; place: string; select?: SelectionKey; go: Destination; fieldPath?: string } {
   const path = pointerPath(issue.pointer);
   const target = targetOf(document, path);
+  const level = levelLinkedFromPage(document, issue, path);
+  if (level) return { sentence: level.sentence, place: level.place, select: target.select, go: target.go, fieldPath: target.fieldPath?.join('/') };
   return { sentence: `${target.place}: ${wordsFor(document, issue, target, path)}`, place: target.place, select: target.select, go: target.go, fieldPath: target.fieldPath?.join('/') };
+}
+
+/**
+ * The error for a page that opens a level (`invalid_combination` at a `pageId`, on a page, that names an entry of `levels[]`): "<Page> links to <Name>, a level.
+ * A page cannot open a level. Move <Name> to Pages, or open it from a sheet." Anything else gets no special words.
+ */
+export function levelLinkedFromPage(document: CompositionDocument, issue: CompositionIssue, path: readonly (string | number)[]): { sentence: string; place: string } | undefined {
+  if (issue.code !== 'invalid_combination' || path.at(-1) !== 'pageId' || path[0] !== 'pages' || typeof path[1] !== 'number') return undefined;
+  const level = (document.levels ?? []).find(item => item.id === valueAt(document, [...path]));
+  const from = document.pages[path[1]]?.title?.trim();
+  if (!level || !from) return undefined;
+  return { place: from, sentence: `${from} links to ${level.title}, a level. A page cannot open a level. Move ${level.title} to Pages, or open it from a sheet.` };
 }
 
 /** Problems (they block publishing) and Suggestions (lints). */
@@ -71,6 +86,13 @@ export function runChecks(document: CompositionDocument): Checks {
     suggestions.push({ id: `no-way-in-${surface.kind}-${surface.id}`, sentence: `${title} has no way in.`, place: title, select: `${surface.kind}:${surface.id}` });
   }
   const links = collectLinks(document);
+  // A level no sheet reaches: published to a build without levels it is a page nothing opens, so it is said like any other surface with no way in.
+  for (const id of levelOwners(document, links).loose) {
+    // A level some link reaches (a page's, say) has a way in; the error names that link, so the suggestion would be untrue.
+    if (links.some(link => link.to.kind === 'page' && link.to.id === id)) continue;
+    const title = (document.levels ?? []).find(item => item.id === id)?.title ?? id;
+    suggestions.push({ id: `no-way-in-level-${id}`, sentence: `${title} has no way in.`, place: title, select: `level:${id}` });
+  }
   for (const page of document.pages) {
     if (page.navigation.type === 'navigation-columns' && !links.some(link => link.from.kind === 'page' && link.from.id === page.id && link.to.kind === 'page'))
       suggestions.push({ id: `columns-${page.id}`, sentence: `${page.title} opens pages beside it but links to none.`, place: page.title, select: `page:${page.id}` });
@@ -104,6 +126,11 @@ export function runChecks(document: CompositionDocument): Checks {
       }
     }
   }
+  // Global chrome (proposal `build/design/global-chrome/proposal.md`, sections 2, 3 and 5).
+  const named = (check: ChromeCheck): CheckRow => ({ id: check.id, sentence: check.sentence, place: check.page.title, select: `page:${check.page.id}` });
+  for (const check of [...tabsHiddenOnFirstPage(document), ...customWithoutQuickLinks(document)]) suggestions.push(named(check));
+  const firstOnly = quickLinksFirstPageOnly(document);
+  if (firstOnly) suggestions.push({ id: 'quick-links-first-page', sentence: firstOnly, place: 'Tabs and header buttons', go: { panel: 'header' } });
   const waiting = pendingUseWords(document);
   if (waiting) suggestions.push({ id: 'pending-capabilities', sentence: waiting, place: 'Project' });
   const warned = new Map<string, number>();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
 import { ChevronLeft, Plus } from 'lucide-react';
 import type { SelectionKey } from '../../preview2/model';
@@ -8,7 +8,7 @@ import { PushStack, usePush } from '../kit';
 import { MoveToPage } from '../PropertiesPanel';
 import { RowsProvider } from '../rows';
 import type { Workspace2 } from '../useWorkspace2';
-import { levelRows, levelTitle, surfaceWordOf, openingLevel, pathTo, survivingLevel, trailTo } from '../levels';
+import { levelCrumbs, levelName, levelRows, levelTitle, surfaceWordOf, openingLevel, pathTo, survivingLevel, trailTo, type Crumb } from '../levels';
 import { typeName } from '../util';
 import Crumbs from '../Crumbs';
 import LevelList from './LevelList';
@@ -37,7 +37,11 @@ function LevelPage({ ws, level, trail, direction, onEnter, onJump, onBack, onDon
   const add = useAdd();
   const root = trail[0], atRoot = level === root;
   const rows = useMemo(() => levelRows(document, index, level), [document, index, level]);
-  const path = useMemo(() => pathTo(document, index, level), [document, index, level]);
+  // A level of a sheet is a surface of its own: its path starts at the sheet it is shown in ("Lights"), then the levels it was reached through, and its Back goes to the one before it.
+  const ofLevel = index.get(root)?.kind === 'level';
+  const reached = useMemo(() => ofLevel ? levelCrumbs(document, ws.surface, root.slice('level:'.length)) : [], [document, ws.surface, ofLevel, root]);
+  const path = useMemo<Crumb[]>(() => ofLevel ? [...reached, ...(atRoot ? [] : pathTo(document, index, level))] : pathTo(document, index, level), [document, index, level, ofLevel, reached, atRoot]);
+  const backTo = ofLevel && atRoot ? reached.at(-1) : !atRoot ? path.at(-1) : undefined;
   const here = index.get(level);
   const destination = endOf(document, level);
   // A local tab's settings are its tabs' node's; every other level selects itself.
@@ -51,12 +55,13 @@ function LevelPage({ ws, level, trail, direction, onEnter, onJump, onBack, onDon
       ws.studio.apply(made.document);
     } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   };
-  const settings = here?.kind === 'local-tab' ? 'Area Settings' : settingsEntry?.kind === 'page' ? 'Page Settings' : settingsEntry?.kind === 'modal' ? `${surfaceWordOf(document, index, settingsKey)} Settings` : `${titleCase(typeName(settingsEntry?.node ?? 'section'))} Settings`;
-  const title = levelTitle(document, index, level);
+  const settings = here?.kind === 'local-tab' ? 'Area Settings' : settingsEntry?.kind === 'level' ? 'Level Settings' : settingsEntry?.kind === 'page' ? 'Page Settings' : settingsEntry?.kind === 'modal' ? `${surfaceWordOf(document, index, settingsKey)} Settings` : `${titleCase(typeName(settingsEntry?.node ?? 'section'))} Settings`;
+  // A level is titled with its own name (the sheet's rows are "This Sheet"): the path under it names the sheet it is a level of.
+  const title = ofLevel ? levelName(document, index, level) : levelTitle(document, index, level);
   return <>
     <header className="w2-level-head">
-      <div className="w2-level-lead">{!atRoot && <button type="button" className="w2-icon-button w2-level-back" aria-label={`Back to ${path.at(-1)?.title ?? ''}`} onClick={onBack}><ChevronLeft size={22} aria-hidden/></button>}</div>
-      <div className="w2-level-titles"><h2 className="w2-level-title-text">{title}</h2><Crumbs path={path} atRoot={atRoot} onJump={onJump}/></div>
+      <div className="w2-level-lead">{backTo && <button type="button" className="w2-icon-button w2-level-back" aria-label={`Back to ${backTo.title}`} onClick={() => atRoot ? onJump(backTo.key) : onBack()}><ChevronLeft size={22} aria-hidden/></button>}</div>
+      <div className="w2-level-titles"><h2 className="w2-level-title-text">{title}</h2><Crumbs path={path} atRoot={atRoot && !ofLevel} onJump={onJump}/></div>
       <div className="w2-level-trail"><button type="button" className="w2-level-done" onClick={onDone}>Done</button></div>
     </header>
     <div className="w2-level-scroll" data-base-ui-swipe-ignore>
@@ -85,6 +90,13 @@ function LevelBody({ ws, onClose, onError }: { ws: Workspace2; onClose: () => vo
   const [direction, setDirection] = useState<'forward' | 'back'>();
   const [snap, setSnap] = useState(HALF);
   const level = survivingLevel(index, trail);
+  // The simulator moved to another surface (Back out of a level, a level crumb): the sheet shows that one's rows, from its start.
+  const shown = useRef(root);
+  useEffect(() => {
+    if (shown.current === root) return;
+    shown.current = root;
+    setDirection('back'); setTrail(trailTo(index, openingLevel(index, root, undefined)));
+  }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
   // The level's node deleted or moved away (Undo, Move To…): the sheet goes up to the nearest level that is left.
   useEffect(() => {
     if (!index.get(trail[0])) { onClose(); return; }
@@ -107,7 +119,12 @@ function LevelBody({ ws, onClose, onError }: { ws: Workspace2; onClose: () => vo
         <RowsProvider value={context}>
           <PushStack rootTitle={aria} root={<LevelPage ws={ws} level={level} trail={trail} direction={direction} onError={onError} onDone={done} onLeave={onClose}
             onEnter={key => { setDirection('forward'); setTrail(trailTo(index, key)); if (index.get(key)?.kind === 'node') ws.select(key); }}
-            onJump={key => { setDirection('back'); setTrail(trailTo(index, key)); }}
+            onJump={key => {
+              // The sheet or level the path names is a surface: the simulator shows it, and this sheet follows. A container of this level is one step inside it.
+              const entry = index.get(key);
+              if (entry?.kind === 'modal' || (entry?.kind === 'level' && key !== root)) { ws.setSurface(entry.kind === 'modal' ? { kind: 'modal', id: entry.id } : { kind: 'level', id: entry.id, ...(surface.kind === 'level' && surface.sheetId ? { sheetId: surface.sheetId } : {}) }); ws.select(undefined); return; }
+              setDirection('back'); setTrail(trailTo(index, key));
+            }}
             onBack={() => { setDirection('back'); setTrail(trail.slice(0, -1)); }}/>}/>
         </RowsProvider>
       </div>

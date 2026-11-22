@@ -4,6 +4,8 @@ import { buildDocumentIndex, type SelectionKey } from '../src/preview2/model';
 import { replaceAt } from '../src/composition-editor';
 import { collapseCrumbs, countWords, isLevel, levelRows, levelTitle, openingLevel, pathTo, rowContext, searchLevel, surfaceWordOf, survivingLevel, trailTo, typeGlyph, typeGlyphs, type Crumb } from '../src/workspace2/levels';
 import homeDomains from '../src/preview2/fixtures/home-domains.json';
+import { demoDocument } from './preview2-gc-fixture';
+import { listedSurface, survivingSurface } from '../src/workspace2/selection';
 
 const home = homeDomains.document as unknown as CompositionDocument;
 const index = buildDocumentIndex(home);
@@ -166,5 +168,44 @@ describe('surfaceWordOf and typeGlyph', () => {
     for (const [type, glyph] of Object.entries(typeGlyphs)) expect(typeGlyph(type)).toBe(glyph);
     expect(typeGlyph('unknown-type')).toBe('Component');
     expect([typeGlyph('tab'), typeGlyph('page'), typeGlyph('sheet'), typeGlyph('modal')].every(glyph => glyph !== 'Component')).toBe(true);
+  });
+});
+
+describe('a level as a surface of the Studio (sh.sheet-levels@1)', () => {
+  const doc = demoDocument();
+  const withLevels = buildDocumentIndex(doc);
+  const level = 'level:demo_level_a' as SelectionKey;
+
+  it('lists the rows of a level, names it and takes its words', () => {
+    expect(levelRows(doc, withLevels, level).map(row => row.key)).toEqual(['node:demo_level_a_to_demo_level_b', 'node:demo_level_a_to_demo_plain']);
+    expect(isLevel(withLevels, level)).toBe(true);
+    expect(surfaceWordOf(doc, withLevels, level)).toBe('Level');
+    expect(levelTitle(doc, withLevels, level)).toBe('This Level');
+  });
+
+  it('opens at the level for a node inside it, and the path of a node starts at the level', () => {
+    const node = 'node:demo_level_a_to_demo_level_b' as SelectionKey;
+    expect(openingLevel(withLevels, level, node)).toBe(level);
+    expect(pathTo(doc, withLevels, node).map(crumb => crumb.title)).toEqual(['Demo Level A']);
+    expect(trailTo(withLevels, node)).toEqual([level, node]);
+  });
+
+  it('keeps a level on show while the document holds it, and falls back to its sheet when it is gone', () => {
+    const shown = { kind: 'level' as const, id: 'demo_level_a', sheetId: 'demo_sheet' };
+    expect(survivingSurface(shown, doc)).toBe(shown);
+    const without = { ...doc, levels: doc.levels!.filter(item => item.id !== 'demo_level_a') } as CompositionDocument;
+    expect(survivingSurface(shown, without)).toEqual({ kind: 'modal', id: 'demo_sheet' });
+    expect(survivingSurface({ kind: 'level', id: 'demo_level_a' }, without)).toBeUndefined();
+    expect(survivingSurface({ kind: 'page', id: 'gone' }, doc)).toBeUndefined();
+    expect(survivingSurface({ kind: 'modal', id: 'demo_sheet' }, doc)).toEqual({ kind: 'modal', id: 'demo_sheet' });
+    expect(survivingSurface(undefined, doc)).toBeUndefined();
+  });
+
+  it('stands a level for the sheet it is shown in, in the panels that list pages and sheets', () => {
+    expect(listedSurface({ kind: 'level', id: 'demo_level_b', sheetId: 'demo_sheet' }, doc)).toEqual({ kind: 'modal', id: 'demo_sheet' });
+    expect(listedSurface({ kind: 'level', id: 'demo_level_b' }, doc)).toEqual({ kind: 'modal', id: 'demo_sheet' });
+    expect(listedSurface({ kind: 'level', id: 'nowhere' }, doc)).toBeUndefined();
+    expect(listedSurface({ kind: 'page', id: 'page-home' }, doc)).toEqual({ kind: 'page', id: 'page-home' });
+    expect(listedSurface(undefined, doc)).toBeUndefined();
   });
 });

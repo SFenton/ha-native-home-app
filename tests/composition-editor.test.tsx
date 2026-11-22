@@ -2,10 +2,8 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, request } from '../src/api';
-import {
-  changeFieldVariant, componentLocations, compositionEditorSchema, compositionErrors, compositionSourceText, defaultField, fieldVariants,
-  importCompositionText, moveCompositionNode, removeCompositionItem, reorderCompositionItem,
-} from '../src/composition-editor';
+import { changeFieldVariant, componentLocations, compositionEditorSchema, compositionErrors, compositionSourceText, defaultField, fieldVariants, moveCompositionNode, removeCompositionItem, reorderCompositionItem } from '../src/composition-editor';
+import { importCompositionText } from '../src/workspace2/editors/importDocument';
 import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { CompositionValidationError, MAX_COMPOSITION_ENVELOPE_BYTES } from '../src/shared/composition/json';
 import { createCompositionDocument, createCompositionPage, type CompositionDraft, type UploadedCompositionAsset } from '../src/shared/composition/workspace';

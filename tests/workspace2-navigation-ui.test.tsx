@@ -125,7 +125,7 @@ describe('New Tab and New Sheet', () => {
 });
 
 describe('the Pages overlay', () => {
-  it('lists the groups and ends with Page, Sheet and Tab', () => {
+  it('lists the groups and ends with Page, Sheet and Tab, and on the Sheets list a Level', () => {
     render(<PagesPanel document={base} current={{ kind: 'page', id: 'page-home' }} onPick={vi.fn()}/>);
     const scope = screen.getByRole('group', { name: 'List' });
     expect(within(scope).getAllByRole('button').map(button => button.textContent)).toEqual(['Tabs', 'Pages', 'Sheets', 'Modals']);
@@ -135,7 +135,7 @@ describe('the Pages overlay', () => {
     expect(within(scope).getByRole('button', { name: 'Sheets' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('heading', { name: /Opened From|Not Linked/ })).toBeTruthy();
     const footer = screen.getByRole('contentinfo', { name: 'Add' });
-    expect(within(footer).getAllByRole('button').map(button => button.textContent)).toEqual(['Page', 'Sheet', 'Tab']);
+    expect(within(footer).getAllByRole('button').map(button => button.textContent)).toEqual(['Page', 'Sheet', 'Tab', 'Level']);
   });
 
   it('opens the creation dialogs from the footer, closing itself first', async () => {

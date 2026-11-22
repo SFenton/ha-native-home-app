@@ -187,7 +187,9 @@ describe('the Duo rail', () => {
   it('keeps the title in the header row of a pushed page, beside Back, and takes no menu there either', () => {
     const { container } = mount(withChrome(), duoFolded, { surface: { kind: 'page', id: 'page-security-system' } });
     const header = container.querySelector('.sh-page[data-current] .sh-header')!;
-    expect(labels(header)).toEqual(['Back']);
+    // The header row holds the title alone: Back is the rail's first item.
+    expect(labels(header)).toEqual([]);
+    expect(container.querySelector('.sh-rail-header button[data-leading=back]')).not.toBeNull();
     expect(header.querySelector('.sh-inline-title')?.textContent).toBeTruthy();
     expect(container.querySelector('.sh-large-title')).toBeNull();
   });
@@ -227,7 +229,7 @@ describe('the Duo rail', () => {
 
     it('shows no header group on a page that replaces the toolbar with none, only the tabs', () => {
       const { container } = mount(withChrome(), duoFolded, { surface: { kind: 'page', id: 'page-security-system' } });
-      expect(container.querySelector('.sh-rail-group, .sh-rail-circles')).toBeNull();
+      expect([...container.querySelectorAll('.sh-rail-header button')].map(button => button.getAttribute('aria-label'))).toEqual(['Back']);
       expect(container.querySelectorAll('.sh-rail-bar .sh-tab')).toHaveLength(tabCount);
     });
   });

@@ -39,7 +39,7 @@ it('matches before/after baseline bytes for all 1812 corpus documents/publicatio
   });
   expect(cases).toHaveLength(1812);
   expect(visits).toBeGreaterThan(0);
-  expect(createHash('sha256').update(JSON.stringify(cases)).digest('hex')).toBe('22a3ab90825bd16fcbd697bbdb747cc47eda39cd2dff6f9bb93498d49e7eed2d');
+  expect(createHash('sha256').update(JSON.stringify(cases)).digest('hex')).toBe('31535efe3384d35693ff4bf0e5bd8ea6459a446224fa4a967a902b7f22ea5181');
 }, 30_000);
 
 it('gives both visitor specialisations identical facts and diagnostics for every grammar root in the corpus', () => {

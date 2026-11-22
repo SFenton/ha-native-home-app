@@ -151,16 +151,16 @@ test.describe('the flow editor', () => {
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(props.getByRole('button', { name: /^Step 3, Count/ })).toBeVisible();
   });
-  test('Average is selectable and says it needs a newer app', async ({ page }) => {
+  test('Average is selectable and carries no newer-app warning', async ({ page }) => {
     const panel = await openData(page);
     await panel.getByRole('button', { name: /^Overdue Chores/ }).click();
     const props = page.getByLabel('Properties');
     await props.getByRole('button', { name: 'Add Step' }).click();
-    await page.getByRole('menuitem', { name: 'Average · Needs a newer app', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Average', exact: true }).click();
     await props.getByRole('button', { name: /^Step 3, Average/ }).click();
     const field = props.getByTestId('logic-field').filter({ hasText: 'Average of' });
     await expect(field.getByRole('button', { name: 'Edit in Canvas', exact: true })).toBeVisible();
-    await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toBeVisible();
+    await expect(props.getByText('Needs a newer app. Publishing it waits for an app update.')).toHaveCount(0);
     await props.getByRole('button', { name: 'Cancel' }).click();
   });
 });

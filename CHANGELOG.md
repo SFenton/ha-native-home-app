@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.26
+
+- The Studio can show a sheet's level and edit its tiles, and the simulator's Back steps out of it while editing.
+- The Studio library opens a sheet's level from its row, with Back, the path and Level Settings, on desktop and phone.
+- A tile's Goes to has a Show button that applies the change and shows the page, level, sheet or modal it opens.
+
+## 0.3.25
+
+- The Studio library lists a sheet's levels, moves pages and levels between Pages and Sheets, and groups the Goes to picker.
+
+## 0.3.24
+
+- The preview now shows sheet-to-page pushes, hidden tabs and buttons, the iPad's top tab bar, wide-window opening and the Duo rail's Back and Close as the app does.
+- Pages can hide the tab bar and header buttons for themselves, and choose how they open in a wide window; the Tabs and header buttons panel shows where each is used.
+- Hide on this page now treats the opening page of a document without tabs as its first page.
+
+## 0.3.23
+
+- Maintenance and internal changes.
+
+## 0.3.22
+
+- Maintenance and internal changes.
+
 ## 0.3.21
 
 - Maintenance and internal changes.

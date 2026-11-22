@@ -3,7 +3,7 @@ import { request } from '../api';
 import { useCompositionStudio } from '../useCompositionStudio';
 import { useHouseStates } from '../preview2/useHouseStates';
 import { previewSources } from '../preview2/component-library';
-import { survivingSelection } from './selection';
+import { sheetForLevel, survivingSelection, survivingSurface } from './selection';
 import { buildDocumentIndex, parseSelectionKey, selectionKey, type DocumentIndex, type SelectionKey } from '../preview2/model';
 import { canonicalCompositionJSON } from '../shared/composition/json';
 import type { CompositionDocument } from '../shared/composition/schema';
@@ -34,7 +34,7 @@ export interface ActivityEntry { id: number; text: string }
 export type PanelKind = 'tabs' | 'header' | 'wallpaper' | 'styles';
 /** What the properties surface shows. */
 export type PropertiesTarget =
-  | { kind: 'node' | 'page' | 'modal'; key: SelectionKey; path: (string | number)[] }
+  | { kind: 'node' | 'page' | 'modal' | 'level'; key: SelectionKey; path: (string | number)[] }
   | { kind: PanelKind; key?: SelectionKey }
   /** An area of a tab container (`local-tab` in the index), shown in the inspector with its tabs and rule. */
   | { kind: 'area'; key: SelectionKey; path: (string | number)[] }
@@ -61,6 +61,8 @@ const firstSurface = (document: CompositionDocument): PreviewSurface => {
 export function useWorkspace2(active: boolean) {
   const studio = useCompositionStudio();
   const { document } = studio;
+  const documentRef = useRef(document);
+  documentRef.current = document;
   const index: DocumentIndex | undefined = useMemo(() => document ? buildDocumentIndex(document) : undefined, [document]);
   // Checks run once the edits pause, so a keystroke never waits on them; saving and publishing wait for them (see `useChecks`).
   const scheduled = useChecks(document);
@@ -77,6 +79,8 @@ export function useWorkspace2(active: boolean) {
   const { pick: pickRepeat } = repeats;
 
   const [mode, setMode] = useState<'edit' | 'use'>('edit');
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [surfaceState, setSurfaceState] = useState<PreviewSurface>();
   const [selection, setSelectionState] = useState<SelectionKey>();
   const [panel, setPanel] = useState<PanelKind>();
@@ -96,8 +100,7 @@ export function useWorkspace2(active: boolean) {
   const [statePreview, setStatePreview] = useState<StatePreview>();
   const surface = useMemo<PreviewSurface | undefined>(() => {
     if (!document) return undefined;
-    const exists = surfaceState && (surfaceState.kind === 'page' ? document.pages : document.modals).some(item => item.id === surfaceState.id);
-    return exists ? surfaceState : firstSurface(document);
+    return survivingSurface(surfaceState, document) ?? firstSurface(document);
   }, [document, surfaceState]);
   const select = useCallback((next: SelectionKey | undefined) => { setSelectionState(next); setPanel(undefined); setFlowId(undefined); setLogicId(undefined); setTemplateId(undefined); if (next) { setRevealKey(next); pickRepeat(undefined); } }, [pickRepeat]);
   /** Opens a Data Flow in the inspector; the node selection ends (spec "Selection"). */
@@ -107,7 +110,20 @@ export function useWorkspace2(active: boolean) {
   const openLogic = useCallback((id: string | undefined, from?: { key: SelectionKey; title: string }) => { setSelectionState(undefined); setPanel(undefined); setFlowId(undefined); setTemplateId(undefined); setLogicId(id); setLogicFrom(id ? from : undefined); }, []);
   // A change that removes the selected node (Undo of an add) ends the selection; any other change keeps it.
   useEffect(() => { setSelectionState(held => survivingSelection(held, index)); }, [index]);
-  const changeSurface = useCallback((next: PreviewSurface) => { setSurfaceState(next); }, []);
+  /**
+   * The simulator moved (Use navigation, a tab tap, Back out of a level). In Edit a selection that is no longer drawn ends with it, so no edit lands on a node
+   * nobody can see; a selection still on show (the sheet a Back returned to, a tab) stays.
+   */
+  const changeSurface = useCallback((next: PreviewSurface) => {
+    setSurfaceState(next);
+    if (modeRef.current !== 'edit') return;
+    const shown = new Set<string>([`${next.kind}:${next.id}`, ...(next.kind === 'level' && next.sheetId ? [`modal:${next.sheetId}`] : [])]);
+    setSelectionState(held => {
+      const entry = held ? buildDocumentIndex(documentRef.current!).get(held) : undefined;
+      const home = entry?.kind === 'page' || entry?.kind === 'modal' || entry?.kind === 'level' ? held : entry?.surface;
+      return held && home && !shown.has(home) ? undefined : held;
+    });
+  }, []);
   /** Use keeps a selection made in the library (L-mark: the simulator marks it); it still closes panels such as Tabs and the open Data Flow. */
   const changeMode = useCallback((next: 'edit' | 'use') => { setMode(next); if (next === 'use') { setPanel(undefined); setFlowId(undefined); setLogicId(undefined); } }, []);
 
@@ -129,7 +145,7 @@ export function useWorkspace2(active: boolean) {
     if (!selection || !index) return undefined;
     const entry = index.get(selection);
     if (!entry) return undefined;
-    if (entry.kind === 'node' || entry.kind === 'page' || entry.kind === 'modal') return { kind: entry.kind, key: selection, path: entry.path };
+    if (entry.kind === 'node' || entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'level') return { kind: entry.kind, key: selection, path: entry.path };
     if (entry.kind === 'tab') return { kind: 'tabs', key: selection };
     if (entry.kind === 'local-tab') return { kind: 'area', key: selection, path: entry.path };
     if (entry.kind === 'chrome-group' || entry.kind === 'chrome-item') return { kind: 'header', key: selection };
@@ -276,9 +292,19 @@ export function useWorkspace2(active: boolean) {
     /** Moves the preview to the surface a selection key lives on, then selects it. */
     selectAnywhere: (key: SelectionKey) => {
       const entry = index?.get(key);
-      const owner = entry?.kind === 'page' || entry?.kind === 'modal' ? key : entry?.surface;
+      const owner = entry?.kind === 'page' || entry?.kind === 'modal' || entry?.kind === 'level' ? key : entry?.surface;
       const parsed = owner ? parseSelectionKey(owner) : undefined;
       if (parsed && (parsed.kind === 'page' || parsed.kind === 'modal')) setSurfaceState({ kind: parsed.kind, id: parsed.id });
+      // A level keeps the sheet it is shown in while it stays on show; otherwise the preview picks the sheet that opens it.
+      else if (parsed?.kind === 'level' && document) {
+        // Name the sheet the level is shown in, so a level that is deleted afterwards falls back to its sheet (`survivingSurface`).
+        // The sheet already open wins when it reaches the level, else the first sheet that does.
+        setSurfaceState(held => {
+          if (held?.kind === 'level' && held.id === parsed.id && held.sheetId !== undefined) return held;
+          const sheetId = sheetForLevel(held, document, parsed.id);
+          return { kind: 'level', id: parsed.id, ...(sheetId ? { sheetId } : {}) };
+        });
+      }
       select(key);
     },
     selectionKey,

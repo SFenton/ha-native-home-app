@@ -4,6 +4,8 @@ import type { DocumentIndex, SelectionKey } from '../preview2/model';
 import { typeName, type NodeLike } from './util';
 import { surfaceWord } from './outline';
 import { componentUses } from '../shared/composition/components';
+import { levelStack, type NavSurface } from '../preview2/navigation';
+import { sheetForLevel } from './selection';
 
 /** The name of a saved component. */
 const componentName = (document: CompositionDocument, id: string | undefined) => document.componentLibrary?.find(entry => entry.id === id)?.name;
@@ -95,7 +97,7 @@ export function areaWords(document: CompositionDocument, index: DocumentIndex, k
 export function isLevel(index: DocumentIndex, key: SelectionKey): boolean {
   const entry = index.get(key);
   if (!entry) return false;
-  if (entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'local-tab') return true;
+  if (entry.kind === 'page' || entry.kind === 'modal' || entry.kind === 'level' || entry.kind === 'local-tab') return true;
   return Boolean(entry.node && childSlots(entry.node).length);
 }
 
@@ -138,10 +140,10 @@ export function levelRows(document: CompositionDocument, index: DocumentIndex, l
   return rows;
 }
 
-/** The page or sheet a key sits on. */
+/** The page, sheet or level a key sits on. */
 const surfaceOf = (index: DocumentIndex, key: SelectionKey): SelectionKey | undefined => {
   const entry = index.get(key);
-  return entry?.kind === 'page' || entry?.kind === 'modal' ? key : entry?.surface;
+  return entry?.kind === 'page' || entry?.kind === 'modal' || entry?.kind === 'level' ? key : entry?.surface;
 };
 
 /**
@@ -152,6 +154,18 @@ export function pathTo(document: CompositionDocument, index: DocumentIndex, leve
   const above = index.ancestors(level);
   const keys = above.length ? above : surfaceOf(index, level) ? [surfaceOf(index, level)!] : [];
   return keys.map(key => ({ key, title: levelName(document, index, key) }));
+}
+
+/**
+ * The places a level is reached through, outermost first: the sheet it is shown in (the one `shown` names, else the one on show that reaches it, else the first that does) and then the
+ * levels between the sheet and it ("Lights", "Demo Room 1"). Empty for a level no sheet opens. The library's header, the phone sheet and the inspector write it as the path.
+ */
+export function levelCrumbs(document: CompositionDocument, shown: NavSurface | undefined, levelId: string): Crumb[] {
+  const sheetId = sheetForLevel(shown, document, levelId);
+  const sheet = sheetId === undefined ? undefined : document.modals.find(modal => modal.id === sheetId);
+  if (!sheet) return [];
+  const between = (levelStack(document, sheet.id, levelId) ?? [levelId]).slice(0, -1);
+  return [{ key: `modal:${sheet.id}` as SelectionKey, title: sheet.title }, ...between.map(id => ({ key: `level:${id}` as SelectionKey, title: document.levels?.find(level => level.id === id)?.title ?? id }))];
 }
 
 /** The levels from the page down to `level`, inclusive: the stack the sheet has pushed. */
@@ -181,16 +195,17 @@ export function openingLevel(index: DocumentIndex, root: SelectionKey, selection
   return entry.parent;
 }
 
-/** The word for a surface in copy: "Page", "Sheet" or "Modal" (see {@link surfaceWord}); empty for a node. */
+/** The word for a surface in copy: "Page", "Sheet", "Modal" or "Level" (see {@link surfaceWord}); empty for a node. */
 export function surfaceWordOf(document: CompositionDocument, index: DocumentIndex, key: SelectionKey): string {
   const entry = index.get(key);
   if (entry?.kind === 'page') return 'Page';
+  if (entry?.kind === 'level') return 'Level';
   if (entry?.kind !== 'modal') return '';
   const modal = document.modals[Number(entry.path[1])];
   return modal ? surfaceWord(modal) : 'Sheet';
 }
 
-/** The text a level's title shows: "This Page", "This Sheet" or "This Modal" at the root, else the name of the container. */
+/** The text a level's title shows: "This Page", "This Sheet", "This Modal" or "This Level" at the root, else the name of the container. */
 export function levelTitle(document: CompositionDocument, index: DocumentIndex, level: SelectionKey): string {
   const word = surfaceWordOf(document, index, level);
   return word ? `This ${word}` : levelName(document, index, level);
