@@ -28,7 +28,8 @@ import ActionRules, { ActionModeSwitch } from '../expr/ActionRules';
 import { useLogicFields } from '../logic-fields/LogicFields';
 import { DraftField } from '../logic-fields/AddressedField';
 import { linkResult } from '../navigation/chromeRules';
-import { goesToChoices, goesToValue, parseGoesTo } from './goesTo';
+import { goesToChoices, goesToTitle, goesToValue, parseGoesTo, showTarget } from './goesTo';
+import { useFinishEditor, useSurfaceActions } from './surfaceActions';
 
 // MARK: Value rows
 
@@ -154,6 +155,19 @@ function ResultLine({ doc, path, kind, id }: { doc: CompositionDocument; path: E
   return <p className="w2-caption w2-link-result" data-link-result role="note"><strong>{result.lead}</strong>{result.rest && ` ${result.rest}`}</p>;
 }
 
+/**
+ * "Show `<Name>`" under a link's result line (proposal `build/design/studio-levels/proposal.md`, "Goes to"): it applies the editor's change as Done does, then shows the destination in the
+ * simulator and the library with nothing selected. Not drawn while the pick names nothing the document has, or outside the workspace where there is no simulator.
+ */
+function ShowButton({ doc, path, value }: { doc: CompositionDocument; path: EditorPath; value: string }) {
+  const surfaces = useSurfaceActions(), finish = useFinishEditor();
+  // Done's own answer for the live draft: while it refuses, so does this button, with the same reason.
+  const problem = finish?.blocked?.(doc);
+  const name = goesToTitle(doc, value), target = showTarget(doc, path, value, surfaces?.current);
+  if (!surfaces || !finish || !target) return null;
+  return <button type="button" className="w2-show-destination" data-show-destination disabled={Boolean(problem)} title={problem} onClick={() => finish.run(() => surfaces.show(target))}>{`Show ${name}`}</button>;
+}
+
 /** Props shared by the action editor's body and its row. */
 export interface ActionEditorProps {
   /** The path of the action field in the document. */
@@ -213,9 +227,11 @@ export function ActionBody({ draft, path, schema, optional, boundSourceId, itemN
       <ChoiceField label="Goes to" choices={goesToChoices(doc, path, goesToValue(doc, action)).map(choice => ({ id: choice.id, label: choice.label, group: choice.group }))} value={goesToValue(doc, action)} onPick={pickGoesTo}
         creates={[...(onCreatePage ? [{ label: 'New Page…', run: (done: (id: string) => void) => adopt(onCreatePage, 'pages')(id => done(`page:${id}`)) }] : []), ...(onCreateSheet ? [{ label: 'New Sheet…', run: (done: (id: string) => void) => adopt(onCreateSheet, 'modals')(id => done(`modal:${id}`)) }] : [])]}/>
       <ResultLine doc={doc} path={path} kind={kind === 'push' ? 'page' : 'modal'} id={kind === 'push' ? action.pageId : action.modalId}/>
+      <ShowButton doc={doc} path={path} value={goesToValue(doc, action)}/>
     </>}
     {kind === 'dismiss-then-push' && action && <ChoiceField label="Page" choices={pages} value={action.destination?.pageId} onPick={id => withDraftValue({ destination: { ...action.destination, pageId: id } })} create={onCreatePage ? { label: 'New Page…', run: adopt(onCreatePage, 'pages') } : undefined}/>}
     {kind === 'dismiss-then-push' && action && <ResultLine doc={doc} path={path} kind="page" id={action.destination?.pageId}/>}
+    {kind === 'dismiss-then-push' && action && action.destination?.pageId && <ShowButton doc={doc} path={path} value={`page:${action.destination.pageId}`}/>}
     {kind === 'present' && action && <>
       {present && <div className="w2-field-row"><span className="w2-field-label">If a sheet is already open</span><div className="w2-segment w2-field-control" role="group" aria-label="If a sheet is already open">
         {(['reject', 'replace'] as const).map(value => <button type="button" key={value} aria-pressed={action.ifPresented === value} onClick={() => withDraftValue({ ifPresented: value })}>{value === 'reject' ? 'Do nothing' : 'Replace it'}</button>)}</div></div>}

@@ -108,7 +108,7 @@ export function summarize(document: CompositionDocument, name: string, value: Js
   if (name === 'action' || /Action$/.test(name)) {
     const action = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : undefined;
     if (!action) return 'Nothing';
-    const page = (id: Json) => document.pages.find(item => item.id === id)?.title ?? String(id);
+    const page = (id: Json) => document.pages.find(item => item.id === id)?.title ?? (document.levels ?? []).find(item => item.id === id)?.title ?? String(id);
     switch (action.type) {
       case 'push': return `Opens ${page(action.pageId)}`;
       case 'dismiss-then-push': return `Opens ${page((action.destination as Record<string, Json>)?.pageId)}`;

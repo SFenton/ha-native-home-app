@@ -28,3 +28,7 @@
 @media (pointer: coarse) { .w2-pages .w2-group-title .w2-group-button { min-height: 44px; min-width: 44px; } }
 .w2-wide-label { width: auto !important; flex: 1 !important; }
 .w2-link-row > span:first-child { flex: 1; text-align: start; }
+.w2-show-destination { align-self: flex-start; min-height: 36px; margin: 0 0 4px; }
+@media (pointer: coarse) { .w2-show-destination { min-height: 44px; } }
+/* A shown surface takes focus as a landing point after "Show"; it is not a control, so it draws no ring. */
+.sh-sheet:focus-visible, .sh-page:focus-visible { outline: none; }

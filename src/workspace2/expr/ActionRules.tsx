@@ -6,6 +6,7 @@ import type { Json } from '../../shared/types';
 import { kindWords, kindOf } from '../editors/action';
 import { useDraftDocument, type Draft } from '../editors/draft';
 import { usePush } from '../kit';
+import { FinishEditorContext, useFinishEditor } from '../editors/surfaceActions';
 import ConditionEditor from './ConditionEditor';
 import { sentence } from './condition';
 import { useNameContext } from './useExpr';
@@ -51,10 +52,10 @@ function CasePage({ draft, path, index, schema, itemName, action }: { draft: Dra
  * runs one or does nothing. `action` draws the action editor for one case, so a rule's Then is the same editor as One Action.
  */
 export default function ActionRules({ draft, path, schema, itemName, action }: { draft: Draft; path: EditorPath; schema: SchemaField; itemName: string; action: (draft: Draft, path: EditorPath, schema: SchemaField, itemName: string) => ReactNode }) {
-  const document = useDraftDocument(draft), push = usePush(), ctx = useNameContext(document);
+  const document = useDraftDocument(draft), push = usePush(), ctx = useNameContext(document), finish = useFinishEditor();
   const rule = valueAt(document, path) as ByRule | undefined, then = caseSchema(schema);
   if (!rule || !then) return null;
-  const open = (index: number | 'otherwise') => push?.push({ title: index === 'otherwise' ? words.otherwise : `Rule ${index + 1}`, body: <CasePage draft={draft} path={path} index={index} schema={then} itemName={itemName} action={action}/> });
+  const open = (index: number | 'otherwise') => push?.push({ title: index === 'otherwise' ? words.otherwise : `Rule ${index + 1}`, body: <FinishEditorContext.Provider value={finish}><CasePage draft={draft} path={path} index={index} schema={then} itemName={itemName} action={action}/></FinishEditorContext.Provider> });
   const add = () => {
     draft.set(rebuildField(draft.get(), path, { ...rule, cases: [...rule.cases, { then: copySubtree(rule.cases.at(-1)?.then ?? { type: 'back' }) }] }));
     open(rule.cases.length);

@@ -5,6 +5,7 @@ import type { CompositionDocument } from '../../shared/composition/schema';
 import { Modal, PushStack, useNarrow, usePush } from '../kit';
 import { createDraft, openDraft, recordStep, useDiscardPrompt, useDraftDocument, type Draft } from './draft';
 import { useWorkspaceData } from '../pickers/WorkspaceData';
+import { FinishEditorContext } from './surfaceActions';
 import '../pickers/pickers.css';
 
 /** The narrow properties sheet goes to full height while an editor is pushed, and back to half after (spec 5.5). */
@@ -70,14 +71,17 @@ export default function EditorRow({ label, summary, itemName, document, onApply,
     closeDraft.current = openDraft(draft);
     if (push) {
       if (narrow) snapSheet('full');
-      const leave = () => { release(); push.pop(); if (narrow) snapSheet('half'); };
-      const done = () => { if (blocked?.(draft.get())) return; if (draft.dirty()) finish(draft); leave(); };
+      const base = push.depth;
+      /** Back to where the editor was opened: a rule's page pushed over the editor goes with it. */
+      const leave = () => { release(); push.popTo(base); if (narrow) snapSheet('half'); };
+      const done = (then?: () => void) => { if (blocked?.(draft.get())) return; if (draft.dirty()) finish(draft); leave(); then?.(); };
       const removal = remove ? { label: remove.label, run: () => { remove.run(draft); finish(draft); leave(); } } : undefined;
-      const body = <PushedEditor draft={draft} inline={!narrow} onDiscard={leave} remove={removal}>{children(draft)}</PushedEditor>;
-      push.push({ title, body, done: <DoneButton draft={draft} blocked={blocked} onDone={done}/>, guard: () => { const ok = draft.tryLeave(); if (ok) { release(); if (narrow) snapSheet('half'); } return ok; } });
+      const body = <FinishEditorContext.Provider value={{ run: done, blocked }}><PushedEditor draft={draft} inline={!narrow} onDiscard={leave} remove={removal}>{children(draft)}</PushedEditor></FinishEditorContext.Provider>;
+      push.push({ title, body, done: <DoneButton draft={draft} blocked={blocked} onDone={() => done()}/>, guard: () => { const ok = draft.tryLeave(); if (ok) { release(); if (narrow) snapSheet('half'); } return ok; } });
     } else setWide(draft);
   };
   const close = () => { release(); setWide(undefined); };
+  const finishWide = (draft: Draft) => (then?: () => void) => { if (blocked?.(draft.get())) return; if (draft.dirty()) finish(draft); close(); then?.(); };
   return <>
     {head ? head(start) : <button type="button" className="w2-disclosure-head" data-disclosure={path} data-field-path={path} onClick={start}><span className="w2-row-label">{label}</span><span className="w2-summary">{summary}</span>{tag}<ChevronRight size={16} aria-hidden/></button>}
     {wide && <Dialog.Root open onOpenChange={next => { if (!next && wide.tryLeave()) close(); }}>
@@ -86,7 +90,7 @@ export default function EditorRow({ label, summary, itemName, document, onApply,
           <Dialog.Close className="w2-icon-button" aria-label="Close"><X size={18} aria-hidden/></Dialog.Close>
           <Dialog.Title>{title}</Dialog.Title><span className="w2-editor-item">{itemName}</span>
         </header>
-        <div className="w2-dialog-body w2-editor-body"><PushStack rootTitle={title} root={children(wide)}/></div>
+        <div className="w2-dialog-body w2-editor-body"><FinishEditorContext.Provider value={{ run: finishWide(wide), blocked }}><PushStack rootTitle={title} root={children(wide)}/></FinishEditorContext.Provider></div>
         <footer className="w2-dialog-foot w2-editor-foot">
           {remove && <button type="button" className="w2-editor-remove" onClick={() => { remove.run(wide); finish(wide); close(); }}>{remove.label}</button>}
           <button type="button" onClick={() => { if (wide.tryLeave()) close(); }}>Cancel</button>
