@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.26
+
+- The Studio can show a sheet's level and edit its tiles, and the simulator's Back steps out of it while editing.
+- The Studio library opens a sheet's level from its row, with Back, the path and Level Settings, on desktop and phone.
+- A tile's Goes to has a Show button that applies the change and shows the page, level, sheet or modal it opens.
+
 ## 0.3.25
 
 - The Studio library lists a sheet's levels, moves pages and levels between Pages and Sheets, and groups the Goes to picker.
