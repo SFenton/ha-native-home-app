@@ -275,7 +275,7 @@ export function componentLocations(document: CompositionDocument, library = fals
     result.push({ node, path: at, parent });
     for (const slot of childSlots(node)) visit(slot.nodes, [...at, ...slot.path], slot.parent);
   });
-  for (const kind of ['pages', 'modals'] as const) document[kind].forEach((surface, index) => visit(surface.components, [kind, index, 'components'], surface.id));
+  for (const kind of ['pages', 'modals', 'levels'] as const) (document[kind] ?? []).forEach((surface, index) => visit(surface.components, [kind, index, 'components'], surface.id));
   if (library) document.componentLibrary?.forEach((entry, index) => visit([entry.node], ['componentLibrary', index, 'node'], `component:${entry.id}`));
   return result;
 }
@@ -289,7 +289,7 @@ export function moveCompositionNode(document: CompositionDocument, id: string, p
   const siblings = valueAt(next, entry.path.slice(0, -1));
   if (!Array.isArray(siblings)) throw new Error('Component parent is unavailable');
   siblings.splice(Number(entry.path.at(-1)), 1);
-  const surface = parent.kind === 'surface' ? [...next.pages, ...next.modals].find(surface => surface.id === parent.id) : undefined;
+  const surface = parent.kind === 'surface' ? [...next.pages, ...next.modals, ...(next.levels ?? [])].find(surface => surface.id === parent.id) : undefined;
   const container = parent.kind !== 'surface' ? componentLocations(next).find(item => item.node.id === parent.id)?.node : undefined;
   const children = surface?.components ?? (container?.type === 'tile-grid' || container?.type === 'section' || container?.type === 'status-rail' || container?.type === 'room-section' || container?.type === 'stack' || container?.type === 'repeat' ? container.children
     : container?.type === 'local-tabs' ? (container.blocks ? container.blocks.find(block => block.id === parent.tabId)?.children : container.tabs.find(tab => tab.id === parent.tabId)?.children)

@@ -37,8 +37,9 @@ describe('a push from a sheet (proposal section 3)', () => {
     expect(tabStack(document, inside)).toEqual(['page-home']);
     expect(inside.sheets[0].pages).toEqual(['demo_level_a']);
     expect(inside.motion).toBe('push');
-    // A level is part of its sheet: the shell is told the sheet is showing.
-    expect(currentSurface(document, inside)).toEqual({ kind: 'modal', id: 'demo_sheet' });
+    // A level is a surface the shell is told about, with the sheet it is shown in.
+    expect(currentSurface(document, inside)).toEqual({ kind: 'level', id: 'demo_level_a', sheetId: 'demo_sheet' });
+    expect(currentSurface(document, run(inside, { type: 'back' }))).toEqual({ kind: 'modal', id: 'demo_sheet' });
     expect(run(inside, { type: 'back' }).sheets[0].pages).toEqual([]);
     expect(run(inside, { type: 'dismiss', scope: 'current-modal' }).sheets).toEqual([]);
     expect(run(inside, push('demo_level_a'))).toBe(inside);

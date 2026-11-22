@@ -13,6 +13,7 @@ import LibraryRow, { type TreeItem } from './LibraryRow';
 import { categoryInfo } from './LibraryRail';
 import { isOverlayLevel, levelName, levelRows, OVERLAY_SLOT, pathTo, searchLevel, type Crumb } from './levels';
 import { moveTab, tabRoom } from './navigation/edit';
+import type { NavSurface } from '../preview2/navigation';
 import { flatRows, levelOwners, libraryGroups, matchGroups, surfaceWord, type LibraryRow as ListRow, type SurfaceRef } from './outline';
 import { isPending, NEWER_APP_WORDS, SHEET_LEVELS_CAPABILITY } from './navigation/chromeRules';
 import { NodeMenu, NodeMenuItems } from './PropertiesPanel';
@@ -89,7 +90,7 @@ export default function LibraryTree({ ws, category, library, trailApi, onCategor
   useEffect(() => { void listIcons.load(); }, []);
   useEffect(() => { listIcons.prune(index); }, [index]);
   const info = categoryInfo[category];
-  const surfaceKey = (surface: SurfaceRef) => selectionKey(surface.kind, surface.id);
+  const surfaceKey = (surface: SurfaceRef | NavSurface) => selectionKey(surface.kind, surface.id);
 
   // --- What is drawn -----------------------------------------------------------------------------------------
   const groups = useMemo(() => libraryGroups(document, category), [document, category]);

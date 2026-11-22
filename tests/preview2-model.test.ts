@@ -7,6 +7,7 @@ import { compileCompositionDocument } from '../src/shared/composition/compiler';
 import { compositionChildren, type CompositionDocument, type CompositionNode } from '../src/shared/composition/schema';
 import { buildDocumentIndex, isHiddenNode, parseSelectionKey, selectionKey, type SelectionKey } from '../src/preview2/model';
 import homeDomains from '../src/preview2/fixtures/home-domains.json';
+import { demoDocument } from './preview2-gc-fixture';
 
 const corpus = path.resolve(__dirname, '../contract/corpus/accept');
 const corpusDocuments = readdirSync(corpus).filter(name => name.endsWith('.json'))
@@ -209,5 +210,30 @@ describe('replaceAt structural sharing', () => {
     console.log('replaceAt measurement', JSON.stringify(result));
     expect(result.stableBefore).toBe(0);
     expect(result.stableAfter).toBeGreaterThan(total - 8);
+  });
+});
+
+describe('levels in the index (sh.sheet-levels@1)', () => {
+  const document = demoDocument();
+  const index = buildDocumentIndex(document);
+
+  it('holds each level as a surface of its own, at its path in levels[]', () => {
+    expect(index.get('level:demo_level_a')).toMatchObject({ kind: 'level', id: 'demo_level_a', path: ['levels', 0] });
+    expect(index.get('level:demo_level_b')?.path).toEqual(['levels', 1]);
+    expect(index.pathOf('level:demo_level_b')).toEqual(['levels', 1]);
+    expect(index.keyAt(['levels', 1])).toBe('level:demo_level_b');
+  });
+
+  it('gives a node inside a level the level as its surface and its ancestor', () => {
+    const tile = index.get('node:demo_level_a_to_demo_level_b')!;
+    expect(tile).toMatchObject({ kind: 'node', surface: 'level:demo_level_a', parent: 'level:demo_level_a', path: ['levels', 0, 'components', 0] });
+    expect(index.ancestors('node:demo_level_a_to_demo_level_b')).toEqual(['level:demo_level_a']);
+    expect(index.children('level:demo_level_a')).toEqual(['node:demo_level_a_to_demo_level_b', 'node:demo_level_a_to_demo_plain']);
+    expect(index.keyAt(['levels', 0, 'components', 1])).toBe('node:demo_level_a_to_demo_plain');
+  });
+
+  it('indexes a document without levels exactly as before', () => {
+    const { levels: _levels, ...plain } = document;
+    expect(buildDocumentIndex(plain as CompositionDocument).keys.some(key => key.startsWith('level:'))).toBe(false);
   });
 });

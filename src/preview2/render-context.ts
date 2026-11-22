@@ -11,6 +11,7 @@ import { useLiveRender } from './live-binding';
 import type { LiveHouse } from './live-house';
 import type { WindowFold } from './fold';
 import type { ItemScope, UseRecords } from './flow-records';
+import type { NavAction } from './navigation';
 
 /** A state the Studio forces on one state tile while it is selected: a state of the style, or a phase of the tap that follows. */
 export interface StatePreview { nodeId: string; state: string; phase?: 'sending' | 'failed' }
@@ -27,6 +28,8 @@ export interface RenderContext {
   local(stateId: string): LocalValue | undefined;
   /** Runs an action in Use mode; a no-op in Edit. `control` is the new value of the control that sent it; `scope` is the cell of a repeat the action is in; `sender` is the leading column of a split, so a push from it cuts the trailing column first. */
   run(action: CompositionActionSlot, control?: Json, scope?: ItemScope, controlValues?: Record<string, Json>, sender?: string): void;
+  /** Applies a navigation action in either mode. Edit uses it for the one step it keeps live, Back out of a level; `run` stays a no-op there. */
+  navigate?(action: NavAction): void;
   store: SelectionStore;
   /** The document's state style library, which `state-tile` nodes apply by id. */
   stateStyles?: StateStyleLibrary;

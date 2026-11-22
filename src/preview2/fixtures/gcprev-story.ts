@@ -30,7 +30,7 @@ export interface DemoPageOptions {
  * The story the harness draws for `fixture=gcprev`, and the unit tests' document: the demo document of the global-chrome rules: the fixture's tabs and sheets, plus made-up pages (`demo_*`) and levels. The app's header holds the
  * shell menu, three buttons (`demo_btn_always`, `demo_btn_first` which shows on the first page only, `demo_btn_hidden`; leading) and the Quick Links and Profile pair (trailing).
  * Pages: `demo_settings` (a columns page), `demo_vacation`, `demo_trip`, `demo_plain` (a plain page), `demo_full` and `demo_beside` (set to Full width and Beside), `demo_hides` (hides the tabs and `demo_btn_hidden`).
- * `page-security` (a tab's first page) opens pages beside itself. Levels of the sheet `demo_sheet`: `demo_level_a`, `demo_level_b`.
+ * `page-security` (a tab's first page) opens pages beside itself. Levels of the sheet `demo_sheet`: `demo_level_a`, `demo_level_b`. `demo_level_alone` is a level no sheet opens: the Studio draws it alone.
  */
 export function demoDocument(options: Partial<Record<string, DemoPageOptions>> = {}, extra: Partial<CompositionDocument['navigation']> = {}): CompositionDocument {
   const { presentation: _presentation, ...surface } = base.modals[0];
@@ -71,7 +71,7 @@ export function demoDocument(options: Partial<Record<string, DemoPageOptions>> =
   ];
   return {
     ...base, pages: pages as CompositionDocument['pages'], modals: [...base.modals, modal] as CompositionDocument['modals'],
-    levels: [level('demo_level_a', 'Demo Level A'), level('demo_level_b', 'Demo Level B')] as unknown as CompositionDocument['levels'],
+    levels: [level('demo_level_a', 'Demo Level A'), level('demo_level_b', 'Demo Level B'), { ...level('demo_level_alone', 'Demo Level Alone'), components: pushes('demo_level_alone', 'demo_plain') }] as unknown as CompositionDocument['levels'],
     navigation: { ...base.navigation, chrome: { groups } as CompositionDocument['navigation']['chrome'], ...extra },
   };
 }

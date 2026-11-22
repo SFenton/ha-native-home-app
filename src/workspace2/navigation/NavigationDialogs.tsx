@@ -3,6 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Field, IconField } from '../../ui';
 import { Modal } from '../kit';
 import type { SurfaceRef } from '../outline';
+import { listedSurface } from '../selection';
 import type { Workspace2 } from '../useWorkspace2';
 import { FIRST_LEVEL_WORDS, firstLevelTitle, moveToSheets, addLevel, addPage, addSheet, addTab, deleteLevel, deleteSurface, levelOpenerCount, openerCount, renameLevel, renameSurface, tabRoom } from './edit';
 import { listenForNavigation, type CreatePageOptions, type CreateSheetOptions, type NavigationRequest } from './controller';
@@ -24,7 +25,7 @@ function Footer({ form, onCancel, disabled, action = 'Create' }: { form: string;
 function NewPage({ ws, options, onDone }: { ws: Workspace2; options: CreatePageOptions; onDone: Resolve }) {
   const form = useId();
   const document = ws.document!;
-  const current = ws.surface;
+  const current = listedSurface(ws.surface, document);
   const initial = options.from === 'none' ? 'none' : options.from && options.from !== 'current' ? refValue(options.from) : current ? refValue(current) : 'none';
   const [name, setName] = useState(''), [from, setFrom] = useState(initial);
   const submit = (event: FormEvent) => {

@@ -84,7 +84,7 @@ export function PageBody({ surface, largeTitle, scrollToTop = 0, sides = false }
     '--gap': `${points(layout.spacing, 12)}px`, maxWidth: layout.maxWidth.type === 'points' && !geometry ? layout.maxWidth.value : undefined,
     ...(geometry ? { '--fold-lead': `${geometry.leading}px`, '--fold-band': `${geometry.band}px`, '--fold-trail': `${geometry.trailing}px` } : {}),
   } as CSSProperties;
-  const owner = `${'presentation' in surface ? 'modal' : 'page'}:${surface.id}` as const;
+  const owner = `${'presentation' in surface ? 'modal' : 'navigation' in surface ? 'page' : 'level'}:${surface.id}` as const;
   const inSide = (side: 'span' | 'leading' | 'trailing') => flow.filter(node => grouped?.sides.get(node.id) === side);
   const topNodes = inSide('span');
   const body = grouped

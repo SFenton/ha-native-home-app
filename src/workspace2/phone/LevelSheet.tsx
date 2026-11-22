@@ -72,7 +72,8 @@ function LevelPage({ ws, level, trail, direction, onEnter, onJump, onBack, onDon
         <button type="button" className="w2-level-add" onClick={() => addArea(false)}><Plus size={16} aria-hidden/>Tab Area</button>
       </> : <button type="button" className="w2-primary w2-level-add" disabled={!add || !destination || !add.accepts(destination)}
         onClick={() => { if (!add || !destination) return; onLeave(); add.open(destination); }}><Plus size={16} aria-hidden/>Add Here</button>}
-      <button type="button" className="w2-level-settings" onClick={() => { ws.select(settingsKey); onLeave(); }}>{settings}</button>
+      {/* A level has no settings to open yet (Level Settings is the library's): no button at its root rather than one that names the wrong thing. */}
+      {settingsEntry?.kind !== 'level' && <button type="button" className="w2-level-settings" onClick={() => { ws.select(settingsKey); onLeave(); }}>{settings}</button>}
     </footer>
   </>;
 }

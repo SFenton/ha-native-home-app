@@ -1,9 +1,15 @@
 import type { CompositionAction, CompositionDocument } from '../shared/composition/schema';
 
-/** The page or sheet the preview shows. Same shape as `PreviewSurface` in the contract. */
-export interface NavSurface { kind: 'page' | 'modal'; id: string }
-/** One presented sheet and the pages pushed inside it (its root is the modal itself). */
-export interface SheetFrame { modalId: string; pages: readonly string[] }
+/**
+ * The page, sheet or level the preview shows. A level is shown inside a sheet: `sheetId` names the one it is shown in. Absent, the sheet already on
+ * show decides when it reaches the level, else the first sheet that does, else no sheet and the level is drawn alone.
+ */
+export type NavSurface = { kind: 'page' | 'modal'; id: string } | { kind: 'level'; id: string; sheetId?: string };
+/**
+ * One presented sheet and the pages and levels pushed inside it (its root is the modal itself). A level no sheet opens is drawn `alone`: `modalId`
+ * is then the level's own id, there is no modal behind it and it has Close and no Back.
+ */
+export interface SheetFrame { modalId: string; pages: readonly string[]; alone?: boolean }
 /**
  * Where the preview is. Each tab keeps its own stack of page ids (root first); sheets are drawn over the page beneath.
  * `motion` says how the last change should move: a push slides in, a pop slides out, anything else cuts.
@@ -31,8 +37,10 @@ const hasPage = (document: CompositionDocument, id: string) => document.pages.so
 const hasModal = (document: CompositionDocument, id: string) => document.modals.some(modal => modal.id === id);
 /** Whether `id` is a level of a sheet (`levels[]`, `sh.sheet-levels@1`): a surface a push inside a sheet reaches without leaving it. */
 export const isLevel = (document: CompositionDocument, id: string) => document.levels?.some(level => level.id === id) ?? false;
-const same = (a: NavSurface | undefined, b: NavSurface | undefined) => a?.kind === b?.kind && a?.id === b?.id;
-/** Whether two surfaces are the same page or sheet. */
+const same = (a: NavSurface | undefined, b: NavSurface | undefined) => a?.kind === b?.kind && a?.id === b?.id
+  // A level named without its sheet stands for the level wherever it is shown.
+  && (a?.kind !== 'level' || b?.kind !== 'level' || a.sheetId === undefined || b.sheetId === undefined || a.sheetId === b.sheetId);
+/** Whether two surfaces are the same page, sheet or level. */
 export const sameSurface = same;
 
 /** The first page the document opens: the initial tab's root, else `initialPageId`. */
@@ -48,11 +56,14 @@ export const tabStack = (document: CompositionDocument, state: NavState): readon
   state.stacks[rootKey(state.tabId)] ?? [document.navigation.initialPageId];
 /** The page beneath any sheets: the top of the selected tab's stack. */
 export const basePageId = (document: CompositionDocument, state: NavState): string => tabStack(document, state).at(-1) ?? document.navigation.initialPageId;
-/** What is on top now: the top sheet (or a page pushed inside it), else the top page. */
+/** What is on top now: the top sheet (or a page or level pushed inside it), else the top page. A level reports the sheet it is shown in. */
 export function currentSurface(document: CompositionDocument, state: NavState): NavSurface {
   const sheet = state.sheets.at(-1);
-  // A level is part of its sheet: the shell has no page to show for it, so it reports the sheet.
-  if (sheet) return sheet.pages.length && !isLevel(document, sheet.pages.at(-1)!) ? { kind: 'page', id: sheet.pages.at(-1)! } : { kind: 'modal', id: sheet.modalId };
+  if (sheet) {
+    const top = sheet.pages.at(-1) ?? (sheet.alone ? sheet.modalId : undefined);
+    if (top !== undefined && isLevel(document, top)) return sheet.alone ? { kind: 'level', id: top } : { kind: 'level', id: top, sheetId: sheet.modalId };
+    return top !== undefined ? { kind: 'page', id: top } : { kind: 'modal', id: sheet.modalId };
+  }
   return { kind: 'page', id: basePageId(document, state) };
 }
 
@@ -154,10 +165,74 @@ export function navigateTo(document: CompositionDocument, state: NavState, surfa
     const stack = tabStack(document, state);
     return { ...state, stacks: withStack(state, [stack[0], surface.id].filter((id, i, all) => all.indexOf(id) === i)), sheets: [], motion: 'none', emptyBase: false };
   }
+  if (surface.kind === 'level') {
+    if (!isLevel(document, surface.id)) return state;
+    const modalId = sheetOfLevel(document, state, surface.id, surface.sheetId);
+    // A level no sheet opens is drawn alone, over the dimmed empty page.
+    if (modalId === undefined) return { ...state, sheets: [{ modalId: surface.id, pages: [], alone: true }], motion: 'none', emptyBase: true };
+    const open = state.sheets.length === 1 && state.sheets[0].modalId === modalId && !state.sheets[0].alone ? state.sheets[0] : undefined;
+    const pages = stackToLevel(document, open?.pages, modalId, surface.id)!;
+    // The sheet already open keeps the page under it, so Back and Close return to where the person was.
+    const under = open ? { ...state, sheets: [] } : navigateTo(document, state, { kind: 'modal', id: modalId });
+    return { ...under, sheets: [{ modalId, pages }], motion: 'none', emptyBase: under.emptyBase };
+  }
   if (!hasModal(document, surface.id)) return state;
   const presenter = presenterOf(document, surface.id);
   const base = presenter ? navigateTo(document, state, { kind: 'page', id: presenter }) : { ...state, sheets: [] };
   return { ...base, sheets: [{ modalId: surface.id, pages: [] }], motion: 'none', emptyBase: !presenter };
+}
+
+/** The levels `surface` pushes to, in document order, anywhere in its own content. */
+function levelsPushedBy(document: CompositionDocument, surface: unknown): string[] {
+  const found: string[] = [];
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    const record = value as Record<string, unknown>;
+    if (record.type === 'push' && typeof record.pageId === 'string' && isLevel(document, record.pageId) && !found.includes(record.pageId)) found.push(record.pageId);
+    Object.values(record).forEach(visit);
+  };
+  visit(surface);
+  return found;
+}
+/**
+ * The shortest chain of levels from `from` (a sheet, or a level already open in it) to `target`, each reached by a `push` of the one before; empty when
+ * `from` is the target, undefined when no chain reaches it.
+ */
+function levelChain(document: CompositionDocument, from: { modalId: string } | { levelId: string }, target: string): string[] | undefined {
+  const start = 'levelId' in from ? document.levels?.find(level => level.id === from.levelId) : document.modals.find(modal => modal.id === from.modalId);
+  if (!start) return undefined;
+  if ('levelId' in from && from.levelId === target) return [];
+  const queue: { chain: string[]; surface: unknown }[] = [{ chain: [], surface: start }];
+  const seen = new Set<string>('levelId' in from ? [from.levelId] : []);
+  for (let at = 0; at < queue.length; at += 1) {
+    for (const next of levelsPushedBy(document, queue[at].surface)) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      const chain = [...queue[at].chain, next];
+      if (next === target) return chain;
+      queue.push({ chain, surface: document.levels!.find(level => level.id === next) });
+    }
+  }
+  return undefined;
+}
+/** The levels the sheet opens when it shows `target`: the way the person came when the sheet is open and a link reaches `target` from it, else the shortest chain. */
+function stackToLevel(document: CompositionDocument, open: readonly string[] | undefined, modalId: string, target: string): string[] | undefined {
+  const came = open ?? [];
+  if (came.includes(target)) return came.slice(0, came.indexOf(target) + 1);
+  for (let kept = came.length; kept >= 0; kept -= 1) {
+    const chain = levelChain(document, kept === 0 ? { modalId } : { levelId: came[kept - 1] }, target);
+    if (chain) return [...came.slice(0, kept), ...chain];
+  }
+  return undefined;
+}
+/** The sheet that shows `levelId`: the one named, else the one on top when it reaches the level, else the first that does. Undefined when no sheet reaches it. */
+function sheetOfLevel(document: CompositionDocument, state: NavState, levelId: string, named?: string): string | undefined {
+  const reaches = (modalId: string) => document.modals.some(modal => modal.id === modalId) && stackToLevel(document, undefined, modalId, levelId) !== undefined;
+  if (named !== undefined && reaches(named)) return named;
+  const top = state.sheets.at(-1);
+  if (top && !top.alone && reaches(top.modalId)) return top.modalId;
+  return document.modals.find(modal => reaches(modal.id))?.id;
 }
 
 /** The first page a page opens by a `push` (or `dismiss-then-push`) action, in document order: what a columns page draws beside itself. */
