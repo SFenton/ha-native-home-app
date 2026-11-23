@@ -23,10 +23,15 @@ export function elementAt(root: Element, path: readonly number[]): Element | und
   return at;
 }
 
+/** The offset each element was last given by {@link copyOffset}, so the scroll event it raises is known for an echo, not a person's own scroll. */
+const given = new WeakMap<Element, string>();
+const offsetOf = (element: Element) => `${element.scrollTop},${element.scrollLeft}`;
 /** Gives `to` the scroll offset of `from`, when they differ. */
 const copyOffset = (from: Element, to: Element) => {
-  if (to.scrollTop !== from.scrollTop) to.scrollTop = from.scrollTop;
-  if (to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+  if (to.scrollTop === from.scrollTop && to.scrollLeft === from.scrollLeft) return;
+  to.scrollTop = from.scrollTop;
+  to.scrollLeft = from.scrollLeft;
+  given.set(to, offsetOf(to));
 };
 
 /** Copies every scroll offset of one copy to the other, walking both trees together. Called when the second copy mounts. */
@@ -37,25 +42,36 @@ export function copyScrolls(from: Element, to: Element): void {
 }
 
 /**
- * Keeps two copies of a screen scrolled together while `enabled`: a scroll in either lands in the other, one frame behind at worst.
- * `first` and `second` are the elements that hold each copy's screen. The copy that mounts second takes the first's offsets once.
+ * Keeps two copies of a screen scrolled together: a scroll in either lands in the other, one frame behind at worst. Returns the function that stops it.
+ * A scroll that is only the echo of the other copy's offset being copied in carries nothing new and is dropped: scroll events arrive a frame after the
+ * change, so an echo that outlived a newer change in the first copy would copy the old offset back over it and the two would settle on the stale one.
+ */
+export function mirrorScrolls(a: Element, b: Element): () => void {
+  const onScroll = (event: Event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (given.get(target) === offsetOf(target)) { given.delete(target); return; }
+    given.delete(target);
+    const [from, to] = a.contains(target) ? [a, b] : b.contains(target) ? [b, a] : [undefined, undefined];
+    if (!from || !to) return;
+    const path = pathTo(from, target), other = path && elementAt(to, path);
+    if (other) copyOffset(target, other);
+  };
+  a.addEventListener('scroll', onScroll, true);
+  b.addEventListener('scroll', onScroll, true);
+  return () => { a.removeEventListener('scroll', onScroll, true); b.removeEventListener('scroll', onScroll, true); };
+}
+
+/**
+ * Keeps two copies of a screen scrolled together while `enabled` ({@link mirrorScrolls}). `first` and `second` are the elements that hold each copy's
+ * screen. The copy that mounts second takes the first's offsets once.
  */
 export function useTwinScroll(first: RefObject<Element | null>, second: RefObject<Element | null>, enabled: boolean): void {
   useEffect(() => {
     const a = first.current, b = second.current;
     if (!enabled || !a || !b) return;
     copyScrolls(a, b);
-    const onScroll = (event: Event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const [from, to] = a.contains(target) ? [a, b] : b.contains(target) ? [b, a] : [undefined, undefined];
-      if (!from || !to) return;
-      const path = pathTo(from, target), other = path && elementAt(to, path);
-      if (other) copyOffset(target, other);
-    };
-    a.addEventListener('scroll', onScroll, true);
-    b.addEventListener('scroll', onScroll, true);
-    return () => { a.removeEventListener('scroll', onScroll, true); b.removeEventListener('scroll', onScroll, true); };
+    return mirrorScrolls(a, b);
   }, [first, second, enabled]);
 }
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { copyScrolls, elementAt, pathTo, visibleCopy } from '../src/preview2/twin-scroll';
+import { copyScrolls, elementAt, mirrorScrolls, pathTo, visibleCopy } from '../src/preview2/twin-scroll';
 
 /** Two copies of the same tree, each in a clip, as the partly folded Duo draws them. */
 function copies(markup = '<div class="s"><p>a</p><div class="scroll"><i>1</i><i id="deep">2</i></div></div>') {
@@ -45,6 +45,39 @@ describe('copying scroll offsets', () => {
     const { a, b } = copies();
     b.querySelector('.scroll')!.remove();
     expect(() => copyScrolls(a, b)).not.toThrow();
+  });
+});
+
+describe('mirroring scrolls between the copies', () => {
+  const scrolls = (a: Element, b: Element) => [a.querySelector('.scroll') as HTMLElement, b.querySelector('.scroll') as HTMLElement];
+  const fire = (element: Element) => element.dispatchEvent(new Event('scroll'));
+
+  it('lands a scroll in the other copy', () => {
+    const { a, b } = copies(), [one, two] = scrolls(a, b), stop = mirrorScrolls(a, b);
+    one.scrollTop = 90; fire(one);
+    expect(two.scrollTop).toBe(90);
+    stop();
+    one.scrollTop = 10; fire(one);
+    expect(two.scrollTop).toBe(90);
+  });
+
+  it('drops the echo of a copied offset, so it cannot copy a stale one back over a newer scroll', () => {
+    const { a, b } = copies(), [one, two] = scrolls(a, b), stop = mirrorScrolls(a, b);
+    one.scrollTop = 1900; fire(one);
+    // The first copy moves again before the second's echo is delivered.
+    one.scrollTop = 1100;
+    two.scrollTop = 1900; fire(two);
+    expect(one.scrollTop).toBe(1100);
+    fire(one);
+    expect(two.scrollTop).toBe(1100);
+    stop();
+  });
+
+  it('still copies a person\'s scroll of the second copy', () => {
+    const { a, b } = copies(), [one, two] = scrolls(a, b), stop = mirrorScrolls(a, b);
+    two.scrollTop = 33; fire(two);
+    expect(one.scrollTop).toBe(33);
+    stop();
   });
 });
 
