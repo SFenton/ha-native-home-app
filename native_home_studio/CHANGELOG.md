@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.28
+
+- Stepping through drop slots with the arrow keys now scrolls the preview, a rail or a list only as far as needed to show the slot you are on.
+
 ## 0.3.27
 
 - Publishing a layout with sheet levels now works with an app that does not have them yet.
